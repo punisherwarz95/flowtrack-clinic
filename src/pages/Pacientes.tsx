@@ -299,19 +299,6 @@ const Pacientes = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="tiene_ficha"
-                      checked={formData.tiene_ficha}
-                      onChange={(e) => setFormData({ ...formData, tiene_ficha: e.target.checked })}
-                      className="w-4 h-4"
-                    />
-                    <Label htmlFor="tiene_ficha" className="cursor-pointer">
-                      Tiene ficha en mano
-                    </Label>
-                  </div>
-
                   <Button type="submit" className="w-full">
                     Guardar Paciente
                   </Button>
