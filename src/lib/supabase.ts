@@ -40,11 +40,51 @@ export const importPatientsFromExcel = async (file: File) => {
 export const getPatients = async () => {
   const { data, error } = await supabase
     .from('pacientes')
+    .select('*, empresas(*)')
+    .order('nombre');
+  
+  if (error) throw error;
+  return data;
+};
+
+export const getEmpresas = async () => {
+  const { data, error } = await supabase
+    .from('empresas')
     .select('*')
     .order('nombre');
   
   if (error) throw error;
   return data;
+};
+
+export const importEmpresasFromExcel = async (file: File) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = async (e) => {
+      try {
+        const text = e.target?.result as string;
+        const rows = text.split('\n').map(row => row.split(','));
+        
+        const empresas = rows.slice(1).filter(row => row.length >= 1 && row[0]?.trim()).map(row => ({
+          nombre: row[0]?.trim() || '',
+        }));
+
+        const { data, error } = await supabase
+          .from('empresas')
+          .insert(empresas)
+          .select();
+
+        if (error) throw error;
+        resolve(data);
+      } catch (error) {
+        reject(error);
+      }
+    };
+
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
 };
 
 export const getBoxes = async () => {

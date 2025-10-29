@@ -167,6 +167,24 @@ export type Database = {
         }
         Relationships: []
       }
+      empresas: {
+        Row: {
+          created_at: string | null
+          id: string
+          nombre: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          nombre: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          nombre?: string
+        }
+        Relationships: []
+      }
       examenes: {
         Row: {
           created_at: string | null
@@ -195,31 +213,48 @@ export type Database = {
         Row: {
           created_at: string | null
           email: string | null
+          empresa_id: string | null
           fecha_nacimiento: string | null
           id: string
           nombre: string
           rut: string
           telefono: string | null
+          tiene_ficha: boolean | null
+          tipo_servicio: Database["public"]["Enums"]["tipo_servicio"] | null
         }
         Insert: {
           created_at?: string | null
           email?: string | null
+          empresa_id?: string | null
           fecha_nacimiento?: string | null
           id?: string
           nombre: string
           rut: string
           telefono?: string | null
+          tiene_ficha?: boolean | null
+          tipo_servicio?: Database["public"]["Enums"]["tipo_servicio"] | null
         }
         Update: {
           created_at?: string | null
           email?: string | null
+          empresa_id?: string | null
           fecha_nacimiento?: string | null
           id?: string
           nombre?: string
           rut?: string
           telefono?: string | null
+          tiene_ficha?: boolean | null
+          tipo_servicio?: Database["public"]["Enums"]["tipo_servicio"] | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pacientes_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -231,6 +266,7 @@ export type Database = {
     Enums: {
       estado_atencion: "en_espera" | "en_atencion" | "completado" | "incompleto"
       estado_examen: "pendiente" | "completado" | "incompleto"
+      tipo_servicio: "workmed" | "jenner"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -360,6 +396,7 @@ export const Constants = {
     Enums: {
       estado_atencion: ["en_espera", "en_atencion", "completado", "incompleto"],
       estado_examen: ["pendiente", "completado", "incompleto"],
+      tipo_servicio: ["workmed", "jenner"],
     },
   },
 } as const

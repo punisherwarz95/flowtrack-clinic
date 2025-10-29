@@ -17,34 +17,52 @@ import {
 
 interface Patient {
   id: string;
-  rut: string;
   nombre: string;
-  telefono: string | null;
-  email: string | null;
-  fecha_nacimiento: string | null;
+  tipo_servicio: 'workmed' | 'jenner' | null;
+  empresa_id: string | null;
+  tiene_ficha: boolean;
+  empresas?: {
+    id: string;
+    nombre: string;
+  } | null;
+}
+
+interface Empresa {
+  id: string;
+  nombre: string;
+}
+
+interface Examen {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
 }
 
 const Pacientes = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [empresas, setEmpresas] = useState<Empresa[]>([]);
+  const [examenes, setExamenes] = useState<Examen[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
+  const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
   const [formData, setFormData] = useState({
-    rut: "",
     nombre: "",
-    telefono: "",
-    email: "",
-    fecha_nacimiento: "",
+    tipo_servicio: "workmed" as "workmed" | "jenner",
+    empresa_id: "",
+    tiene_ficha: true,
   });
 
   useEffect(() => {
     loadPatients();
+    loadEmpresas();
+    loadExamenes();
   }, []);
 
   const loadPatients = async () => {
     try {
       const { data, error } = await supabase
         .from("pacientes")
-        .select("*")
+        .select("*, empresas(*)")
         .order("nombre");
 
       if (error) throw error;
@@ -55,23 +73,88 @@ const Pacientes = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const loadEmpresas = async () => {
     try {
-      const { error } = await supabase.from("pacientes").insert([
-        {
-          ...formData,
-          telefono: formData.telefono || null,
-          email: formData.email || null,
-          fecha_nacimiento: formData.fecha_nacimiento || null,
-        },
-      ]);
+      const { data, error } = await supabase
+        .from("empresas")
+        .select("*")
+        .order("nombre");
 
       if (error) throw error;
-      
+      setEmpresas(data || []);
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al cargar empresas");
+    }
+  };
+
+  const loadExamenes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("examenes")
+        .select("*")
+        .order("nombre");
+
+      if (error) throw error;
+      setExamenes(data || []);
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al cargar exámenes");
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.empresa_id) {
+      toast.error("Debe seleccionar una empresa");
+      return;
+    }
+
+    if (selectedExamenes.length === 0) {
+      toast.error("Debe seleccionar al menos un examen");
+      return;
+    }
+
+    try {
+      // Insertar paciente
+      const { data: pacienteData, error: pacienteError } = await supabase
+        .from("pacientes")
+        .insert([formData])
+        .select()
+        .single();
+
+      if (pacienteError) throw pacienteError;
+
+      // Crear atención para el paciente
+      const { data: atencionData, error: atencionError } = await supabase
+        .from("atenciones")
+        .insert([{
+          paciente_id: pacienteData.id,
+          estado: 'en_espera'
+        }])
+        .select()
+        .single();
+
+      if (atencionError) throw atencionError;
+
+      // Agregar exámenes a la atención
+      const examenesData = selectedExamenes.map(examenId => ({
+        atencion_id: atencionData.id,
+        examen_id: examenId,
+        estado: 'pendiente' as 'pendiente' | 'completado' | 'incompleto'
+      }));
+
+      const { error: examenesError } = await supabase
+        .from("atencion_examenes")
+        .insert(examenesData);
+
+      if (examenesError) throw examenesError;
+
       toast.success("Paciente agregado exitosamente");
       setOpenDialog(false);
-      setFormData({ rut: "", nombre: "", telefono: "", email: "", fecha_nacimiento: "" });
+      setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: "", tiene_ficha: true });
+      setSelectedExamenes([]);
       loadPatients();
     } catch (error: any) {
       console.error("Error:", error);
@@ -79,7 +162,7 @@ const Pacientes = () => {
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleEmpresasUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -87,33 +170,29 @@ const Pacientes = () => {
       const text = await file.text();
       const rows = text.split("\n").map((row) => row.split(","));
       
-      const patientsData = rows
+      const empresasData = rows
         .slice(1)
-        .filter((row) => row.length >= 2)
+        .filter((row) => row.length >= 1 && row[0]?.trim())
         .map((row) => ({
-          rut: row[0]?.trim() || "",
-          nombre: row[1]?.trim() || "",
-          telefono: row[2]?.trim() || null,
-          email: row[3]?.trim() || null,
-          fecha_nacimiento: row[4]?.trim() || null,
+          nombre: row[0]?.trim() || "",
         }));
 
-      const { error } = await supabase.from("pacientes").insert(patientsData);
+      const { error } = await supabase.from("empresas").insert(empresasData);
 
       if (error) throw error;
       
-      toast.success(`${patientsData.length} pacientes importados`);
-      loadPatients();
+      toast.success(`${empresasData.length} empresas importadas`);
+      loadEmpresas();
     } catch (error: any) {
       console.error("Error:", error);
-      toast.error(error.message || "Error al importar archivo");
+      toast.error(error.message || "Error al importar empresas");
     }
   };
 
   const filteredPatients = patients.filter(
     (p) =>
       p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.rut.includes(searchTerm)
+      (p.empresas?.nombre || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -141,16 +220,6 @@ const Pacientes = () => {
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
-                    <Label htmlFor="rut">RUT *</Label>
-                    <Input
-                      id="rut"
-                      required
-                      value={formData.rut}
-                      onChange={(e) => setFormData({ ...formData, rut: e.target.value })}
-                      placeholder="12345678-9"
-                    />
-                  </div>
-                  <div>
                     <Label htmlFor="nombre">Nombre Completo *</Label>
                     <Input
                       id="nombre"
@@ -159,34 +228,89 @@ const Pacientes = () => {
                       onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="telefono">Teléfono</Label>
-                    <Input
-                      id="telefono"
-                      value={formData.telefono}
-                      onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
-                    />
+                  
+                  <div className="space-y-2">
+                    <Label>Tipo de Servicio *</Label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="tipo_servicio"
+                          value="workmed"
+                          checked={formData.tipo_servicio === "workmed"}
+                          onChange={(e) => setFormData({ ...formData, tipo_servicio: e.target.value as "workmed" | "jenner" })}
+                          className="w-4 h-4"
+                        />
+                        <span>Workmed</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="tipo_servicio"
+                          value="jenner"
+                          checked={formData.tipo_servicio === "jenner"}
+                          onChange={(e) => setFormData({ ...formData, tipo_servicio: e.target.value as "workmed" | "jenner" })}
+                          className="w-4 h-4"
+                        />
+                        <span>Jenner</span>
+                      </label>
+                    </div>
                   </div>
+
                   <div>
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    />
+                    <Label htmlFor="empresa">Empresa *</Label>
+                    <select
+                      id="empresa"
+                      required
+                      value={formData.empresa_id}
+                      onChange={(e) => setFormData({ ...formData, empresa_id: e.target.value })}
+                      className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                    >
+                      <option value="">Seleccione una empresa</option>
+                      {empresas.map((empresa) => (
+                        <option key={empresa.id} value={empresa.id}>
+                          {empresa.nombre}
+                        </option>
+                      ))}
+                    </select>
                   </div>
+
                   <div>
-                    <Label htmlFor="fecha_nacimiento">Fecha de Nacimiento</Label>
-                    <Input
-                      id="fecha_nacimiento"
-                      type="date"
-                      value={formData.fecha_nacimiento}
-                      onChange={(e) =>
-                        setFormData({ ...formData, fecha_nacimiento: e.target.value })
-                      }
-                    />
+                    <Label>Exámenes a Realizar *</Label>
+                    <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2">
+                      {examenes.map((examen) => (
+                        <label key={examen.id} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedExamenes.includes(examen.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedExamenes([...selectedExamenes, examen.id]);
+                              } else {
+                                setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
+                              }
+                            }}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm">{examen.nombre}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="tiene_ficha"
+                      checked={formData.tiene_ficha}
+                      onChange={(e) => setFormData({ ...formData, tiene_ficha: e.target.checked })}
+                      className="w-4 h-4"
+                    />
+                    <Label htmlFor="tiene_ficha" className="cursor-pointer">
+                      Tiene ficha en mano
+                    </Label>
+                  </div>
+
                   <Button type="submit" className="w-full">
                     Guardar Paciente
                   </Button>
@@ -197,12 +321,12 @@ const Pacientes = () => {
             <Button variant="secondary" className="gap-2" asChild>
               <label>
                 <Upload className="h-4 w-4" />
-                Importar CSV
+                Importar Empresas CSV
                 <input
                   type="file"
                   accept=".csv"
                   className="hidden"
-                  onChange={handleFileUpload}
+                  onChange={handleEmpresasUpload}
                 />
               </label>
             </Button>
@@ -214,7 +338,7 @@ const Pacientes = () => {
             <div className="flex items-center gap-3">
               <Search className="h-5 w-5 text-muted-foreground" />
               <Input
-                placeholder="Buscar por nombre o RUT..."
+                placeholder="Buscar por nombre o empresa..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="max-w-md"
@@ -230,11 +354,17 @@ const Pacientes = () => {
                 >
                   <div>
                     <div className="font-medium text-foreground">{patient.nombre}</div>
-                    <div className="text-sm text-muted-foreground">RUT: {patient.rut}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {patient.empresas?.nombre || "Sin empresa"}
+                    </div>
                   </div>
-                  <div className="text-right text-sm text-muted-foreground">
-                    {patient.telefono && <div>Tel: {patient.telefono}</div>}
-                    {patient.email && <div>{patient.email}</div>}
+                  <div className="text-right text-sm">
+                    <div className={`font-medium ${patient.tipo_servicio === 'workmed' ? 'text-blue-600' : 'text-green-600'}`}>
+                      {patient.tipo_servicio === 'workmed' ? 'Workmed' : 'Jenner'}
+                    </div>
+                    <div className={`text-xs ${patient.tiene_ficha ? 'text-green-600' : 'text-orange-600'}`}>
+                      {patient.tiene_ficha ? '📋 Tiene ficha' : '⏳ Ficha entregada'}
+                    </div>
                   </div>
                 </div>
               ))}

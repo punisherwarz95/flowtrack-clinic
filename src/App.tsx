@@ -8,6 +8,7 @@ import Flujo from "./pages/Flujo";
 import Pacientes from "./pages/Pacientes";
 import Boxes from "./pages/Boxes";
 import Examenes from "./pages/Examenes";
+import BoxView from "./pages/BoxView";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,6 +24,7 @@ const App = () => (
           <Route path="/flujo" element={<Flujo />} />
           <Route path="/pacientes" element={<Pacientes />} />
           <Route path="/boxes" element={<Boxes />} />
+          <Route path="/boxes/:boxId" element={<BoxView />} />
           <Route path="/examenes" element={<Examenes />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
