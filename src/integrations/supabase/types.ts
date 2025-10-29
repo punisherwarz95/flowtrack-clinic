@@ -217,7 +217,7 @@ export type Database = {
           fecha_nacimiento: string | null
           id: string
           nombre: string
-          rut: string
+          rut: string | null
           telefono: string | null
           tiene_ficha: boolean | null
           tipo_servicio: Database["public"]["Enums"]["tipo_servicio"] | null
@@ -229,7 +229,7 @@ export type Database = {
           fecha_nacimiento?: string | null
           id?: string
           nombre: string
-          rut: string
+          rut?: string | null
           telefono?: string | null
           tiene_ficha?: boolean | null
           tipo_servicio?: Database["public"]["Enums"]["tipo_servicio"] | null
@@ -241,7 +241,7 @@ export type Database = {
           fecha_nacimiento?: string | null
           id?: string
           nombre?: string
-          rut?: string
+          rut?: string | null
           telefono?: string | null
           tiene_ficha?: boolean | null
           tipo_servicio?: Database["public"]["Enums"]["tipo_servicio"] | null

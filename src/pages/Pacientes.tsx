@@ -50,6 +50,7 @@ const Pacientes = () => {
     tipo_servicio: "workmed" as "workmed" | "jenner",
     empresa_id: "",
     tiene_ficha: true,
+    rut: "", // Temporary until types are regenerated
   });
 
   useEffect(() => {
@@ -153,7 +154,7 @@ const Pacientes = () => {
 
       toast.success("Paciente agregado exitosamente");
       setOpenDialog(false);
-      setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: "", tiene_ficha: true });
+      setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: "", tiene_ficha: true, rut: "" });
       setSelectedExamenes([]);
       loadPatients();
     } catch (error: any) {
