@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
@@ -14,6 +14,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Patient {
   id: string;
@@ -54,6 +64,7 @@ const Pacientes = () => {
   const [paquetes, setPaquetes] = useState<Paquete[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
+  const [pacienteToDelete, setPacienteToDelete] = useState<string | null>(null);
   const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
   const [selectedPaquete, setSelectedPaquete] = useState<string>("");
   const [formData, setFormData] = useState({
@@ -188,6 +199,26 @@ const Pacientes = () => {
     } catch (error: any) {
       console.error("Error:", error);
       toast.error(error.message || "Error al agregar paciente");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!pacienteToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from("pacientes")
+        .delete()
+        .eq("id", pacienteToDelete);
+
+      if (error) throw error;
+      
+      toast.success("Paciente eliminado exitosamente");
+      setPacienteToDelete(null);
+      loadPatients();
+    } catch (error: any) {
+      console.error("Error:", error);
+      toast.error(error.message || "Error al eliminar paciente");
     }
   };
 
@@ -364,19 +395,43 @@ const Pacientes = () => {
                       {patient.empresas?.nombre || "Sin empresa"}
                     </div>
                   </div>
-                  <div className="text-right text-sm">
-                    <div className={`font-medium ${patient.tipo_servicio === 'workmed' ? 'text-blue-600' : 'text-green-600'}`}>
-                      {patient.tipo_servicio === 'workmed' ? 'Workmed' : 'Jenner'}
+                  <div className="flex items-center gap-3">
+                    <div className="text-right text-sm">
+                      <div className={`font-medium ${patient.tipo_servicio === 'workmed' ? 'text-blue-600' : 'text-green-600'}`}>
+                        {patient.tipo_servicio === 'workmed' ? 'Workmed' : 'Jenner'}
+                      </div>
+                      <div className={`text-xs ${patient.tiene_ficha ? 'text-green-600' : 'text-orange-600'}`}>
+                        {patient.tiene_ficha ? '📋 Tiene ficha' : '⏳ Ficha entregada'}
+                      </div>
                     </div>
-                    <div className={`text-xs ${patient.tiene_ficha ? 'text-green-600' : 'text-orange-600'}`}>
-                      {patient.tiene_ficha ? '📋 Tiene ficha' : '⏳ Ficha entregada'}
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setPacienteToDelete(patient.id)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
                   </div>
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
+
+        <AlertDialog open={!!pacienteToDelete} onOpenChange={() => setPacienteToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción no se puede deshacer. Se eliminará permanentemente el paciente y todas sus atenciones.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete}>Eliminar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </div>
   );

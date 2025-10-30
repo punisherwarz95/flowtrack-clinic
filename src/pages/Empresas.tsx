@@ -3,11 +3,21 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Upload, Building2 } from "lucide-react";
+import { Plus, Upload, Building2, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Empresa {
   id: string;
@@ -18,6 +28,7 @@ interface Empresa {
 const Empresas = () => {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
+  const [empresaToDelete, setEmpresaToDelete] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     nombre: "",
   });
@@ -89,6 +100,26 @@ const Empresas = () => {
     }
   };
 
+  const handleDelete = async () => {
+    if (!empresaToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from("empresas")
+        .delete()
+        .eq("id", empresaToDelete);
+
+      if (error) throw error;
+      
+      toast.success("Empresa eliminada exitosamente");
+      setEmpresaToDelete(null);
+      loadEmpresas();
+    } catch (error: any) {
+      console.error("Error:", error);
+      toast.error(error.message || "Error al eliminar empresa");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
@@ -149,10 +180,19 @@ const Empresas = () => {
           {empresas.map((empresa) => (
             <Card key={empresa.id}>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-primary" />
-                  {empresa.nombre}
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-primary" />
+                    {empresa.nombre}
+                  </CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setEmpresaToDelete(empresa.id)}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
@@ -162,6 +202,21 @@ const Empresas = () => {
             </Card>
           ))}
         </div>
+
+        <AlertDialog open={!!empresaToDelete} onOpenChange={() => setEmpresaToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción no se puede deshacer. Se eliminará permanentemente la empresa.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete}>Eliminar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </div>
   );

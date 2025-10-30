@@ -4,12 +4,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, ClipboardList, Package } from "lucide-react";
+import { Plus, ClipboardList, Package, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Examen {
   id: string;
@@ -41,6 +51,8 @@ const Examenes = () => {
   const [paquetes, setPaquetes] = useState<Paquete[]>([]);
   const [openExamenDialog, setOpenExamenDialog] = useState(false);
   const [openPaqueteDialog, setOpenPaqueteDialog] = useState(false);
+  const [examenToDelete, setExamenToDelete] = useState<string | null>(null);
+  const [paqueteToDelete, setPaqueteToDelete] = useState<string | null>(null);
   const [selectedBoxes, setSelectedBoxes] = useState<string[]>([]);
   const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
   const [formData, setFormData] = useState({
@@ -193,6 +205,46 @@ const Examenes = () => {
     } catch (error: any) {
       console.error("Error:", error);
       toast.error(error.message || "Error al crear paquete");
+    }
+  };
+
+  const handleDeleteExamen = async () => {
+    if (!examenToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from("examenes")
+        .delete()
+        .eq("id", examenToDelete);
+
+      if (error) throw error;
+      
+      toast.success("Examen eliminado exitosamente");
+      setExamenToDelete(null);
+      loadExamenes();
+    } catch (error: any) {
+      console.error("Error:", error);
+      toast.error(error.message || "Error al eliminar examen");
+    }
+  };
+
+  const handleDeletePaquete = async () => {
+    if (!paqueteToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from("paquetes_examenes")
+        .delete()
+        .eq("id", paqueteToDelete);
+
+      if (error) throw error;
+      
+      toast.success("Paquete eliminado exitosamente");
+      setPaqueteToDelete(null);
+      loadPaquetes();
+    } catch (error: any) {
+      console.error("Error:", error);
+      toast.error(error.message || "Error al eliminar paquete");
     }
   };
 
@@ -351,10 +403,19 @@ const Examenes = () => {
               {examenes.map((examen) => (
                 <Card key={examen.id}>
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <ClipboardList className="h-5 w-5 text-primary" />
-                      {examen.nombre}
-                    </CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <ClipboardList className="h-5 w-5 text-primary" />
+                        {examen.nombre}
+                      </CardTitle>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setExamenToDelete(examen.id)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     {examen.descripcion && (
@@ -377,10 +438,19 @@ const Examenes = () => {
               {paquetes.map((paquete) => (
                 <Card key={paquete.id}>
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Package className="h-5 w-5 text-primary" />
-                      {paquete.nombre}
-                    </CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <Package className="h-5 w-5 text-primary" />
+                        {paquete.nombre}
+                      </CardTitle>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setPaqueteToDelete(paquete.id)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     {paquete.descripcion && (
@@ -402,6 +472,36 @@ const Examenes = () => {
             </div>
           </TabsContent>
         </Tabs>
+
+        <AlertDialog open={!!examenToDelete} onOpenChange={() => setExamenToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción no se puede deshacer. Se eliminará permanentemente el examen.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteExamen}>Eliminar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={!!paqueteToDelete} onOpenChange={() => setPaqueteToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción no se puede deshacer. Se eliminará permanentemente el paquete.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeletePaquete}>Eliminar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </div>
   );

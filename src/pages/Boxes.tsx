@@ -4,12 +4,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Box {
   id: string;
@@ -21,6 +31,7 @@ interface Box {
 const Boxes = () => {
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
+  const [boxToDelete, setBoxToDelete] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     nombre: "",
     descripcion: "",
@@ -84,6 +95,26 @@ const Boxes = () => {
     }
   };
 
+  const handleDelete = async () => {
+    if (!boxToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from("boxes")
+        .delete()
+        .eq("id", boxToDelete);
+
+      if (error) throw error;
+      
+      toast.success("Box eliminado exitosamente");
+      setBoxToDelete(null);
+      loadBoxes();
+    } catch (error: any) {
+      console.error("Error:", error);
+      toast.error(error.message || "Error al eliminar box");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
@@ -138,13 +169,24 @@ const Boxes = () => {
           {boxes.map((box) => (
             <Card key={box.id} className={box.activo ? "" : "opacity-60"}>
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>{box.nombre}</span>
-                  <Switch
-                    checked={box.activo}
-                    onCheckedChange={() => handleToggleActive(box.id, box.activo)}
-                  />
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <span>{box.nombre}</span>
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={box.activo}
+                      onCheckedChange={() => handleToggleActive(box.id, box.activo)}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setBoxToDelete(box.id)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 {box.descripcion && (
@@ -159,6 +201,21 @@ const Boxes = () => {
             </Card>
           ))}
         </div>
+
+        <AlertDialog open={!!boxToDelete} onOpenChange={() => setBoxToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción no se puede deshacer. Se eliminará permanentemente el box.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete}>Eliminar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </div>
   );
