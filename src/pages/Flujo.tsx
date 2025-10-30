@@ -228,6 +228,9 @@ const Flujo = () => {
         delete newState[atencionId];
         return newState;
       });
+      
+      // Forzar recarga inmediata de datos
+      await loadData();
     } catch (error: any) {
       console.error("Error:", error);
       toast.error(error.message || "Error al iniciar atención");
