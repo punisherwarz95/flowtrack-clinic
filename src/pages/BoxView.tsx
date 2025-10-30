@@ -256,7 +256,7 @@ const BoxView = () => {
                 <CardContent>
                   <div className="space-y-3">
                     {atencion.atencion_examenes
-                      .filter(ae => box.box_examenes.some(be => be.examen_id === ae.examen_id))
+                      .filter(ae => box.box_examenes.some(be => be.examen_id === ae.examen_id) && ae.estado === 'pendiente')
                       .map((ae) => (
                         <div
                           key={ae.id}
