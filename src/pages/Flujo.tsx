@@ -8,6 +8,9 @@ import Navigation from "@/components/Navigation";
 import PatientCombobox from "@/components/PatientCombobox";
 import { Clock, UserPlus, Play, CheckCircle, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 interface Atencion {
   id: string;
@@ -30,12 +33,21 @@ interface Box {
   }>;
 }
 
+interface Examen {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+}
+
 const Flujo = () => {
   const [atenciones, setAtenciones] = useState<Atencion[]>([]);
   const [boxes, setBoxes] = useState<Box[]>([]);
+  const [examenes, setExamenes] = useState<Examen[]>([]);
   const [selectedPatient, setSelectedPatient] = useState("");
   const [selectedBox, setSelectedBox] = useState<{[atencionId: string]: string}>({});
   const [availableBoxes, setAvailableBoxes] = useState<{[atencionId: string]: Box[]}>({});
+  const [showExamenesDialog, setShowExamenesDialog] = useState(false);
+  const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
 
   useEffect(() => {
     loadData();
@@ -57,7 +69,7 @@ const Flujo = () => {
 
   const loadData = async () => {
     try {
-      const [atencionesRes, boxesRes] = await Promise.all([
+      const [atencionesRes, boxesRes, examenesRes] = await Promise.all([
         supabase
           .from("atenciones")
           .select("*, pacientes(id, nombre, rut, tiene_ficha), boxes(*)")
@@ -67,13 +79,19 @@ const Flujo = () => {
           .from("boxes")
           .select("*, box_examenes(examen_id)")
           .eq("activo", true),
+        supabase
+          .from("examenes")
+          .select("*")
+          .order("nombre", { ascending: true }),
       ]);
 
       if (atencionesRes.error) throw atencionesRes.error;
       if (boxesRes.error) throw boxesRes.error;
+      if (examenesRes.error) throw examenesRes.error;
 
       setAtenciones(atencionesRes.data || []);
       setBoxes(boxesRes.data || []);
+      setExamenes(examenesRes.data || []);
 
       // Cargar boxes disponibles para cada atención
       await loadAvailableBoxesForAtenciones(atencionesRes.data || []);
@@ -116,24 +134,52 @@ const Flujo = () => {
     setAvailableBoxes(newAvailableBoxes);
   };
 
-  const handleIngresoClick = async () => {
+  const handleIngresoClick = () => {
     if (!selectedPatient) {
       toast.error("Selecciona un paciente");
       return;
     }
+    setShowExamenesDialog(true);
+  };
+
+  const handleConfirmIngreso = async () => {
+    if (selectedExamenes.length === 0) {
+      toast.error("Selecciona al menos un examen");
+      return;
+    }
 
     try {
-      const { error } = await supabase.from("atenciones").insert([
-        {
-          paciente_id: selectedPatient,
-          estado: "en_espera",
-        },
-      ]);
+      // Crear la atención
+      const { data: atencionData, error: atencionError } = await supabase
+        .from("atenciones")
+        .insert([
+          {
+            paciente_id: selectedPatient,
+            estado: "en_espera",
+          },
+        ])
+        .select()
+        .single();
 
-      if (error) throw error;
-      
+      if (atencionError) throw atencionError;
+
+      // Crear los registros de atencion_examenes
+      const atencionExamenes = selectedExamenes.map((examenId) => ({
+        atencion_id: atencionData.id,
+        examen_id: examenId,
+        estado: "pendiente" as const,
+      }));
+
+      const { error: examenesError } = await supabase
+        .from("atencion_examenes")
+        .insert(atencionExamenes);
+
+      if (examenesError) throw examenesError;
+
       toast.success("Paciente ingresado a la lista de espera");
       setSelectedPatient("");
+      setSelectedExamenes([]);
+      setShowExamenesDialog(false);
     } catch (error: any) {
       console.error("Error:", error);
       toast.error(error.message || "Error al ingresar paciente");
@@ -249,6 +295,56 @@ const Flujo = () => {
             </div>
           </CardContent>
         </Card>
+
+        <Dialog open={showExamenesDialog} onOpenChange={setShowExamenesDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Seleccionar Exámenes</DialogTitle>
+              <DialogDescription>
+                Selecciona los exámenes que el paciente debe realizar
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 max-h-[400px] overflow-y-auto">
+              {examenes.map((examen) => (
+                <div key={examen.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={examen.id}
+                    checked={selectedExamenes.includes(examen.id)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedExamenes([...selectedExamenes, examen.id]);
+                      } else {
+                        setSelectedExamenes(
+                          selectedExamenes.filter((id) => id !== examen.id)
+                        );
+                      }
+                    }}
+                  />
+                  <Label htmlFor={examen.id} className="cursor-pointer">
+                    <div className="font-medium">{examen.nombre}</div>
+                    {examen.descripcion && (
+                      <div className="text-sm text-muted-foreground">
+                        {examen.descripcion}
+                      </div>
+                    )}
+                  </Label>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowExamenesDialog(false);
+                  setSelectedExamenes([]);
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button onClick={handleConfirmIngreso}>Confirmar</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <div className="grid md:grid-cols-2 gap-6">
           <Card>
