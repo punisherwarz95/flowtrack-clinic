@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
@@ -64,6 +64,7 @@ const Pacientes = () => {
   const [paquetes, setPaquetes] = useState<Paquete[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
+  const [editingPatient, setEditingPatient] = useState<string | null>(null);
   const [pacienteToDelete, setPacienteToDelete] = useState<string | null>(null);
   const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
   const [selectedPaquete, setSelectedPaquete] = useState<string>("");
@@ -142,6 +143,46 @@ const Pacientes = () => {
     }
   };
 
+  const handleEdit = async (patient: Patient) => {
+    setEditingPatient(patient.id);
+    setFormData({
+      nombre: patient.nombre,
+      tipo_servicio: patient.tipo_servicio || "workmed",
+      empresa_id: patient.empresa_id || "",
+      tiene_ficha: patient.tiene_ficha,
+      rut: "",
+    });
+
+    // Cargar exámenes pendientes de la última atención
+    try {
+      const { data: atencionData, error: atencionError } = await supabase
+        .from("atenciones")
+        .select("id")
+        .eq("paciente_id", patient.id)
+        .in("estado", ["en_espera", "en_atencion"])
+        .single();
+
+      if (atencionError) throw atencionError;
+
+      if (atencionData) {
+        const { data: examenesData, error: examenesError } = await supabase
+          .from("atencion_examenes")
+          .select("examen_id")
+          .eq("atencion_id", atencionData.id)
+          .eq("estado", "pendiente");
+
+        if (examenesError) throw examenesError;
+
+        setSelectedExamenes(examenesData?.map(e => e.examen_id) || []);
+      }
+    } catch (error) {
+      console.error("Error loading exams:", error);
+      setSelectedExamenes([]);
+    }
+
+    setOpenDialog(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -156,49 +197,94 @@ const Pacientes = () => {
     }
 
     try {
-      // Insertar paciente
-      const { data: pacienteData, error: pacienteError } = await supabase
-        .from("pacientes")
-        .insert([formData])
-        .select()
-        .single();
+      if (editingPatient) {
+        // Actualizar paciente
+        const { error: pacienteError } = await supabase
+          .from("pacientes")
+          .update(formData)
+          .eq("id", editingPatient);
 
-      if (pacienteError) throw pacienteError;
+        if (pacienteError) throw pacienteError;
 
-      // Crear atención para el paciente
-      const { data: atencionData, error: atencionError } = await supabase
-        .from("atenciones")
-        .insert([{
-          paciente_id: pacienteData.id,
-          estado: 'en_espera'
-        }])
-        .select()
-        .single();
+        // Actualizar exámenes de la atención pendiente
+        const { data: atencionData, error: atencionError } = await supabase
+          .from("atenciones")
+          .select("id")
+          .eq("paciente_id", editingPatient)
+          .in("estado", ["en_espera", "en_atencion"])
+          .single();
 
-      if (atencionError) throw atencionError;
+        if (atencionError) throw atencionError;
 
-      // Agregar exámenes a la atención
-      const examenesData = selectedExamenes.map(examenId => ({
-        atencion_id: atencionData.id,
-        examen_id: examenId,
-        estado: 'pendiente' as 'pendiente' | 'completado' | 'incompleto'
-      }));
+        if (atencionData) {
+          // Eliminar exámenes anteriores
+          await supabase
+            .from("atencion_examenes")
+            .delete()
+            .eq("atencion_id", atencionData.id);
 
-      const { error: examenesError } = await supabase
-        .from("atencion_examenes")
-        .insert(examenesData);
+          // Agregar nuevos exámenes
+          const examenesData = selectedExamenes.map(examenId => ({
+            atencion_id: atencionData.id,
+            examen_id: examenId,
+            estado: 'pendiente' as 'pendiente' | 'completado' | 'incompleto'
+          }));
 
-      if (examenesError) throw examenesError;
+          const { error: examenesError } = await supabase
+            .from("atencion_examenes")
+            .insert(examenesData);
 
-      toast.success("Paciente agregado exitosamente");
+          if (examenesError) throw examenesError;
+        }
+
+        toast.success("Paciente actualizado exitosamente");
+      } else {
+        // Insertar paciente
+        const { data: pacienteData, error: pacienteError } = await supabase
+          .from("pacientes")
+          .insert([formData])
+          .select()
+          .single();
+
+        if (pacienteError) throw pacienteError;
+
+        // Crear atención para el paciente
+        const { data: atencionData, error: atencionError } = await supabase
+          .from("atenciones")
+          .insert([{
+            paciente_id: pacienteData.id,
+            estado: 'en_espera'
+          }])
+          .select()
+          .single();
+
+        if (atencionError) throw atencionError;
+
+        // Agregar exámenes a la atención
+        const examenesData = selectedExamenes.map(examenId => ({
+          atencion_id: atencionData.id,
+          examen_id: examenId,
+          estado: 'pendiente' as 'pendiente' | 'completado' | 'incompleto'
+        }));
+
+        const { error: examenesError } = await supabase
+          .from("atencion_examenes")
+          .insert(examenesData);
+
+        if (examenesError) throw examenesError;
+
+        toast.success("Paciente agregado exitosamente");
+      }
+
       setOpenDialog(false);
+      setEditingPatient(null);
       setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: "", tiene_ficha: false, rut: "" });
       setSelectedExamenes([]);
       setSelectedPaquete("");
       loadPatients();
     } catch (error: any) {
       console.error("Error:", error);
-      toast.error(error.message || "Error al agregar paciente");
+      toast.error(error.message || "Error al procesar paciente");
     }
   };
 
@@ -240,7 +326,15 @@ const Pacientes = () => {
           </div>
           
           <div className="flex gap-3">
-            <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+            <Dialog open={openDialog} onOpenChange={(open) => {
+              setOpenDialog(open);
+              if (!open) {
+                setEditingPatient(null);
+                setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: "", tiene_ficha: false, rut: "" });
+                setSelectedExamenes([]);
+                setSelectedPaquete("");
+              }
+            }}>
               <DialogTrigger asChild>
                 <Button className="gap-2">
                   <Plus className="h-4 w-4" />
@@ -249,7 +343,7 @@ const Pacientes = () => {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Agregar Nuevo Paciente</DialogTitle>
+                  <DialogTitle>{editingPatient ? "Editar Paciente" : "Agregar Nuevo Paciente"}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
@@ -362,7 +456,7 @@ const Pacientes = () => {
                   </div>
 
                   <Button type="submit" className="w-full">
-                    Guardar Paciente
+                    {editingPatient ? "Actualizar Paciente" : "Guardar Paciente"}
                   </Button>
                 </form>
               </DialogContent>
@@ -401,9 +495,16 @@ const Pacientes = () => {
                         {patient.tipo_servicio === 'workmed' ? 'Workmed' : 'Jenner'}
                       </div>
                       <div className={`text-xs ${patient.tiene_ficha ? 'text-green-600' : 'text-orange-600'}`}>
-                        {patient.tiene_ficha ? '📋 Tiene ficha' : '⏳ Ficha entregada'}
+                        {patient.tiene_ficha ? '📋 Con ficha' : '⏳ Sin ficha'}
                       </div>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEdit(patient)}
+                    >
+                      <Pencil className="h-4 w-4 text-primary" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"
