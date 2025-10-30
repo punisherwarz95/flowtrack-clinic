@@ -7,6 +7,9 @@ import { Plus, Search, Trash2, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +37,10 @@ interface Patient {
   empresas?: {
     id: string;
     nombre: string;
+  } | null;
+  atencion_actual?: {
+    numero_ingreso: number;
+    fecha_ingreso: string;
   } | null;
 }
 
@@ -85,13 +92,40 @@ const Pacientes = () => {
 
   const loadPatients = async () => {
     try {
-      const { data, error } = await supabase
+      const today = new Date();
+      const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
+      const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+
+      const { data: patientsData, error: patientsError } = await supabase
         .from("pacientes")
         .select("*, empresas(*)")
         .order("nombre");
 
-      if (error) throw error;
-      setPatients(data || []);
+      if (patientsError) throw patientsError;
+
+      // Obtener atenciones del día actual para cada paciente
+      const { data: atencionesData, error: atencionesError } = await supabase
+        .from("atenciones")
+        .select("paciente_id, numero_ingreso, fecha_ingreso")
+        .gte("fecha_ingreso", startOfDay)
+        .lte("fecha_ingreso", endOfDay)
+        .in("estado", ["en_espera", "en_atencion"]);
+
+      if (atencionesError) throw atencionesError;
+
+      // Mapear atenciones a pacientes
+      const patientsWithAtenciones = (patientsData || []).map(patient => {
+        const atencion = atencionesData?.find(a => a.paciente_id === patient.id);
+        return {
+          ...patient,
+          atencion_actual: atencion ? {
+            numero_ingreso: atencion.numero_ingreso,
+            fecha_ingreso: atencion.fecha_ingreso
+          } : null
+        };
+      });
+
+      setPatients(patientsWithAtenciones);
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al cargar pacientes");
@@ -308,11 +342,25 @@ const Pacientes = () => {
     }
   };
 
-  const filteredPatients = patients.filter(
-    (p) =>
-      p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.empresas?.nombre || "").toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredPatients = patients
+    .filter(
+      (p) =>
+        p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.empresas?.nombre || "").toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      // Primero ordenar por si tiene atención actual
+      if (a.atencion_actual && !b.atencion_actual) return -1;
+      if (!a.atencion_actual && b.atencion_actual) return 1;
+      
+      // Si ambos tienen atención actual, ordenar por número de ingreso
+      if (a.atencion_actual && b.atencion_actual) {
+        return a.atencion_actual.numero_ingreso - b.atencion_actual.numero_ingreso;
+      }
+      
+      // Si ninguno tiene atención, ordenar por nombre
+      return a.nombre.localeCompare(b.nombre);
+    });
 
   return (
     <div className="min-h-screen bg-background">
@@ -482,13 +530,23 @@ const Pacientes = () => {
                 <div
                   key={patient.id}
                   className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-accent transition-colors"
-                >
-                  <div>
-                    <div className="font-medium text-foreground">{patient.nombre}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {patient.empresas?.nombre || "Sin empresa"}
-                    </div>
-                  </div>
+                 >
+                   <div>
+                     <div className="flex items-center gap-2">
+                       {patient.atencion_actual && (
+                         <Badge variant="outline" className="font-bold">#{patient.atencion_actual.numero_ingreso}</Badge>
+                       )}
+                       <div className="font-medium text-foreground">{patient.nombre}</div>
+                     </div>
+                     <div className="text-sm text-muted-foreground">
+                       {patient.empresas?.nombre || "Sin empresa"}
+                     </div>
+                     {patient.atencion_actual && (
+                       <div className="text-xs text-muted-foreground mt-1">
+                         Ingresó hoy: {format(new Date(patient.atencion_actual.fecha_ingreso), "HH:mm", { locale: es })}
+                       </div>
+                     )}
+                   </div>
                   <div className="flex items-center gap-3">
                     <div className="text-right text-sm">
                       <div className={`font-medium ${patient.tipo_servicio === 'workmed' ? 'text-blue-600' : 'text-green-600'}`}>

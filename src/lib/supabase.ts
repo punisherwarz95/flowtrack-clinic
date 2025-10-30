@@ -117,7 +117,7 @@ export const getAtenciones = async () => {
       boxes(*),
       atencion_examenes(*, examenes(*))
     `)
-    .order('fecha_ingreso', { ascending: false });
+    .order('numero_ingreso', { ascending: true });
   
   if (error) throw error;
   return data;

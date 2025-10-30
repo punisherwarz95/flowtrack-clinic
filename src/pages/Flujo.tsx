@@ -20,6 +20,7 @@ interface Atencion {
   id: string;
   estado: string;
   fecha_ingreso: string;
+  numero_ingreso: number;
   pacientes: { 
     id: string;
     nombre: string; 
@@ -444,8 +445,11 @@ const Flujo = () => {
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
-                        <div className="font-medium text-foreground">
-                          {atencion.pacientes.nombre}
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="font-bold">#{atencion.numero_ingreso}</Badge>
+                          <div className="font-medium text-foreground">
+                            {atencion.pacientes.nombre}
+                          </div>
                         </div>
                         <div className="text-sm text-muted-foreground">
                           RUT: {atencion.pacientes.rut}
@@ -525,8 +529,11 @@ const Flujo = () => {
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <div className="font-medium text-foreground">
-                        {atencion.pacientes.nombre}
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="font-bold">#{atencion.numero_ingreso}</Badge>
+                        <div className="font-medium text-foreground">
+                          {atencion.pacientes.nombre}
+                        </div>
                       </div>
                       <div className="text-sm text-muted-foreground">
                         RUT: {atencion.pacientes.rut}
