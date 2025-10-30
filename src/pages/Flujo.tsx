@@ -92,14 +92,14 @@ const Flujo = () => {
       setBoxes(boxesRes.data || []);
       setExamenes(examenesRes.data || []);
 
-      await loadAvailableBoxesForAtenciones(atencionesRes.data || []);
+      await loadAvailableBoxesForAtenciones(atencionesRes.data || [], boxesRes.data || []);
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al cargar datos");
     }
   };
 
-  const loadAvailableBoxesForAtenciones = async (atenciones: Atencion[]) => {
+  const loadAvailableBoxesForAtenciones = async (atenciones: Atencion[], boxesList: Box[]) => {
     const newAvailableBoxes: {[atencionId: string]: Box[]} = {};
 
     for (const atencion of atenciones) {
@@ -115,7 +115,7 @@ const Flujo = () => {
 
           const examenesIds = atencionExamenes?.map(ae => ae.examen_id) || [];
 
-          const boxesDisponibles = boxes.filter(box => 
+          const boxesDisponibles = boxesList.filter(box => 
             box.box_examenes.some(be => examenesIds.includes(be.examen_id))
           );
 
