@@ -66,6 +66,16 @@ const Flujo = () => {
         { event: "*", schema: "public", table: "atenciones" },
         () => loadData()
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "atencion_examenes" },
+        () => loadData()
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "pacientes" },
+        () => loadData()
+      )
       .subscribe();
 
     return () => {
