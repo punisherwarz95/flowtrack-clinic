@@ -289,6 +289,9 @@ const Flujo = () => {
         if (error) throw error;
         toast.success(estado === "completado" ? "Atención completada" : "Atención marcada como incompleta");
       }
+
+      // Refrescar datos inmediatamente para reflejar cambios
+      await loadData();
     } catch (error: any) {
       console.error("Error:", error);
       toast.error(error.message || "Error al actualizar atención");
