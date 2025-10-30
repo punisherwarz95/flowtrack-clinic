@@ -50,7 +50,6 @@ const Flujo = () => {
   const [examenes, setExamenes] = useState<Examen[]>([]);
   const [selectedPatient, setSelectedPatient] = useState("");
   const [selectedBox, setSelectedBox] = useState<{[atencionId: string]: string}>({});
-  const [availableBoxes, setAvailableBoxes] = useState<{[atencionId: string]: Box[]}>({});
   const [showExamenesDialog, setShowExamenesDialog] = useState(false);
   const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
@@ -118,43 +117,11 @@ const Flujo = () => {
       setBoxes(boxesRes.data || []);
       setExamenes(examenesRes.data || []);
 
-      await loadAvailableBoxesForAtenciones(atencionesRes.data || [], boxesRes.data || []);
       await loadPendingBoxesForAtenciones(atencionesRes.data || [], boxesRes.data || []);
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al cargar datos");
     }
-  };
-
-  const loadAvailableBoxesForAtenciones = async (atenciones: Atencion[], boxesList: Box[]) => {
-    const newAvailableBoxes: {[atencionId: string]: Box[]} = {};
-
-    for (const atencion of atenciones) {
-      if (atencion.estado === "en_espera") {
-        try {
-          const { data: atencionExamenes, error } = await supabase
-            .from("atencion_examenes")
-            .select("examen_id")
-            .eq("atencion_id", atencion.id)
-            .eq("estado", "pendiente");
-
-          if (error) throw error;
-
-          const examenesIds = atencionExamenes?.map(ae => ae.examen_id) || [];
-
-          const boxesDisponibles = boxesList.filter(box => 
-            box.box_examenes.some(be => examenesIds.includes(be.examen_id))
-          );
-
-          newAvailableBoxes[atencion.id] = boxesDisponibles;
-        } catch (error) {
-          console.error("Error loading available boxes:", error);
-          newAvailableBoxes[atencion.id] = [];
-        }
-      }
-    }
-
-    setAvailableBoxes(newAvailableBoxes);
   };
 
   const loadPendingBoxesForAtenciones = async (atenciones: Atencion[], boxesList: Box[]) => {
@@ -255,7 +222,7 @@ const Flujo = () => {
 
       if (error) throw error;
       
-      toast.success("Atención iniciada");
+      toast.success("Atención iniciada - El paciente puede pasar al box");
       setSelectedBox(prev => {
         const newState = {...prev};
         delete newState[atencionId];
@@ -446,9 +413,7 @@ const Flujo = () => {
               <CardTitle className="text-warning">En Espera ({enEspera.length})</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {enEspera.map((atencion) => {
-                const boxesDisponibles = availableBoxes[atencion.id] || [];
-                return (
+              {enEspera.map((atencion) => (
                   <div
                     key={atencion.id}
                     className="p-4 rounded-lg border border-border bg-card hover:shadow-md transition-shadow"
@@ -478,47 +443,39 @@ const Flujo = () => {
                           className="mt-2"
                           onClick={() => toggleFicha(atencion.pacientes.id, atencion.pacientes.tiene_ficha)}
                         >
-                          {atencion.pacientes.tiene_ficha ? "📋 Tiene ficha" : "⏳ Sin ficha"}
+                          {atencion.pacientes.tiene_ficha ? "✅ Ficha entregada" : "⏳ Ficha pendiente"}
                         </Button>
                       </div>
                       {getEstadoBadge(atencion.estado)}
                     </div>
                     
-                    {boxesDisponibles.length > 0 ? (
-                      <div className="flex gap-2">
-                        <Select 
-                          value={selectedBox[atencion.id] || ""} 
-                          onValueChange={(value) => setSelectedBox(prev => ({...prev, [atencion.id]: value}))}
-                        >
-                          <SelectTrigger className="flex-1">
-                            <SelectValue placeholder="Seleccionar box" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {boxesDisponibles.map((box) => (
-                              <SelectItem key={box.id} value={box.id}>
-                                {box.nombre}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          size="sm"
-                          onClick={() => handleIniciarAtencion(atencion.id)}
-                          className="gap-2"
-                        >
-                          <Play className="h-4 w-4" />
-                          Iniciar
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="text-sm text-muted-foreground italic">
-                        No hay boxes disponibles con exámenes pendientes
-                      </div>
-                    )}
+                    <div className="flex gap-2">
+                      <Select 
+                        value={selectedBox[atencion.id] || ""} 
+                        onValueChange={(value) => setSelectedBox(prev => ({...prev, [atencion.id]: value}))}
+                      >
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Seleccionar box" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {boxes.map((box) => (
+                            <SelectItem key={box.id} value={box.id}>
+                              {box.nombre}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size="sm"
+                        onClick={() => handleIniciarAtencion(atencion.id)}
+                        className="gap-2"
+                      >
+                        <Play className="h-4 w-4" />
+                        Llamar
+                      </Button>
+                    </div>
                   </div>
-                );
-              })}
-              
+                ))}
               {enEspera.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   No hay pacientes en espera
@@ -567,7 +524,7 @@ const Flujo = () => {
                         className="mt-2"
                         onClick={() => toggleFicha(atencion.pacientes.id, atencion.pacientes.tiene_ficha)}
                       >
-                        {atencion.pacientes.tiene_ficha ? "📋 Tiene ficha" : "⏳ Sin ficha"}
+                        {atencion.pacientes.tiene_ficha ? "✅ Ficha entregada" : "⏳ Ficha pendiente"}
                       </Button>
                     </div>
                     {getEstadoBadge(atencion.estado)}

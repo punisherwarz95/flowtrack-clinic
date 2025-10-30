@@ -249,7 +249,7 @@ const BoxView = () => {
                       size="sm"
                       onClick={() => toggleFicha(atencion.pacientes.id, atencion.pacientes.tiene_ficha)}
                     >
-                      {atencion.pacientes.tiene_ficha ? "📋 Tiene ficha" : "⏳ Ficha entregada"}
+                      {atencion.pacientes.tiene_ficha ? "✅ Ficha entregada" : "⏳ Ficha pendiente"}
                     </Button>
                   </div>
                 </CardHeader>
