@@ -31,6 +31,15 @@ interface Atencion {
   boxes: { nombre: string } | null;
 }
 
+interface AtencionExamen {
+  id: string;
+  examen_id: string;
+  estado: string;
+  examenes: {
+    nombre: string;
+  };
+}
+
 interface Box {
   id: string;
   nombre: string;
@@ -55,6 +64,7 @@ const Flujo = () => {
   const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [pendingBoxes, setPendingBoxes] = useState<{[atencionId: string]: string[]}>({});
+  const [atencionExamenes, setAtencionExamenes] = useState<{[atencionId: string]: AtencionExamen[]}>({});
 
   useEffect(() => {
     loadData();
@@ -119,10 +129,38 @@ const Flujo = () => {
       setExamenes(examenesRes.data || []);
 
       await loadPendingBoxesForAtenciones(atencionesRes.data || [], boxesRes.data || []);
+      await loadAtencionExamenes(atencionesRes.data || []);
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al cargar datos");
     }
+  };
+
+  const loadAtencionExamenes = async (atenciones: Atencion[]) => {
+    const newAtencionExamenes: {[atencionId: string]: AtencionExamen[]} = {};
+
+    for (const atencion of atenciones) {
+      if (atencion.estado === "en_atencion" && atencion.box_id) {
+        try {
+          const box = boxes.find(b => b.id === atencion.box_id);
+          const boxExamIds = box?.box_examenes.map(be => be.examen_id) || [];
+
+          const { data: examenesData, error } = await supabase
+            .from("atencion_examenes")
+            .select("id, examen_id, estado, examenes(nombre)")
+            .eq("atencion_id", atencion.id)
+            .in("examen_id", boxExamIds);
+
+          if (error) throw error;
+          newAtencionExamenes[atencion.id] = examenesData || [];
+        } catch (error) {
+          console.error("Error loading atencion examenes:", error);
+          newAtencionExamenes[atencion.id] = [];
+        }
+      }
+    }
+
+    setAtencionExamenes(newAtencionExamenes);
   };
 
   const loadPendingBoxesForAtenciones = async (atenciones: Atencion[], boxesList: Box[]) => {
@@ -251,6 +289,26 @@ const Flujo = () => {
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al actualizar ficha");
+    }
+  };
+
+  const handleToggleExamen = async (atencionExamenId: string, currentEstado: string) => {
+    try {
+      const nuevoEstado = currentEstado === "pendiente" ? "completado" : "pendiente";
+      const { error } = await supabase
+        .from("atencion_examenes")
+        .update({ 
+          estado: nuevoEstado,
+          fecha_realizacion: nuevoEstado === "completado" ? new Date().toISOString() : null
+        })
+        .eq("id", atencionExamenId);
+
+      if (error) throw error;
+      toast.success(`Examen marcado como ${nuevoEstado}`);
+      await loadData();
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al actualizar examen");
     }
   };
 
@@ -555,6 +613,31 @@ const Flujo = () => {
                     </div>
                     {getEstadoBadge(atencion.estado)}
                   </div>
+
+                  {atencionExamenes[atencion.id] && atencionExamenes[atencion.id].length > 0 && (
+                    <div className="mb-3 p-3 bg-muted/50 rounded-md">
+                      <div className="text-xs font-medium text-muted-foreground mb-2">
+                        Exámenes de este box:
+                      </div>
+                      <div className="space-y-2">
+                        {atencionExamenes[atencion.id].map((ae) => (
+                          <div key={ae.id} className="flex items-center gap-2">
+                            <Checkbox
+                              id={ae.id}
+                              checked={ae.estado === "completado"}
+                              onCheckedChange={() => handleToggleExamen(ae.id, ae.estado)}
+                            />
+                            <Label htmlFor={ae.id} className="text-sm cursor-pointer flex-1">
+                              {ae.examenes.nombre}
+                            </Label>
+                            <Badge variant={ae.estado === "completado" ? "default" : "secondary"} className="text-xs">
+                              {ae.estado === "completado" ? "✓" : "○"}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   
                   <div className="flex gap-2">
                     <Button
