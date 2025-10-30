@@ -4,11 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, ClipboardList } from "lucide-react";
+import { Plus, ClipboardList, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Examen {
   id: string;
@@ -17,17 +18,45 @@ interface Examen {
   duracion_estimada: number | null;
 }
 
+interface Box {
+  id: string;
+  nombre: string;
+}
+
+interface Paquete {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  paquete_examen_items: Array<{
+    examen_id: string;
+    examenes: {
+      nombre: string;
+    };
+  }>;
+}
+
 const Examenes = () => {
   const [examenes, setExamenes] = useState<Examen[]>([]);
-  const [openDialog, setOpenDialog] = useState(false);
+  const [boxes, setBoxes] = useState<Box[]>([]);
+  const [paquetes, setPaquetes] = useState<Paquete[]>([]);
+  const [openExamenDialog, setOpenExamenDialog] = useState(false);
+  const [openPaqueteDialog, setOpenPaqueteDialog] = useState(false);
+  const [selectedBoxes, setSelectedBoxes] = useState<string[]>([]);
+  const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     nombre: "",
     descripcion: "",
     duracion_estimada: "",
   });
+  const [paqueteFormData, setPaqueteFormData] = useState({
+    nombre: "",
+    descripcion: "",
+  });
 
   useEffect(() => {
     loadExamenes();
+    loadBoxes();
+    loadPaquetes();
   }, []);
 
   const loadExamenes = async () => {
@@ -45,26 +74,125 @@ const Examenes = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const loadBoxes = async () => {
     try {
-      const { error } = await supabase.from("examenes").insert([
-        {
-          nombre: formData.nombre,
-          descripcion: formData.descripcion || null,
-          duracion_estimada: formData.duracion_estimada ? parseInt(formData.duracion_estimada) : null,
-        },
-      ]);
+      const { data, error } = await supabase
+        .from("boxes")
+        .select("id, nombre")
+        .eq("activo", true)
+        .order("nombre");
 
       if (error) throw error;
+      setBoxes(data || []);
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al cargar boxes");
+    }
+  };
+
+  const loadPaquetes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("paquetes_examenes")
+        .select("*, paquete_examen_items(examen_id, examenes(nombre))")
+        .order("nombre");
+
+      if (error) throw error;
+      setPaquetes(data || []);
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al cargar paquetes");
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (selectedBoxes.length === 0) {
+      toast.error("Debe seleccionar al menos un box");
+      return;
+    }
+
+    try {
+      const { data: examenData, error: examenError } = await supabase
+        .from("examenes")
+        .insert([
+          {
+            nombre: formData.nombre,
+            descripcion: formData.descripcion || null,
+            duracion_estimada: formData.duracion_estimada ? parseInt(formData.duracion_estimada) : null,
+          },
+        ])
+        .select()
+        .single();
+
+      if (examenError) throw examenError;
+
+      // Asociar el examen a los boxes seleccionados
+      const boxExamenesData = selectedBoxes.map(boxId => ({
+        box_id: boxId,
+        examen_id: examenData.id,
+      }));
+
+      const { error: boxExamenesError } = await supabase
+        .from("box_examenes")
+        .insert(boxExamenesData);
+
+      if (boxExamenesError) throw boxExamenesError;
       
-      toast.success("Examen agregado exitosamente");
-      setOpenDialog(false);
+      toast.success("Examen agregado y asociado a boxes exitosamente");
+      setOpenExamenDialog(false);
       setFormData({ nombre: "", descripcion: "", duracion_estimada: "" });
+      setSelectedBoxes([]);
       loadExamenes();
     } catch (error: any) {
       console.error("Error:", error);
       toast.error(error.message || "Error al agregar examen");
+    }
+  };
+
+  const handlePaqueteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (selectedExamenes.length === 0) {
+      toast.error("Debe seleccionar al menos un examen");
+      return;
+    }
+
+    try {
+      const { data: paqueteData, error: paqueteError } = await supabase
+        .from("paquetes_examenes")
+        .insert([
+          {
+            nombre: paqueteFormData.nombre,
+            descripcion: paqueteFormData.descripcion || null,
+          },
+        ])
+        .select()
+        .single();
+
+      if (paqueteError) throw paqueteError;
+
+      // Asociar exámenes al paquete
+      const paqueteExamenesData = selectedExamenes.map(examenId => ({
+        paquete_id: paqueteData.id,
+        examen_id: examenId,
+      }));
+
+      const { error: itemsError } = await supabase
+        .from("paquete_examen_items")
+        .insert(paqueteExamenesData);
+
+      if (itemsError) throw itemsError;
+      
+      toast.success("Paquete de exámenes creado exitosamente");
+      setOpenPaqueteDialog(false);
+      setPaqueteFormData({ nombre: "", descripcion: "" });
+      setSelectedExamenes([]);
+      loadPaquetes();
+    } catch (error: any) {
+      console.error("Error:", error);
+      toast.error(error.message || "Error al crear paquete");
     }
   };
 
@@ -75,82 +203,205 @@ const Examenes = () => {
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">Exámenes</h1>
-            <p className="text-muted-foreground">Administra los tipos de exámenes disponibles</p>
+            <h1 className="text-3xl font-bold text-foreground mb-2">Exámenes y Paquetes</h1>
+            <p className="text-muted-foreground">Administra exámenes individuales y paquetes</p>
           </div>
           
-          <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="h-4 w-4" />
-                Nuevo Examen
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Agregar Nuevo Examen</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="nombre">Nombre del Examen *</Label>
-                  <Input
-                    id="nombre"
-                    required
-                    value={formData.nombre}
-                    onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                    placeholder="Ej: Radiografía, Análisis de Sangre"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="descripcion">Descripción</Label>
-                  <Textarea
-                    id="descripcion"
-                    value={formData.descripcion}
-                    onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                    placeholder="Descripción del examen"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="duracion">Duración Estimada (minutos)</Label>
-                  <Input
-                    id="duracion"
-                    type="number"
-                    value={formData.duracion_estimada}
-                    onChange={(e) => setFormData({ ...formData, duracion_estimada: e.target.value })}
-                    placeholder="30"
-                  />
-                </div>
-                <Button type="submit" className="w-full">
-                  Guardar Examen
+          <div className="flex gap-3">
+            <Dialog open={openExamenDialog} onOpenChange={setOpenExamenDialog}>
+              <DialogTrigger asChild>
+                <Button className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Nuevo Examen
                 </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Agregar Nuevo Examen</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <Label htmlFor="nombre">Nombre del Examen *</Label>
+                    <Input
+                      id="nombre"
+                      required
+                      value={formData.nombre}
+                      onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                      placeholder="Ej: Radiografía, Análisis de Sangre"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="descripcion">Descripción</Label>
+                    <Textarea
+                      id="descripcion"
+                      value={formData.descripcion}
+                      onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                      placeholder="Descripción del examen"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="duracion">Duración Estimada (minutos)</Label>
+                    <Input
+                      id="duracion"
+                      type="number"
+                      value={formData.duracion_estimada}
+                      onChange={(e) => setFormData({ ...formData, duracion_estimada: e.target.value })}
+                      placeholder="30"
+                    />
+                  </div>
+                  <div>
+                    <Label>Boxes donde se realiza *</Label>
+                    <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2">
+                      {boxes.map((box) => (
+                        <label key={box.id} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedBoxes.includes(box.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedBoxes([...selectedBoxes, box.id]);
+                              } else {
+                                setSelectedBoxes(selectedBoxes.filter(id => id !== box.id));
+                              }
+                            }}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm">{box.nombre}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <Button type="submit" className="w-full">
+                    Guardar Examen
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={openPaqueteDialog} onOpenChange={setOpenPaqueteDialog}>
+              <DialogTrigger asChild>
+                <Button variant="secondary" className="gap-2">
+                  <Package className="h-4 w-4" />
+                  Nuevo Paquete
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Crear Paquete de Exámenes</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handlePaqueteSubmit} className="space-y-4">
+                  <div>
+                    <Label htmlFor="paquete-nombre">Nombre del Paquete *</Label>
+                    <Input
+                      id="paquete-nombre"
+                      required
+                      value={paqueteFormData.nombre}
+                      onChange={(e) => setPaqueteFormData({ ...paqueteFormData, nombre: e.target.value })}
+                      placeholder="Ej: Examen Pre-ocupacional Completo"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="paquete-descripcion">Descripción</Label>
+                    <Textarea
+                      id="paquete-descripcion"
+                      value={paqueteFormData.descripcion}
+                      onChange={(e) => setPaqueteFormData({ ...paqueteFormData, descripcion: e.target.value })}
+                      placeholder="Descripción del paquete"
+                    />
+                  </div>
+                  <div>
+                    <Label>Exámenes incluidos *</Label>
+                    <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2">
+                      {examenes.map((examen) => (
+                        <label key={examen.id} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedExamenes.includes(examen.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedExamenes([...selectedExamenes, examen.id]);
+                              } else {
+                                setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
+                              }
+                            }}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm">{examen.nombre}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <Button type="submit" className="w-full">
+                    Crear Paquete
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {examenes.map((examen) => (
-            <Card key={examen.id}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ClipboardList className="h-5 w-5 text-primary" />
-                  {examen.nombre}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {examen.descripcion && (
-                  <p className="text-sm text-muted-foreground mb-3">{examen.descripcion}</p>
-                )}
-                {examen.duracion_estimada && (
-                  <div className="text-sm">
-                    <span className="font-medium text-foreground">Duración:</span>{" "}
-                    <span className="text-muted-foreground">{examen.duracion_estimada} min</span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <Tabs defaultValue="examenes" className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="examenes">Exámenes</TabsTrigger>
+            <TabsTrigger value="paquetes">Paquetes</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="examenes" className="mt-6">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {examenes.map((examen) => (
+                <Card key={examen.id}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <ClipboardList className="h-5 w-5 text-primary" />
+                      {examen.nombre}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {examen.descripcion && (
+                      <p className="text-sm text-muted-foreground mb-3">{examen.descripcion}</p>
+                    )}
+                    {examen.duracion_estimada && (
+                      <div className="text-sm">
+                        <span className="font-medium text-foreground">Duración:</span>{" "}
+                        <span className="text-muted-foreground">{examen.duracion_estimada} min</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="paquetes" className="mt-6">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {paquetes.map((paquete) => (
+                <Card key={paquete.id}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Package className="h-5 w-5 text-primary" />
+                      {paquete.nombre}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {paquete.descripcion && (
+                      <p className="text-sm text-muted-foreground mb-3">{paquete.descripcion}</p>
+                    )}
+                    <div className="mt-3">
+                      <p className="text-xs font-medium text-muted-foreground mb-2">Incluye:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {paquete.paquete_examen_items.map((item, idx) => (
+                          <span key={idx} className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                            {item.examenes.nombre}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );

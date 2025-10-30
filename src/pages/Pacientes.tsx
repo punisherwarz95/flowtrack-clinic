@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Upload, Plus, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
@@ -38,13 +38,24 @@ interface Examen {
   descripcion: string | null;
 }
 
+interface Paquete {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  paquete_examen_items: Array<{
+    examen_id: string;
+  }>;
+}
+
 const Pacientes = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [examenes, setExamenes] = useState<Examen[]>([]);
+  const [paquetes, setPaquetes] = useState<Paquete[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
+  const [selectedPaquete, setSelectedPaquete] = useState<string>("");
   const [formData, setFormData] = useState({
     nombre: "",
     tipo_servicio: "workmed" as "workmed" | "jenner",
@@ -57,6 +68,7 @@ const Pacientes = () => {
     loadPatients();
     loadEmpresas();
     loadExamenes();
+    loadPaquetes();
   }, []);
 
   const loadPatients = async () => {
@@ -101,6 +113,21 @@ const Pacientes = () => {
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al cargar exámenes");
+    }
+  };
+
+  const loadPaquetes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("paquetes_examenes")
+        .select("*, paquete_examen_items(examen_id)")
+        .order("nombre");
+
+      if (error) throw error;
+      setPaquetes(data || []);
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al cargar paquetes");
     }
   };
 
@@ -156,37 +183,11 @@ const Pacientes = () => {
       setOpenDialog(false);
       setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: "", tiene_ficha: true, rut: "" });
       setSelectedExamenes([]);
+      setSelectedPaquete("");
       loadPatients();
     } catch (error: any) {
       console.error("Error:", error);
       toast.error(error.message || "Error al agregar paciente");
-    }
-  };
-
-  const handleEmpresasUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const text = await file.text();
-      const rows = text.split("\n").map((row) => row.split(","));
-      
-      const empresasData = rows
-        .slice(1)
-        .filter((row) => row.length >= 1 && row[0]?.trim())
-        .map((row) => ({
-          nombre: row[0]?.trim() || "",
-        }));
-
-      const { error } = await supabase.from("empresas").insert(empresasData);
-
-      if (error) throw error;
-      
-      toast.success(`${empresasData.length} empresas importadas`);
-      loadEmpresas();
-    } catch (error: any) {
-      console.error("Error:", error);
-      toast.error(error.message || "Error al importar empresas");
     }
   };
 
@@ -277,14 +278,44 @@ const Pacientes = () => {
                   </div>
 
                   <div>
+                    <Label htmlFor="paquete">Paquete de Exámenes (Opcional)</Label>
+                    <select
+                      id="paquete"
+                      value={selectedPaquete}
+                      onChange={(e) => {
+                        const paqueteId = e.target.value;
+                        setSelectedPaquete(paqueteId);
+                        if (paqueteId) {
+                          const paquete = paquetes.find(p => p.id === paqueteId);
+                          if (paquete) {
+                            const examenesIds = paquete.paquete_examen_items.map(item => item.examen_id);
+                            setSelectedExamenes(examenesIds);
+                          }
+                        } else {
+                          setSelectedExamenes([]);
+                        }
+                      }}
+                      className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                    >
+                      <option value="">Sin paquete - seleccionar individual</option>
+                      {paquetes.map((paquete) => (
+                        <option key={paquete.id} value={paquete.id}>
+                          {paquete.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
                     <Label>Exámenes a Realizar *</Label>
-                    <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2">
+                    <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2 bg-muted/30">
                       {examenes.map((examen) => (
                         <label key={examen.id} className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={selectedExamenes.includes(examen.id)}
                             onChange={(e) => {
+                              setSelectedPaquete(""); // Clear paquete selection
                               if (e.target.checked) {
                                 setSelectedExamenes([...selectedExamenes, examen.id]);
                               } else {
@@ -305,19 +336,6 @@ const Pacientes = () => {
                 </form>
               </DialogContent>
             </Dialog>
-
-            <Button variant="secondary" className="gap-2" asChild>
-              <label>
-                <Upload className="h-4 w-4" />
-                Importar Empresas CSV
-                <input
-                  type="file"
-                  accept=".csv"
-                  className="hidden"
-                  onChange={handleEmpresasUpload}
-                />
-              </label>
-            </Button>
           </div>
         </div>
 

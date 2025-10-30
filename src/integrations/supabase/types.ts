@@ -256,6 +256,63 @@ export type Database = {
           },
         ]
       }
+      paquete_examen_items: {
+        Row: {
+          created_at: string | null
+          examen_id: string
+          id: string
+          paquete_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          examen_id: string
+          id?: string
+          paquete_id: string
+        }
+        Update: {
+          created_at?: string | null
+          examen_id?: string
+          id?: string
+          paquete_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paquete_examen_items_examen_id_fkey"
+            columns: ["examen_id"]
+            isOneToOne: false
+            referencedRelation: "examenes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paquete_examen_items_paquete_id_fkey"
+            columns: ["paquete_id"]
+            isOneToOne: false
+            referencedRelation: "paquetes_examenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paquetes_examenes: {
+        Row: {
+          created_at: string | null
+          descripcion: string | null
+          id: string
+          nombre: string
+        }
+        Insert: {
+          created_at?: string | null
+          descripcion?: string | null
+          id?: string
+          nombre: string
+        }
+        Update: {
+          created_at?: string | null
+          descripcion?: string | null
+          id?: string
+          nombre?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
