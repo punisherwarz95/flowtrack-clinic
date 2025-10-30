@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Upload, Building2, Trash2 } from "lucide-react";
+import { Plus, Upload, Building2, Trash2, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
@@ -29,6 +29,7 @@ const Empresas = () => {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [empresaToDelete, setEmpresaToDelete] = useState<string | null>(null);
+  const [editingEmpresa, setEditingEmpresa] = useState<Empresa | null>(null);
   const [formData, setFormData] = useState({
     nombre: "",
   });
@@ -55,21 +56,34 @@ const Empresas = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { error } = await supabase.from("empresas").insert([
-        {
-          nombre: formData.nombre,
-        },
-      ]);
+      if (editingEmpresa) {
+        const { error } = await supabase
+          .from("empresas")
+          .update({
+            nombre: formData.nombre,
+          })
+          .eq("id", editingEmpresa.id);
 
-      if (error) throw error;
+        if (error) throw error;
+        toast.success("Empresa actualizada exitosamente");
+      } else {
+        const { error } = await supabase.from("empresas").insert([
+          {
+            nombre: formData.nombre,
+          },
+        ]);
+
+        if (error) throw error;
+        toast.success("Empresa agregada exitosamente");
+      }
       
-      toast.success("Empresa agregada exitosamente");
       setOpenDialog(false);
+      setEditingEmpresa(null);
       setFormData({ nombre: "" });
       loadEmpresas();
     } catch (error: any) {
       console.error("Error:", error);
-      toast.error(error.message || "Error al agregar empresa");
+      toast.error(error.message || (editingEmpresa ? "Error al actualizar empresa" : "Error al agregar empresa"));
     }
   };
 
@@ -132,7 +146,13 @@ const Empresas = () => {
           </div>
           
           <div className="flex gap-3">
-            <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+            <Dialog open={openDialog} onOpenChange={(open) => {
+              setOpenDialog(open);
+              if (!open) {
+                setEditingEmpresa(null);
+                setFormData({ nombre: "" });
+              }
+            }}>
               <DialogTrigger asChild>
                 <Button className="gap-2">
                   <Plus className="h-4 w-4" />
@@ -141,7 +161,7 @@ const Empresas = () => {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Agregar Nueva Empresa</DialogTitle>
+                  <DialogTitle>{editingEmpresa ? "Editar Empresa" : "Agregar Nueva Empresa"}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
@@ -155,7 +175,7 @@ const Empresas = () => {
                     />
                   </div>
                   <Button type="submit" className="w-full">
-                    Guardar Empresa
+                    {editingEmpresa ? "Actualizar Empresa" : "Guardar Empresa"}
                   </Button>
                 </form>
               </DialogContent>
@@ -185,13 +205,26 @@ const Empresas = () => {
                     <Building2 className="h-5 w-5 text-primary" />
                     {empresa.nombre}
                   </CardTitle>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setEmpresaToDelete(empresa.id)}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setEditingEmpresa(empresa);
+                        setFormData({ nombre: empresa.nombre });
+                        setOpenDialog(true);
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setEmpresaToDelete(empresa.id)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>

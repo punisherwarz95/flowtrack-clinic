@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, ClipboardList, Package, Trash2 } from "lucide-react";
+import { Plus, ClipboardList, Package, Trash2, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
@@ -53,6 +53,8 @@ const Examenes = () => {
   const [openPaqueteDialog, setOpenPaqueteDialog] = useState(false);
   const [examenToDelete, setExamenToDelete] = useState<string | null>(null);
   const [paqueteToDelete, setPaqueteToDelete] = useState<string | null>(null);
+  const [editingExamen, setEditingExamen] = useState<Examen | null>(null);
+  const [editingPaquete, setEditingPaquete] = useState<Paquete | null>(null);
   const [selectedBoxes, setSelectedBoxes] = useState<string[]>([]);
   const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
   const [formData, setFormData] = useState({
@@ -126,40 +128,75 @@ const Examenes = () => {
     }
 
     try {
-      const { data: examenData, error: examenError } = await supabase
-        .from("examenes")
-        .insert([
-          {
+      if (editingExamen) {
+        const { error: examenError } = await supabase
+          .from("examenes")
+          .update({
             nombre: formData.nombre,
             descripcion: formData.descripcion || null,
             duracion_estimada: formData.duracion_estimada ? parseInt(formData.duracion_estimada) : null,
-          },
-        ])
-        .select()
-        .single();
+          })
+          .eq("id", editingExamen.id);
 
-      if (examenError) throw examenError;
+        if (examenError) throw examenError;
 
-      // Asociar el examen a los boxes seleccionados
-      const boxExamenesData = selectedBoxes.map(boxId => ({
-        box_id: boxId,
-        examen_id: examenData.id,
-      }));
+        // Eliminar asociaciones anteriores
+        await supabase
+          .from("box_examenes")
+          .delete()
+          .eq("examen_id", editingExamen.id);
 
-      const { error: boxExamenesError } = await supabase
-        .from("box_examenes")
-        .insert(boxExamenesData);
+        // Crear nuevas asociaciones
+        const boxExamenesData = selectedBoxes.map(boxId => ({
+          box_id: boxId,
+          examen_id: editingExamen.id,
+        }));
 
-      if (boxExamenesError) throw boxExamenesError;
+        const { error: boxExamenesError } = await supabase
+          .from("box_examenes")
+          .insert(boxExamenesData);
+
+        if (boxExamenesError) throw boxExamenesError;
+        
+        toast.success("Examen actualizado exitosamente");
+      } else {
+        const { data: examenData, error: examenError } = await supabase
+          .from("examenes")
+          .insert([
+            {
+              nombre: formData.nombre,
+              descripcion: formData.descripcion || null,
+              duracion_estimada: formData.duracion_estimada ? parseInt(formData.duracion_estimada) : null,
+            },
+          ])
+          .select()
+          .single();
+
+        if (examenError) throw examenError;
+
+        // Asociar el examen a los boxes seleccionados
+        const boxExamenesData = selectedBoxes.map(boxId => ({
+          box_id: boxId,
+          examen_id: examenData.id,
+        }));
+
+        const { error: boxExamenesError } = await supabase
+          .from("box_examenes")
+          .insert(boxExamenesData);
+
+        if (boxExamenesError) throw boxExamenesError;
+        
+        toast.success("Examen agregado y asociado a boxes exitosamente");
+      }
       
-      toast.success("Examen agregado y asociado a boxes exitosamente");
       setOpenExamenDialog(false);
+      setEditingExamen(null);
       setFormData({ nombre: "", descripcion: "", duracion_estimada: "" });
       setSelectedBoxes([]);
       loadExamenes();
     } catch (error: any) {
       console.error("Error:", error);
-      toast.error(error.message || "Error al agregar examen");
+      toast.error(error.message || (editingExamen ? "Error al actualizar examen" : "Error al agregar examen"));
     }
   };
 
@@ -172,39 +209,73 @@ const Examenes = () => {
     }
 
     try {
-      const { data: paqueteData, error: paqueteError } = await supabase
-        .from("paquetes_examenes")
-        .insert([
-          {
+      if (editingPaquete) {
+        const { error: paqueteError } = await supabase
+          .from("paquetes_examenes")
+          .update({
             nombre: paqueteFormData.nombre,
             descripcion: paqueteFormData.descripcion || null,
-          },
-        ])
-        .select()
-        .single();
+          })
+          .eq("id", editingPaquete.id);
 
-      if (paqueteError) throw paqueteError;
+        if (paqueteError) throw paqueteError;
 
-      // Asociar exámenes al paquete
-      const paqueteExamenesData = selectedExamenes.map(examenId => ({
-        paquete_id: paqueteData.id,
-        examen_id: examenId,
-      }));
+        // Eliminar asociaciones anteriores
+        await supabase
+          .from("paquete_examen_items")
+          .delete()
+          .eq("paquete_id", editingPaquete.id);
 
-      const { error: itemsError } = await supabase
-        .from("paquete_examen_items")
-        .insert(paqueteExamenesData);
+        // Crear nuevas asociaciones
+        const paqueteExamenesData = selectedExamenes.map(examenId => ({
+          paquete_id: editingPaquete.id,
+          examen_id: examenId,
+        }));
 
-      if (itemsError) throw itemsError;
+        const { error: itemsError } = await supabase
+          .from("paquete_examen_items")
+          .insert(paqueteExamenesData);
+
+        if (itemsError) throw itemsError;
+        
+        toast.success("Paquete actualizado exitosamente");
+      } else {
+        const { data: paqueteData, error: paqueteError } = await supabase
+          .from("paquetes_examenes")
+          .insert([
+            {
+              nombre: paqueteFormData.nombre,
+              descripcion: paqueteFormData.descripcion || null,
+            },
+          ])
+          .select()
+          .single();
+
+        if (paqueteError) throw paqueteError;
+
+        // Asociar exámenes al paquete
+        const paqueteExamenesData = selectedExamenes.map(examenId => ({
+          paquete_id: paqueteData.id,
+          examen_id: examenId,
+        }));
+
+        const { error: itemsError } = await supabase
+          .from("paquete_examen_items")
+          .insert(paqueteExamenesData);
+
+        if (itemsError) throw itemsError;
+        
+        toast.success("Paquete de exámenes creado exitosamente");
+      }
       
-      toast.success("Paquete de exámenes creado exitosamente");
       setOpenPaqueteDialog(false);
+      setEditingPaquete(null);
       setPaqueteFormData({ nombre: "", descripcion: "" });
       setSelectedExamenes([]);
       loadPaquetes();
     } catch (error: any) {
       console.error("Error:", error);
-      toast.error(error.message || "Error al crear paquete");
+      toast.error(error.message || (editingPaquete ? "Error al actualizar paquete" : "Error al crear paquete"));
     }
   };
 
@@ -260,7 +331,14 @@ const Examenes = () => {
           </div>
           
           <div className="flex gap-3">
-            <Dialog open={openExamenDialog} onOpenChange={setOpenExamenDialog}>
+            <Dialog open={openExamenDialog} onOpenChange={(open) => {
+              setOpenExamenDialog(open);
+              if (!open) {
+                setEditingExamen(null);
+                setFormData({ nombre: "", descripcion: "", duracion_estimada: "" });
+                setSelectedBoxes([]);
+              }
+            }}>
               <DialogTrigger asChild>
                 <Button className="gap-2">
                   <Plus className="h-4 w-4" />
@@ -269,7 +347,7 @@ const Examenes = () => {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Agregar Nuevo Examen</DialogTitle>
+                  <DialogTitle>{editingExamen ? "Editar Examen" : "Agregar Nuevo Examen"}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
@@ -324,13 +402,20 @@ const Examenes = () => {
                     </div>
                   </div>
                   <Button type="submit" className="w-full">
-                    Guardar Examen
+                    {editingExamen ? "Actualizar Examen" : "Guardar Examen"}
                   </Button>
                 </form>
               </DialogContent>
             </Dialog>
 
-            <Dialog open={openPaqueteDialog} onOpenChange={setOpenPaqueteDialog}>
+            <Dialog open={openPaqueteDialog} onOpenChange={(open) => {
+              setOpenPaqueteDialog(open);
+              if (!open) {
+                setEditingPaquete(null);
+                setPaqueteFormData({ nombre: "", descripcion: "" });
+                setSelectedExamenes([]);
+              }
+            }}>
               <DialogTrigger asChild>
                 <Button variant="secondary" className="gap-2">
                   <Package className="h-4 w-4" />
@@ -339,7 +424,7 @@ const Examenes = () => {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Crear Paquete de Exámenes</DialogTitle>
+                  <DialogTitle>{editingPaquete ? "Editar Paquete" : "Crear Paquete de Exámenes"}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handlePaqueteSubmit} className="space-y-4">
                   <div>
@@ -384,7 +469,7 @@ const Examenes = () => {
                     </div>
                   </div>
                   <Button type="submit" className="w-full">
-                    Crear Paquete
+                    {editingPaquete ? "Actualizar Paquete" : "Crear Paquete"}
                   </Button>
                 </form>
               </DialogContent>
@@ -408,13 +493,38 @@ const Examenes = () => {
                         <ClipboardList className="h-5 w-5 text-primary" />
                         {examen.nombre}
                       </CardTitle>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setExamenToDelete(examen.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={async () => {
+                            setEditingExamen(examen);
+                            setFormData({
+                              nombre: examen.nombre,
+                              descripcion: examen.descripcion || "",
+                              duracion_estimada: examen.duracion_estimada?.toString() || "",
+                            });
+                            
+                            // Cargar boxes asociados al examen
+                            const { data: boxExamenes } = await supabase
+                              .from("box_examenes")
+                              .select("box_id")
+                              .eq("examen_id", examen.id);
+                            
+                            setSelectedBoxes(boxExamenes?.map(be => be.box_id) || []);
+                            setOpenExamenDialog(true);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setExamenToDelete(examen.id)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -443,13 +553,30 @@ const Examenes = () => {
                         <Package className="h-5 w-5 text-primary" />
                         {paquete.nombre}
                       </CardTitle>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setPaqueteToDelete(paquete.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setEditingPaquete(paquete);
+                            setPaqueteFormData({
+                              nombre: paquete.nombre,
+                              descripcion: paquete.descripcion || "",
+                            });
+                            setSelectedExamenes(paquete.paquete_examen_items.map(item => item.examen_id));
+                            setOpenPaqueteDialog(true);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setPaqueteToDelete(paquete.id)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>

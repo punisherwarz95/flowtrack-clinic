@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
@@ -32,6 +32,7 @@ const Boxes = () => {
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [boxToDelete, setBoxToDelete] = useState<string | null>(null);
+  const [editingBox, setEditingBox] = useState<Box | null>(null);
   const [formData, setFormData] = useState({
     nombre: "",
     descripcion: "",
@@ -59,22 +60,36 @@ const Boxes = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { error } = await supabase.from("boxes").insert([
-        {
-          nombre: formData.nombre,
-          descripcion: formData.descripcion || null,
-        },
-      ]);
+      if (editingBox) {
+        const { error } = await supabase
+          .from("boxes")
+          .update({
+            nombre: formData.nombre,
+            descripcion: formData.descripcion || null,
+          })
+          .eq("id", editingBox.id);
 
-      if (error) throw error;
+        if (error) throw error;
+        toast.success("Box actualizado exitosamente");
+      } else {
+        const { error } = await supabase.from("boxes").insert([
+          {
+            nombre: formData.nombre,
+            descripcion: formData.descripcion || null,
+          },
+        ]);
+
+        if (error) throw error;
+        toast.success("Box agregado exitosamente");
+      }
       
-      toast.success("Box agregado exitosamente");
       setOpenDialog(false);
+      setEditingBox(null);
       setFormData({ nombre: "", descripcion: "" });
       loadBoxes();
     } catch (error: any) {
       console.error("Error:", error);
-      toast.error(error.message || "Error al agregar box");
+      toast.error(error.message || (editingBox ? "Error al actualizar box" : "Error al agregar box"));
     }
   };
 
@@ -126,7 +141,13 @@ const Boxes = () => {
             <p className="text-muted-foreground">Administra los consultorios disponibles</p>
           </div>
           
-          <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+          <Dialog open={openDialog} onOpenChange={(open) => {
+            setOpenDialog(open);
+            if (!open) {
+              setEditingBox(null);
+              setFormData({ nombre: "", descripcion: "" });
+            }
+          }}>
             <DialogTrigger asChild>
               <Button className="gap-2">
                 <Plus className="h-4 w-4" />
@@ -135,7 +156,7 @@ const Boxes = () => {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Agregar Nuevo Box</DialogTitle>
+                <DialogTitle>{editingBox ? "Editar Box" : "Agregar Nuevo Box"}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
@@ -158,7 +179,7 @@ const Boxes = () => {
                   />
                 </div>
                 <Button type="submit" className="w-full">
-                  Guardar Box
+                  {editingBox ? "Actualizar Box" : "Guardar Box"}
                 </Button>
               </form>
             </DialogContent>
@@ -178,6 +199,20 @@ const Boxes = () => {
                       checked={box.activo}
                       onCheckedChange={() => handleToggleActive(box.id, box.activo)}
                     />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setEditingBox(box);
+                        setFormData({
+                          nombre: box.nombre,
+                          descripcion: box.descripcion || "",
+                        });
+                        setOpenDialog(true);
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"
