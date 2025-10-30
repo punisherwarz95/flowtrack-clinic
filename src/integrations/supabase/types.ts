@@ -68,6 +68,7 @@ export type Database = {
           fecha_ingreso: string | null
           fecha_inicio_atencion: string | null
           id: string
+          numero_ingreso: number | null
           observaciones: string | null
           paciente_id: string
         }
@@ -79,6 +80,7 @@ export type Database = {
           fecha_ingreso?: string | null
           fecha_inicio_atencion?: string | null
           id?: string
+          numero_ingreso?: number | null
           observaciones?: string | null
           paciente_id: string
         }
@@ -90,6 +92,7 @@ export type Database = {
           fecha_ingreso?: string | null
           fecha_inicio_atencion?: string | null
           id?: string
+          numero_ingreso?: number | null
           observaciones?: string | null
           paciente_id?: string
         }
