@@ -71,7 +71,7 @@ const Pacientes = () => {
     nombre: "",
     tipo_servicio: "workmed" as "workmed" | "jenner",
     empresa_id: "",
-    tiene_ficha: true,
+    tiene_ficha: false, // Por defecto NO tiene ficha
     rut: "", // Temporary until types are regenerated
   });
 
@@ -192,7 +192,7 @@ const Pacientes = () => {
 
       toast.success("Paciente agregado exitosamente");
       setOpenDialog(false);
-      setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: "", tiene_ficha: true, rut: "" });
+      setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: "", tiene_ficha: false, rut: "" });
       setSelectedExamenes([]);
       setSelectedPaquete("");
       loadPatients();

@@ -13,15 +13,29 @@ interface Atencion {
   id: string;
   estado: string;
   fecha_ingreso: string;
-  pacientes: { nombre: string; rut: string };
+  pacientes: { 
+    id: string;
+    nombre: string; 
+    rut: string;
+    tiene_ficha: boolean;
+  };
   boxes: { nombre: string } | null;
+}
+
+interface Box {
+  id: string;
+  nombre: string;
+  box_examenes: Array<{
+    examen_id: string;
+  }>;
 }
 
 const Flujo = () => {
   const [atenciones, setAtenciones] = useState<Atencion[]>([]);
-  const [boxes, setBoxes] = useState<any[]>([]);
+  const [boxes, setBoxes] = useState<Box[]>([]);
   const [selectedPatient, setSelectedPatient] = useState("");
-  const [selectedBox, setSelectedBox] = useState("");
+  const [selectedBox, setSelectedBox] = useState<{[atencionId: string]: string}>({});
+  const [availableBoxes, setAvailableBoxes] = useState<{[atencionId: string]: Box[]}>({});
 
   useEffect(() => {
     loadData();
@@ -46,10 +60,13 @@ const Flujo = () => {
       const [atencionesRes, boxesRes] = await Promise.all([
         supabase
           .from("atenciones")
-          .select("*, pacientes(*), boxes(*)")
+          .select("*, pacientes(id, nombre, rut, tiene_ficha), boxes(*)")
           .in("estado", ["en_espera", "en_atencion"])
           .order("fecha_ingreso", { ascending: true }),
-        supabase.from("boxes").select("*").eq("activo", true),
+        supabase
+          .from("boxes")
+          .select("*, box_examenes(examen_id)")
+          .eq("activo", true),
       ]);
 
       if (atencionesRes.error) throw atencionesRes.error;
@@ -57,10 +74,46 @@ const Flujo = () => {
 
       setAtenciones(atencionesRes.data || []);
       setBoxes(boxesRes.data || []);
+
+      // Cargar boxes disponibles para cada atención
+      await loadAvailableBoxesForAtenciones(atencionesRes.data || []);
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al cargar datos");
     }
+  };
+
+  const loadAvailableBoxesForAtenciones = async (atenciones: Atencion[]) => {
+    const newAvailableBoxes: {[atencionId: string]: Box[]} = {};
+
+    for (const atencion of atenciones) {
+      if (atencion.estado === "en_espera") {
+        try {
+          // Obtener exámenes pendientes del paciente
+          const { data: atencionExamenes, error } = await supabase
+            .from("atencion_examenes")
+            .select("examen_id")
+            .eq("atencion_id", atencion.id)
+            .eq("estado", "pendiente");
+
+          if (error) throw error;
+
+          const examenesIds = atencionExamenes?.map(ae => ae.examen_id) || [];
+
+          // Filtrar boxes que tengan al menos un examen pendiente del paciente
+          const boxesDisponibles = boxes.filter(box => 
+            box.box_examenes.some(be => examenesIds.includes(be.examen_id))
+          );
+
+          newAvailableBoxes[atencion.id] = boxesDisponibles;
+        } catch (error) {
+          console.error("Error loading available boxes:", error);
+          newAvailableBoxes[atencion.id] = [];
+        }
+      }
+    }
+
+    setAvailableBoxes(newAvailableBoxes);
   };
 
   const handleIngresoClick = async () => {
@@ -88,7 +141,8 @@ const Flujo = () => {
   };
 
   const handleIniciarAtencion = async (atencionId: string) => {
-    if (!selectedBox) {
+    const boxId = selectedBox[atencionId];
+    if (!boxId) {
       toast.error("Selecciona un box");
       return;
     }
@@ -98,7 +152,7 @@ const Flujo = () => {
         .from("atenciones")
         .update({
           estado: "en_atencion",
-          box_id: selectedBox,
+          box_id: boxId,
           fecha_inicio_atencion: new Date().toISOString(),
         })
         .eq("id", atencionId);
@@ -106,10 +160,30 @@ const Flujo = () => {
       if (error) throw error;
       
       toast.success("Atención iniciada");
-      setSelectedBox("");
+      setSelectedBox(prev => {
+        const newState = {...prev};
+        delete newState[atencionId];
+        return newState;
+      });
     } catch (error: any) {
       console.error("Error:", error);
       toast.error(error.message || "Error al iniciar atención");
+    }
+  };
+
+  const toggleFicha = async (pacienteId: string, tieneFicha: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("pacientes")
+        .update({ tiene_ficha: !tieneFicha })
+        .eq("id", pacienteId);
+
+      if (error) throw error;
+      toast.success("Estado de ficha actualizado");
+      loadData();
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al actualizar ficha");
     }
   };
 
@@ -182,47 +256,67 @@ const Flujo = () => {
               <CardTitle className="text-warning">En Espera ({enEspera.length})</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {enEspera.map((atencion) => (
-                <div
-                  key={atencion.id}
-                  className="p-4 rounded-lg border border-border bg-card hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <div className="font-medium text-foreground">
-                        {atencion.pacientes.nombre}
+              {enEspera.map((atencion) => {
+                const boxesDisponibles = availableBoxes[atencion.id] || [];
+                return (
+                  <div
+                    key={atencion.id}
+                    className="p-4 rounded-lg border border-border bg-card hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="font-medium text-foreground">
+                          {atencion.pacientes.nombre}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          RUT: {atencion.pacientes.rut}
+                        </div>
+                        <Button
+                          variant={atencion.pacientes.tiene_ficha ? "default" : "outline"}
+                          size="sm"
+                          className="mt-2"
+                          onClick={() => toggleFicha(atencion.pacientes.id, atencion.pacientes.tiene_ficha)}
+                        >
+                          {atencion.pacientes.tiene_ficha ? "📋 Tiene ficha" : "⏳ Sin ficha"}
+                        </Button>
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        RUT: {atencion.pacientes.rut}
-                      </div>
+                      {getEstadoBadge(atencion.estado)}
                     </div>
-                    {getEstadoBadge(atencion.estado)}
+                    
+                    {boxesDisponibles.length > 0 ? (
+                      <div className="flex gap-2">
+                        <Select 
+                          value={selectedBox[atencion.id] || ""} 
+                          onValueChange={(value) => setSelectedBox(prev => ({...prev, [atencion.id]: value}))}
+                        >
+                          <SelectTrigger className="flex-1">
+                            <SelectValue placeholder="Seleccionar box" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {boxesDisponibles.map((box) => (
+                              <SelectItem key={box.id} value={box.id}>
+                                {box.nombre}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          size="sm"
+                          onClick={() => handleIniciarAtencion(atencion.id)}
+                          className="gap-2"
+                        >
+                          <Play className="h-4 w-4" />
+                          Iniciar
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground italic">
+                        No hay boxes disponibles con exámenes pendientes
+                      </div>
+                    )}
                   </div>
-                  
-                  <div className="flex gap-2">
-                    <Select value={selectedBox} onValueChange={setSelectedBox}>
-                      <SelectTrigger className="flex-1">
-                        <SelectValue placeholder="Seleccionar box" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {boxes.map((box) => (
-                          <SelectItem key={box.id} value={box.id}>
-                            {box.nombre}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      size="sm"
-                      onClick={() => handleIniciarAtencion(atencion.id)}
-                      className="gap-2"
-                    >
-                      <Play className="h-4 w-4" />
-                      Iniciar
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               
               {enEspera.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
@@ -243,7 +337,7 @@ const Flujo = () => {
                   className="p-4 rounded-lg border border-border bg-card hover:shadow-md transition-shadow"
                 >
                   <div className="flex items-start justify-between mb-3">
-                    <div>
+                    <div className="flex-1">
                       <div className="font-medium text-foreground">
                         {atencion.pacientes.nombre}
                       </div>
@@ -255,6 +349,14 @@ const Flujo = () => {
                           Box: {atencion.boxes.nombre}
                         </div>
                       )}
+                      <Button
+                        variant={atencion.pacientes.tiene_ficha ? "default" : "outline"}
+                        size="sm"
+                        className="mt-2"
+                        onClick={() => toggleFicha(atencion.pacientes.id, atencion.pacientes.tiene_ficha)}
+                      >
+                        {atencion.pacientes.tiene_ficha ? "📋 Tiene ficha" : "⏳ Sin ficha"}
+                      </Button>
                     </div>
                     {getEstadoBadge(atencion.estado)}
                   </div>
