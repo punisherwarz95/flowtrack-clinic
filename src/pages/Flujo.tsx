@@ -6,11 +6,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import PatientCombobox from "@/components/PatientCombobox";
-import { Clock, UserPlus, Play, CheckCircle, XCircle } from "lucide-react";
+import { Clock, UserPlus, Play, CheckCircle, XCircle, Calendar as CalendarIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 interface Atencion {
   id: string;
@@ -48,6 +52,8 @@ const Flujo = () => {
   const [availableBoxes, setAvailableBoxes] = useState<{[atencionId: string]: Box[]}>({});
   const [showExamenesDialog, setShowExamenesDialog] = useState(false);
   const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [pendingBoxes, setPendingBoxes] = useState<{[atencionId: string]: string[]}>({});
 
   useEffect(() => {
     loadData();
@@ -64,16 +70,25 @@ const Flujo = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [selectedDate]);
 
   const loadData = async () => {
     try {
+      const startOfDay = selectedDate ? new Date(selectedDate.setHours(0, 0, 0, 0)).toISOString() : null;
+      const endOfDay = selectedDate ? new Date(selectedDate.setHours(23, 59, 59, 999)).toISOString() : null;
+
+      let atencionesQuery = supabase
+        .from("atenciones")
+        .select("*, pacientes(id, nombre, rut, tiene_ficha), boxes(*)")
+        .in("estado", ["en_espera", "en_atencion"])
+        .order("fecha_ingreso", { ascending: true });
+
+      if (startOfDay && endOfDay) {
+        atencionesQuery = atencionesQuery.gte("fecha_ingreso", startOfDay).lte("fecha_ingreso", endOfDay);
+      }
+
       const [atencionesRes, boxesRes, examenesRes] = await Promise.all([
-        supabase
-          .from("atenciones")
-          .select("*, pacientes(id, nombre, rut, tiene_ficha), boxes(*)")
-          .in("estado", ["en_espera", "en_atencion"])
-          .order("fecha_ingreso", { ascending: true }),
+        atencionesQuery,
         supabase
           .from("boxes")
           .select("*, box_examenes(examen_id)")
@@ -93,6 +108,7 @@ const Flujo = () => {
       setExamenes(examenesRes.data || []);
 
       await loadAvailableBoxesForAtenciones(atencionesRes.data || [], boxesRes.data || []);
+      await loadPendingBoxesForAtenciones(atencionesRes.data || [], boxesRes.data || []);
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al cargar datos");
@@ -128,6 +144,35 @@ const Flujo = () => {
     }
 
     setAvailableBoxes(newAvailableBoxes);
+  };
+
+  const loadPendingBoxesForAtenciones = async (atenciones: Atencion[], boxesList: Box[]) => {
+    const newPendingBoxes: {[atencionId: string]: string[]} = {};
+
+    for (const atencion of atenciones) {
+      try {
+        const { data: atencionExamenes, error } = await supabase
+          .from("atencion_examenes")
+          .select("examen_id")
+          .eq("atencion_id", atencion.id)
+          .eq("estado", "pendiente");
+
+        if (error) throw error;
+
+        const examenesIds = atencionExamenes?.map(ae => ae.examen_id) || [];
+
+        const boxesConExamenes = boxesList.filter(box => 
+          box.box_examenes.some(be => examenesIds.includes(be.examen_id))
+        );
+
+        newPendingBoxes[atencion.id] = boxesConExamenes.map(b => b.nombre);
+      } catch (error) {
+        console.error("Error loading pending boxes:", error);
+        newPendingBoxes[atencion.id] = [];
+      }
+    }
+
+    setPendingBoxes(newPendingBoxes);
   };
 
   const handleIngresoClick = () => {
@@ -289,8 +334,29 @@ const Flujo = () => {
 
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Flujo de Pacientes</h1>
-          <p className="text-muted-foreground">Gestión en tiempo real del flujo de atención</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground mb-2">Flujo de Pacientes</h1>
+              <p className="text-muted-foreground">Gestión en tiempo real del flujo de atención</p>
+            </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <CalendarIcon className="h-4 w-4" />
+                  {selectedDate ? format(selectedDate, "PPP", { locale: es }) : "Seleccionar fecha"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={setSelectedDate}
+                  locale={es}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
 
         <Card className="mb-6">
@@ -384,6 +450,14 @@ const Flujo = () => {
                         <div className="text-sm text-muted-foreground">
                           RUT: {atencion.pacientes.rut}
                         </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Ingreso: {format(new Date(atencion.fecha_ingreso), "HH:mm", { locale: es })}
+                        </div>
+                        {pendingBoxes[atencion.id] && pendingBoxes[atencion.id].length > 0 && (
+                          <div className="text-xs text-primary mt-1">
+                            Boxes pendientes: {pendingBoxes[atencion.id].join(", ")}
+                          </div>
+                        )}
                         <Button
                           variant={atencion.pacientes.tiene_ficha ? "default" : "outline"}
                           size="sm"
@@ -457,9 +531,17 @@ const Flujo = () => {
                       <div className="text-sm text-muted-foreground">
                         RUT: {atencion.pacientes.rut}
                       </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Ingreso: {format(new Date(atencion.fecha_ingreso), "HH:mm", { locale: es })}
+                      </div>
                       {atencion.boxes && (
                         <div className="text-sm text-primary font-medium mt-1">
                           Box: {atencion.boxes.nombre}
+                        </div>
+                      )}
+                      {pendingBoxes[atencion.id] && pendingBoxes[atencion.id].length > 0 && (
+                        <div className="text-xs text-primary mt-1">
+                          Boxes pendientes: {pendingBoxes[atencion.id].join(", ")}
                         </div>
                       )}
                       <Button
