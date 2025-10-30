@@ -229,17 +229,40 @@ const Flujo = () => {
 
   const handleCompletarAtencion = async (atencionId: string, estado: "completado" | "incompleto") => {
     try {
-      const { error } = await supabase
-        .from("atenciones")
-        .update({
-          estado,
-          fecha_fin_atencion: new Date().toISOString(),
-        })
-        .eq("id", atencionId);
+      // Verificar si hay exámenes pendientes
+      const { data: examenesPendientes, error: examenesError } = await supabase
+        .from("atencion_examenes")
+        .select("id")
+        .eq("atencion_id", atencionId)
+        .eq("estado", "pendiente");
 
-      if (error) throw error;
-      
-      toast.success(estado === "completado" ? "Atención completada" : "Atención marcada como incompleta");
+      if (examenesError) throw examenesError;
+
+      // Si hay exámenes pendientes, devolver a espera
+      if (examenesPendientes && examenesPendientes.length > 0) {
+        const { error } = await supabase
+          .from("atenciones")
+          .update({
+            estado: "en_espera",
+            box_id: null,
+          })
+          .eq("id", atencionId);
+
+        if (error) throw error;
+        toast.success("Paciente devuelto a espera - tiene exámenes pendientes");
+      } else {
+        // Si no hay exámenes pendientes, completar la atención
+        const { error } = await supabase
+          .from("atenciones")
+          .update({
+            estado,
+            fecha_fin_atencion: new Date().toISOString(),
+          })
+          .eq("id", atencionId);
+
+        if (error) throw error;
+        toast.success(estado === "completado" ? "Atención completada" : "Atención marcada como incompleta");
+      }
     } catch (error: any) {
       console.error("Error:", error);
       toast.error(error.message || "Error al actualizar atención");
