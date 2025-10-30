@@ -458,11 +458,13 @@ const Flujo = () => {
                           <SelectValue placeholder="Seleccionar box" />
                         </SelectTrigger>
                         <SelectContent>
-                          {boxes.map((box) => (
-                            <SelectItem key={box.id} value={box.id}>
-                              {box.nombre}
-                            </SelectItem>
-                          ))}
+                          {boxes
+                            .filter((box) => pendingBoxes[atencion.id]?.includes(box.nombre))
+                            .map((box) => (
+                              <SelectItem key={box.id} value={box.id}>
+                                {box.nombre}
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                       <Button
