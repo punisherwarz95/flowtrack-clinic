@@ -21,6 +21,7 @@ interface Atencion {
   estado: string;
   fecha_ingreso: string;
   numero_ingreso: number;
+  box_id: string | null;
   pacientes: { 
     id: string;
     nombre: string; 
@@ -255,7 +256,25 @@ const Flujo = () => {
 
   const handleCompletarAtencion = async (atencionId: string, estado: "completado" | "incompleto") => {
     try {
-      // Verificar si hay exámenes pendientes
+      // 1) Si se presiona "Completar" dentro de un box, marcar como completados
+      // los exámenes de ese box para esta atención
+      const atencionActual = atenciones.find((a) => a.id === atencionId);
+      const currentBoxId = atencionActual?.box_id;
+
+      if (estado === "completado" && currentBoxId) {
+        const boxExamIds = boxes.find((b) => b.id === currentBoxId)?.box_examenes.map((be) => be.examen_id) || [];
+        if (boxExamIds.length > 0) {
+          const { error: updateExamsError } = await supabase
+            .from("atencion_examenes")
+            .update({ estado: "completado", fecha_realizacion: new Date().toISOString() })
+            .eq("atencion_id", atencionId)
+            .in("examen_id", boxExamIds)
+            .eq("estado", "pendiente");
+          if (updateExamsError) throw updateExamsError;
+        }
+      }
+
+      // 2) Verificar si quedan exámenes pendientes luego de lo anterior
       const { data: examenesPendientes, error: examenesError } = await supabase
         .from("atencion_examenes")
         .select("id")
@@ -264,7 +283,7 @@ const Flujo = () => {
 
       if (examenesError) throw examenesError;
 
-      // Si hay exámenes pendientes, devolver a espera
+      // 3) Actualizar el estado de la atención según si quedan pendientes o no
       if (examenesPendientes && examenesPendientes.length > 0) {
         const { error } = await supabase
           .from("atenciones")
@@ -277,7 +296,6 @@ const Flujo = () => {
         if (error) throw error;
         toast.success("Paciente devuelto a espera - tiene exámenes pendientes");
       } else {
-        // Si no hay exámenes pendientes, completar la atención
         const { error } = await supabase
           .from("atenciones")
           .update({
@@ -290,7 +308,7 @@ const Flujo = () => {
         toast.success(estado === "completado" ? "Atención completada" : "Atención marcada como incompleta");
       }
 
-      // Refrescar datos inmediatamente para reflejar cambios
+      // 4) Refrescar datos inmediatamente para reflejar cambios
       await loadData();
     } catch (error: any) {
       console.error("Error:", error);
