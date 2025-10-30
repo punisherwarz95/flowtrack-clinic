@@ -52,7 +52,6 @@ const Flujo = () => {
   useEffect(() => {
     loadData();
     
-    // Suscripción en tiempo real
     const channel = supabase
       .channel("atenciones-changes")
       .on(
@@ -93,7 +92,6 @@ const Flujo = () => {
       setBoxes(boxesRes.data || []);
       setExamenes(examenesRes.data || []);
 
-      // Cargar boxes disponibles para cada atención
       await loadAvailableBoxesForAtenciones(atencionesRes.data || []);
     } catch (error) {
       console.error("Error:", error);
@@ -107,7 +105,6 @@ const Flujo = () => {
     for (const atencion of atenciones) {
       if (atencion.estado === "en_espera") {
         try {
-          // Obtener exámenes pendientes del paciente
           const { data: atencionExamenes, error } = await supabase
             .from("atencion_examenes")
             .select("examen_id")
@@ -118,7 +115,6 @@ const Flujo = () => {
 
           const examenesIds = atencionExamenes?.map(ae => ae.examen_id) || [];
 
-          // Filtrar boxes que tengan al menos un examen pendiente del paciente
           const boxesDisponibles = boxes.filter(box => 
             box.box_examenes.some(be => examenesIds.includes(be.examen_id))
           );
@@ -149,7 +145,6 @@ const Flujo = () => {
     }
 
     try {
-      // Crear la atención
       const { data: atencionData, error: atencionError } = await supabase
         .from("atenciones")
         .insert([
@@ -163,7 +158,6 @@ const Flujo = () => {
 
       if (atencionError) throw atencionError;
 
-      // Crear los registros de atencion_examenes
       const atencionExamenes = selectedExamenes.map((examenId) => ({
         atencion_id: atencionData.id,
         examen_id: examenId,
