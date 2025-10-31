@@ -26,6 +26,7 @@ interface Atencion {
     id: string;
     nombre: string;
     rut: string;
+    tipo_servicio: string;
   };
   boxes: { nombre: string } | null;
 }
@@ -100,7 +101,7 @@ const Flujo = () => {
 
       let atencionesQuery = supabase
         .from("atenciones")
-        .select("*, pacientes(id, nombre, rut), boxes(*)")
+        .select("*, pacientes(id, nombre, rut, tipo_servicio), boxes(*)")
         .in("estado", ["en_espera", "en_atencion"])
         .order("fecha_ingreso", { ascending: true });
 
@@ -527,8 +528,11 @@ const Flujo = () => {
                             Exámenes pendientes: {examenesPendientes[atencion.id].join(", ")}
                           </div>
                         )}
-                        <div className="text-xs text-muted-foreground mt-1">
-                          Ingreso: {format(new Date(atencion.fecha_ingreso), "HH:mm", { locale: es })}
+                        <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
+                          <span>Ingreso: {format(new Date(atencion.fecha_ingreso), "HH:mm", { locale: es })}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {atencion.pacientes.tipo_servicio === "workmed" ? "WM" : "J"}
+                          </Badge>
                         </div>
                         {pendingBoxes[atencion.id] && pendingBoxes[atencion.id].length > 0 && (
                           <div className="text-xs text-primary mt-1">
@@ -599,8 +603,11 @@ const Flujo = () => {
                           Exámenes pendientes: {examenesPendientes[atencion.id].join(", ")}
                         </div>
                       )}
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Ingreso: {format(new Date(atencion.fecha_ingreso), "HH:mm", { locale: es })}
+                      <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
+                        <span>Ingreso: {format(new Date(atencion.fecha_ingreso), "HH:mm", { locale: es })}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {atencion.pacientes.tipo_servicio === "workmed" ? "WM" : "J"}
+                        </Badge>
                       </div>
                       {atencion.boxes && (
                         <div className="text-sm text-primary font-medium mt-1">
