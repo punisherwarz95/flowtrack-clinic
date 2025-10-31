@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import PatientCombobox from "@/components/PatientCombobox";
-import { Clock, UserPlus, Play, CheckCircle, XCircle, Calendar as CalendarIcon } from "lucide-react";
+import { Clock, UserPlus, Play, CheckCircle, XCircle, Calendar as CalendarIcon, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -22,6 +22,7 @@ interface Atencion {
   fecha_ingreso: string;
   numero_ingreso: number;
   box_id: string | null;
+  estado_ficha: string;
   pacientes: {
     id: string;
     nombre: string;
@@ -327,6 +328,28 @@ const Flujo = () => {
     }
   };
 
+  const handleCambiarEstadoFicha = async (atencionId: string, nuevoEstado: string) => {
+    try {
+      const { error } = await supabase
+        .from("atenciones")
+        .update({ estado_ficha: nuevoEstado as 'pendiente' | 'en_mano_paciente' | 'completada' })
+        .eq("id", atencionId);
+
+      if (error) throw error;
+      
+      const mensajes = {
+        'en_mano_paciente': 'Ficha entregada al paciente',
+        'completada': 'Ficha recibida de vuelta'
+      };
+      
+      toast.success(mensajes[nuevoEstado as keyof typeof mensajes] || 'Estado actualizado');
+      await loadData();
+    } catch (error: any) {
+      console.error("Error:", error);
+      toast.error("Error al actualizar estado de ficha");
+    }
+  };
+
   const handleCompletarAtencion = async (atencionId: string, estado: "completado" | "incompleto") => {
     try {
       // 1) Si se presiona "Completar" dentro de un box, marcar como completados
@@ -534,6 +557,15 @@ const Flujo = () => {
                             {atencion.pacientes.tipo_servicio === "workmed" ? "WM" : "J"}
                           </Badge>
                         </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">
+                            Ficha: 
+                            {atencion.estado_ficha === 'pendiente' && ' Pendiente de entregar'}
+                            {atencion.estado_ficha === 'en_mano_paciente' && ' En mano del paciente'}
+                            {atencion.estado_ficha === 'completada' && ' ✓ Completada'}
+                          </span>
+                        </div>
                         {pendingBoxes[atencion.id] && pendingBoxes[atencion.id].length > 0 && (
                           <div className="text-xs text-primary mt-1">
                             Boxes pendientes: {pendingBoxes[atencion.id].join(", ")}
@@ -543,32 +575,62 @@ const Flujo = () => {
                       {getEstadoBadge(atencion.estado)}
                     </div>
                     
-                    <div className="flex gap-2">
-                      <Select 
-                        value={selectedBox[atencion.id] || ""} 
-                        onValueChange={(value) => setSelectedBox(prev => ({...prev, [atencion.id]: value}))}
-                      >
-                        <SelectTrigger className="flex-1">
-                          <SelectValue placeholder="Seleccionar box" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {boxes
-                            .filter((box) => pendingBoxes[atencion.id]?.includes(box.nombre))
-                            .map((box) => (
-                              <SelectItem key={box.id} value={box.id}>
-                                {box.nombre}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        size="sm"
-                        onClick={() => handleIniciarAtencion(atencion.id)}
-                        className="gap-2"
-                      >
-                        <Play className="h-4 w-4" />
-                        Llamar
-                      </Button>
+                    <div className="space-y-2">
+                      {atencion.estado_ficha !== 'completada' && (
+                        <div className="flex gap-2">
+                          {atencion.estado_ficha === 'pendiente' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleCambiarEstadoFicha(atencion.id, 'en_mano_paciente')}
+                              className="flex-1 gap-2"
+                            >
+                              <FileText className="h-4 w-4" />
+                              Entregar Ficha
+                            </Button>
+                          )}
+                          {atencion.estado_ficha === 'en_mano_paciente' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleCambiarEstadoFicha(atencion.id, 'completada')}
+                              className="flex-1 gap-2"
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                              Recibir Ficha
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <Select 
+                          value={selectedBox[atencion.id] || ""} 
+                          onValueChange={(value) => setSelectedBox(prev => ({...prev, [atencion.id]: value}))}
+                          disabled={atencion.estado_ficha !== 'completada'}
+                        >
+                          <SelectTrigger className="flex-1">
+                            <SelectValue placeholder={atencion.estado_ficha !== 'completada' ? 'Esperando ficha...' : 'Seleccionar box'} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {boxes
+                              .filter((box) => pendingBoxes[atencion.id]?.includes(box.nombre))
+                              .map((box) => (
+                                <SelectItem key={box.id} value={box.id}>
+                                  {box.nombre}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          size="sm"
+                          onClick={() => handleIniciarAtencion(atencion.id)}
+                          className="gap-2"
+                          disabled={atencion.estado_ficha !== 'completada'}
+                        >
+                          <Play className="h-4 w-4" />
+                          Llamar
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -608,6 +670,15 @@ const Flujo = () => {
                         <Badge variant="outline" className="text-xs">
                           {atencion.pacientes.tipo_servicio === "workmed" ? "WM" : "J"}
                         </Badge>
+                      </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">
+                          Ficha: 
+                          {atencion.estado_ficha === 'pendiente' && ' Pendiente de entregar'}
+                          {atencion.estado_ficha === 'en_mano_paciente' && ' En mano del paciente'}
+                          {atencion.estado_ficha === 'completada' && ' ✓ Completada'}
+                        </span>
                       </div>
                       {atencion.boxes && (
                         <div className="text-sm text-primary font-medium mt-1">

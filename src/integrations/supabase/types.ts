@@ -64,6 +64,7 @@ export type Database = {
           box_id: string | null
           created_at: string | null
           estado: Database["public"]["Enums"]["estado_atencion"] | null
+          estado_ficha: Database["public"]["Enums"]["estado_ficha"] | null
           fecha_fin_atencion: string | null
           fecha_ingreso: string | null
           fecha_inicio_atencion: string | null
@@ -76,6 +77,7 @@ export type Database = {
           box_id?: string | null
           created_at?: string | null
           estado?: Database["public"]["Enums"]["estado_atencion"] | null
+          estado_ficha?: Database["public"]["Enums"]["estado_ficha"] | null
           fecha_fin_atencion?: string | null
           fecha_ingreso?: string | null
           fecha_inicio_atencion?: string | null
@@ -88,6 +90,7 @@ export type Database = {
           box_id?: string | null
           created_at?: string | null
           estado?: Database["public"]["Enums"]["estado_atencion"] | null
+          estado_ficha?: Database["public"]["Enums"]["estado_ficha"] | null
           fecha_fin_atencion?: string | null
           fecha_ingreso?: string | null
           fecha_inicio_atencion?: string | null
@@ -323,6 +326,7 @@ export type Database = {
     Enums: {
       estado_atencion: "en_espera" | "en_atencion" | "completado" | "incompleto"
       estado_examen: "pendiente" | "completado" | "incompleto"
+      estado_ficha: "pendiente" | "en_mano_paciente" | "completada"
       tipo_servicio: "workmed" | "jenner"
     }
     CompositeTypes: {
@@ -453,6 +457,7 @@ export const Constants = {
     Enums: {
       estado_atencion: ["en_espera", "en_atencion", "completado", "incompleto"],
       estado_examen: ["pendiente", "completado", "incompleto"],
+      estado_ficha: ["pendiente", "en_mano_paciente", "completada"],
       tipo_servicio: ["workmed", "jenner"],
     },
   },
