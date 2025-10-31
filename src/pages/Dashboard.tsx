@@ -9,6 +9,7 @@ const Dashboard = () => {
     totalPacientes: 0,
     enEspera: 0,
     enAtencion: 0,
+    completados: 0,
     totalBoxes: 0,
     totalExamenes: 0,
   });
@@ -19,9 +20,19 @@ const Dashboard = () => {
 
   const loadStats = async () => {
     try {
-      const [pacientesRes, atencionesRes, boxesRes, examenesRes] = await Promise.all([
+      const today = new Date();
+      const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
+      const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+
+      const [pacientesRes, atencionesRes, completadosRes, boxesRes, examenesRes] = await Promise.all([
         supabase.from("pacientes").select("id", { count: "exact", head: true }),
         supabase.from("atenciones").select("estado"),
+        supabase
+          .from("atenciones")
+          .select("id", { count: "exact", head: true })
+          .eq("estado", "completado")
+          .gte("fecha_ingreso", startOfDay)
+          .lte("fecha_ingreso", endOfDay),
         supabase.from("boxes").select("id", { count: "exact", head: true }).eq("activo", true),
         supabase.from("examenes").select("id", { count: "exact", head: true }),
       ]);
@@ -33,6 +44,7 @@ const Dashboard = () => {
         totalPacientes: pacientesRes.count || 0,
         enEspera,
         enAtencion,
+        completados: completadosRes.count || 0,
         totalBoxes: boxesRes.count || 0,
         totalExamenes: examenesRes.count || 0,
       });
@@ -53,7 +65,7 @@ const Dashboard = () => {
           </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
           <Card className="border-l-4 border-l-primary">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -87,6 +99,18 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-foreground">{stats.enAtencion}</div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-green-600">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Completados Hoy
+              </CardTitle>
+              <ClipboardCheck className="h-5 w-5 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-foreground">{stats.completados}</div>
             </CardContent>
           </Card>
 

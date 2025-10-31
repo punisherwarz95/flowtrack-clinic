@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Activity, Users, Box, ClipboardList, LayoutDashboard, Building2 } from "lucide-react";
+import { Activity, Users, Box, ClipboardList, LayoutDashboard, Building2, CheckCircle } from "lucide-react";
 
 const Navigation = () => {
   const location = useLocation();
@@ -8,6 +8,7 @@ const Navigation = () => {
     { to: "/", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/flujo", icon: Activity, label: "Flujo" },
     { to: "/pacientes", icon: Users, label: "Pacientes" },
+    { to: "/completados", icon: CheckCircle, label: "Completados" },
     { to: "/empresas", icon: Building2, label: "Empresas" },
     { to: "/boxes", icon: Box, label: "Boxes" },
     { to: "/examenes", icon: ClipboardList, label: "Exámenes" },
