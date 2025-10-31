@@ -222,7 +222,6 @@ export type Database = {
           nombre: string
           rut: string | null
           telefono: string | null
-          tiene_ficha: boolean | null
           tipo_servicio: Database["public"]["Enums"]["tipo_servicio"] | null
         }
         Insert: {
@@ -234,7 +233,6 @@ export type Database = {
           nombre: string
           rut?: string | null
           telefono?: string | null
-          tiene_ficha?: boolean | null
           tipo_servicio?: Database["public"]["Enums"]["tipo_servicio"] | null
         }
         Update: {
@@ -246,7 +244,6 @@ export type Database = {
           nombre?: string
           rut?: string | null
           telefono?: string | null
-          tiene_ficha?: boolean | null
           tipo_servicio?: Database["public"]["Enums"]["tipo_servicio"] | null
         }
         Relationships: [
