@@ -561,10 +561,30 @@ const Flujo = () => {
                           <FileText className="h-4 w-4 text-muted-foreground" />
                           <span className="text-xs text-muted-foreground">
                             Ficha: 
-                            {atencion.estado_ficha === 'pendiente' && ' Pendiente de entregar'}
-                            {atencion.estado_ficha === 'en_mano_paciente' && ' En mano del paciente'}
-                            {atencion.estado_ficha === 'completada' && ' ✓ Completada'}
+                            {atencion.estado_ficha === 'pendiente' && ' Pendiente'}
+                            {atencion.estado_ficha === 'en_mano_paciente' && ' Con paciente'}
+                            {atencion.estado_ficha === 'completada' && ' ✓ Recibida'}
                           </span>
+                          {atencion.estado_ficha === 'pendiente' && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleCambiarEstadoFicha(atencion.id, 'en_mano_paciente')}
+                              className="h-6 px-2 text-xs"
+                            >
+                              Entregar
+                            </Button>
+                          )}
+                          {atencion.estado_ficha === 'en_mano_paciente' && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleCambiarEstadoFicha(atencion.id, 'completada')}
+                              className="h-6 px-2 text-xs"
+                            >
+                              Recibir
+                            </Button>
+                          )}
                         </div>
                         {pendingBoxes[atencion.id] && pendingBoxes[atencion.id].length > 0 && (
                           <div className="text-xs text-primary mt-1">
@@ -575,62 +595,32 @@ const Flujo = () => {
                       {getEstadoBadge(atencion.estado)}
                     </div>
                     
-                    <div className="space-y-2">
-                      {atencion.estado_ficha !== 'completada' && (
-                        <div className="flex gap-2">
-                          {atencion.estado_ficha === 'pendiente' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleCambiarEstadoFicha(atencion.id, 'en_mano_paciente')}
-                              className="flex-1 gap-2"
-                            >
-                              <FileText className="h-4 w-4" />
-                              Entregar Ficha
-                            </Button>
-                          )}
-                          {atencion.estado_ficha === 'en_mano_paciente' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleCambiarEstadoFicha(atencion.id, 'completada')}
-                              className="flex-1 gap-2"
-                            >
-                              <CheckCircle className="h-4 w-4" />
-                              Recibir Ficha
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                      <div className="flex gap-2">
-                        <Select 
-                          value={selectedBox[atencion.id] || ""} 
-                          onValueChange={(value) => setSelectedBox(prev => ({...prev, [atencion.id]: value}))}
-                          disabled={atencion.estado_ficha !== 'completada'}
-                        >
-                          <SelectTrigger className="flex-1">
-                            <SelectValue placeholder={atencion.estado_ficha !== 'completada' ? 'Esperando ficha...' : 'Seleccionar box'} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {boxes
-                              .filter((box) => pendingBoxes[atencion.id]?.includes(box.nombre))
-                              .map((box) => (
-                                <SelectItem key={box.id} value={box.id}>
-                                  {box.nombre}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          size="sm"
-                          onClick={() => handleIniciarAtencion(atencion.id)}
-                          className="gap-2"
-                          disabled={atencion.estado_ficha !== 'completada'}
-                        >
-                          <Play className="h-4 w-4" />
-                          Llamar
-                        </Button>
-                      </div>
+                    <div className="flex gap-2">
+                      <Select 
+                        value={selectedBox[atencion.id] || ""} 
+                        onValueChange={(value) => setSelectedBox(prev => ({...prev, [atencion.id]: value}))}
+                      >
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Seleccionar box" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {boxes
+                            .filter((box) => pendingBoxes[atencion.id]?.includes(box.nombre))
+                            .map((box) => (
+                              <SelectItem key={box.id} value={box.id}>
+                                {box.nombre}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size="sm"
+                        onClick={() => handleIniciarAtencion(atencion.id)}
+                        className="gap-2"
+                      >
+                        <Play className="h-4 w-4" />
+                        Llamar
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -675,10 +665,30 @@ const Flujo = () => {
                         <FileText className="h-4 w-4 text-muted-foreground" />
                         <span className="text-xs text-muted-foreground">
                           Ficha: 
-                          {atencion.estado_ficha === 'pendiente' && ' Pendiente de entregar'}
-                          {atencion.estado_ficha === 'en_mano_paciente' && ' En mano del paciente'}
-                          {atencion.estado_ficha === 'completada' && ' ✓ Completada'}
+                          {atencion.estado_ficha === 'pendiente' && ' Pendiente'}
+                          {atencion.estado_ficha === 'en_mano_paciente' && ' Con paciente'}
+                          {atencion.estado_ficha === 'completada' && ' ✓ Recibida'}
                         </span>
+                        {atencion.estado_ficha === 'pendiente' && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleCambiarEstadoFicha(atencion.id, 'en_mano_paciente')}
+                            className="h-6 px-2 text-xs"
+                          >
+                            Entregar
+                          </Button>
+                        )}
+                        {atencion.estado_ficha === 'en_mano_paciente' && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleCambiarEstadoFicha(atencion.id, 'completada')}
+                            className="h-6 px-2 text-xs"
+                          >
+                            Recibir
+                          </Button>
+                        )}
                       </div>
                       {atencion.boxes && (
                         <div className="text-sm text-primary font-medium mt-1">
