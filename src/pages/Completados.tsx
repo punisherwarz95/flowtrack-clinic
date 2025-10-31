@@ -21,6 +21,7 @@ interface AtencionCompletada {
     id: string;
     nombre: string;
     rut: string;
+    tipo_servicio: string;
     empresas: {
       nombre: string;
     } | null;
@@ -62,7 +63,7 @@ const Completados = () => {
 
       let query = supabase
         .from("atenciones")
-        .select("*, pacientes(id, nombre, rut, empresas(nombre)), atencion_examenes(id, estado, examenes(nombre))")
+        .select("*, pacientes(id, nombre, rut, tipo_servicio, empresas(nombre)), atencion_examenes(id, estado, examenes(nombre))")
         .eq("estado", "completado")
         .order("fecha_fin_atencion", { ascending: false });
 
@@ -136,10 +137,10 @@ const Completados = () => {
                         <div className="font-medium text-foreground">
                           {atencion.pacientes.nombre}
                         </div>
+                        <Badge variant="outline" className="text-xs">
+                          {atencion.pacientes.tipo_servicio === "workmed" ? "WM" : "J"}
+                        </Badge>
                         <Badge className="bg-green-600">Completado</Badge>
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        RUT: {atencion.pacientes.rut}
                       </div>
                       <div className="text-sm text-muted-foreground">
                         Empresa: {atencion.pacientes.empresas?.nombre || "Sin empresa"}
@@ -147,6 +148,9 @@ const Completados = () => {
                       <div className="text-xs text-muted-foreground mt-2">
                         <div>Ingreso: {format(new Date(atencion.fecha_ingreso), "dd/MM/yyyy HH:mm", { locale: es })}</div>
                         <div>Finalizado: {format(new Date(atencion.fecha_fin_atencion), "dd/MM/yyyy HH:mm", { locale: es })}</div>
+                        <div className="font-medium mt-1">
+                          Tiempo en centro: {Math.round((new Date(atencion.fecha_fin_atencion).getTime() - new Date(atencion.fecha_ingreso).getTime()) / 60000)} min
+                        </div>
                       </div>
                     </div>
                   </div>
