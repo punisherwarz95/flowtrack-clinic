@@ -64,6 +64,7 @@ const Flujo = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [pendingBoxes, setPendingBoxes] = useState<{[atencionId: string]: string[]}>({});
   const [atencionExamenes, setAtencionExamenes] = useState<{[atencionId: string]: AtencionExamen[]}>({});
+  const [examenesPendientes, setExamenesPendientes] = useState<{[atencionId: string]: string[]}>({});
 
   useEffect(() => {
     loadData();
@@ -129,10 +130,39 @@ const Flujo = () => {
 
       await loadPendingBoxesForAtenciones(atencionesRes.data || [], boxesRes.data || []);
       await loadAtencionExamenes(atencionesRes.data || []);
+      await loadExamenesPendientes(atencionesRes.data || [], examenesRes.data || []);
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al cargar datos");
     }
+  };
+
+  const loadExamenesPendientes = async (atenciones: Atencion[], examenesList: Examen[]) => {
+    const newExamenesPendientes: {[atencionId: string]: string[]} = {};
+
+    for (const atencion of atenciones) {
+      try {
+        const { data: atencionExamenes, error } = await supabase
+          .from("atencion_examenes")
+          .select("examen_id")
+          .eq("atencion_id", atencion.id)
+          .eq("estado", "pendiente");
+
+        if (error) throw error;
+
+        const examenesIds = atencionExamenes?.map(ae => ae.examen_id) || [];
+        const nombresExamenes = examenesList
+          .filter(ex => examenesIds.includes(ex.id))
+          .map(ex => ex.nombre);
+
+        newExamenesPendientes[atencion.id] = nombresExamenes;
+      } catch (error) {
+        console.error("Error loading examenes pendientes:", error);
+        newExamenesPendientes[atencion.id] = [];
+      }
+    }
+
+    setExamenesPendientes(newExamenesPendientes);
   };
 
   const loadAtencionExamenes = async (atenciones: Atencion[]) => {
@@ -492,9 +522,11 @@ const Flujo = () => {
                             {atencion.pacientes.nombre}
                           </div>
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          RUT: {atencion.pacientes.rut}
-                        </div>
+                        {examenesPendientes[atencion.id] && examenesPendientes[atencion.id].length > 0 && (
+                          <div className="text-sm text-muted-foreground mt-1">
+                            Exámenes pendientes: {examenesPendientes[atencion.id].join(", ")}
+                          </div>
+                        )}
                         <div className="text-xs text-muted-foreground mt-1">
                           Ingreso: {format(new Date(atencion.fecha_ingreso), "HH:mm", { locale: es })}
                         </div>
@@ -562,9 +594,11 @@ const Flujo = () => {
                           {atencion.pacientes.nombre}
                         </div>
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        RUT: {atencion.pacientes.rut}
-                      </div>
+                      {examenesPendientes[atencion.id] && examenesPendientes[atencion.id].length > 0 && (
+                        <div className="text-sm text-muted-foreground mt-1">
+                          Exámenes pendientes: {examenesPendientes[atencion.id].join(", ")}
+                        </div>
+                      )}
                       <div className="text-xs text-muted-foreground mt-1">
                         Ingreso: {format(new Date(atencion.fecha_ingreso), "HH:mm", { locale: es })}
                       </div>
