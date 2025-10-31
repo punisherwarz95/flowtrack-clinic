@@ -33,7 +33,6 @@ interface Patient {
   nombre: string;
   tipo_servicio: 'workmed' | 'jenner' | null;
   empresa_id: string | null;
-  tiene_ficha: boolean;
   empresas?: {
     id: string;
     nombre: string;
@@ -79,7 +78,6 @@ const Pacientes = () => {
     nombre: "",
     tipo_servicio: "workmed" as "workmed" | "jenner",
     empresa_id: "",
-    tiene_ficha: false, // Por defecto NO tiene ficha
     rut: "", // Temporary until types are regenerated
   });
 
@@ -183,7 +181,6 @@ const Pacientes = () => {
       nombre: patient.nombre,
       tipo_servicio: patient.tipo_servicio || "workmed",
       empresa_id: patient.empresa_id || "",
-      tiene_ficha: patient.tiene_ficha,
       rut: "",
     });
 
@@ -312,7 +309,7 @@ const Pacientes = () => {
 
       setOpenDialog(false);
       setEditingPatient(null);
-      setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: "", tiene_ficha: false, rut: "" });
+      setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: "", rut: "" });
       setSelectedExamenes([]);
       setSelectedPaquete("");
       loadPatients();
@@ -378,7 +375,7 @@ const Pacientes = () => {
               setOpenDialog(open);
               if (!open) {
                 setEditingPatient(null);
-                setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: "", tiene_ficha: false, rut: "" });
+                setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: "", rut: "" });
                 setSelectedExamenes([]);
                 setSelectedPaquete("");
               }
@@ -551,9 +548,6 @@ const Pacientes = () => {
                     <div className="text-right text-sm">
                       <div className={`font-medium ${patient.tipo_servicio === 'workmed' ? 'text-blue-600' : 'text-green-600'}`}>
                         {patient.tipo_servicio === 'workmed' ? 'Workmed' : 'Jenner'}
-                      </div>
-                      <div className={`text-xs ${patient.tiene_ficha ? 'text-green-600' : 'text-orange-600'}`}>
-                        {patient.tiene_ficha ? '📋 Con ficha' : '⏳ Sin ficha'}
                       </div>
                     </div>
                     <Button

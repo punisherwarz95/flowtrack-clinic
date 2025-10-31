@@ -22,11 +22,10 @@ interface Atencion {
   fecha_ingreso: string;
   numero_ingreso: number;
   box_id: string | null;
-  pacientes: { 
+  pacientes: {
     id: string;
-    nombre: string; 
+    nombre: string;
     rut: string;
-    tiene_ficha: boolean;
   };
   boxes: { nombre: string } | null;
 }
@@ -100,7 +99,7 @@ const Flujo = () => {
 
       let atencionesQuery = supabase
         .from("atenciones")
-        .select("*, pacientes(id, nombre, rut, tiene_ficha), boxes(*)")
+        .select("*, pacientes(id, nombre, rut), boxes(*)")
         .in("estado", ["en_espera", "en_atencion"])
         .order("fecha_ingreso", { ascending: true });
 
@@ -276,21 +275,6 @@ const Flujo = () => {
     }
   };
 
-  const toggleFicha = async (pacienteId: string, tieneFicha: boolean) => {
-    try {
-      const { error } = await supabase
-        .from("pacientes")
-        .update({ tiene_ficha: !tieneFicha })
-        .eq("id", pacienteId);
-
-      if (error) throw error;
-      toast.success("Estado de ficha actualizado");
-      loadData();
-    } catch (error) {
-      console.error("Error:", error);
-      toast.error("Error al actualizar ficha");
-    }
-  };
 
   const handleToggleExamen = async (atencionExamenId: string, currentEstado: string) => {
     try {
@@ -519,14 +503,6 @@ const Flujo = () => {
                             Boxes pendientes: {pendingBoxes[atencion.id].join(", ")}
                           </div>
                         )}
-                        <Button
-                          variant={atencion.pacientes.tiene_ficha ? "default" : "outline"}
-                          size="sm"
-                          className="mt-2"
-                          onClick={() => toggleFicha(atencion.pacientes.id, atencion.pacientes.tiene_ficha)}
-                        >
-                          {atencion.pacientes.tiene_ficha ? "✅ Ficha entregada" : "⏳ Ficha pendiente"}
-                        </Button>
                       </div>
                       {getEstadoBadge(atencion.estado)}
                     </div>
@@ -602,14 +578,6 @@ const Flujo = () => {
                           Boxes pendientes: {pendingBoxes[atencion.id].join(", ")}
                         </div>
                       )}
-                      <Button
-                        variant={atencion.pacientes.tiene_ficha ? "default" : "outline"}
-                        size="sm"
-                        className="mt-2"
-                        onClick={() => toggleFicha(atencion.pacientes.id, atencion.pacientes.tiene_ficha)}
-                      >
-                        {atencion.pacientes.tiene_ficha ? "✅ Ficha entregada" : "⏳ Ficha pendiente"}
-                      </Button>
                     </div>
                     {getEstadoBadge(atencion.estado)}
                   </div>

@@ -16,7 +16,6 @@ interface Atencion {
     id: string;
     nombre: string;
     tipo_servicio: string;
-    tiene_ficha: boolean;
     empresas: {
       nombre: string;
     } | null;
@@ -174,21 +173,6 @@ const BoxView = () => {
     }
   };
 
-  const toggleFicha = async (pacienteId: string, tieneFicha: boolean) => {
-    try {
-      const { error } = await supabase
-        .from("pacientes")
-        .update({ tiene_ficha: !tieneFicha })
-        .eq("id", pacienteId);
-
-      if (error) throw error;
-      toast.success("Estado de ficha actualizado");
-      loadAtenciones();
-    } catch (error) {
-      console.error("Error:", error);
-      toast.error("Error al actualizar ficha");
-    }
-  };
 
   if (!box) {
     return (
@@ -244,13 +228,6 @@ const BoxView = () => {
                         </span>
                       </p>
                     </div>
-                    <Button
-                      variant={atencion.pacientes.tiene_ficha ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => toggleFicha(atencion.pacientes.id, atencion.pacientes.tiene_ficha)}
-                    >
-                      {atencion.pacientes.tiene_ficha ? "✅ Ficha entregada" : "⏳ Ficha pendiente"}
-                    </Button>
                   </div>
                 </CardHeader>
                 <CardContent>
