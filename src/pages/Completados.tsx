@@ -149,7 +149,7 @@ const Completados = () => {
                         <div>Ingreso: {format(new Date(atencion.fecha_ingreso), "dd/MM/yyyy HH:mm", { locale: es })}</div>
                         <div>Finalizado: {format(new Date(atencion.fecha_fin_atencion), "dd/MM/yyyy HH:mm", { locale: es })}</div>
                         <div className="font-medium mt-1">
-                          Tiempo en centro: {Math.round((new Date(atencion.fecha_fin_atencion).getTime() - new Date(atencion.fecha_ingreso).getTime()) / 60000)} min
+                          Tiempo en centro: {Math.floor((new Date(atencion.fecha_fin_atencion).getTime() - new Date(atencion.fecha_ingreso).getTime()) / 60000)} min
                         </div>
                       </div>
                     </div>
