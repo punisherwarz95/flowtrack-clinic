@@ -92,12 +92,18 @@ const Dashboard = () => {
               <div className="text-3xl font-bold text-foreground">{stats.totalPacientes}</div>
               {stats.pacientesPorEmpresa.length > 0 && (
                 <div className="mt-2 flex gap-2 text-xs text-muted-foreground">
-                  {stats.pacientesPorEmpresa.map((emp) => (
-                    <span key={emp.empresa} className="flex items-center gap-1">
-                      <span className="font-medium">{emp.empresa}:</span>
-                      <span>{emp.count}</span>
-                    </span>
-                  ))}
+                  {stats.pacientesPorEmpresa.map((emp) => {
+                    const abreviatura = emp.empresa.toLowerCase().includes('wom') ? 'WM' : 
+                                       emp.empresa.toLowerCase().includes('jenner') ? 'J' : 
+                                       emp.empresa.substring(0, 2).toUpperCase();
+                    const countFormatted = emp.count.toString().padStart(2, '0');
+                    return (
+                      <span key={emp.empresa} className="flex items-center gap-1">
+                        <span className="font-medium">{abreviatura}:</span>
+                        <span>{countFormatted}</span>
+                      </span>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
