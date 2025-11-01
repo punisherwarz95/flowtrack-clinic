@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, Users, Box, ClipboardCheck, Calendar as CalendarIcon } from "lucide-react";
+import { Activity, Box, ClipboardCheck, Calendar as CalendarIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import Navigation from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
@@ -13,13 +13,11 @@ import { cn } from "@/lib/utils";
 const Dashboard = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [stats, setStats] = useState({
-    totalPacientes: 0,
     enEspera: 0,
     enAtencion: 0,
     completados: 0,
     totalBoxes: 0,
     totalExamenes: 0,
-    pacientesPorEmpresa: [] as Array<{ empresa: string; count: number }>,
     enEsperaDistribucion: { workmed: 0, jenner: 0 },
     enAtencionDistribucion: { workmed: 0, jenner: 0 },
     completadosDistribucion: { workmed: 0, jenner: 0 },
@@ -35,8 +33,7 @@ const Dashboard = () => {
       const startOfDay = new Date(dateToUse.setHours(0, 0, 0, 0)).toISOString();
       const endOfDay = new Date(dateToUse.setHours(23, 59, 59, 999)).toISOString();
 
-      const [pacientesRes, atencionesRes, completadosRes, boxesRes, examenesRes, pacientesTipoRes] = await Promise.all([
-        supabase.from("pacientes").select("id", { count: "exact", head: true }),
+      const [atencionesRes, completadosRes, boxesRes, examenesRes] = await Promise.all([
         supabase.from("atenciones").select("estado, pacientes(tipo_servicio)"),
         supabase
           .from("atenciones")
@@ -46,23 +43,10 @@ const Dashboard = () => {
           .lte("fecha_ingreso", endOfDay),
         supabase.from("boxes").select("id", { count: "exact", head: true }).eq("activo", true),
         supabase.from("examenes").select("id", { count: "exact", head: true }),
-        supabase.from("pacientes").select("tipo_servicio"),
       ]);
 
       const enEsperaData = atencionesRes.data?.filter((a: any) => a.estado === "en_espera") || [];
       const enAtencionData = atencionesRes.data?.filter((a: any) => a.estado === "en_atencion") || [];
-
-      // Contar pacientes por tipo de servicio
-      const tipoCount: Record<string, number> = {};
-      pacientesTipoRes.data?.forEach((p: any) => {
-        const tipo = p.tipo_servicio || "Sin tipo";
-        tipoCount[tipo] = (tipoCount[tipo] || 0) + 1;
-      });
-
-      const pacientesPorEmpresa = Object.entries(tipoCount).map(([empresa, count]) => ({
-        empresa,
-        count,
-      }));
 
       // Distribución en espera
       const enEsperaWM = enEsperaData.filter((a: any) => a.pacientes?.tipo_servicio === "workmed").length;
@@ -77,13 +61,11 @@ const Dashboard = () => {
       const completadosJ = completadosRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "jenner").length || 0;
 
       setStats({
-        totalPacientes: pacientesRes.count || 0,
         enEspera: enEsperaData.length,
         enAtencion: enAtencionData.length,
         completados: completadosRes.data?.length || 0,
         totalBoxes: boxesRes.count || 0,
         totalExamenes: examenesRes.count || 0,
-        pacientesPorEmpresa,
         enEsperaDistribucion: { workmed: enEsperaWM, jenner: enEsperaJ },
         enAtencionDistribucion: { workmed: enAtencionWM, jenner: enAtencionJ },
         completadosDistribucion: { workmed: completadosWM, jenner: completadosJ },
@@ -127,35 +109,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
-          <Card className="border-l-4 border-l-primary">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Pacientes
-              </CardTitle>
-              <Users className="h-5 w-5 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-foreground">{stats.totalPacientes}</div>
-              {stats.pacientesPorEmpresa.length > 0 && (
-                <div className="mt-2 flex gap-2 text-xs text-muted-foreground">
-                  {stats.pacientesPorEmpresa.map((emp) => {
-                    const abreviatura = emp.empresa.toLowerCase().includes('workmed') ? 'WM' : 
-                                       emp.empresa.toLowerCase().includes('jenner') ? 'J' : 
-                                       emp.empresa.substring(0, 2).toUpperCase();
-                    const countFormatted = emp.count.toString().padStart(2, '0');
-                    return (
-                      <span key={emp.empresa} className="flex items-center gap-1">
-                        <span className="font-medium">{abreviatura}:</span>
-                        <span>{countFormatted}</span>
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           <Card className="border-l-4 border-l-warning">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
