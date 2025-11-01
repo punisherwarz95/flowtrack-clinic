@@ -38,6 +38,7 @@ interface AtencionCompletada {
 const Completados = () => {
   const [atenciones, setAtenciones] = useState<AtencionCompletada[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [distribucion, setDistribucion] = useState({ workmed: 0, jenner: 0 });
 
   useEffect(() => {
     loadAtenciones();
@@ -75,6 +76,11 @@ const Completados = () => {
 
       if (error) throw error;
       setAtenciones(data || []);
+      
+      // Calcular distribución por tipo de servicio
+      const workmedCount = data?.filter(a => a.pacientes.tipo_servicio === "workmed").length || 0;
+      const jennerCount = data?.filter(a => a.pacientes.tipo_servicio === "jenner").length || 0;
+      setDistribucion({ workmed: workmedCount, jenner: jennerCount });
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al cargar atenciones completadas");
@@ -114,9 +120,13 @@ const Completados = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-3">
               <CheckCircle className="h-5 w-5 text-green-600" />
-              Total Completadas: {atenciones.length}
+              <span>Total Completadas: {atenciones.length}</span>
+              <div className="flex gap-2 text-sm font-normal text-muted-foreground">
+                <span>WM: {distribucion.workmed.toString().padStart(2, "0")}</span>
+                <span>J: {distribucion.jenner.toString().padStart(2, "0")}</span>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
