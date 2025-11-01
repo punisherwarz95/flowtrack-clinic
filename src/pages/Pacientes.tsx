@@ -248,13 +248,14 @@ const Pacientes = () => {
         if (atencionError) throw atencionError;
 
         if (atencionData) {
-          // Eliminar exámenes anteriores
+          // Solo eliminar exámenes pendientes (conservar los completados)
           await supabase
             .from("atencion_examenes")
             .delete()
-            .eq("atencion_id", atencionData.id);
+            .eq("atencion_id", atencionData.id)
+            .eq("estado", "pendiente");
 
-          // Agregar nuevos exámenes
+          // Agregar nuevos exámenes como pendientes
           const examenesData = selectedExamenes.map(examenId => ({
             atencion_id: atencionData.id,
             examen_id: examenId,

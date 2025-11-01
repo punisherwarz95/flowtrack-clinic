@@ -9,6 +9,7 @@ import PatientCombobox from "@/components/PatientCombobox";
 import { Clock, UserPlus, Play, CheckCircle, XCircle, Calendar as CalendarIcon, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
@@ -67,6 +68,7 @@ const Flujo = () => {
   const [pendingBoxes, setPendingBoxes] = useState<{[atencionId: string]: string[]}>({});
   const [atencionExamenes, setAtencionExamenes] = useState<{[atencionId: string]: AtencionExamen[]}>({});
   const [examenesPendientes, setExamenesPendientes] = useState<{[atencionId: string]: string[]}>({});
+  const [confirmCompletarDialog, setConfirmCompletarDialog] = useState<{open: boolean, atencionId: string | null}>({open: false, atencionId: null});
 
   useEffect(() => {
     loadData();
@@ -527,6 +529,28 @@ const Flujo = () => {
           </DialogContent>
         </Dialog>
 
+        <AlertDialog open={confirmCompletarDialog.open} onOpenChange={(open) => setConfirmCompletarDialog({open, atencionId: null})}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Completar atención?</AlertDialogTitle>
+              <AlertDialogDescription>
+                ¿Todos los exámenes de este box han sido completados? Esta acción marcará los exámenes pendientes del box actual como completados.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={() => {
+                if (confirmCompletarDialog.atencionId) {
+                  handleCompletarAtencion(confirmCompletarDialog.atencionId, "completado");
+                }
+                setConfirmCompletarDialog({open: false, atencionId: null});
+              }}>
+                Confirmar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         <div className="grid md:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
@@ -733,7 +757,7 @@ const Flujo = () => {
                     <Button
                       size="sm"
                       variant="default"
-                      onClick={() => handleCompletarAtencion(atencion.id, "completado")}
+                      onClick={() => setConfirmCompletarDialog({open: true, atencionId: atencion.id})}
                       className="flex-1 gap-2"
                     >
                       <CheckCircle className="h-4 w-4" />
