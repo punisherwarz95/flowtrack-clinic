@@ -87,7 +87,7 @@ const Flujo = () => {
       )
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "pacientes" },
+        { event: "*", schema: "public", table: "pacientes" },
         () => loadData()
       )
       .subscribe();
