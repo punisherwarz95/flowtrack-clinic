@@ -25,7 +25,7 @@ const Dashboard = () => {
       const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
       const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString();
 
-      const [pacientesRes, atencionesRes, completadosRes, boxesRes, examenesRes, pacientesEmpresaRes] = await Promise.all([
+      const [pacientesRes, atencionesRes, completadosRes, boxesRes, examenesRes, pacientesTipoRes] = await Promise.all([
         supabase.from("pacientes").select("id", { count: "exact", head: true }),
         supabase.from("atenciones").select("estado"),
         supabase
@@ -36,20 +36,20 @@ const Dashboard = () => {
           .lte("fecha_ingreso", endOfDay),
         supabase.from("boxes").select("id", { count: "exact", head: true }).eq("activo", true),
         supabase.from("examenes").select("id", { count: "exact", head: true }),
-        supabase.from("pacientes").select("empresa_id, empresas(nombre)"),
+        supabase.from("pacientes").select("tipo_servicio"),
       ]);
 
       const enEspera = atencionesRes.data?.filter((a) => a.estado === "en_espera").length || 0;
       const enAtencion = atencionesRes.data?.filter((a) => a.estado === "en_atencion").length || 0;
 
-      // Contar pacientes por empresa
-      const empresaCount: Record<string, number> = {};
-      pacientesEmpresaRes.data?.forEach((p: any) => {
-        const empresaNombre = p.empresas?.nombre || "Sin empresa";
-        empresaCount[empresaNombre] = (empresaCount[empresaNombre] || 0) + 1;
+      // Contar pacientes por tipo de servicio
+      const tipoCount: Record<string, number> = {};
+      pacientesTipoRes.data?.forEach((p: any) => {
+        const tipo = p.tipo_servicio || "Sin tipo";
+        tipoCount[tipo] = (tipoCount[tipo] || 0) + 1;
       });
 
-      const pacientesPorEmpresa = Object.entries(empresaCount).map(([empresa, count]) => ({
+      const pacientesPorEmpresa = Object.entries(tipoCount).map(([empresa, count]) => ({
         empresa,
         count,
       }));
@@ -93,7 +93,7 @@ const Dashboard = () => {
               {stats.pacientesPorEmpresa.length > 0 && (
                 <div className="mt-2 flex gap-2 text-xs text-muted-foreground">
                   {stats.pacientesPorEmpresa.map((emp) => {
-                    const abreviatura = emp.empresa.toLowerCase().includes('wom') ? 'WM' : 
+                    const abreviatura = emp.empresa.toLowerCase().includes('workmed') ? 'WM' : 
                                        emp.empresa.toLowerCase().includes('jenner') ? 'J' : 
                                        emp.empresa.substring(0, 2).toUpperCase();
                     const countFormatted = emp.count.toString().padStart(2, '0');
