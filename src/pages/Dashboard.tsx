@@ -12,6 +12,7 @@ const Dashboard = () => {
     completados: 0,
     totalBoxes: 0,
     totalExamenes: 0,
+    pacientesPorEmpresa: [] as Array<{ empresa: string; count: number }>,
   });
 
   useEffect(() => {
@@ -24,7 +25,7 @@ const Dashboard = () => {
       const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
       const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString();
 
-      const [pacientesRes, atencionesRes, completadosRes, boxesRes, examenesRes] = await Promise.all([
+      const [pacientesRes, atencionesRes, completadosRes, boxesRes, examenesRes, pacientesEmpresaRes] = await Promise.all([
         supabase.from("pacientes").select("id", { count: "exact", head: true }),
         supabase.from("atenciones").select("estado"),
         supabase
@@ -35,10 +36,23 @@ const Dashboard = () => {
           .lte("fecha_ingreso", endOfDay),
         supabase.from("boxes").select("id", { count: "exact", head: true }).eq("activo", true),
         supabase.from("examenes").select("id", { count: "exact", head: true }),
+        supabase.from("pacientes").select("empresa_id, empresas(nombre)"),
       ]);
 
       const enEspera = atencionesRes.data?.filter((a) => a.estado === "en_espera").length || 0;
       const enAtencion = atencionesRes.data?.filter((a) => a.estado === "en_atencion").length || 0;
+
+      // Contar pacientes por empresa
+      const empresaCount: Record<string, number> = {};
+      pacientesEmpresaRes.data?.forEach((p: any) => {
+        const empresaNombre = p.empresas?.nombre || "Sin empresa";
+        empresaCount[empresaNombre] = (empresaCount[empresaNombre] || 0) + 1;
+      });
+
+      const pacientesPorEmpresa = Object.entries(empresaCount).map(([empresa, count]) => ({
+        empresa,
+        count,
+      }));
 
       setStats({
         totalPacientes: pacientesRes.count || 0,
@@ -47,6 +61,7 @@ const Dashboard = () => {
         completados: completadosRes.count || 0,
         totalBoxes: boxesRes.count || 0,
         totalExamenes: examenesRes.count || 0,
+        pacientesPorEmpresa,
       });
     } catch (error) {
       console.error("Error cargando estadísticas:", error);
@@ -75,6 +90,16 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-foreground">{stats.totalPacientes}</div>
+              {stats.pacientesPorEmpresa.length > 0 && (
+                <div className="mt-2 flex gap-2 text-xs text-muted-foreground">
+                  {stats.pacientesPorEmpresa.map((emp) => (
+                    <span key={emp.empresa} className="flex items-center gap-1">
+                      <span className="font-medium">{emp.empresa}:</span>
+                      <span>{emp.count}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
