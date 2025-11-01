@@ -1,10 +1,17 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, Users, Box, ClipboardCheck } from "lucide-react";
+import { Activity, Users, Box, ClipboardCheck, Calendar as CalendarIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import Navigation from "@/components/Navigation";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 const Dashboard = () => {
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [stats, setStats] = useState({
     totalPacientes: 0,
     enEspera: 0,
@@ -13,24 +20,27 @@ const Dashboard = () => {
     totalBoxes: 0,
     totalExamenes: 0,
     pacientesPorEmpresa: [] as Array<{ empresa: string; count: number }>,
+    enEsperaDistribucion: { workmed: 0, jenner: 0 },
+    enAtencionDistribucion: { workmed: 0, jenner: 0 },
+    completadosDistribucion: { workmed: 0, jenner: 0 },
   });
 
   useEffect(() => {
     loadStats();
-  }, []);
+  }, [selectedDate]);
 
   const loadStats = async () => {
     try {
-      const today = new Date();
-      const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
-      const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+      const dateToUse = selectedDate || new Date();
+      const startOfDay = new Date(dateToUse.setHours(0, 0, 0, 0)).toISOString();
+      const endOfDay = new Date(dateToUse.setHours(23, 59, 59, 999)).toISOString();
 
       const [pacientesRes, atencionesRes, completadosRes, boxesRes, examenesRes, pacientesTipoRes] = await Promise.all([
         supabase.from("pacientes").select("id", { count: "exact", head: true }),
-        supabase.from("atenciones").select("estado"),
+        supabase.from("atenciones").select("estado, pacientes(tipo_servicio)"),
         supabase
           .from("atenciones")
-          .select("id", { count: "exact", head: true })
+          .select("id, pacientes(tipo_servicio)")
           .eq("estado", "completado")
           .gte("fecha_ingreso", startOfDay)
           .lte("fecha_ingreso", endOfDay),
@@ -39,8 +49,8 @@ const Dashboard = () => {
         supabase.from("pacientes").select("tipo_servicio"),
       ]);
 
-      const enEspera = atencionesRes.data?.filter((a) => a.estado === "en_espera").length || 0;
-      const enAtencion = atencionesRes.data?.filter((a) => a.estado === "en_atencion").length || 0;
+      const enEsperaData = atencionesRes.data?.filter((a: any) => a.estado === "en_espera") || [];
+      const enAtencionData = atencionesRes.data?.filter((a: any) => a.estado === "en_atencion") || [];
 
       // Contar pacientes por tipo de servicio
       const tipoCount: Record<string, number> = {};
@@ -54,14 +64,29 @@ const Dashboard = () => {
         count,
       }));
 
+      // Distribución en espera
+      const enEsperaWM = enEsperaData.filter((a: any) => a.pacientes?.tipo_servicio === "workmed").length;
+      const enEsperaJ = enEsperaData.filter((a: any) => a.pacientes?.tipo_servicio === "jenner").length;
+
+      // Distribución en atención
+      const enAtencionWM = enAtencionData.filter((a: any) => a.pacientes?.tipo_servicio === "workmed").length;
+      const enAtencionJ = enAtencionData.filter((a: any) => a.pacientes?.tipo_servicio === "jenner").length;
+
+      // Distribución completados
+      const completadosWM = completadosRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "workmed").length || 0;
+      const completadosJ = completadosRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "jenner").length || 0;
+
       setStats({
         totalPacientes: pacientesRes.count || 0,
-        enEspera,
-        enAtencion,
-        completados: completadosRes.count || 0,
+        enEspera: enEsperaData.length,
+        enAtencion: enAtencionData.length,
+        completados: completadosRes.data?.length || 0,
         totalBoxes: boxesRes.count || 0,
         totalExamenes: examenesRes.count || 0,
         pacientesPorEmpresa,
+        enEsperaDistribucion: { workmed: enEsperaWM, jenner: enEsperaJ },
+        enAtencionDistribucion: { workmed: enAtencionWM, jenner: enAtencionJ },
+        completadosDistribucion: { workmed: completadosWM, jenner: completadosJ },
       });
     } catch (error) {
       console.error("Error cargando estadísticas:", error);
@@ -74,10 +99,32 @@ const Dashboard = () => {
       
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Vista general del sistema de gestión de pacientes
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard</h1>
+              <p className="text-muted-foreground">
+                Vista general del sistema de gestión de pacientes
+              </p>
+            </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <CalendarIcon className="h-4 w-4" />
+                  {selectedDate ? format(selectedDate, "PPP", { locale: es }) : "Seleccionar fecha"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={setSelectedDate}
+                  locale={es}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
@@ -118,6 +165,10 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-foreground">{stats.enEspera}</div>
+              <div className="mt-2 flex gap-2 text-xs text-muted-foreground">
+                <span>WM: {stats.enEsperaDistribucion.workmed.toString().padStart(2, "0")}</span>
+                <span>J: {stats.enEsperaDistribucion.jenner.toString().padStart(2, "0")}</span>
+              </div>
             </CardContent>
           </Card>
 
@@ -130,6 +181,10 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-foreground">{stats.enAtencion}</div>
+              <div className="mt-2 flex gap-2 text-xs text-muted-foreground">
+                <span>WM: {stats.enAtencionDistribucion.workmed.toString().padStart(2, "0")}</span>
+                <span>J: {stats.enAtencionDistribucion.jenner.toString().padStart(2, "0")}</span>
+              </div>
             </CardContent>
           </Card>
 
@@ -142,6 +197,10 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-foreground">{stats.completados}</div>
+              <div className="mt-2 flex gap-2 text-xs text-muted-foreground">
+                <span>WM: {stats.completadosDistribucion.workmed.toString().padStart(2, "0")}</span>
+                <span>J: {stats.completadosDistribucion.jenner.toString().padStart(2, "0")}</span>
+              </div>
             </CardContent>
           </Card>
 
