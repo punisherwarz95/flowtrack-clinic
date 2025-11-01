@@ -133,7 +133,7 @@ const Flujo = () => {
       setExamenes(examenesRes.data || []);
 
       await loadPendingBoxesForAtenciones(atencionesRes.data || [], boxesRes.data || []);
-      await loadAtencionExamenes(atencionesRes.data || []);
+      await loadAtencionExamenes(atencionesRes.data || [], boxesRes.data || []);
       await loadExamenesPendientes(atencionesRes.data || [], examenesRes.data || []);
     } catch (error) {
       console.error("Error:", error);
@@ -169,13 +169,13 @@ const Flujo = () => {
     setExamenesPendientes(newExamenesPendientes);
   };
 
-  const loadAtencionExamenes = async (atenciones: Atencion[]) => {
+  const loadAtencionExamenes = async (atenciones: Atencion[], boxesList: Box[]) => {
     const newAtencionExamenes: {[atencionId: string]: AtencionExamen[]} = {};
 
     for (const atencion of atenciones) {
       if (atencion.estado === "en_atencion" && atencion.box_id) {
         try {
-          const box = boxes.find(b => b.id === atencion.box_id);
+          const box = boxesList.find(b => b.id === atencion.box_id);
           const boxExamIds = box?.box_examenes.map(be => be.examen_id) || [];
 
           const { data: examenesData, error } = await supabase
