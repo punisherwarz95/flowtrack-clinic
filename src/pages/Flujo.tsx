@@ -807,12 +807,12 @@ const Flujo = () => {
                     </Button>
                     <Button
                       size="sm"
-                      variant="destructive"
+                      variant="outline"
                       onClick={() => handleCompletarAtencion(atencion.id, "incompleto")}
-                      className="flex-1 gap-2"
+                      className="flex-1 gap-2 border-warning text-warning hover:bg-warning/10"
                     >
                       <XCircle className="h-4 w-4" />
-                      Incompleto
+                      Parcial
                     </Button>
                   </div>
                 </div>
