@@ -301,6 +301,9 @@ const Flujo = () => {
 
       // Si no se actualizó ninguna fila, otro box lo llamó antes
       if (!updated) {
+        // Actualizar inmediatamente la vista
+        await loadData();
+        
         const { data: current } = await supabase
           .from("atenciones")
           .select("box_id, boxes(nombre), estado")
@@ -312,7 +315,6 @@ const Flujo = () => {
         } else {
           toast.error("Este paciente ya fue llamado por otro box recientemente");
         }
-        await loadData();
         return;
       }
 
