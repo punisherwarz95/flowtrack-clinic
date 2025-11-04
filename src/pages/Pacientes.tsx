@@ -387,131 +387,135 @@ const Pacientes = () => {
                   Nuevo Paciente
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>{editingPatient ? "Editar Paciente" : "Agregar Nuevo Paciente"}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div>
-                    <Label htmlFor="nombre">Nombre Completo *</Label>
-                    <Input
-                      id="nombre"
-                      required
-                      value={formData.nombre}
-                      onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Tipo de Servicio *</Label>
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="tipo_servicio"
-                          value="workmed"
-                          checked={formData.tipo_servicio === "workmed"}
-                          onChange={(e) => setFormData({ ...formData, tipo_servicio: e.target.value as "workmed" | "jenner" })}
-                          className="w-4 h-4"
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Columna izquierda - Datos del paciente */}
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="nombre">Nombre Completo *</Label>
+                        <Input
+                          id="nombre"
+                          required
+                          value={formData.nombre}
+                          onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
                         />
-                        <span>Workmed</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="tipo_servicio"
-                          value="jenner"
-                          checked={formData.tipo_servicio === "jenner"}
-                          onChange={(e) => setFormData({ ...formData, tipo_servicio: e.target.value as "workmed" | "jenner" })}
-                          className="w-4 h-4"
-                        />
-                        <span>Jenner</span>
-                      </label>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label>Tipo de Servicio *</Label>
+                        <div className="flex gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="tipo_servicio"
+                              value="workmed"
+                              checked={formData.tipo_servicio === "workmed"}
+                              onChange={(e) => setFormData({ ...formData, tipo_servicio: e.target.value as "workmed" | "jenner" })}
+                              className="w-4 h-4"
+                            />
+                            <span>Workmed</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="tipo_servicio"
+                              value="jenner"
+                              checked={formData.tipo_servicio === "jenner"}
+                              onChange={(e) => setFormData({ ...formData, tipo_servicio: e.target.value as "workmed" | "jenner" })}
+                              className="w-4 h-4"
+                            />
+                            <span>Jenner</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="empresa">Empresa *</Label>
+                        <select
+                          id="empresa"
+                          required
+                          value={formData.empresa_id}
+                          onChange={(e) => setFormData({ ...formData, empresa_id: e.target.value })}
+                          className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                        >
+                          <option value="">Seleccione una empresa</option>
+                          {empresas.map((empresa) => (
+                            <option key={empresa.id} value={empresa.id}>
+                              {empresa.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <Label>Paquetes de Exámenes</Label>
+                        <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2 bg-muted/30">
+                          {paquetes.map((paquete) => (
+                            <label key={paquete.id} className="flex items-start gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={selectedPaquetes.includes(paquete.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedPaquetes([...selectedPaquetes, paquete.id]);
+                                    const examenesIds = paquete.paquete_examen_items.map(item => item.examen_id);
+                                    const nuevosExamenes = examenesIds.filter(id => !selectedExamenes.includes(id));
+                                    setSelectedExamenes([...selectedExamenes, ...nuevosExamenes]);
+                                  } else {
+                                    setSelectedPaquetes(selectedPaquetes.filter(id => id !== paquete.id));
+                                  }
+                                }}
+                                className="w-4 h-4 mt-0.5"
+                              />
+                              <div className="flex-1">
+                                <span className="text-sm font-medium">{paquete.nombre}</span>
+                                {paquete.descripcion && (
+                                  <p className="text-xs text-muted-foreground">{paquete.descripcion}</p>
+                                )}
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                  </div>
 
-                  <div>
-                    <Label htmlFor="empresa">Empresa *</Label>
-                    <select
-                      id="empresa"
-                      required
-                      value={formData.empresa_id}
-                      onChange={(e) => setFormData({ ...formData, empresa_id: e.target.value })}
-                      className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                    >
-                      <option value="">Seleccione una empresa</option>
-                      {empresas.map((empresa) => (
-                        <option key={empresa.id} value={empresa.id}>
-                          {empresa.nombre}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <Label>Paquetes de Exámenes (Opcional)</Label>
-                    <div className="border rounded-md p-3 max-h-32 overflow-y-auto space-y-2 bg-muted/30">
-                      {paquetes.map((paquete) => (
-                        <label key={paquete.id} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedPaquetes.includes(paquete.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                // Agregar paquete y sus exámenes
-                                setSelectedPaquetes([...selectedPaquetes, paquete.id]);
-                                const examenesIds = paquete.paquete_examen_items.map(item => item.examen_id);
-                                // Agregar solo los exámenes que no estén ya seleccionados
-                                const nuevosExamenes = examenesIds.filter(id => !selectedExamenes.includes(id));
-                                setSelectedExamenes([...selectedExamenes, ...nuevosExamenes]);
-                              } else {
-                                // Remover paquete pero mantener los exámenes seleccionados
-                                setSelectedPaquetes(selectedPaquetes.filter(id => id !== paquete.id));
-                              }
-                            }}
-                            className="w-4 h-4"
-                          />
-                          <div>
-                            <span className="text-sm font-medium">{paquete.nombre}</span>
-                            {paquete.descripcion && (
-                              <p className="text-xs text-muted-foreground">{paquete.descripcion}</p>
-                            )}
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label>Exámenes a Realizar *</Label>
-                    <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2 bg-muted/30">
-                      {examenes.map((examen) => (
-                        <label key={examen.id} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedExamenes.includes(examen.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedExamenes([...selectedExamenes, examen.id]);
-                              } else {
-                                setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
-                                // Si el examen pertenece a un paquete seleccionado, deseleccionar ese paquete
-                                const paquetesConExamen = paquetes.filter(p => 
-                                  p.paquete_examen_items.some(item => item.examen_id === examen.id)
-                                );
-                                const paquetesARemover = paquetesConExamen.filter(p => selectedPaquetes.includes(p.id));
-                                if (paquetesARemover.length > 0) {
-                                  setSelectedPaquetes(selectedPaquetes.filter(id => 
-                                    !paquetesARemover.map(p => p.id).includes(id)
-                                  ));
-                                }
-                              }
-                            }}
-                            className="w-4 h-4"
-                          />
-                          <span className="text-sm">{examen.nombre}</span>
-                        </label>
-                      ))}
+                    {/* Columna derecha - Exámenes */}
+                    <div className="space-y-4">
+                      <div>
+                        <Label>Exámenes a Realizar *</Label>
+                        <div className="border rounded-md p-3 max-h-[400px] overflow-y-auto space-y-2 bg-muted/30">
+                          {examenes.map((examen) => (
+                            <label key={examen.id} className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={selectedExamenes.includes(examen.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedExamenes([...selectedExamenes, examen.id]);
+                                  } else {
+                                    setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
+                                    const paquetesConExamen = paquetes.filter(p => 
+                                      p.paquete_examen_items.some(item => item.examen_id === examen.id)
+                                    );
+                                    const paquetesARemover = paquetesConExamen.filter(p => selectedPaquetes.includes(p.id));
+                                    if (paquetesARemover.length > 0) {
+                                      setSelectedPaquetes(selectedPaquetes.filter(id => 
+                                        !paquetesARemover.map(p => p.id).includes(id)
+                                      ));
+                                    }
+                                  }
+                                }}
+                                className="w-4 h-4"
+                              />
+                              <span className="text-sm">{examen.nombre}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
