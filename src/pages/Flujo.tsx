@@ -346,9 +346,20 @@ const Flujo = () => {
   };
 
 
-  const handleToggleExamen = async (atencionExamenId: string, currentEstado: string) => {
+  const handleToggleExamen = async (atencionExamenId: string, currentEstado: string, atencionId: string) => {
+    const nuevoEstado = currentEstado === "pendiente" ? "completado" : "pendiente";
+    
+    // Actualización optimista: cambiar UI inmediatamente
+    setAtencionExamenes(prev => ({
+      ...prev,
+      [atencionId]: prev[atencionId].map(ae => 
+        ae.id === atencionExamenId 
+          ? { ...ae, estado: nuevoEstado }
+          : ae
+      )
+    }));
+
     try {
-      const nuevoEstado = currentEstado === "pendiente" ? "completado" : "pendiente";
       const { error } = await supabase
         .from("atencion_examenes")
         .update({ 
@@ -361,6 +372,15 @@ const Flujo = () => {
       toast.success(`Examen marcado como ${nuevoEstado}`);
       await loadData();
     } catch (error) {
+      // Revertir cambio si hay error
+      setAtencionExamenes(prev => ({
+        ...prev,
+        [atencionId]: prev[atencionId].map(ae => 
+          ae.id === atencionExamenId 
+            ? { ...ae, estado: currentEstado }
+            : ae
+        )
+      }));
       console.error("Error:", error);
       toast.error("Error al actualizar examen");
     }
@@ -781,7 +801,7 @@ const Flujo = () => {
                             <Checkbox
                               id={ae.id}
                               checked={ae.estado === "completado"}
-                              onCheckedChange={() => handleToggleExamen(ae.id, ae.estado)}
+                              onCheckedChange={() => handleToggleExamen(ae.id, ae.estado, atencion.id)}
                             />
                             <Label htmlFor={ae.id} className="text-sm cursor-pointer flex-1">
                               {ae.examenes.nombre}
