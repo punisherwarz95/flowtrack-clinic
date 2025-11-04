@@ -283,6 +283,20 @@ const Flujo = () => {
     }
 
     try {
+      // Verificar si el paciente ya está en atención con otro box
+      const { data: atencionActual, error: checkError } = await supabase
+        .from("atenciones")
+        .select("box_id, boxes(nombre)")
+        .eq("id", atencionId)
+        .single();
+
+      if (checkError) throw checkError;
+
+      if (atencionActual.box_id) {
+        toast.error(`Este paciente ya está siendo atendido en ${atencionActual.boxes?.nombre || 'otro box'}`);
+        return;
+      }
+
       const { error } = await supabase
         .from("atenciones")
         .update({
@@ -290,7 +304,8 @@ const Flujo = () => {
           box_id: boxId,
           fecha_inicio_atencion: new Date().toISOString(),
         })
-        .eq("id", atencionId);
+        .eq("id", atencionId)
+        .is("box_id", null); // Solo actualizar si no tiene box asignado
 
       if (error) throw error;
       
