@@ -414,7 +414,8 @@ const Flujo = () => {
     }
   };
 
-  const enEspera = atenciones.filter((a) => a.estado === "en_espera");
+  // Solo mostrar en espera los pacientes que NO tienen box asignado
+  const enEspera = atenciones.filter((a) => a.estado === "en_espera" && !a.box_id);
   const enAtencion = atenciones.filter((a) => a.estado === "en_atencion");
 
   const getEstadoBadge = (estado: string) => {
