@@ -283,21 +283,8 @@ const Flujo = () => {
     }
 
     try {
-      // Verificar si el paciente ya está en atención con otro box
-      const { data: atencionActual, error: checkError } = await supabase
-        .from("atenciones")
-        .select("box_id, boxes(nombre)")
-        .eq("id", atencionId)
-        .single();
-
-      if (checkError) throw checkError;
-
-      if (atencionActual.box_id) {
-        toast.error(`Este paciente ya está siendo atendido en ${atencionActual.boxes?.nombre || 'otro box'}`);
-        return;
-      }
-
-      const { error } = await supabase
+      // Intento atómico: solo pasar a en_atencion si sigue en espera y sin box
+      const { data: updated, error: updateError } = await supabase
         .from("atenciones")
         .update({
           estado: "en_atencion",
@@ -305,17 +292,37 @@ const Flujo = () => {
           fecha_inicio_atencion: new Date().toISOString(),
         })
         .eq("id", atencionId)
-        .is("box_id", null); // Solo actualizar si no tiene box asignado
+        .eq("estado", "en_espera")
+        .is("box_id", null)
+        .select("id")
+        .maybeSingle();
 
-      if (error) throw error;
-      
+      if (updateError) throw updateError;
+
+      // Si no se actualizó ninguna fila, otro box lo llamó antes
+      if (!updated) {
+        const { data: current } = await supabase
+          .from("atenciones")
+          .select("box_id, boxes(nombre), estado")
+          .eq("id", atencionId)
+          .single();
+
+        if (current?.box_id) {
+          toast.error(`Este paciente ya está siendo atendido en ${current.boxes?.nombre || "otro box"}`);
+        } else {
+          toast.error("Este paciente ya fue llamado por otro box recientemente");
+        }
+        await loadData();
+        return;
+      }
+
       toast.success("Atención iniciada - El paciente puede pasar al box");
-      setSelectedBox(prev => {
-        const newState = {...prev};
+      setSelectedBox((prev) => {
+        const newState = { ...prev };
         delete newState[atencionId];
         return newState;
       });
-      
+
       // Forzar recarga inmediata de datos
       await loadData();
     } catch (error: any) {
