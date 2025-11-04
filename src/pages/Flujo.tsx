@@ -318,7 +318,14 @@ const Flujo = () => {
         return;
       }
 
-      toast.success("Atención iniciada - El paciente puede pasar al box");
+      toast.success(`🔔 Paciente ${atenciones.find(a => a.id === atencionId)?.pacientes.nombre} entró a ${boxes.find(b => b.id === boxId)?.nombre}`, {
+        duration: 5000,
+        style: {
+          fontSize: '18px',
+          padding: '20px',
+          fontWeight: 'bold'
+        }
+      });
       setSelectedBox((prev) => {
         const newState = { ...prev };
         delete newState[atencionId];
