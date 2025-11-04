@@ -69,6 +69,7 @@ const Flujo = () => {
   const [atencionExamenes, setAtencionExamenes] = useState<{[atencionId: string]: AtencionExamen[]}>({});
   const [examenesPendientes, setExamenesPendientes] = useState<{[atencionId: string]: string[]}>({});
   const [confirmCompletarDialog, setConfirmCompletarDialog] = useState<{open: boolean, atencionId: string | null}>({open: false, atencionId: null});
+  const [showErrorOverlay, setShowErrorOverlay] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -301,6 +302,10 @@ const Flujo = () => {
 
       // Si no se actualizó ninguna fila, otro box lo llamó antes
       if (!updated) {
+        // Mostrar overlay oscuro
+        setShowErrorOverlay(true);
+        setTimeout(() => setShowErrorOverlay(false), 1000);
+        
         // Actualizar inmediatamente la vista
         await loadData();
         
@@ -462,6 +467,11 @@ const Flujo = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Overlay de error */}
+      {showErrorOverlay && (
+        <div className="fixed inset-0 bg-black/70 z-50 animate-fade-in" />
+      )}
+      
       <Navigation />
 
       <main className="container mx-auto px-4 py-8">
