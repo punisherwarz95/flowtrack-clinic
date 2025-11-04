@@ -73,7 +73,7 @@ const Pacientes = () => {
   const [editingPatient, setEditingPatient] = useState<string | null>(null);
   const [pacienteToDelete, setPacienteToDelete] = useState<string | null>(null);
   const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
-  const [selectedPaquete, setSelectedPaquete] = useState<string>("");
+  const [selectedPaquetes, setSelectedPaquetes] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     nombre: "",
     tipo_servicio: "workmed" as "workmed" | "jenner",
@@ -312,7 +312,7 @@ const Pacientes = () => {
       setEditingPatient(null);
       setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: "", rut: "" });
       setSelectedExamenes([]);
-      setSelectedPaquete("");
+      setSelectedPaquetes([]);
       loadPatients();
     } catch (error: any) {
       console.error("Error:", error);
@@ -378,7 +378,7 @@ const Pacientes = () => {
                 setEditingPatient(null);
                 setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: "", rut: "" });
                 setSelectedExamenes([]);
-                setSelectedPaquete("");
+                setSelectedPaquetes([]);
               }
             }}>
               <DialogTrigger asChild>
@@ -449,32 +449,37 @@ const Pacientes = () => {
                   </div>
 
                   <div>
-                    <Label htmlFor="paquete">Paquete de Exámenes (Opcional)</Label>
-                    <select
-                      id="paquete"
-                      value={selectedPaquete}
-                      onChange={(e) => {
-                        const paqueteId = e.target.value;
-                        setSelectedPaquete(paqueteId);
-                        if (paqueteId) {
-                          const paquete = paquetes.find(p => p.id === paqueteId);
-                          if (paquete) {
-                            const examenesIds = paquete.paquete_examen_items.map(item => item.examen_id);
-                            setSelectedExamenes(examenesIds);
-                          }
-                        } else {
-                          setSelectedExamenes([]);
-                        }
-                      }}
-                      className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                    >
-                      <option value="">Sin paquete - seleccionar individual</option>
+                    <Label>Paquetes de Exámenes (Opcional)</Label>
+                    <div className="border rounded-md p-3 max-h-32 overflow-y-auto space-y-2 bg-muted/30">
                       {paquetes.map((paquete) => (
-                        <option key={paquete.id} value={paquete.id}>
-                          {paquete.nombre}
-                        </option>
+                        <label key={paquete.id} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedPaquetes.includes(paquete.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                // Agregar paquete y sus exámenes
+                                setSelectedPaquetes([...selectedPaquetes, paquete.id]);
+                                const examenesIds = paquete.paquete_examen_items.map(item => item.examen_id);
+                                // Agregar solo los exámenes que no estén ya seleccionados
+                                const nuevosExamenes = examenesIds.filter(id => !selectedExamenes.includes(id));
+                                setSelectedExamenes([...selectedExamenes, ...nuevosExamenes]);
+                              } else {
+                                // Remover paquete pero mantener los exámenes seleccionados
+                                setSelectedPaquetes(selectedPaquetes.filter(id => id !== paquete.id));
+                              }
+                            }}
+                            className="w-4 h-4"
+                          />
+                          <div>
+                            <span className="text-sm font-medium">{paquete.nombre}</span>
+                            {paquete.descripcion && (
+                              <p className="text-xs text-muted-foreground">{paquete.descripcion}</p>
+                            )}
+                          </div>
+                        </label>
                       ))}
-                    </select>
+                    </div>
                   </div>
 
                   <div>
@@ -486,11 +491,20 @@ const Pacientes = () => {
                             type="checkbox"
                             checked={selectedExamenes.includes(examen.id)}
                             onChange={(e) => {
-                              setSelectedPaquete(""); // Clear paquete selection
                               if (e.target.checked) {
                                 setSelectedExamenes([...selectedExamenes, examen.id]);
                               } else {
                                 setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
+                                // Si el examen pertenece a un paquete seleccionado, deseleccionar ese paquete
+                                const paquetesConExamen = paquetes.filter(p => 
+                                  p.paquete_examen_items.some(item => item.examen_id === examen.id)
+                                );
+                                const paquetesARemover = paquetesConExamen.filter(p => selectedPaquetes.includes(p.id));
+                                if (paquetesARemover.length > 0) {
+                                  setSelectedPaquetes(selectedPaquetes.filter(id => 
+                                    !paquetesARemover.map(p => p.id).includes(id)
+                                  ));
+                                }
                               }
                             }}
                             className="w-4 h-4"
