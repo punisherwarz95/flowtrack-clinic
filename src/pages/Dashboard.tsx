@@ -34,7 +34,12 @@ const Dashboard = () => {
       const endOfDay = new Date(dateToUse.setHours(23, 59, 59, 999)).toISOString();
 
       const [atencionesRes, completadosRes, boxesRes, examenesRes] = await Promise.all([
-        supabase.from("atenciones").select("estado, pacientes(tipo_servicio)"),
+        supabase
+          .from("atenciones")
+          .select("estado, pacientes(tipo_servicio)")
+          .in("estado", ["en_espera", "en_atencion"])
+          .gte("fecha_ingreso", startOfDay)
+          .lte("fecha_ingreso", endOfDay),
         supabase
           .from("atenciones")
           .select("id, pacientes(tipo_servicio)")
