@@ -74,6 +74,7 @@ const Pacientes = () => {
   const [pacienteToDelete, setPacienteToDelete] = useState<string | null>(null);
   const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
   const [selectedPaquetes, setSelectedPaquetes] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     nombre: "",
     tipo_servicio: "workmed" as "workmed" | "jenner",
@@ -217,6 +218,8 @@ const Pacientes = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (isSubmitting) return;
+    
     if (!formData.empresa_id) {
       toast.error("Debe seleccionar una empresa");
       return;
@@ -227,6 +230,7 @@ const Pacientes = () => {
       return;
     }
 
+    setIsSubmitting(true);
     try {
       if (editingPatient) {
         // Actualizar paciente
@@ -317,6 +321,8 @@ const Pacientes = () => {
     } catch (error: any) {
       console.error("Error:", error);
       toast.error(error.message || "Error al procesar paciente");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -519,8 +525,8 @@ const Pacientes = () => {
                     </div>
                   </div>
 
-                  <Button type="submit" className="w-full">
-                    {editingPatient ? "Actualizar Paciente" : "Guardar Paciente"}
+                  <Button type="submit" className="w-full" disabled={isSubmitting}>
+                    {isSubmitting ? "Guardando..." : (editingPatient ? "Actualizar Paciente" : "Guardar Paciente")}
                   </Button>
                 </form>
               </DialogContent>
