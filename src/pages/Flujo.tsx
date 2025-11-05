@@ -643,34 +643,43 @@ const Flujo = () => {
                             {atencion.pacientes.tipo_servicio === "workmed" ? "WM" : "J"}
                           </Badge>
                         </div>
-                        <div className="flex items-center gap-2 mt-2">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">
-                            Ficha: 
-                            {atencion.estado_ficha === 'pendiente' && ' Pendiente'}
-                            {atencion.estado_ficha === 'en_mano_paciente' && ' Con paciente'}
-                            {atencion.estado_ficha === 'completada' && ' ✓ Recibida'}
-                          </span>
-                          {atencion.estado_ficha === 'pendiente' && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleCambiarEstadoFicha(atencion.id, 'en_mano_paciente')}
-                              className="h-6 px-2 text-xs"
-                            >
-                              Entregar
-                            </Button>
-                          )}
-                          {atencion.estado_ficha === 'en_mano_paciente' && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleCambiarEstadoFicha(atencion.id, 'completada')}
-                              className="h-6 px-2 text-xs"
-                            >
-                              Recibir
-                            </Button>
-                          )}
+                        <div className="mt-2">
+                          <div className="flex items-center gap-1 mb-1">
+                            <FileText className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-xs font-medium text-muted-foreground">Estado Ficha:</span>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-1.5">
+                              <Checkbox
+                                id={`pendiente-${atencion.id}`}
+                                checked={atencion.estado_ficha === 'pendiente'}
+                                onCheckedChange={() => handleCambiarEstadoFicha(atencion.id, 'pendiente')}
+                              />
+                              <Label htmlFor={`pendiente-${atencion.id}`} className="text-xs cursor-pointer">
+                                Pendiente
+                              </Label>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Checkbox
+                                id={`en_mano-${atencion.id}`}
+                                checked={atencion.estado_ficha === 'en_mano_paciente'}
+                                onCheckedChange={() => handleCambiarEstadoFicha(atencion.id, 'en_mano_paciente')}
+                              />
+                              <Label htmlFor={`en_mano-${atencion.id}`} className="text-xs cursor-pointer">
+                                Con Paciente
+                              </Label>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Checkbox
+                                id={`completada-${atencion.id}`}
+                                checked={atencion.estado_ficha === 'completada'}
+                                onCheckedChange={() => handleCambiarEstadoFicha(atencion.id, 'completada')}
+                              />
+                              <Label htmlFor={`completada-${atencion.id}`} className="text-xs cursor-pointer">
+                                Recibida
+                              </Label>
+                            </div>
+                          </div>
                         </div>
                         {pendingBoxes[atencion.id] && pendingBoxes[atencion.id].length > 0 && (
                           <div className="text-xs text-primary mt-1">
@@ -747,34 +756,43 @@ const Flujo = () => {
                           {atencion.pacientes.tipo_servicio === "workmed" ? "WM" : "J"}
                         </Badge>
                       </div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground">
-                          Ficha: 
-                          {atencion.estado_ficha === 'pendiente' && ' Pendiente'}
-                          {atencion.estado_ficha === 'en_mano_paciente' && ' Con paciente'}
-                          {atencion.estado_ficha === 'completada' && ' ✓ Recibida'}
-                        </span>
-                        {atencion.estado_ficha === 'pendiente' && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleCambiarEstadoFicha(atencion.id, 'en_mano_paciente')}
-                            className="h-6 px-2 text-xs"
-                          >
-                            Entregar
-                          </Button>
-                        )}
-                        {atencion.estado_ficha === 'en_mano_paciente' && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleCambiarEstadoFicha(atencion.id, 'completada')}
-                            className="h-6 px-2 text-xs"
-                          >
-                            Recibir
-                          </Button>
-                        )}
+                      <div className="mt-2">
+                        <div className="flex items-center gap-1 mb-1">
+                          <FileText className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs font-medium text-muted-foreground">Estado Ficha:</span>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-1.5">
+                            <Checkbox
+                              id={`pendiente-aten-${atencion.id}`}
+                              checked={atencion.estado_ficha === 'pendiente'}
+                              onCheckedChange={() => handleCambiarEstadoFicha(atencion.id, 'pendiente')}
+                            />
+                            <Label htmlFor={`pendiente-aten-${atencion.id}`} className="text-xs cursor-pointer">
+                              Pendiente
+                            </Label>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Checkbox
+                              id={`en_mano-aten-${atencion.id}`}
+                              checked={atencion.estado_ficha === 'en_mano_paciente'}
+                              onCheckedChange={() => handleCambiarEstadoFicha(atencion.id, 'en_mano_paciente')}
+                            />
+                            <Label htmlFor={`en_mano-aten-${atencion.id}`} className="text-xs cursor-pointer">
+                              Con Paciente
+                            </Label>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Checkbox
+                              id={`completada-aten-${atencion.id}`}
+                              checked={atencion.estado_ficha === 'completada'}
+                              onCheckedChange={() => handleCambiarEstadoFicha(atencion.id, 'completada')}
+                            />
+                            <Label htmlFor={`completada-aten-${atencion.id}`} className="text-xs cursor-pointer">
+                              Recibida
+                            </Label>
+                          </div>
+                        </div>
                       </div>
                       {atencion.boxes && (
                         <div className="text-sm text-primary font-medium mt-1">
