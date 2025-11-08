@@ -71,6 +71,7 @@ const Flujo = () => {
   const [confirmCompletarDialog, setConfirmCompletarDialog] = useState<{open: boolean, atencionId: string | null}>({open: false, atencionId: null});
   const [showErrorOverlay, setShowErrorOverlay] = useState(false);
   const [filtroBox, setFiltroBox] = useState<string>("todos");
+  const [filtroBoxAtencion, setFiltroBoxAtencion] = useState<string>("todos");
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
@@ -498,7 +499,14 @@ const Flujo = () => {
     );
   }
   
-  const enAtencion = atenciones.filter((a) => a.estado === "en_atencion");
+  let enAtencion = atenciones.filter((a) => a.estado === "en_atencion");
+  
+  // Filtrar por box pendiente si se seleccionó uno
+  if (filtroBoxAtencion !== "todos") {
+    enAtencion = enAtencion.filter((a) => 
+      pendingBoxes[a.id]?.includes(boxes.find(b => b.id === filtroBoxAtencion)?.nombre || "")
+    );
+  }
 
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
@@ -783,6 +791,21 @@ const Flujo = () => {
           <Card>
             <CardHeader>
               <CardTitle className="text-info">En Atención ({enAtencion.length})</CardTitle>
+              <div className="mt-3">
+                <Select value={filtroBoxAtencion} onValueChange={setFiltroBoxAtencion}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Filtrar por box pendiente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos los boxes</SelectItem>
+                    {boxes.map((box) => (
+                      <SelectItem key={box.id} value={box.id}>
+                        {box.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               {enAtencion.map((atencion) => (
