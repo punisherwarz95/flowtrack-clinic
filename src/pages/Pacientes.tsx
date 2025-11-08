@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Trash2, Pencil } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Calendar as CalendarIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
@@ -27,6 +27,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 interface Patient {
   id: string;
@@ -75,6 +78,7 @@ const Pacientes = () => {
   const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
   const [selectedPaquetes, setSelectedPaquetes] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [formData, setFormData] = useState({
     nombre: "",
     tipo_servicio: "workmed" as "workmed" | "jenner",
@@ -87,13 +91,13 @@ const Pacientes = () => {
     loadEmpresas();
     loadExamenes();
     loadPaquetes();
-  }, []);
+  }, [selectedDate]);
 
   const loadPatients = async () => {
     try {
-      const today = new Date();
-      const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
-      const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+      const dateToUse = selectedDate || new Date();
+      const startOfDay = new Date(dateToUse.setHours(0, 0, 0, 0)).toISOString();
+      const endOfDay = new Date(dateToUse.setHours(23, 59, 59, 999)).toISOString();
 
       const { data: patientsData, error: patientsError } = await supabase
         .from("pacientes")
@@ -378,6 +382,24 @@ const Pacientes = () => {
           </div>
           
           <div className="flex gap-3">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <CalendarIcon className="h-4 w-4" />
+                  {selectedDate ? format(selectedDate, "PPP", { locale: es }) : "Seleccionar fecha"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={setSelectedDate}
+                  locale={es}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
             <Dialog open={openDialog} onOpenChange={(open) => {
               setOpenDialog(open);
               if (!open) {
