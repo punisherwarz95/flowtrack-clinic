@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, Box, ClipboardCheck, Calendar as CalendarIcon } from "lucide-react";
+import { Activity, Box, ClipboardCheck, Calendar as CalendarIcon, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import Navigation from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
@@ -114,7 +114,24 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+          <Card className="border-l-4 border-l-primary col-span-full lg:col-span-1">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Total Pacientes
+              </CardTitle>
+              <Users className="h-5 w-5 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-foreground">
+                {stats.enEspera + stats.enAtencion + stats.completados}
+              </div>
+              <div className="mt-2 text-xs text-muted-foreground">
+                Hoy
+              </div>
+            </CardContent>
+          </Card>
+
           <Card className="border-l-4 border-l-warning">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
