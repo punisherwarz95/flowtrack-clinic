@@ -99,22 +99,31 @@ const Pacientes = () => {
       const startOfDay = new Date(dateToUse.setHours(0, 0, 0, 0)).toISOString();
       const endOfDay = new Date(dateToUse.setHours(23, 59, 59, 999)).toISOString();
 
+      // Obtener atenciones del día seleccionado (cualquier estado)
+      const { data: atencionesData, error: atencionesError } = await supabase
+        .from("atenciones")
+        .select("paciente_id, numero_ingreso, fecha_ingreso, estado")
+        .gte("fecha_ingreso", startOfDay)
+        .lte("fecha_ingreso", endOfDay);
+
+      if (atencionesError) throw atencionesError;
+
+      // Obtener IDs únicos de pacientes que tienen atención en el día
+      const pacienteIds = [...new Set(atencionesData?.map(a => a.paciente_id) || [])];
+
+      if (pacienteIds.length === 0) {
+        setPatients([]);
+        return;
+      }
+
+      // Obtener solo los pacientes que tienen atenciones en el día
       const { data: patientsData, error: patientsError } = await supabase
         .from("pacientes")
         .select("*, empresas(*)")
+        .in("id", pacienteIds)
         .order("nombre");
 
       if (patientsError) throw patientsError;
-
-      // Obtener atenciones del día actual para cada paciente
-      const { data: atencionesData, error: atencionesError } = await supabase
-        .from("atenciones")
-        .select("paciente_id, numero_ingreso, fecha_ingreso")
-        .gte("fecha_ingreso", startOfDay)
-        .lte("fecha_ingreso", endOfDay)
-        .in("estado", ["en_espera", "en_atencion"]);
-
-      if (atencionesError) throw atencionesError;
 
       // Mapear atenciones a pacientes
       const patientsWithAtenciones = (patientsData || []).map(patient => {
