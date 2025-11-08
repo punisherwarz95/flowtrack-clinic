@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import PatientCombobox from "@/components/PatientCombobox";
-import { Clock, UserPlus, Play, CheckCircle, XCircle, Calendar as CalendarIcon, FileText } from "lucide-react";
+import { Clock, UserPlus, Play, CheckCircle, XCircle, Calendar as CalendarIcon, FileText, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -70,6 +70,8 @@ const Flujo = () => {
   const [examenesPendientes, setExamenesPendientes] = useState<{[atencionId: string]: string[]}>({});
   const [confirmCompletarDialog, setConfirmCompletarDialog] = useState<{open: boolean, atencionId: string | null}>({open: false, atencionId: null});
   const [showErrorOverlay, setShowErrorOverlay] = useState(false);
+  const [filtroBox, setFiltroBox] = useState<string>("todos");
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -96,6 +98,15 @@ const Flujo = () => {
     return () => {
       supabase.removeChannel(channel);
     };
+  }, [selectedDate]);
+
+  // Auto-refresh cada 10 segundos solo para tabla "En Espera"
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadData();
+    }, 10000);
+
+    return () => clearInterval(interval);
   }, [selectedDate]);
 
   const loadData = async () => {
@@ -470,8 +481,23 @@ const Flujo = () => {
     }
   };
 
+  // Función de refrescar manual
+  const handleRefreshEnEspera = async () => {
+    setIsRefreshing(true);
+    await loadData();
+    setTimeout(() => setIsRefreshing(false), 500);
+  };
+
   // Solo mostrar en espera los pacientes que NO tienen box asignado
-  const enEspera = atenciones.filter((a) => a.estado === "en_espera" && !a.box_id);
+  let enEspera = atenciones.filter((a) => a.estado === "en_espera" && !a.box_id);
+  
+  // Filtrar por box pendiente si se seleccionó uno
+  if (filtroBox !== "todos") {
+    enEspera = enEspera.filter((a) => 
+      pendingBoxes[a.id]?.includes(boxes.find(b => b.id === filtroBox)?.nombre || "")
+    );
+  }
+  
   const enAtencion = atenciones.filter((a) => a.estado === "en_atencion");
 
   const getEstadoBadge = (estado: string) => {
@@ -616,7 +642,34 @@ const Flujo = () => {
         <div className="grid md:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-warning">En Espera ({enEspera.length})</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-warning">En Espera ({enEspera.length})</CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRefreshEnEspera}
+                  disabled={isRefreshing}
+                  className="gap-2"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  Actualizar
+                </Button>
+              </div>
+              <div className="mt-3">
+                <Select value={filtroBox} onValueChange={setFiltroBox}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Filtrar por box pendiente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos los boxes</SelectItem>
+                    {boxes.map((box) => (
+                      <SelectItem key={box.id} value={box.id}>
+                        {box.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               {enEspera.map((atencion) => (
