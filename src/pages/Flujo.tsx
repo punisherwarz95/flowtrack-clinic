@@ -501,11 +501,9 @@ const Flujo = () => {
   
   let enAtencion = atenciones.filter((a) => a.estado === "en_atencion");
   
-  // Filtrar por box pendiente si se seleccionó uno
+  // Filtrar por box asignado si se seleccionó uno
   if (filtroBoxAtencion !== "todos") {
-    enAtencion = enAtencion.filter((a) => 
-      pendingBoxes[a.id]?.includes(boxes.find(b => b.id === filtroBoxAtencion)?.nombre || "")
-    );
+    enAtencion = enAtencion.filter((a) => a.box_id === filtroBoxAtencion);
   }
 
   const getEstadoBadge = (estado: string) => {
