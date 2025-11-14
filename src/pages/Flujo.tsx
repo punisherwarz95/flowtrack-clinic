@@ -692,6 +692,7 @@ const Flujo = () => {
                             {atencion.pacientes.nombre}
                           </div>
                         </div>
+                        {examenesPendientes[atencion.id] && examenesPendientes[atencion.id].length > 0 && atencionExamenes[atencion.id] && (
                           <Collapsible className="mt-2">
                             <CollapsibleTrigger className="flex items-center gap-1 text-xs text-primary hover:underline">
                               <ChevronDown className="h-3 w-3" />
@@ -731,6 +732,7 @@ const Flujo = () => {
                               })()}
                             </CollapsibleContent>
                           </Collapsible>
+                        )}
                         <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
                           <span>Ingreso: {format(new Date(atencion.fecha_ingreso), "HH:mm", { locale: es })}</span>
                           <Badge variant="outline" className="text-xs">
@@ -854,7 +856,7 @@ const Flujo = () => {
                           {atencion.pacientes.nombre}
                         </div>
                       </div>
-                      {examenesPendientes[atencion.id] && examenesPendientes[atencion.id].length > 0 && (
+                      {examenesPendientes[atencion.id] && examenesPendientes[atencion.id].length > 0 && atencionExamenes[atencion.id] && (
                         <Collapsible className="mt-2">
                           <CollapsibleTrigger className="flex items-center gap-1 text-xs text-primary hover:underline">
                             <ChevronDown className="h-3 w-3" />
