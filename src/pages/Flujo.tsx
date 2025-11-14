@@ -187,23 +187,32 @@ const Flujo = () => {
     const newAtencionExamenes: {[atencionId: string]: AtencionExamen[]} = {};
 
     for (const atencion of atenciones) {
-      if (atencion.estado === "en_atencion" && atencion.box_id) {
-        try {
+      try {
+        let query = supabase
+          .from("atencion_examenes")
+          .select("id, examen_id, estado, examenes(nombre)")
+          .eq("atencion_id", atencion.id)
+          .eq("estado", "pendiente");
+
+        // Si está en atención y con box asignado, limitar a los exámenes del box
+        if (atencion.estado === "en_atencion" && atencion.box_id) {
           const box = boxesList.find(b => b.id === atencion.box_id);
           const boxExamIds = box?.box_examenes.map(be => be.examen_id) || [];
-
-          const { data: examenesData, error } = await supabase
-            .from("atencion_examenes")
-            .select("id, examen_id, estado, examenes(nombre)")
-            .eq("atencion_id", atencion.id)
-            .in("examen_id", boxExamIds);
-
-          if (error) throw error;
-          newAtencionExamenes[atencion.id] = examenesData || [];
-        } catch (error) {
-          console.error("Error loading atencion examenes:", error);
-          newAtencionExamenes[atencion.id] = [];
+          if (boxExamIds.length > 0) {
+            query = query.in("examen_id", boxExamIds);
+          } else {
+            // Si el box no tiene exámenes configurados, no hay nada que mostrar
+            newAtencionExamenes[atencion.id] = [];
+            continue;
+          }
         }
+
+        const { data: examenesData, error } = await query;
+        if (error) throw error;
+        newAtencionExamenes[atencion.id] = examenesData || [];
+      } catch (error) {
+        console.error("Error loading atencion examenes:", error);
+        newAtencionExamenes[atencion.id] = [];
       }
     }
 
