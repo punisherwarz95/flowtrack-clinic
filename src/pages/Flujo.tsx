@@ -692,11 +692,45 @@ const Flujo = () => {
                             {atencion.pacientes.nombre}
                           </div>
                         </div>
-                        {examenesPendientes[atencion.id] && examenesPendientes[atencion.id].length > 0 && (
-                          <div className="text-sm text-muted-foreground mt-1">
-                            Exámenes pendientes: {examenesPendientes[atencion.id].join(", ")}
-                          </div>
-                        )}
+                          <Collapsible className="mt-2">
+                            <CollapsibleTrigger className="flex items-center gap-1 text-xs text-primary hover:underline">
+                              <ChevronDown className="h-3 w-3" />
+                              <span className="font-medium">
+                                Ver exámenes pendientes ({examenesPendientes[atencion.id].length})
+                              </span>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="mt-2 space-y-2 data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up">
+                              {(() => {
+                                const examenPorBox: { [boxNombre: string]: string[] } = {};
+                                atencionExamenes[atencion.id]
+                                  ?.filter((ae) => ae.estado === "pendiente")
+                                  .forEach((ae) => {
+                                    const boxConExamen = boxes.find((box) =>
+                                      box.box_examenes.some((be) => be.examen_id === ae.examen_id)
+                                    );
+                                    const boxNombre = boxConExamen?.nombre || "Sin box";
+                                    if (!examenPorBox[boxNombre]) {
+                                      examenPorBox[boxNombre] = [];
+                                    }
+                                    examenPorBox[boxNombre].push(ae.examenes.nombre);
+                                  });
+                                return Object.entries(examenPorBox).map(([boxNombre, examenes]) => (
+                                  <div key={boxNombre} className="pl-4 border-l-2 border-primary/30">
+                                    <div className="text-xs font-semibold text-muted-foreground mb-1">
+                                      {boxNombre}
+                                    </div>
+                                    <div className="flex flex-wrap gap-1">
+                                      {examenes.map((examen, idx) => (
+                                        <Badge key={idx} variant="secondary" className="text-xs py-0 px-2">
+                                          {examen}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ));
+                              })()}
+                            </CollapsibleContent>
+                          </Collapsible>
                         <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
                           <span>Ingreso: {format(new Date(atencion.fecha_ingreso), "HH:mm", { locale: es })}</span>
                           <Badge variant="outline" className="text-xs">
@@ -828,7 +862,7 @@ const Flujo = () => {
                               Ver exámenes pendientes ({examenesPendientes[atencion.id].length})
                             </span>
                           </CollapsibleTrigger>
-                          <CollapsibleContent className="mt-2 space-y-2">
+                          <CollapsibleContent className="mt-2 space-y-2 data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up">
                             {(() => {
                               // Agrupar exámenes por box
                               const examenPorBox: { [boxNombre: string]: string[] } = {};
