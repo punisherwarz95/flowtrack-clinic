@@ -21,6 +21,7 @@ const Dashboard = () => {
     enEsperaDistribucion: { workmed: 0, jenner: 0 },
     enAtencionDistribucion: { workmed: 0, jenner: 0 },
     completadosDistribucion: { workmed: 0, jenner: 0 },
+    pacientesMensuales: { total: 0, workmed: 0, jenner: 0 },
   });
 
   useEffect(() => {
@@ -33,7 +34,12 @@ const Dashboard = () => {
       const startOfDay = new Date(dateToUse.setHours(0, 0, 0, 0)).toISOString();
       const endOfDay = new Date(dateToUse.setHours(23, 59, 59, 999)).toISOString();
 
-      const [atencionesRes, completadosRes, boxesRes, examenesRes] = await Promise.all([
+      // Calcular inicio y fin del mes actual
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).toISOString();
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
+
+      const [atencionesRes, completadosRes, boxesRes, examenesRes, pacientesMensualesRes] = await Promise.all([
         supabase
           .from("atenciones")
           .select("estado, pacientes(tipo_servicio)")
@@ -48,6 +54,11 @@ const Dashboard = () => {
           .lte("fecha_ingreso", endOfDay),
         supabase.from("boxes").select("id", { count: "exact", head: true }).eq("activo", true),
         supabase.from("examenes").select("id", { count: "exact", head: true }),
+        supabase
+          .from("atenciones")
+          .select("id, pacientes(tipo_servicio)")
+          .gte("fecha_ingreso", startOfMonth)
+          .lte("fecha_ingreso", endOfMonth),
       ]);
 
       const enEsperaData = atencionesRes.data?.filter((a: any) => a.estado === "en_espera") || [];
@@ -65,6 +76,11 @@ const Dashboard = () => {
       const completadosWM = completadosRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "workmed").length || 0;
       const completadosJ = completadosRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "jenner").length || 0;
 
+      // Contadores mensuales
+      const pacientesMensualesWM = pacientesMensualesRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "workmed").length || 0;
+      const pacientesMensualesJ = pacientesMensualesRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "jenner").length || 0;
+      const pacientesMensualesTotal = pacientesMensualesRes.data?.length || 0;
+
       setStats({
         enEspera: enEsperaData.length,
         enAtencion: enAtencionData.length,
@@ -74,6 +90,7 @@ const Dashboard = () => {
         enEsperaDistribucion: { workmed: enEsperaWM, jenner: enEsperaJ },
         enAtencionDistribucion: { workmed: enAtencionWM, jenner: enAtencionJ },
         completadosDistribucion: { workmed: completadosWM, jenner: completadosJ },
+        pacientesMensuales: { total: pacientesMensualesTotal, workmed: pacientesMensualesWM, jenner: pacientesMensualesJ },
       });
     } catch (error) {
       console.error("Error cargando estadísticas:", error);
@@ -191,6 +208,56 @@ const Dashboard = () => {
               <div className="text-3xl font-bold text-foreground">{stats.totalBoxes}</div>
             </CardContent>
           </Card>
+        </div>
+
+        <div className="mt-8">
+          <h2 className="text-2xl font-bold text-foreground mb-4">Estadísticas Mensuales</h2>
+          <div className="grid gap-6 md:grid-cols-3">
+            <Card className="border-l-4 border-l-purple-600">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Total Pacientes Mes
+                </CardTitle>
+                <Users className="h-5 w-5 text-purple-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-foreground">{stats.pacientesMensuales.total}</div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  {format(new Date(), "MMMM yyyy", { locale: es })}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-l-4 border-l-blue-600">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Workmed Mensual
+                </CardTitle>
+                <Users className="h-5 w-5 text-blue-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-foreground">{stats.pacientesMensuales.workmed}</div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  {format(new Date(), "MMMM yyyy", { locale: es })}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-l-4 border-l-amber-600">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Jenner Mensual
+                </CardTitle>
+                <Users className="h-5 w-5 text-amber-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-foreground">{stats.pacientesMensuales.jenner}</div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  {format(new Date(), "MMMM yyyy", { locale: es })}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         <div className="mt-8 grid gap-6 md:grid-cols-2">
