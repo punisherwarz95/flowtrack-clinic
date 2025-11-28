@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 
 const Dashboard = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [selectedMonth, setSelectedMonth] = useState<Date | undefined>(new Date());
   const [stats, setStats] = useState({
     enEspera: 0,
     enAtencion: 0,
@@ -26,7 +27,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     loadStats();
-  }, [selectedDate]);
+  }, [selectedDate, selectedMonth]);
 
   const loadStats = async () => {
     try {
@@ -34,10 +35,10 @@ const Dashboard = () => {
       const startOfDay = new Date(dateToUse.setHours(0, 0, 0, 0)).toISOString();
       const endOfDay = new Date(dateToUse.setHours(23, 59, 59, 999)).toISOString();
 
-      // Calcular inicio y fin del mes actual
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).toISOString();
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
+      // Calcular inicio y fin del mes seleccionado
+      const monthToUse = selectedMonth || new Date();
+      const startOfMonth = new Date(monthToUse.getFullYear(), monthToUse.getMonth(), 1, 0, 0, 0, 0).toISOString();
+      const endOfMonth = new Date(monthToUse.getFullYear(), monthToUse.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
 
       const [atencionesRes, completadosRes, boxesRes, examenesRes, pacientesMensualesRes] = await Promise.all([
         supabase
@@ -110,24 +111,26 @@ const Dashboard = () => {
                 Vista general del sistema de gestión de pacientes
               </p>
             </div>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <CalendarIcon className="h-4 w-4" />
-                  {selectedDate ? format(selectedDate, "PPP", { locale: es }) : "Seleccionar fecha"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={setSelectedDate}
-                  locale={es}
-                  initialFocus
-                  className={cn("p-3 pointer-events-auto")}
-                />
-              </PopoverContent>
-            </Popover>
+            <div className="flex gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <CalendarIcon className="h-4 w-4" />
+                    {selectedDate ? format(selectedDate, "PPP", { locale: es }) : "Seleccionar fecha"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={setSelectedDate}
+                    locale={es}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
         </div>
 
@@ -211,7 +214,27 @@ const Dashboard = () => {
         </div>
 
         <div className="mt-8">
-          <h2 className="text-2xl font-bold text-foreground mb-4">Estadísticas Mensuales</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-foreground">Estadísticas Mensuales</h2>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <CalendarIcon className="h-4 w-4" />
+                  {selectedMonth ? format(selectedMonth, "MMMM yyyy", { locale: es }) : "Seleccionar mes"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={selectedMonth}
+                  onSelect={setSelectedMonth}
+                  locale={es}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
           <div className="grid gap-6 md:grid-cols-3">
             <Card className="border-l-4 border-l-purple-600">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -223,7 +246,7 @@ const Dashboard = () => {
               <CardContent>
                 <div className="text-3xl font-bold text-foreground">{stats.pacientesMensuales.total}</div>
                 <div className="mt-2 text-xs text-muted-foreground">
-                  {format(new Date(), "MMMM yyyy", { locale: es })}
+                  {format(selectedMonth || new Date(), "MMMM yyyy", { locale: es })}
                 </div>
               </CardContent>
             </Card>
@@ -238,7 +261,7 @@ const Dashboard = () => {
               <CardContent>
                 <div className="text-3xl font-bold text-foreground">{stats.pacientesMensuales.workmed}</div>
                 <div className="mt-2 text-xs text-muted-foreground">
-                  {format(new Date(), "MMMM yyyy", { locale: es })}
+                  {format(selectedMonth || new Date(), "MMMM yyyy", { locale: es })}
                 </div>
               </CardContent>
             </Card>
@@ -253,7 +276,7 @@ const Dashboard = () => {
               <CardContent>
                 <div className="text-3xl font-bold text-foreground">{stats.pacientesMensuales.jenner}</div>
                 <div className="mt-2 text-xs text-muted-foreground">
-                  {format(new Date(), "MMMM yyyy", { locale: es })}
+                  {format(selectedMonth || new Date(), "MMMM yyyy", { locale: es })}
                 </div>
               </CardContent>
             </Card>
