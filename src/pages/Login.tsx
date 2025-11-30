@@ -29,8 +29,11 @@ const Login = () => {
     setLoading(true);
 
     try {
+      // Convert username to email format if it doesn't contain @
+      const emailToUse = username.includes('@') ? username : `${username}@mediflow.local`;
+      
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: username,
+        email: emailToUse,
         password: password,
       });
 
