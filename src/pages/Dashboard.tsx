@@ -285,7 +285,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="mt-8 grid gap-6 md:grid-cols-2">
+        <div className="mt-8">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -298,32 +298,6 @@ const Dashboard = () => {
               <p className="text-sm text-muted-foreground mt-2">
                 Exámenes configurados en el sistema
               </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-primary/10 to-secondary/10 border-primary/20">
-            <CardHeader>
-              <CardTitle>Acceso Rápido</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <a
-                href="/flujo"
-                className="block p-3 rounded-lg bg-card hover:bg-accent transition-colors border border-border"
-              >
-                <div className="font-medium text-foreground">Ver Flujo de Pacientes</div>
-                <div className="text-sm text-muted-foreground">
-                  Gestiona el flujo en tiempo real
-                </div>
-              </a>
-              <a
-                href="/pacientes"
-                className="block p-3 rounded-lg bg-card hover:bg-accent transition-colors border border-border"
-              >
-                <div className="font-medium text-foreground">Gestionar Pacientes</div>
-                <div className="text-sm text-muted-foreground">
-                  Agregar, editar o importar pacientes
-                </div>
-              </a>
             </CardContent>
           </Card>
         </div>
