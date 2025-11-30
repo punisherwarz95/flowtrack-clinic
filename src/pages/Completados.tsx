@@ -10,6 +10,7 @@ import { es } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 
 interface AtencionCompletada {
   id: string;
@@ -36,6 +37,7 @@ interface AtencionCompletada {
 }
 
 const Completados = () => {
+  useAuth(); // Protect route
   const [atenciones, setAtenciones] = useState<AtencionCompletada[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [distribucion, setDistribucion] = useState({ workmed: 0, jenner: 0 });

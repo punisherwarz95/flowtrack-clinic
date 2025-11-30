@@ -30,6 +30,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Patient {
   id: string;
@@ -67,6 +68,7 @@ interface Paquete {
 }
 
 const Pacientes = () => {
+  useAuth(); // Protect route
   const [patients, setPatients] = useState<Patient[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [examenes, setExamenes] = useState<Examen[]>([]);

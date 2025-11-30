@@ -17,6 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Atencion {
   id: string;
@@ -58,6 +59,7 @@ interface Examen {
 }
 
 const Flujo = () => {
+  useAuth(); // Protect route
   const [atenciones, setAtenciones] = useState<Atencion[]>([]);
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [examenes, setExamenes] = useState<Examen[]>([]);

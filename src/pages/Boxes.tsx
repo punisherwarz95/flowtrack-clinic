@@ -20,6 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Box {
   id: string;
@@ -29,6 +30,7 @@ interface Box {
 }
 
 const Boxes = () => {
+  useAuth(); // Protect route
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [boxToDelete, setBoxToDelete] = useState<string | null>(null);
