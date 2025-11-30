@@ -101,10 +101,18 @@ const Usuarios = () => {
     }
 
     try {
+      // Convert username to email format if it doesn't contain @
+      const emailToUse = newUsername.includes('@') ? newUsername : `${newUsername}@mediflow.local`;
+      
       // Create auth user
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: newUsername,
+        email: emailToUse,
         password: newPassword,
+        options: {
+          data: {
+            username: newUsername
+          }
+        }
       });
 
       if (authError) throw authError;

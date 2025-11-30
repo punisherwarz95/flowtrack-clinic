@@ -42,11 +42,14 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Create the admin user
+    // Create the admin user with valid email format
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: 'operaciones',
+      email: 'operaciones@mediflow.local',
       password: 'sami1005',
       email_confirm: true,
+      user_metadata: {
+        username: 'operaciones'
+      }
     })
 
     if (authError) {
