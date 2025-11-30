@@ -6,15 +6,36 @@ import Navigation from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 
+interface AtencionIngresada {
+  id: string;
+  numero_ingreso: number;
+  estado: string;
+  pacientes: {
+    nombre: string;
+    tipo_servicio: string;
+    empresas: {
+      nombre: string;
+    } | null;
+  };
+  atencion_examenes: Array<{
+    examenes: {
+      nombre: string;
+    };
+  }>;
+}
+
 const Dashboard = () => {
   const { loading: authLoading } = useAuth();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedMonth, setSelectedMonth] = useState<Date | undefined>(new Date());
+  const [atencionesIngresadas, setAtencionesIngresadas] = useState<AtencionIngresada[]>([]);
   const [stats, setStats] = useState({
     enEspera: 0,
     enAtencion: 0,
@@ -42,7 +63,7 @@ const Dashboard = () => {
       const startOfMonth = new Date(monthToUse.getFullYear(), monthToUse.getMonth(), 1, 0, 0, 0, 0).toISOString();
       const endOfMonth = new Date(monthToUse.getFullYear(), monthToUse.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
 
-      const [atencionesRes, completadosRes, boxesRes, examenesRes, pacientesMensualesRes] = await Promise.all([
+      const [atencionesRes, completadosRes, boxesRes, examenesRes, pacientesMensualesRes, atencionesIngresadasRes] = await Promise.all([
         supabase
           .from("atenciones")
           .select("estado, pacientes(tipo_servicio)")
@@ -62,6 +83,28 @@ const Dashboard = () => {
           .select("id, pacientes(tipo_servicio)")
           .gte("fecha_ingreso", startOfMonth)
           .lte("fecha_ingreso", endOfMonth),
+        supabase
+          .from("atenciones")
+          .select(`
+            id,
+            numero_ingreso,
+            estado,
+            pacientes (
+              nombre,
+              tipo_servicio,
+              empresas (
+                nombre
+              )
+            ),
+            atencion_examenes (
+              examenes (
+                nombre
+              )
+            )
+          `)
+          .gte("fecha_ingreso", startOfDay)
+          .lte("fecha_ingreso", endOfDay)
+          .order("numero_ingreso", { ascending: true }),
       ]);
 
       const enEsperaData = atencionesRes.data?.filter((a: any) => a.estado === "en_espera") || [];
@@ -83,6 +126,8 @@ const Dashboard = () => {
       const pacientesMensualesWM = pacientesMensualesRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "workmed").length || 0;
       const pacientesMensualesJ = pacientesMensualesRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "jenner").length || 0;
       const pacientesMensualesTotal = pacientesMensualesRes.data?.length || 0;
+
+      setAtencionesIngresadas((atencionesIngresadasRes.data as AtencionIngresada[]) || []);
 
       setStats({
         enEspera: enEsperaData.length,
@@ -283,6 +328,92 @@ const Dashboard = () => {
               </CardContent>
             </Card>
           </div>
+        </div>
+
+        <div className="mt-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary" />
+                Pacientes Ingresados
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                {format(selectedDate || new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })}
+              </p>
+            </CardHeader>
+            <CardContent>
+              {atencionesIngresadas.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  No hay pacientes ingresados en esta fecha
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-20">Orden</TableHead>
+                        <TableHead>Paciente</TableHead>
+                        <TableHead>Empresa</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Exámenes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {atencionesIngresadas.map((atencion) => (
+                        <TableRow key={atencion.id}>
+                          <TableCell className="font-medium">
+                            #{atencion.numero_ingreso.toString().padStart(3, "0")}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {atencion.pacientes.nombre}
+                          </TableCell>
+                          <TableCell>
+                            {atencion.pacientes.empresas?.nombre || "-"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={atencion.pacientes.tipo_servicio === "workmed" ? "default" : "secondary"}>
+                              {atencion.pacientes.tipo_servicio === "workmed" ? "Workmed" : "Jenner"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={
+                                atencion.estado === "completado" 
+                                  ? "default" 
+                                  : atencion.estado === "en_atencion"
+                                  ? "secondary"
+                                  : "outline"
+                              }
+                            >
+                              {atencion.estado === "en_espera" 
+                                ? "En Espera" 
+                                : atencion.estado === "en_atencion"
+                                ? "En Atención"
+                                : "Completado"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {atencion.atencion_examenes.length > 0 ? (
+                                atencion.atencion_examenes.map((ae, idx) => (
+                                  <Badge key={idx} variant="outline" className="text-xs">
+                                    {ae.examenes.nombre}
+                                  </Badge>
+                                ))
+                              ) : (
+                                <span className="text-xs text-muted-foreground">Sin exámenes</span>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         <div className="mt-8">
