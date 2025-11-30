@@ -42,6 +42,7 @@ const Usuarios = () => {
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newIsAdmin, setNewIsAdmin] = useState(false);
+  const [newPermissions, setNewPermissions] = useState<string[]>([]);
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [editPermissions, setEditPermissions] = useState<string[]>([]);
 
@@ -100,6 +101,11 @@ const Usuarios = () => {
       return;
     }
 
+    if (!newIsAdmin && newPermissions.length === 0) {
+      toast.error("Debes seleccionar al menos un permiso o marcar como administrador");
+      return;
+    }
+
     try {
       // Convert username to email format if it doesn't contain @
       const emailToUse = newUsername.includes('@') ? newUsername : `${newUsername}@mediflow.local`;
@@ -126,30 +132,38 @@ const Usuarios = () => {
 
         if (roleError) throw roleError;
 
-        // If admin, add all permissions
-        if (newIsAdmin) {
-          const allPermissions = menuOptions.map((menu) => ({
-            user_id: authData.user!.id,
-            menu_path: menu.path,
-          }));
+        // Add permissions
+        const permissionsToAdd = newIsAdmin ? menuOptions.map(m => m.path) : newPermissions;
+        const permissionsData = permissionsToAdd.map((path) => ({
+          user_id: authData.user!.id,
+          menu_path: path,
+        }));
 
-          const { error: permError } = await supabase
-            .from("menu_permissions")
-            .insert(allPermissions);
+        const { error: permError } = await supabase
+          .from("menu_permissions")
+          .insert(permissionsData);
 
-          if (permError) throw permError;
-        }
+        if (permError) throw permError;
 
         toast.success("Usuario creado exitosamente");
         setDialogOpen(false);
         setNewUsername("");
         setNewPassword("");
         setNewIsAdmin(false);
+        setNewPermissions([]);
         loadUsers();
       }
     } catch (error: any) {
       toast.error("Error al crear usuario: " + error.message);
     }
+  };
+
+  const toggleNewPermission = (path: string) => {
+    setNewPermissions((prev) =>
+      prev.includes(path)
+        ? prev.filter((p) => p !== path)
+        : [...prev, path]
+    );
   };
 
   const handleDeleteUser = async (userId: string) => {
@@ -269,10 +283,36 @@ const Usuarios = () => {
                   <Checkbox
                     id="isAdmin"
                     checked={newIsAdmin}
-                    onCheckedChange={(checked) => setNewIsAdmin(checked as boolean)}
+                    onCheckedChange={(checked) => {
+                      setNewIsAdmin(checked as boolean);
+                      if (checked) {
+                        setNewPermissions([]);
+                      }
+                    }}
                   />
                   <Label htmlFor="isAdmin">Administrador (acceso a todo)</Label>
                 </div>
+                
+                {!newIsAdmin && (
+                  <div className="space-y-2">
+                    <Label>Permisos de Menú</Label>
+                    <div className="grid grid-cols-2 gap-2 p-3 border rounded-md">
+                      {menuOptions.map((menu) => (
+                        <div key={menu.path} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`new-${menu.path}`}
+                            checked={newPermissions.includes(menu.path)}
+                            onCheckedChange={() => toggleNewPermission(menu.path)}
+                          />
+                          <Label htmlFor={`new-${menu.path}`} className="cursor-pointer">
+                            {menu.label}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
                 <Button onClick={handleCreateUser} className="w-full">
                   Crear Usuario
                 </Button>
