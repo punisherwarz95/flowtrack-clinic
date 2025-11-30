@@ -110,51 +110,38 @@ const Usuarios = () => {
       // Convert username to email format if it doesn't contain @
       const emailToUse = newUsername.includes('@') ? newUsername : `${newUsername}@mediflow.local`;
       
-      // Create auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: emailToUse,
-        password: newPassword,
-        options: {
-          data: {
-            username: newUsername
-          }
+      // Call edge function to create user with admin API
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: emailToUse,
+          password: newPassword,
+          username: newUsername,
+          isAdmin: newIsAdmin,
+          permissions: newIsAdmin ? [] : newPermissions,
         }
       });
 
-      if (authError) throw authError;
-
-      if (authData.user) {
-        // Add role
-        const { error: roleError } = await supabase.from("user_roles").insert({
-          user_id: authData.user.id,
-          role: newIsAdmin ? "admin" : "user",
-        });
-
-        if (roleError) throw roleError;
-
-        // Add permissions
-        const permissionsToAdd = newIsAdmin ? menuOptions.map(m => m.path) : newPermissions;
-        const permissionsData = permissionsToAdd.map((path) => ({
-          user_id: authData.user!.id,
-          menu_path: path,
-        }));
-
-        const { error: permError } = await supabase
-          .from("menu_permissions")
-          .insert(permissionsData);
-
-        if (permError) throw permError;
-
-        toast.success("Usuario creado exitosamente");
-        setDialogOpen(false);
-        setNewUsername("");
-        setNewPassword("");
-        setNewIsAdmin(false);
-        setNewPermissions([]);
-        loadUsers();
+      if (error) {
+        console.error('Error from create-user function:', error);
+        toast.error("Error al crear usuario: " + error.message);
+        return;
       }
+
+      if (data?.error) {
+        toast.error("Error al crear usuario: " + data.error);
+        return;
+      }
+
+      toast.success("Usuario creado exitosamente");
+      setDialogOpen(false);
+      setNewUsername("");
+      setNewPassword("");
+      setNewIsAdmin(false);
+      setNewPermissions([]);
+      loadUsers();
     } catch (error: any) {
-      toast.error("Error al crear usuario: " + error.message);
+      console.error('Unexpected error:', error);
+      toast.error("Error inesperado al crear usuario: " + error.message);
     }
   };
 
