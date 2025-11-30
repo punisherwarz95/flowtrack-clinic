@@ -1,10 +1,15 @@
 import { Link, useLocation } from "react-router-dom";
-import { Activity, Users, Box, ClipboardList, LayoutDashboard, Building2, CheckCircle } from "lucide-react";
+import { Activity, Users, Box, ClipboardList, LayoutDashboard, Building2, CheckCircle, UserCog, LogOut } from "lucide-react";
+import { usePermissions } from "@/hooks/usePermissions";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
 
 const Navigation = () => {
   const location = useLocation();
+  const { hasPermission } = usePermissions();
+  const { signOut } = useAuth();
 
-  const links = [
+  const allLinks = [
     { to: "/", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/flujo", icon: Activity, label: "Flujo" },
     { to: "/pacientes", icon: Users, label: "Pacientes" },
@@ -12,7 +17,10 @@ const Navigation = () => {
     { to: "/empresas", icon: Building2, label: "Empresas" },
     { to: "/boxes", icon: Box, label: "Boxes" },
     { to: "/examenes", icon: ClipboardList, label: "Exámenes" },
+    { to: "/usuarios", icon: UserCog, label: "Usuarios" },
   ];
+
+  const links = allLinks.filter((link) => hasPermission(link.to));
 
   return (
     <nav className="border-b border-border bg-card shadow-sm">
@@ -23,7 +31,7 @@ const Navigation = () => {
             <span className="font-bold text-lg text-foreground">MediFlow</span>
           </div>
           
-          <div className="flex gap-1">
+          <div className="flex gap-1 flex-1">
             {links.map((link) => {
               const Icon = link.icon;
               const isActive = location.pathname === link.to;
@@ -44,6 +52,11 @@ const Navigation = () => {
               );
             })}
           </div>
+          
+          <Button variant="outline" size="sm" onClick={signOut}>
+            <LogOut className="h-4 w-4 mr-2" />
+            Cerrar Sesión
+          </Button>
         </div>
       </div>
     </nav>

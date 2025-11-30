@@ -20,6 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Examen {
   id: string;
@@ -46,6 +47,7 @@ interface Paquete {
 }
 
 const Examenes = () => {
+  useAuth(); // Protect route
   const [examenes, setExamenes] = useState<Examen[]>([]);
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [paquetes, setPaquetes] = useState<Paquete[]>([]);

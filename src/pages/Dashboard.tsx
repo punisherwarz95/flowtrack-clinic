@@ -9,8 +9,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 const Dashboard = () => {
+  const { loading: authLoading } = useAuth();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedMonth, setSelectedMonth] = useState<Date | undefined>(new Date());
   const [stats, setStats] = useState({

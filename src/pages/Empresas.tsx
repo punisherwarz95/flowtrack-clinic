@@ -18,6 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Empresa {
   id: string;
@@ -26,6 +27,7 @@ interface Empresa {
 }
 
 const Empresas = () => {
+  useAuth(); // Protect route
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [empresaToDelete, setEmpresaToDelete] = useState<string | null>(null);

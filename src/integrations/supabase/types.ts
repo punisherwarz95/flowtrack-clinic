@@ -215,6 +215,35 @@ export type Database = {
         }
         Relationships: []
       }
+      menu_permissions: {
+        Row: {
+          created_at: string | null
+          id: string
+          menu_path: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          menu_path: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          menu_path?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menu_permissions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pacientes: {
         Row: {
           created_at: string | null
@@ -316,14 +345,65 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          created_at: string | null
+          id: string
+          username: string
+        }
+        Insert: {
+          created_at?: string | null
+          id: string
+          username: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
+      app_role: "admin" | "user"
       estado_atencion: "en_espera" | "en_atencion" | "completado" | "incompleto"
       estado_examen: "pendiente" | "completado" | "incompleto"
       estado_ficha: "pendiente" | "en_mano_paciente" | "completada"
@@ -455,6 +535,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "user"],
       estado_atencion: ["en_espera", "en_atencion", "completado", "incompleto"],
       estado_examen: ["pendiente", "completado", "incompleto"],
       estado_ficha: ["pendiente", "en_mano_paciente", "completada"],
