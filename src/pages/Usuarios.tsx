@@ -27,6 +27,7 @@ interface User {
 const menuOptions = [
   { path: "/", label: "Dashboard" },
   { path: "/flujo", label: "Flujo" },
+  { path: "/mi-box", label: "Mi Box" },
   { path: "/pacientes", label: "Pacientes" },
   { path: "/completados", label: "Completados" },
   { path: "/empresas", label: "Empresas" },
