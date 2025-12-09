@@ -38,6 +38,8 @@ export const useAuth = () => {
   }, [navigate]);
 
   const signOut = async () => {
+    // Limpiar box seleccionado al cerrar sesión
+    localStorage.removeItem("mediflow_selected_box");
     await supabase.auth.signOut();
     navigate("/login");
   };

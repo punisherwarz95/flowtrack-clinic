@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Flujo from "./pages/Flujo";
+import MiBox from "./pages/MiBox";
 import Pacientes from "./pages/Pacientes";
 import Completados from "./pages/Completados";
 import Empresas from "./pages/Empresas";
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<Dashboard />} />
           <Route path="/flujo" element={<Flujo />} />
+          <Route path="/mi-box" element={<MiBox />} />
           <Route path="/pacientes" element={<Pacientes />} />
           <Route path="/completados" element={<Completados />} />
           <Route path="/empresas" element={<Empresas />} />

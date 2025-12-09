@@ -12,6 +12,7 @@ const Navigation = () => {
   const allLinks = [
     { to: "/", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/flujo", icon: Activity, label: "Flujo" },
+    { to: "/mi-box", icon: Box, label: "Mi Box" },
     { to: "/pacientes", icon: Users, label: "Pacientes" },
     { to: "/completados", icon: CheckCircle, label: "Completados" },
     { to: "/empresas", icon: Building2, label: "Empresas" },
