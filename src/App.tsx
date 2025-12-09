@@ -18,6 +18,7 @@ import BoxView from "./pages/BoxView";
 import Usuarios from "./pages/Usuarios";
 import NotFound from "./pages/NotFound";
 import { InitAdmin } from "./components/InitAdmin";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -31,16 +32,16 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/flujo" element={<Flujo />} />
-            <Route path="/mi-box" element={<MiBox />} />
-            <Route path="/pacientes" element={<Pacientes />} />
-            <Route path="/completados" element={<Completados />} />
-            <Route path="/empresas" element={<Empresas />} />
-            <Route path="/boxes" element={<Boxes />} />
-            <Route path="/boxes/:boxId" element={<BoxView />} />
-            <Route path="/examenes" element={<Examenes />} />
-            <Route path="/usuarios" element={<Usuarios />} />
+            <Route path="/" element={<ProtectedRoute path="/"><Dashboard /></ProtectedRoute>} />
+            <Route path="/flujo" element={<ProtectedRoute path="/flujo"><Flujo /></ProtectedRoute>} />
+            <Route path="/mi-box" element={<ProtectedRoute path="/mi-box"><MiBox /></ProtectedRoute>} />
+            <Route path="/pacientes" element={<ProtectedRoute path="/pacientes"><Pacientes /></ProtectedRoute>} />
+            <Route path="/completados" element={<ProtectedRoute path="/completados"><Completados /></ProtectedRoute>} />
+            <Route path="/empresas" element={<ProtectedRoute path="/empresas"><Empresas /></ProtectedRoute>} />
+            <Route path="/boxes" element={<ProtectedRoute path="/boxes"><Boxes /></ProtectedRoute>} />
+            <Route path="/boxes/:boxId" element={<ProtectedRoute path="/boxes"><BoxView /></ProtectedRoute>} />
+            <Route path="/examenes" element={<ProtectedRoute path="/examenes"><Examenes /></ProtectedRoute>} />
+            <Route path="/usuarios" element={<ProtectedRoute path="/usuarios"><Usuarios /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
