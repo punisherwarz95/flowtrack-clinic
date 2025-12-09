@@ -31,6 +31,7 @@ interface Atencion {
 
 interface AtencionConExamenes extends Atencion {
   examenesRealizados?: string[];
+  examenesPendientes?: string[];
 }
 
 interface AtencionExamen {
@@ -61,7 +62,7 @@ const MiBox = () => {
   const [tempSelectedBox, setTempSelectedBox] = useState<string>("");
   
   // Pacientes en espera (con exámenes pendientes para este box)
-  const [pacientesEnEspera, setPacientesEnEspera] = useState<Atencion[]>([]);
+  const [pacientesEnEspera, setPacientesEnEspera] = useState<AtencionConExamenes[]>([]);
   // Paciente actualmente en el box
   const [pacienteEnAtencion, setPacienteEnAtencion] = useState<Atencion | null>(null);
   // Pacientes completados en este box hoy (con sus exámenes realizados)
@@ -160,18 +161,21 @@ const MiBox = () => {
 
         if (esperaError) throw esperaError;
 
-        // Filtrar solo las que tienen exámenes pendientes de este box
-        const pacientesConExamenesBox: Atencion[] = [];
+        // Filtrar solo las que tienen exámenes pendientes de este box y obtener nombres
+        const pacientesConExamenesBox: AtencionConExamenes[] = [];
         for (const atencion of esperaData || []) {
           const { data: examenes } = await supabase
             .from("atencion_examenes")
-            .select("id")
+            .select("id, examenes(nombre)")
             .eq("atencion_id", atencion.id)
             .eq("estado", "pendiente")
             .in("examen_id", boxExamIds);
 
           if (examenes && examenes.length > 0) {
-            pacientesConExamenesBox.push(atencion);
+            pacientesConExamenesBox.push({
+              ...atencion,
+              examenesPendientes: examenes.map((e: any) => e.examenes?.nombre || "")
+            });
           }
         }
         setPacientesEnEspera(pacientesConExamenesBox);
@@ -502,6 +506,16 @@ const MiBox = () => {
                         Llamar
                       </Button>
                     </div>
+                    {/* Exámenes pendientes para este box */}
+                    {atencion.examenesPendientes && atencion.examenesPendientes.length > 0 && (
+                      <div className="flex flex-wrap gap-1 pt-1 border-t">
+                        {atencion.examenesPendientes.map((examen, idx) => (
+                          <Badge key={idx} variant="outline" className="text-xs">
+                            {examen}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))
               )}
