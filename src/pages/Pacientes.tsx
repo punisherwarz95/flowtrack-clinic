@@ -503,10 +503,12 @@ const Pacientes = () => {
                       </div>
 
                       <div>
-                        <Label htmlFor="empresa">Empresa *</Label>
+                        <Label htmlFor="empresa">
+                          Empresa {formData.tipo_servicio === "jenner" && "*"}
+                        </Label>
                         <select
                           id="empresa"
-                          required
+                          required={formData.tipo_servicio === "jenner"}
                           value={formData.empresa_id}
                           onChange={(e) => setFormData({ ...formData, empresa_id: e.target.value })}
                           className="w-full h-10 px-3 rounded-md border border-input bg-background"
@@ -555,7 +557,7 @@ const Pacientes = () => {
                     {/* Columna derecha - Exámenes */}
                     <div className="space-y-4">
                       <div>
-                        <Label>Exámenes a Realizar *</Label>
+                        <Label>Exámenes a Realizar</Label>
                         <div className="border rounded-md p-3 max-h-[400px] overflow-y-auto space-y-2 bg-muted/30">
                           {examenes.map((examen) => (
                             <label key={examen.id} className="flex items-center gap-2 cursor-pointer">
