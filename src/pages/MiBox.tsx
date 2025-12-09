@@ -63,8 +63,8 @@ const MiBox = () => {
   
   // Pacientes en espera (con exámenes pendientes para este box)
   const [pacientesEnEspera, setPacientesEnEspera] = useState<AtencionConExamenes[]>([]);
-  // Paciente actualmente en el box
-  const [pacienteEnAtencion, setPacienteEnAtencion] = useState<Atencion | null>(null);
+  // Pacientes actualmente en el box
+  const [pacientesEnAtencion, setPacientesEnAtencion] = useState<Atencion[]>([]);
   // Pacientes completados en este box hoy (con sus exámenes realizados)
   const [pacientesCompletados, setPacientesCompletados] = useState<AtencionConExamenes[]>([]);
   
@@ -135,7 +135,7 @@ const MiBox = () => {
 
       const boxExamIds = boxData?.box_examenes?.map((be: { examen_id: string }) => be.examen_id) || [];
 
-      // 1. Paciente actualmente en atención en este box
+      // 1. Pacientes actualmente en atención en este box
       const { data: enAtencionData, error: enAtencionError } = await supabase
         .from("atenciones")
         .select("*, pacientes(id, nombre, rut, tipo_servicio)")
@@ -143,10 +143,10 @@ const MiBox = () => {
         .eq("box_id", selectedBoxId)
         .gte("fecha_ingreso", startOfDay.toISOString())
         .lte("fecha_ingreso", endOfDay.toISOString())
-        .maybeSingle();
+        .order("fecha_inicio_atencion", { ascending: true });
 
       if (enAtencionError) throw enAtencionError;
-      setPacienteEnAtencion(enAtencionData);
+      setPacientesEnAtencion(enAtencionData || []);
 
       // 2. Pacientes en espera con exámenes pendientes para este box
       if (boxExamIds.length > 0) {
@@ -217,9 +217,11 @@ const MiBox = () => {
         setPacientesCompletados([]);
       }
 
-      // Cargar exámenes para paciente en atención
-      if (enAtencionData) {
-        await loadAtencionExamenes(enAtencionData.id, boxExamIds);
+      // Cargar exámenes para todos los pacientes en atención
+      if (enAtencionData && enAtencionData.length > 0) {
+        for (const atencion of enAtencionData) {
+          await loadAtencionExamenes(atencion.id, boxExamIds);
+        }
       }
     } catch (error) {
       console.error("Error:", error);
@@ -240,7 +242,7 @@ const MiBox = () => {
       return;
     }
 
-    setAtencionExamenes({ [atencionId]: data || [] });
+    setAtencionExamenes(prev => ({ ...prev, [atencionId]: data || [] }));
   };
 
   const handleSelectBox = () => {
@@ -500,7 +502,6 @@ const MiBox = () => {
                       <Button
                         size="sm"
                         onClick={() => handleLlamarPaciente(atencion.id)}
-                        disabled={!!pacienteEnAtencion}
                       >
                         <Play className="h-4 w-4 mr-1" />
                         Llamar
@@ -522,73 +523,73 @@ const MiBox = () => {
             </CardContent>
           </Card>
 
-          {/* Paciente en Atención */}
+          {/* Pacientes en Atención */}
           <Card className="border-primary/50">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Play className="h-5 w-5 text-primary" />
-                En Atención
+                En Atención ({pacientesEnAtencion.length})
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              {!pacienteEnAtencion ? (
+            <CardContent className="space-y-4 max-h-[60vh] overflow-y-auto">
+              {pacientesEnAtencion.length === 0 ? (
                 <p className="text-muted-foreground text-sm text-center py-8">
-                  No hay paciente en atención
+                  No hay pacientes en atención
                 </p>
               ) : (
-                <div className="space-y-4">
-                  <div className="bg-accent/50 rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge variant="outline">#{pacienteEnAtencion.numero_ingreso}</Badge>
-                      <span className="font-semibold">{pacienteEnAtencion.pacientes.nombre}</span>
+                pacientesEnAtencion.map((paciente) => (
+                  <div key={paciente.id} className="bg-accent/50 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">#{paciente.numero_ingreso}</Badge>
+                      <span className="font-semibold">{paciente.pacientes.nombre}</span>
                     </div>
                     <Badge 
-                      variant={pacienteEnAtencion.pacientes.tipo_servicio === "workmed" ? "default" : "secondary"}
+                      variant={paciente.pacientes.tipo_servicio === "workmed" ? "default" : "secondary"}
                     >
-                      {pacienteEnAtencion.pacientes.tipo_servicio}
+                      {paciente.pacientes.tipo_servicio}
                     </Badge>
-                  </div>
 
-                  {/* Exámenes pendientes */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Exámenes:</Label>
-                    {atencionExamenes[pacienteEnAtencion.id]?.map((examen) => (
-                      <div key={examen.id} className="flex items-center gap-2">
-                        <Checkbox
-                          id={examen.id}
-                          checked={examen.estado === "completado"}
-                          onCheckedChange={() => handleToggleExamen(examen.id, examen.estado, pacienteEnAtencion.id)}
-                        />
-                        <Label htmlFor={examen.id} className="text-sm cursor-pointer">
-                          {examen.examenes.nombre}
-                        </Label>
-                      </div>
-                    ))}
-                    {(!atencionExamenes[pacienteEnAtencion.id] || atencionExamenes[pacienteEnAtencion.id].length === 0) && (
-                      <p className="text-muted-foreground text-sm">Todos los exámenes completados</p>
-                    )}
-                  </div>
+                    {/* Exámenes pendientes */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Exámenes:</Label>
+                      {atencionExamenes[paciente.id]?.map((examen) => (
+                        <div key={examen.id} className="flex items-center gap-2">
+                          <Checkbox
+                            id={examen.id}
+                            checked={examen.estado === "completado"}
+                            onCheckedChange={() => handleToggleExamen(examen.id, examen.estado, paciente.id)}
+                          />
+                          <Label htmlFor={examen.id} className="text-sm cursor-pointer">
+                            {examen.examenes.nombre}
+                          </Label>
+                        </div>
+                      ))}
+                      {(!atencionExamenes[paciente.id] || atencionExamenes[paciente.id].length === 0) && (
+                        <p className="text-muted-foreground text-sm">Todos los exámenes completados</p>
+                      )}
+                    </div>
 
-                  {/* Botones de acción */}
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => setConfirmCompletarDialog({ open: true, atencionId: pacienteEnAtencion.id })}
-                    >
-                      <CheckCircle className="h-4 w-4 mr-1" />
-                      Completar
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleCompletarAtencion(pacienteEnAtencion.id, "incompleto")}
-                    >
-                      <XCircle className="h-4 w-4 mr-1" />
-                      Parcial
-                    </Button>
+                    {/* Botones de acción */}
+                    <div className="flex gap-2 pt-2 border-t">
+                      <Button
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setConfirmCompletarDialog({ open: true, atencionId: paciente.id })}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                        Completar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleCompletarAtencion(paciente.id, "incompleto")}
+                      >
+                        <XCircle className="h-4 w-4 mr-1" />
+                        Parcial
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                ))
               )}
             </CardContent>
           </Card>
