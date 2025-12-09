@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Trash2, Plus, Save } from "lucide-react";
+import { Trash2, Plus, Save, Key } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +46,9 @@ const Usuarios = () => {
   const [newPermissions, setNewPermissions] = useState<string[]>([]);
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [editPermissions, setEditPermissions] = useState<string[]>([]);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [selectedUserForPassword, setSelectedUserForPassword] = useState<User | null>(null);
+  const [newUserPassword, setNewUserPassword] = useState("");
 
   useEffect(() => {
     loadUsers();
@@ -216,6 +219,50 @@ const Usuarios = () => {
     );
   };
 
+  const handleOpenPasswordDialog = (user: User) => {
+    setSelectedUserForPassword(user);
+    setNewUserPassword("");
+    setPasswordDialogOpen(true);
+  };
+
+  const handleUpdatePassword = async () => {
+    if (!selectedUserForPassword || !newUserPassword) {
+      toast.error("La contraseña es requerida");
+      return;
+    }
+
+    if (newUserPassword.length < 6) {
+      toast.error("La contraseña debe tener al menos 6 caracteres");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('update-password', {
+        body: {
+          userId: selectedUserForPassword.id,
+          newPassword: newUserPassword,
+        }
+      });
+
+      if (error) {
+        toast.error("Error al actualizar contraseña: " + error.message);
+        return;
+      }
+
+      if (data?.error) {
+        toast.error("Error: " + data.error);
+        return;
+      }
+
+      toast.success("Contraseña actualizada exitosamente");
+      setPasswordDialogOpen(false);
+      setSelectedUserForPassword(null);
+      setNewUserPassword("");
+    } catch (error: any) {
+      toast.error("Error inesperado: " + error.message);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -320,86 +367,139 @@ const Usuarios = () => {
                       {user.isAdmin ? "Administrador" : "Usuario"}
                     </p>
                   </div>
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    onClick={() => handleDeleteUser(user.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleOpenPasswordDialog(user)}
+                      title="Cambiar contraseña"
+                    >
+                      <Key className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      onClick={() => handleDeleteUser(user.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
-              {!user.isAdmin && (
-                <CardContent>
-                  {editingUser === user.id ? (
-                    <div className="space-y-4">
-                      <Label>Permisos de Menú</Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {menuOptions.map((menu) => (
-                          <div key={menu.path} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`${user.id}-${menu.path}`}
-                              checked={editPermissions.includes(menu.path)}
-                              onCheckedChange={() => togglePermission(menu.path)}
-                            />
-                            <Label htmlFor={`${user.id}-${menu.path}`}>{menu.label}</Label>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="flex gap-2">
-                        <Button onClick={handleSavePermissions}>
-                          <Save className="h-4 w-4 mr-2" />
-                          Guardar
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setEditingUser(null);
-                            setEditPermissions([]);
-                          }}
-                        >
-                          Cancelar
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <div className="mb-2">
-                        <Label>Permisos:</Label>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {user.permissions.length > 0 ? (
-                            user.permissions.map((path) => {
-                              const menu = menuOptions.find((m) => m.path === path);
-                              return (
-                                <span
-                                  key={path}
-                                  className="px-2 py-1 bg-accent text-accent-foreground rounded text-sm"
-                                >
-                                  {menu?.label || path}
-                                </span>
-                              );
-                            })
-                          ) : (
-                            <span className="text-sm text-muted-foreground">
-                              Sin permisos asignados
-                            </span>
-                          )}
+              <CardContent>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handleOpenPasswordDialog(user)}
+                  className="mb-4"
+                >
+                  <Key className="h-4 w-4 mr-2" />
+                  Cambiar Contraseña
+                </Button>
+                {!user.isAdmin && (
+                  <>
+                    {editingUser === user.id ? (
+                      <div className="space-y-4">
+                        <Label>Permisos de Menú</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {menuOptions.map((menu) => (
+                            <div key={menu.path} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`${user.id}-${menu.path}`}
+                                checked={editPermissions.includes(menu.path)}
+                                onCheckedChange={() => togglePermission(menu.path)}
+                              />
+                              <Label htmlFor={`${user.id}-${menu.path}`}>{menu.label}</Label>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button onClick={handleSavePermissions}>
+                            <Save className="h-4 w-4 mr-2" />
+                            Guardar
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setEditingUser(null);
+                              setEditPermissions([]);
+                            }}
+                          >
+                            Cancelar
+                          </Button>
                         </div>
                       </div>
-                      <Button
-                        variant="outline"
-                        onClick={() => handleEditPermissions(user.id, user.permissions)}
-                        className="mt-2"
-                      >
-                        Editar Permisos
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              )}
+                    ) : (
+                      <div>
+                        <div className="mb-2">
+                          <Label>Permisos:</Label>
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {user.permissions.length > 0 ? (
+                              user.permissions.map((path) => {
+                                const menu = menuOptions.find((m) => m.path === path);
+                                return (
+                                  <span
+                                    key={path}
+                                    className="px-2 py-1 bg-accent text-accent-foreground rounded text-sm"
+                                  >
+                                    {menu?.label || path}
+                                  </span>
+                                );
+                              })
+                            ) : (
+                              <span className="text-sm text-muted-foreground">
+                                Sin permisos asignados
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          onClick={() => handleEditPermissions(user.id, user.permissions)}
+                          className="mt-2"
+                        >
+                          Editar Permisos
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
             </Card>
           ))}
         </div>
+
+        {/* Password Change Dialog */}
+        <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Cambiar Contraseña</DialogTitle>
+              <DialogDescription>
+                Cambiar contraseña para: {selectedUserForPassword?.username}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="p-3 bg-muted rounded-md">
+                <p className="text-sm text-muted-foreground">
+                  <strong>Nota:</strong> Por seguridad, las contraseñas se almacenan encriptadas y no es posible ver la contraseña actual.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">Nueva Contraseña</Label>
+                <Input
+                  id="newPassword"
+                  type="password"
+                  value={newUserPassword}
+                  onChange={(e) => setNewUserPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                />
+              </div>
+              <Button onClick={handleUpdatePassword} className="w-full">
+                Actualizar Contraseña
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
