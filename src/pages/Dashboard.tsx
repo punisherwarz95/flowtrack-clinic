@@ -8,6 +8,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -27,9 +28,15 @@ interface AtencionIngresada {
   atencion_examenes: Array<{
     estado: string;
     examenes: {
+      id: string;
       nombre: string;
     };
   }>;
+}
+
+interface Examen {
+  id: string;
+  nombre: string;
 }
 
 const Dashboard = () => {
@@ -37,12 +44,15 @@ const Dashboard = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedMonth, setSelectedMonth] = useState<Date | undefined>(new Date());
   const [atencionesIngresadas, setAtencionesIngresadas] = useState<AtencionIngresada[]>([]);
+  const [examenes, setExamenes] = useState<Examen[]>([]);
+  const [selectedExamenFilter, setSelectedExamenFilter] = useState<string>("all");
   const [stats, setStats] = useState({
     enEspera: 0,
     enAtencion: 0,
     completados: 0,
     totalBoxes: 0,
     totalExamenes: 0,
+    examenesRealizadosHoy: 0,
     enEsperaDistribucion: { workmed: 0, jenner: 0 },
     enAtencionDistribucion: { workmed: 0, jenner: 0 },
     completadosDistribucion: { workmed: 0, jenner: 0 },
@@ -51,7 +61,13 @@ const Dashboard = () => {
 
   useEffect(() => {
     loadStats();
+    loadExamenes();
   }, [selectedDate, selectedMonth]);
+
+  const loadExamenes = async () => {
+    const { data } = await supabase.from("examenes").select("id, nombre").order("nombre");
+    setExamenes(data || []);
+  };
 
   const loadStats = async () => {
     try {
@@ -64,7 +80,7 @@ const Dashboard = () => {
       const startOfMonth = new Date(monthToUse.getFullYear(), monthToUse.getMonth(), 1, 0, 0, 0, 0).toISOString();
       const endOfMonth = new Date(monthToUse.getFullYear(), monthToUse.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
 
-      const [atencionesRes, completadosRes, boxesRes, examenesRes, pacientesMensualesRes, atencionesIngresadasRes] = await Promise.all([
+      const [atencionesRes, completadosRes, boxesRes, examenesRes, pacientesMensualesRes, atencionesIngresadasRes, examenesRealizadosRes] = await Promise.all([
         supabase
           .from("atenciones")
           .select("estado, pacientes(tipo_servicio)")
@@ -100,6 +116,7 @@ const Dashboard = () => {
             atencion_examenes (
               estado,
               examenes (
+                id,
                 nombre
               )
             )
@@ -107,6 +124,11 @@ const Dashboard = () => {
           .gte("fecha_ingreso", startOfDay)
           .lte("fecha_ingreso", endOfDay)
           .order("numero_ingreso", { ascending: true }),
+        supabase
+          .from("atencion_examenes")
+          .select("id, atencion_id, atenciones!inner(fecha_ingreso)")
+          .gte("atenciones.fecha_ingreso", startOfDay)
+          .lte("atenciones.fecha_ingreso", endOfDay),
       ]);
 
       const enEsperaData = atencionesRes.data?.filter((a: any) => a.estado === "en_espera") || [];
@@ -137,6 +159,7 @@ const Dashboard = () => {
         completados: completadosRes.data?.length || 0,
         totalBoxes: boxesRes.count || 0,
         totalExamenes: examenesRes.count || 0,
+        examenesRealizadosHoy: examenesRealizadosRes.data?.length || 0,
         enEsperaDistribucion: { workmed: enEsperaWM, jenner: enEsperaJ },
         enAtencionDistribucion: { workmed: enAtencionWM, jenner: enAtencionJ },
         completadosDistribucion: { workmed: completadosWM, jenner: completadosJ },
@@ -146,6 +169,13 @@ const Dashboard = () => {
       console.error("Error cargando estadísticas:", error);
     }
   };
+
+  // Filter patients by selected exam
+  const filteredAtenciones = selectedExamenFilter === "all"
+    ? atencionesIngresadas
+    : atencionesIngresadas.filter(a => 
+        a.atencion_examenes.some(ae => ae.examenes.id === selectedExamenFilter)
+      );
 
   return (
     <div className="min-h-screen bg-background">
@@ -335,16 +365,31 @@ const Dashboard = () => {
         <div className="mt-8">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" />
-                Pacientes Ingresados
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {format(selectedDate || new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })}
-              </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-primary" />
+                    Pacientes Ingresados
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {format(selectedDate || new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })}
+                  </p>
+                </div>
+                <Select value={selectedExamenFilter} onValueChange={setSelectedExamenFilter}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Filtrar por examen" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los exámenes</SelectItem>
+                    {examenes.map((examen) => (
+                      <SelectItem key={examen.id} value={examen.id}>{examen.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent>
-              {atencionesIngresadas.length === 0 ? (
+              {filteredAtenciones.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">
                   No hay pacientes ingresados en esta fecha
                 </p>
@@ -362,7 +407,7 @@ const Dashboard = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {atencionesIngresadas.map((atencion) => (
+                      {filteredAtenciones.map((atencion) => (
                         <TableRow key={atencion.id}>
                           <TableCell className="font-medium">
                             #{atencion.numero_ingreso.toString().padStart(3, "0")}
@@ -427,14 +472,20 @@ const Dashboard = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ClipboardCheck className="h-5 w-5 text-primary" />
-                Exámenes Disponibles
+                Exámenes del Día
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-foreground">{stats.totalExamenes}</div>
+              <div className="text-4xl font-bold text-foreground">{stats.examenesRealizadosHoy}</div>
               <p className="text-sm text-muted-foreground mt-2">
-                Exámenes configurados en el sistema
+                Exámenes asignados - {format(selectedDate || new Date(), "dd/MM/yyyy", { locale: es })}
               </p>
+              <div className="mt-4 pt-4 border-t">
+                <div className="text-2xl font-bold text-foreground">{stats.totalExamenes}</div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Exámenes configurados en el sistema
+                </p>
+              </div>
             </CardContent>
           </Card>
         </div>
