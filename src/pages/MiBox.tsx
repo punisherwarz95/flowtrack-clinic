@@ -340,24 +340,27 @@ const MiBox = () => {
           .eq("estado", "pendiente");
       }
 
-      const { data: examenesPendientes } = await supabase
+      const { data: examenesPendientesData } = await supabase
         .from("atencion_examenes")
         .select("id")
         .eq("atencion_id", atencionId)
         .eq("estado", "pendiente");
 
-      if (examenesPendientes && examenesPendientes.length > 0) {
+      if (examenesPendientesData && examenesPendientesData.length > 0) {
+        // Si quedan exámenes pendientes, devolver a espera
         await supabase
           .from("atenciones")
           .update({ estado: "en_espera", box_id: null })
           .eq("id", atencionId);
         toast.success("Paciente devuelto a espera - tiene exámenes pendientes");
       } else {
+        // Si NO quedan pendientes, solo liberar el box pero mantener en_atencion
+        // El paciente aparecerá en "Listos para Finalizar" en Flujo
         await supabase
           .from("atenciones")
-          .update({ estado, fecha_fin_atencion: new Date().toISOString() })
+          .update({ box_id: null })
           .eq("id", atencionId);
-        toast.success(estado === "completado" ? "Atención completada" : "Atención marcada como incompleta");
+        toast.success("Exámenes completados - paciente listo para finalizar en Flujo");
       }
 
       setConfirmCompletarDialog({ open: false, atencionId: null });
