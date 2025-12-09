@@ -119,8 +119,14 @@ const MiBox = () => {
       const endOfDay = new Date();
       endOfDay.setHours(23, 59, 59, 999);
 
-      const currentBox = boxes.find(b => b.id === selectedBoxId);
-      const boxExamIds = currentBox?.box_examenes.map(be => be.examen_id) || [];
+      // Cargar box directamente para asegurar que tenemos los exámenes
+      const { data: boxData } = await supabase
+        .from("boxes")
+        .select("*, box_examenes(examen_id)")
+        .eq("id", selectedBoxId)
+        .single();
+
+      const boxExamIds = boxData?.box_examenes?.map((be: { examen_id: string }) => be.examen_id) || [];
 
       // 1. Paciente actualmente en atención en este box
       const { data: enAtencionData, error: enAtencionError } = await supabase
