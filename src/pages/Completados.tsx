@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
-import { CheckCircle, Calendar as CalendarIcon } from "lucide-react";
+import { CheckCircle, Calendar as CalendarIcon, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -11,6 +11,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 interface AtencionCompletada {
   id: string;
@@ -41,6 +44,8 @@ const Completados = () => {
   const [atenciones, setAtenciones] = useState<AtencionCompletada[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [distribucion, setDistribucion] = useState({ workmed: 0, jenner: 0 });
+  const [revertDialog, setRevertDialog] = useState<{open: boolean, atencion: AtencionCompletada | null}>({open: false, atencion: null});
+  const [selectedExamenesRevert, setSelectedExamenesRevert] = useState<string[]>([]);
 
   useEffect(() => {
     loadAtenciones();
@@ -87,6 +92,60 @@ const Completados = () => {
       console.error("Error:", error);
       toast.error("Error al cargar atenciones completadas");
     }
+  };
+
+  const handleOpenRevertDialog = (atencion: AtencionCompletada) => {
+    setRevertDialog({ open: true, atencion });
+    // Pre-seleccionar todos los exámenes completados
+    const completedExams = atencion.atencion_examenes
+      .filter(ae => ae.estado === "completado")
+      .map(ae => ae.id);
+    setSelectedExamenesRevert(completedExams);
+  };
+
+  const handleRevertAtencion = async () => {
+    if (!revertDialog.atencion || selectedExamenesRevert.length === 0) {
+      toast.error("Selecciona al menos un examen para revertir");
+      return;
+    }
+
+    try {
+      // Revertir los exámenes seleccionados a pendiente
+      const { error: examenesError } = await supabase
+        .from("atencion_examenes")
+        .update({ estado: "pendiente", fecha_realizacion: null })
+        .in("id", selectedExamenesRevert);
+
+      if (examenesError) throw examenesError;
+
+      // Devolver la atención a en_espera
+      const { error: atencionError } = await supabase
+        .from("atenciones")
+        .update({ 
+          estado: "en_espera", 
+          box_id: null,
+          fecha_fin_atencion: null 
+        })
+        .eq("id", revertDialog.atencion.id);
+
+      if (atencionError) throw atencionError;
+
+      toast.success(`Paciente devuelto a espera con ${selectedExamenesRevert.length} examen(es) pendiente(s)`);
+      setRevertDialog({ open: false, atencion: null });
+      setSelectedExamenesRevert([]);
+      await loadAtenciones();
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al revertir atención");
+    }
+  };
+
+  const toggleExamenRevert = (examenId: string) => {
+    setSelectedExamenesRevert(prev => 
+      prev.includes(examenId) 
+        ? prev.filter(id => id !== examenId)
+        : [...prev, examenId]
+    );
   };
 
   return (
@@ -154,6 +213,15 @@ const Completados = () => {
                         </Badge>
                         <Badge className="bg-green-600">Completado</Badge>
                       </div>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => handleOpenRevertDialog(atencion)}
+                      className="shrink-0"
+                    >
+                      <RotateCcw className="h-4 w-4 mr-1" />
+                      Devolver
+                    </Button>
                       <div className="text-sm text-muted-foreground">
                         Empresa: {atencion.pacientes.empresas?.nombre || "Sin empresa"}
                       </div>
@@ -188,6 +256,50 @@ const Completados = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Dialog para revertir atención */}
+        <Dialog open={revertDialog.open} onOpenChange={(open) => {
+          setRevertDialog({ open, atencion: open ? revertDialog.atencion : null });
+          if (!open) setSelectedExamenesRevert([]);
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Devolver Paciente a Espera</DialogTitle>
+              <DialogDescription>
+                Selecciona los exámenes que deseas revertir a pendiente para el paciente{" "}
+                <span className="font-semibold">{revertDialog.atencion?.pacientes.nombre}</span>
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-4">
+              <Label className="text-sm font-medium">Exámenes a revertir:</Label>
+              {revertDialog.atencion?.atencion_examenes
+                .filter(ae => ae.estado === "completado")
+                .map((ae) => (
+                  <div key={ae.id} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`revert-${ae.id}`}
+                      checked={selectedExamenesRevert.includes(ae.id)}
+                      onCheckedChange={() => toggleExamenRevert(ae.id)}
+                    />
+                    <Label htmlFor={`revert-${ae.id}`} className="cursor-pointer">
+                      {ae.examenes.nombre}
+                    </Label>
+                  </div>
+                ))}
+              {revertDialog.atencion?.atencion_examenes.filter(ae => ae.estado === "completado").length === 0 && (
+                <p className="text-muted-foreground text-sm">No hay exámenes completados para revertir</p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setRevertDialog({ open: false, atencion: null })}>
+                Cancelar
+              </Button>
+              <Button onClick={handleRevertAtencion} disabled={selectedExamenesRevert.length === 0}>
+                Devolver a Espera
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

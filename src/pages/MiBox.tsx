@@ -374,6 +374,26 @@ const MiBox = () => {
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
+  const handleCambiarEstadoFicha = async (atencionId: string, estadoActual: string) => {
+    const estados: Array<"pendiente" | "en_mano_paciente" | "completada"> = ["pendiente", "en_mano_paciente", "completada"];
+    const currentIndex = estados.indexOf(estadoActual as "pendiente" | "en_mano_paciente" | "completada");
+    const nuevoEstado = estados[(currentIndex + 1) % estados.length];
+    
+    try {
+      const { error } = await supabase
+        .from("atenciones")
+        .update({ estado_ficha: nuevoEstado })
+        .eq("id", atencionId);
+
+      if (error) throw error;
+      toast.success(`Ficha: ${nuevoEstado === "completada" ? "Recibida" : nuevoEstado === "en_mano_paciente" ? "Con Paciente" : "Pendiente"}`);
+      await loadData();
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al cambiar estado de ficha");
+    }
+  };
+
   const currentBox = boxes.find(b => b.id === selectedBoxId);
 
   return (
@@ -492,12 +512,24 @@ const MiBox = () => {
                           <Badge variant="outline" className="text-xs">#{atencion.numero_ingreso}</Badge>
                           <span className="font-medium text-sm">{atencion.pacientes.nombre}</span>
                         </div>
-                        <Badge 
-                          variant={atencion.pacientes.tipo_servicio === "workmed" ? "default" : "secondary"}
-                          className="mt-1 text-xs"
-                        >
-                          {atencion.pacientes.tipo_servicio}
-                        </Badge>
+                    <Badge 
+                      variant={atencion.pacientes.tipo_servicio === "workmed" ? "default" : "secondary"}
+                      className="mt-1 text-xs"
+                    >
+                      {atencion.pacientes.tipo_servicio}
+                    </Badge>
+                    <Badge 
+                      variant="outline"
+                      className={`mt-1 text-xs cursor-pointer ${
+                        atencion.estado_ficha === "completada" ? "bg-green-100 text-green-800" :
+                        atencion.estado_ficha === "en_mano_paciente" ? "bg-yellow-100 text-yellow-800" :
+                        "bg-gray-100 text-gray-800"
+                      }`}
+                      onClick={() => handleCambiarEstadoFicha(atencion.id, atencion.estado_ficha)}
+                    >
+                      Ficha: {atencion.estado_ficha === "completada" ? "Recibida" : 
+                              atencion.estado_ficha === "en_mano_paciente" ? "Con Paciente" : "Pendiente"}
+                    </Badge>
                       </div>
                       <Button
                         size="sm"
@@ -547,6 +579,18 @@ const MiBox = () => {
                       variant={paciente.pacientes.tipo_servicio === "workmed" ? "default" : "secondary"}
                     >
                       {paciente.pacientes.tipo_servicio}
+                    </Badge>
+                    <Badge 
+                      variant="outline"
+                      className={`cursor-pointer ${
+                        paciente.estado_ficha === "completada" ? "bg-green-100 text-green-800" :
+                        paciente.estado_ficha === "en_mano_paciente" ? "bg-yellow-100 text-yellow-800" :
+                        "bg-gray-100 text-gray-800"
+                      }`}
+                      onClick={() => handleCambiarEstadoFicha(paciente.id, paciente.estado_ficha)}
+                    >
+                      Ficha: {paciente.estado_ficha === "completada" ? "Recibida" : 
+                              paciente.estado_ficha === "en_mano_paciente" ? "Con Paciente" : "Pendiente"}
                     </Badge>
 
                     {/* Exámenes pendientes */}
