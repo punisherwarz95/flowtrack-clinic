@@ -31,7 +31,7 @@ export const usePermissions = () => {
 
       // If admin, has access to everything
       if (userIsAdmin) {
-        setPermissions(["/", "/flujo", "/pacientes", "/completados", "/empresas", "/boxes", "/examenes", "/usuarios"]);
+        setPermissions(["/", "/flujo", "/mi-box", "/pacientes", "/completados", "/empresas", "/boxes", "/examenes", "/usuarios"]);
         setLoading(false);
         return;
       }
