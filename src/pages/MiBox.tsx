@@ -374,11 +374,7 @@ const MiBox = () => {
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
-  const handleCambiarEstadoFicha = async (atencionId: string, estadoActual: string) => {
-    const estados: Array<"pendiente" | "en_mano_paciente" | "completada"> = ["pendiente", "en_mano_paciente", "completada"];
-    const currentIndex = estados.indexOf(estadoActual as "pendiente" | "en_mano_paciente" | "completada");
-    const nuevoEstado = estados[(currentIndex + 1) % estados.length];
-    
+  const handleCambiarEstadoFicha = async (atencionId: string, nuevoEstado: "pendiente" | "en_mano_paciente" | "completada") => {
     try {
       const { error } = await supabase
         .from("atenciones")
@@ -386,7 +382,12 @@ const MiBox = () => {
         .eq("id", atencionId);
 
       if (error) throw error;
-      toast.success(`Ficha: ${nuevoEstado === "completada" ? "Recibida" : nuevoEstado === "en_mano_paciente" ? "Con Paciente" : "Pendiente"}`);
+      const mensajes = {
+        pendiente: "Ficha: Pendiente",
+        en_mano_paciente: "Ficha: Con Paciente",
+        completada: "Ficha: Recibida"
+      };
+      toast.success(mensajes[nuevoEstado]);
       await loadData();
     } catch (error) {
       console.error("Error:", error);
@@ -518,18 +519,38 @@ const MiBox = () => {
                     >
                       {atencion.pacientes.tipo_servicio}
                     </Badge>
-                    <Badge 
-                      variant="outline"
-                      className={`mt-1 text-xs cursor-pointer ${
-                        atencion.estado_ficha === "completada" ? "bg-green-100 text-green-800" :
-                        atencion.estado_ficha === "en_mano_paciente" ? "bg-yellow-100 text-yellow-800" :
-                        "bg-gray-100 text-gray-800"
-                      }`}
-                      onClick={() => handleCambiarEstadoFicha(atencion.id, atencion.estado_ficha)}
-                    >
-                      Ficha: {atencion.estado_ficha === "completada" ? "Recibida" : 
-                              atencion.estado_ficha === "en_mano_paciente" ? "Con Paciente" : "Pendiente"}
-                    </Badge>
+                    <div className="flex items-center gap-3 mt-2">
+                      <div className="flex items-center gap-1">
+                        <Checkbox
+                          id={`pendiente-espera-${atencion.id}`}
+                          checked={atencion.estado_ficha === 'pendiente'}
+                          onCheckedChange={() => handleCambiarEstadoFicha(atencion.id, 'pendiente')}
+                        />
+                        <Label htmlFor={`pendiente-espera-${atencion.id}`} className="text-xs cursor-pointer">
+                          Pendiente
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Checkbox
+                          id={`en_mano-espera-${atencion.id}`}
+                          checked={atencion.estado_ficha === 'en_mano_paciente'}
+                          onCheckedChange={() => handleCambiarEstadoFicha(atencion.id, 'en_mano_paciente')}
+                        />
+                        <Label htmlFor={`en_mano-espera-${atencion.id}`} className="text-xs cursor-pointer">
+                          Con Paciente
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Checkbox
+                          id={`completada-espera-${atencion.id}`}
+                          checked={atencion.estado_ficha === 'completada'}
+                          onCheckedChange={() => handleCambiarEstadoFicha(atencion.id, 'completada')}
+                        />
+                        <Label htmlFor={`completada-espera-${atencion.id}`} className="text-xs cursor-pointer">
+                          Recibida
+                        </Label>
+                      </div>
+                    </div>
                       </div>
                       <Button
                         size="sm"
@@ -580,18 +601,38 @@ const MiBox = () => {
                     >
                       {paciente.pacientes.tipo_servicio}
                     </Badge>
-                    <Badge 
-                      variant="outline"
-                      className={`cursor-pointer ${
-                        paciente.estado_ficha === "completada" ? "bg-green-100 text-green-800" :
-                        paciente.estado_ficha === "en_mano_paciente" ? "bg-yellow-100 text-yellow-800" :
-                        "bg-gray-100 text-gray-800"
-                      }`}
-                      onClick={() => handleCambiarEstadoFicha(paciente.id, paciente.estado_ficha)}
-                    >
-                      Ficha: {paciente.estado_ficha === "completada" ? "Recibida" : 
-                              paciente.estado_ficha === "en_mano_paciente" ? "Con Paciente" : "Pendiente"}
-                    </Badge>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1">
+                        <Checkbox
+                          id={`pendiente-aten-${paciente.id}`}
+                          checked={paciente.estado_ficha === 'pendiente'}
+                          onCheckedChange={() => handleCambiarEstadoFicha(paciente.id, 'pendiente')}
+                        />
+                        <Label htmlFor={`pendiente-aten-${paciente.id}`} className="text-xs cursor-pointer">
+                          Pendiente
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Checkbox
+                          id={`en_mano-aten-${paciente.id}`}
+                          checked={paciente.estado_ficha === 'en_mano_paciente'}
+                          onCheckedChange={() => handleCambiarEstadoFicha(paciente.id, 'en_mano_paciente')}
+                        />
+                        <Label htmlFor={`en_mano-aten-${paciente.id}`} className="text-xs cursor-pointer">
+                          Con Paciente
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Checkbox
+                          id={`completada-aten-${paciente.id}`}
+                          checked={paciente.estado_ficha === 'completada'}
+                          onCheckedChange={() => handleCambiarEstadoFicha(paciente.id, 'completada')}
+                        />
+                        <Label htmlFor={`completada-aten-${paciente.id}`} className="text-xs cursor-pointer">
+                          Recibida
+                        </Label>
+                      </div>
+                    </div>
 
                     {/* Exámenes pendientes */}
                     <div className="space-y-2">
