@@ -96,11 +96,7 @@ const Completados = () => {
 
   const handleOpenRevertDialog = (atencion: AtencionCompletada) => {
     setRevertDialog({ open: true, atencion });
-    // Pre-seleccionar todos los exámenes completados
-    const completedExams = atencion.atencion_examenes
-      .filter(ae => ae.estado === "completado")
-      .map(ae => ae.id);
-    setSelectedExamenesRevert(completedExams);
+    setSelectedExamenesRevert([]);
   };
 
   const handleRevertAtencion = async () => {
