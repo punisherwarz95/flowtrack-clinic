@@ -495,7 +495,7 @@ const Dashboard = () => {
                   {Object.entries(examenesConteo)
                     .sort((a, b) => b[1] - a[1])
                     .map(([nombre, cantidad]) => (
-                      <div key={nombre} className="flex items-center justify-between py-1 border-b border-border/50 last:border-0">
+                      <div key={nombre} className="flex items-center gap-2 py-1 border-b border-border/50 last:border-0">
                         <span className="text-sm text-muted-foreground">{nombre}</span>
                         <Badge variant="secondary">{cantidad}</Badge>
                       </div>
