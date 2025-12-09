@@ -143,7 +143,7 @@ const MiBox = () => {
         .eq("box_id", selectedBoxId)
         .gte("fecha_ingreso", startOfDay.toISOString())
         .lte("fecha_ingreso", endOfDay.toISOString())
-        .order("fecha_inicio_atencion", { ascending: true });
+        .order("numero_ingreso", { ascending: true });
 
       if (enAtencionError) throw enAtencionError;
       setPacientesEnAtencion(enAtencionData || []);
