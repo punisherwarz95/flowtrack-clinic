@@ -200,18 +200,26 @@ const Pacientes = () => {
       rut: "",
     });
 
-    // Cargar exámenes pendientes de la última atención
+    // Cargar exámenes de la última atención (cualquier estado)
     try {
+      const dateToUse = selectedDate || new Date();
+      const startOfDay = new Date(dateToUse.setHours(0, 0, 0, 0)).toISOString();
+      const endOfDay = new Date(dateToUse.setHours(23, 59, 59, 999)).toISOString();
+
       const { data: atencionData, error: atencionError } = await supabase
         .from("atenciones")
-        .select("id")
+        .select("id, estado")
         .eq("paciente_id", patient.id)
-        .in("estado", ["en_espera", "en_atencion"])
-        .single();
+        .gte("fecha_ingreso", startOfDay)
+        .lte("fecha_ingreso", endOfDay)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       if (atencionError) throw atencionError;
 
       if (atencionData) {
+        // Cargar exámenes pendientes (para agregar nuevos)
         const { data: examenesData, error: examenesError } = await supabase
           .from("atencion_examenes")
           .select("examen_id")
@@ -221,6 +229,8 @@ const Pacientes = () => {
         if (examenesError) throw examenesError;
 
         setSelectedExamenes(examenesData?.map(e => e.examen_id) || []);
+      } else {
+        setSelectedExamenes([]);
       }
     } catch (error) {
       console.error("Error loading exams:", error);
@@ -256,13 +266,20 @@ const Pacientes = () => {
 
         if (pacienteError) throw pacienteError;
 
-        // Actualizar exámenes de la atención pendiente
+        // Buscar atención del día (cualquier estado)
+        const dateToUse = selectedDate || new Date();
+        const startOfDay = new Date(dateToUse.setHours(0, 0, 0, 0)).toISOString();
+        const endOfDay = new Date(dateToUse.setHours(23, 59, 59, 999)).toISOString();
+
         const { data: atencionData, error: atencionError } = await supabase
           .from("atenciones")
-          .select("id")
+          .select("id, estado")
           .eq("paciente_id", editingPatient)
-          .in("estado", ["en_espera", "en_atencion"])
-          .single();
+          .gte("fecha_ingreso", startOfDay)
+          .lte("fecha_ingreso", endOfDay)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
         if (atencionError) throw atencionError;
 
@@ -286,9 +303,24 @@ const Pacientes = () => {
             .insert(examenesData);
 
           if (examenesError) throw examenesError;
-        }
 
-        toast.success("Paciente actualizado exitosamente");
+          // Si la atención estaba completada o incompleta, devolverla a en_espera
+          if (atencionData.estado === "completado" || atencionData.estado === "incompleto") {
+            const { error: updateError } = await supabase
+              .from("atenciones")
+              .update({ 
+                estado: "en_espera", 
+                box_id: null,
+                fecha_fin_atencion: null 
+              })
+              .eq("id", atencionData.id);
+
+            if (updateError) throw updateError;
+            toast.success("Paciente devuelto a lista de espera con nuevos exámenes");
+          } else {
+            toast.success("Paciente actualizado exitosamente");
+          }
+        }
       } else {
         // Insertar paciente
         const { data: pacienteData, error: pacienteError } = await supabase
