@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, Box, ClipboardCheck, Calendar as CalendarIcon, Users } from "lucide-react";
+import { Activity, Box, ClipboardCheck, Calendar as CalendarIcon, Users, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import Navigation from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
@@ -46,6 +46,8 @@ const Dashboard = () => {
   const [atencionesIngresadas, setAtencionesIngresadas] = useState<AtencionIngresada[]>([]);
   const [examenes, setExamenes] = useState<Examen[]>([]);
   const [selectedExamenFilter, setSelectedExamenFilter] = useState<string>("all");
+  const [filterCompletado, setFilterCompletado] = useState<boolean>(true);
+  const [filterIncompleto, setFilterIncompleto] = useState<boolean>(true);
   const [examenesConteo, setExamenesConteo] = useState<Record<string, number>>({});
   const [stats, setStats] = useState({
     enEspera: 0,
@@ -179,12 +181,23 @@ const Dashboard = () => {
     }
   };
 
-  // Filter patients by selected exam
-  const filteredAtenciones = selectedExamenFilter === "all"
-    ? atencionesIngresadas
-    : atencionesIngresadas.filter(a => 
-        a.atencion_examenes.some(ae => ae.examenes.id === selectedExamenFilter)
-      );
+  // Filter patients by selected exam and status
+  const filteredAtenciones = atencionesIngresadas.filter(a => {
+    // First filter by exam if selected
+    if (selectedExamenFilter !== "all") {
+      const hasExam = a.atencion_examenes.some(ae => ae.examenes.id === selectedExamenFilter);
+      if (!hasExam) return false;
+      
+      // Then filter by exam status checkboxes
+      const examStatus = a.atencion_examenes.find(ae => ae.examenes.id === selectedExamenFilter);
+      if (examStatus) {
+        const isCompleted = examStatus.estado === "completado";
+        if (isCompleted && !filterCompletado) return false;
+        if (!isCompleted && !filterIncompleto) return false;
+      }
+    }
+    return true;
+  });
 
   return (
     <div className="min-h-screen bg-background">
@@ -384,17 +397,50 @@ const Dashboard = () => {
                     {format(selectedDate || new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })}
                   </p>
                 </div>
-                <Select value={selectedExamenFilter} onValueChange={setSelectedExamenFilter}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Filtrar por examen" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los exámenes</SelectItem>
-                    {examenes.map((examen) => (
-                      <SelectItem key={examen.id} value={examen.id}>{examen.nombre}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-4">
+                  <Select value={selectedExamenFilter} onValueChange={setSelectedExamenFilter}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Filtrar por examen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los exámenes</SelectItem>
+                      {examenes.map((examen) => (
+                        <SelectItem key={examen.id} value={examen.id}>{examen.nombre}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  {selectedExamenFilter !== "all" && (
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <div 
+                          onClick={() => setFilterCompletado(!filterCompletado)}
+                          className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
+                            filterCompletado 
+                              ? "bg-green-600 border-green-600 text-white" 
+                              : "border-muted-foreground"
+                          }`}
+                        >
+                          {filterCompletado && <Check className="h-3 w-3" />}
+                        </div>
+                        <span className="text-sm">Completado</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <div 
+                          onClick={() => setFilterIncompleto(!filterIncompleto)}
+                          className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
+                            filterIncompleto 
+                              ? "bg-yellow-600 border-yellow-600 text-white" 
+                              : "border-muted-foreground"
+                          }`}
+                        >
+                          {filterIncompleto && <Check className="h-3 w-3" />}
+                        </div>
+                        <span className="text-sm">Pendiente</span>
+                      </label>
+                    </div>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
