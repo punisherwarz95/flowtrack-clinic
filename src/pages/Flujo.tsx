@@ -470,18 +470,17 @@ const Flujo = () => {
     );
   }
   
-  let enAtencion = atenciones.filter((a) => a.estado === "en_atencion");
+  // En atención: solo mostrar pacientes que tienen box asignado (están siendo atendidos activamente)
+  let enAtencion = atenciones.filter((a) => a.estado === "en_atencion" && a.box_id);
   
   // Filtrar por box asignado si se seleccionó uno
   if (filtroBoxAtencion !== "todos") {
     enAtencion = enAtencion.filter((a) => a.box_id === filtroBoxAtencion);
   }
 
-  // Pacientes listos para finalizar: en_atencion sin exámenes pendientes
+  // Pacientes listos para finalizar: en_atencion sin box_id asignado (ya liberados de todos los boxes)
   const listosParaFinalizar = atenciones.filter((a) => {
-    if (a.estado !== "en_atencion") return false;
-    const pendientes = examenesPendientes[a.id] || [];
-    return pendientes.length === 0;
+    return a.estado === "en_atencion" && !a.box_id;
   });
 
   const getEstadoBadge = (estado: string) => {
