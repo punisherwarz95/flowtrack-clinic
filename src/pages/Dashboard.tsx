@@ -25,6 +25,7 @@ interface AtencionIngresada {
     } | null;
   };
   atencion_examenes: Array<{
+    estado: string;
     examenes: {
       nombre: string;
     };
@@ -97,6 +98,7 @@ const Dashboard = () => {
               )
             ),
             atencion_examenes (
+              estado,
               examenes (
                 nombre
               )
@@ -397,8 +399,12 @@ const Dashboard = () => {
                             <div className="flex flex-wrap gap-1">
                               {atencion.atencion_examenes.length > 0 ? (
                                 atencion.atencion_examenes.map((ae, idx) => (
-                                  <Badge key={idx} variant="outline" className="text-xs">
-                                    {ae.examenes.nombre}
+                                  <Badge 
+                                    key={idx} 
+                                    variant="outline" 
+                                    className={`text-xs ${ae.estado === "completado" ? "bg-green-100 text-green-800 border-green-300" : ""}`}
+                                  >
+                                    {ae.estado === "completado" && "✓ "}{ae.examenes.nombre}
                                   </Badge>
                                 ))
                               ) : (
