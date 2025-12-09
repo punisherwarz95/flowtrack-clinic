@@ -318,10 +318,14 @@ const Pacientes = () => {
           }
         }
       } else {
-        // Insertar paciente
+        // Insertar paciente - convertir empresa_id vacío a null
+        const insertData = {
+          ...formData,
+          empresa_id: formData.empresa_id || null
+        };
         const { data: pacienteData, error: pacienteError } = await supabase
           .from("pacientes")
-          .insert([formData])
+          .insert([insertData])
           .select()
           .single();
 
