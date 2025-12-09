@@ -49,6 +49,7 @@ const Usuarios = () => {
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [selectedUserForPassword, setSelectedUserForPassword] = useState<User | null>(null);
   const [newUserPassword, setNewUserPassword] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -110,6 +111,7 @@ const Usuarios = () => {
       return;
     }
 
+    setIsCreating(true);
     try {
       // Convert username to email format if it doesn't contain @
       const emailToUse = newUsername.includes('@') ? newUsername : `${newUsername}@mediflow.local`;
@@ -146,6 +148,8 @@ const Usuarios = () => {
     } catch (error: any) {
       console.error('Unexpected error:', error);
       toast.error("Error inesperado al crear usuario: " + error.message);
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -359,8 +363,8 @@ const Usuarios = () => {
                   </div>
                 )}
                 
-                <Button onClick={handleCreateUser} className="w-full">
-                  Crear Usuario
+                <Button onClick={handleCreateUser} className="w-full" disabled={isCreating}>
+                  {isCreating ? "Creando..." : "Crear Usuario"}
                 </Button>
               </div>
             </DialogContent>
