@@ -491,16 +491,32 @@ const Dashboard = () => {
               <div className="text-4xl font-bold text-foreground mb-4">{stats.examenesRealizadosHoy}</div>
               
               {Object.keys(examenesConteo).length > 0 ? (
-                <div className="columns-2 md:columns-3 gap-4">
-                  {Object.entries(examenesConteo)
-                    .sort((a, b) => b[1] - a[1])
-                    .map(([nombre, cantidad]) => (
-                      <div key={nombre} className="flex items-center gap-2 py-1 break-inside-avoid">
-                        <span className="text-sm text-muted-foreground">{nombre}</span>
-                        <Badge variant="secondary">{cantidad}</Badge>
-                      </div>
-                    ))}
-                </div>
+                (() => {
+                  const sortedExamenes = Object.entries(examenesConteo).sort((a, b) => b[1] - a[1]);
+                  const itemsPerColumn = Math.ceil(sortedExamenes.length / 3);
+                  const columns = [
+                    sortedExamenes.slice(0, itemsPerColumn),
+                    sortedExamenes.slice(itemsPerColumn, itemsPerColumn * 2),
+                    sortedExamenes.slice(itemsPerColumn * 2),
+                  ].filter(col => col.length > 0);
+                  
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {columns.map((column, colIndex) => (
+                        <table key={colIndex} className="w-auto">
+                          <tbody>
+                            {column.map(([nombre, cantidad]) => (
+                              <tr key={nombre}>
+                                <td className="text-sm text-muted-foreground py-1 pr-3">{nombre}</td>
+                                <td className="py-1"><Badge variant="secondary">{cantidad}</Badge></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      ))}
+                    </div>
+                  );
+                })()
               ) : (
                 <p className="text-sm text-muted-foreground">Sin exámenes asignados</p>
               )}
