@@ -398,7 +398,7 @@ const Flujo = () => {
       }
 
       // 2) Verificar si quedan exámenes pendientes luego de lo anterior
-      const { data: examenesPendientes, error: examenesError } = await supabase
+      const { data: examenesPendientesData, error: examenesError } = await supabase
         .from("atencion_examenes")
         .select("id")
         .eq("atencion_id", atencionId)
@@ -406,8 +406,9 @@ const Flujo = () => {
 
       if (examenesError) throw examenesError;
 
-      // 3) Actualizar el estado de la atención según si quedan pendientes o no
-      if (examenesPendientes && examenesPendientes.length > 0) {
+      // 3) Actualizar el estado de la atención
+      if (examenesPendientesData && examenesPendientesData.length > 0) {
+        // Si quedan exámenes pendientes, devolver a espera
         const { error } = await supabase
           .from("atenciones")
           .update({
@@ -418,7 +419,20 @@ const Flujo = () => {
 
         if (error) throw error;
         toast.success("Paciente devuelto a espera - tiene exámenes pendientes");
+      } else if (currentBoxId) {
+        // Si NO quedan pendientes pero viene de un box, solo liberar el box
+        // El paciente se queda en "en_atencion" sin box asignado para finalización manual
+        const { error } = await supabase
+          .from("atenciones")
+          .update({
+            box_id: null,
+          })
+          .eq("id", atencionId);
+
+        if (error) throw error;
+        toast.success("Exámenes completados - paciente listo para finalizar");
       } else {
+        // Si viene de la sección "Listos para Finalizar" (sin box), finalizar definitivamente
         const { error } = await supabase
           .from("atenciones")
           .update({
