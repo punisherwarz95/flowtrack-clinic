@@ -539,7 +539,7 @@ const Flujo = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-3 justify-end">
+              <div className="flex flex-wrap gap-3 justify-start">
                 {listosParaFinalizar.map((atencion) => (
                   <div
                     key={atencion.id}
