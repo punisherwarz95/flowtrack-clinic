@@ -254,10 +254,14 @@ const Pacientes = () => {
     setIsSubmitting(true);
     try {
       if (editingPatient) {
-        // Actualizar paciente
+        // Actualizar paciente - convertir empresa_id vacío a null
+        const updateData = {
+          ...formData,
+          empresa_id: formData.empresa_id || null
+        };
         const { error: pacienteError } = await supabase
           .from("pacientes")
-          .update(formData)
+          .update(updateData)
           .eq("id", editingPatient);
 
         if (pacienteError) throw pacienteError;
