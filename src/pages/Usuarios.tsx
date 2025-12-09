@@ -387,15 +387,6 @@ const Usuarios = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => handleOpenPasswordDialog(user)}
-                  className="mb-4"
-                >
-                  <Key className="h-4 w-4 mr-2" />
-                  Cambiar Contraseña
-                </Button>
                 {!user.isAdmin && (
                   <>
                     {editingUser === user.id ? (
