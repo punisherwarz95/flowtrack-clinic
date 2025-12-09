@@ -5,10 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
-import PatientCombobox from "@/components/PatientCombobox";
-import { Clock, UserPlus, Play, CheckCircle, XCircle, Calendar as CalendarIcon, FileText, RefreshCw, ChevronDown } from "lucide-react";
+import { Play, CheckCircle, XCircle, Calendar as CalendarIcon, FileText, RefreshCw, ChevronDown, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -63,10 +61,7 @@ const Flujo = () => {
   const [atenciones, setAtenciones] = useState<Atencion[]>([]);
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [examenes, setExamenes] = useState<Examen[]>([]);
-  const [selectedPatient, setSelectedPatient] = useState("");
   const [selectedBox, setSelectedBox] = useState<{[atencionId: string]: string}>({});
-  const [showExamenesDialog, setShowExamenesDialog] = useState(false);
-  const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [pendingBoxes, setPendingBoxes] = useState<{[atencionId: string]: string[]}>({});
   const [atencionExamenes, setAtencionExamenes] = useState<{[atencionId: string]: AtencionExamen[]}>({});
@@ -248,56 +243,6 @@ const Flujo = () => {
     }
 
     setPendingBoxes(newPendingBoxes);
-  };
-
-  const handleIngresoClick = () => {
-    if (!selectedPatient) {
-      toast.error("Selecciona un paciente");
-      return;
-    }
-    setShowExamenesDialog(true);
-  };
-
-  const handleConfirmIngreso = async () => {
-    if (selectedExamenes.length === 0) {
-      toast.error("Selecciona al menos un examen");
-      return;
-    }
-
-    try {
-      const { data: atencionData, error: atencionError } = await supabase
-        .from("atenciones")
-        .insert([
-          {
-            paciente_id: selectedPatient,
-            estado: "en_espera",
-          },
-        ])
-        .select()
-        .single();
-
-      if (atencionError) throw atencionError;
-
-      const atencionExamenes = selectedExamenes.map((examenId) => ({
-        atencion_id: atencionData.id,
-        examen_id: examenId,
-        estado: "pendiente" as const,
-      }));
-
-      const { error: examenesError } = await supabase
-        .from("atencion_examenes")
-        .insert(atencionExamenes);
-
-      if (examenesError) throw examenesError;
-
-      toast.success("Paciente ingresado a la lista de espera");
-      setSelectedPatient("");
-      setSelectedExamenes([]);
-      setShowExamenesDialog(false);
-    } catch (error: any) {
-      console.error("Error:", error);
-      toast.error(error.message || "Error al ingresar paciente");
-    }
   };
 
   const handleIniciarAtencion = async (atencionId: string) => {
@@ -518,6 +463,13 @@ const Flujo = () => {
     enAtencion = enAtencion.filter((a) => a.box_id === filtroBoxAtencion);
   }
 
+  // Pacientes listos para finalizar: en_atencion sin exámenes pendientes
+  const listosParaFinalizar = atenciones.filter((a) => {
+    if (a.estado !== "en_atencion") return false;
+    const pendientes = examenesPendientes[a.id] || [];
+    return pendientes.length === 0;
+  });
+
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
       case "en_espera":
@@ -565,75 +517,47 @@ const Flujo = () => {
           </div>
         </div>
 
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5 text-primary" />
-              Ingresar Paciente
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-4">
-              <div className="flex-1">
-                <PatientCombobox value={selectedPatient} onSelect={setSelectedPatient} />
+        {listosParaFinalizar.length > 0 && (
+          <Card className="mb-6 border-success/50">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-success">
+                <Check className="h-5 w-5" />
+                Listos para Finalizar ({listosParaFinalizar.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-3 justify-end">
+                {listosParaFinalizar.map((atencion) => (
+                  <div
+                    key={atencion.id}
+                    className="flex items-center gap-3 p-3 rounded-lg border border-success/30 bg-success/5"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="font-bold">#{atencion.numero_ingreso}</Badge>
+                      <span className="font-medium text-foreground">{atencion.pacientes.nombre}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {atencion.pacientes.tipo_servicio === "workmed" ? "WM" : "J"}
+                      </Badge>
+                      {atencion.boxes && (
+                        <span className="text-xs text-muted-foreground">({atencion.boxes.nombre})</span>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => handleCompletarAtencion(atencion.id, "completado")}
+                      className="gap-2 bg-success hover:bg-success/90"
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                      Finalizar
+                    </Button>
+                  </div>
+                ))}
               </div>
-              <Button onClick={handleIngresoClick} className="gap-2">
-                <Clock className="h-4 w-4" />
-                Agregar a Espera
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
-        <Dialog open={showExamenesDialog} onOpenChange={setShowExamenesDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Seleccionar Exámenes</DialogTitle>
-              <DialogDescription>
-                Selecciona los exámenes que el paciente debe realizar
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 max-h-[400px] overflow-y-auto">
-              {examenes.map((examen) => (
-                <div key={examen.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={examen.id}
-                    checked={selectedExamenes.includes(examen.id)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setSelectedExamenes([...selectedExamenes, examen.id]);
-                      } else {
-                        setSelectedExamenes(
-                          selectedExamenes.filter((id) => id !== examen.id)
-                        );
-                      }
-                    }}
-                  />
-                  <Label htmlFor={examen.id} className="cursor-pointer">
-                    <div className="font-medium">{examen.nombre}</div>
-                    {examen.descripcion && (
-                      <div className="text-sm text-muted-foreground">
-                        {examen.descripcion}
-                      </div>
-                    )}
-                  </Label>
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-2 justify-end">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowExamenesDialog(false);
-                  setSelectedExamenes([]);
-                }}
-              >
-                Cancelar
-              </Button>
-              <Button onClick={handleConfirmIngreso}>Confirmar</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
 
         <AlertDialog open={confirmCompletarDialog.open} onOpenChange={(open) => setConfirmCompletarDialog({open, atencionId: null})}>
           <AlertDialogContent>
