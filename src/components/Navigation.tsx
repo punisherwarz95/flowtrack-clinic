@@ -1,13 +1,15 @@
 import { Link, useLocation } from "react-router-dom";
-import { Activity, Users, Box, ClipboardList, LayoutDashboard, Building2, CheckCircle, UserCog, LogOut } from "lucide-react";
+import { Activity, Users, Box, ClipboardList, LayoutDashboard, Building2, CheckCircle, UserCog, LogOut, Moon, Sun } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
+import { useTheme } from "@/hooks/useTheme";
 import { Button } from "@/components/ui/button";
 
 const Navigation = () => {
   const location = useLocation();
   const { hasPermission } = usePermissions();
   const { signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   const allLinks = [
     { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -30,6 +32,19 @@ const Navigation = () => {
           <div className="flex items-center gap-2">
             <Activity className="h-6 w-6 text-primary" />
             <span className="font-bold text-lg text-foreground">MediFlow</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              className="ml-2"
+              title={theme === "light" ? "Cambiar a modo oscuro" : "Cambiar a modo claro"}
+            >
+              {theme === "light" ? (
+                <Moon className="h-5 w-5" />
+              ) : (
+                <Sun className="h-5 w-5" />
+              )}
+            </Button>
           </div>
           
           <div className="flex gap-1 flex-1">
