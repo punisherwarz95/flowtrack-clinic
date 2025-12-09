@@ -157,17 +157,28 @@ const Usuarios = () => {
     );
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm("¿Estás seguro de eliminar este usuario?")) return;
+  const handleDeleteUser = async (userId: string, username: string) => {
+    if (!confirm(`¿Estás seguro de eliminar el usuario "${username}"?`)) return;
 
     try {
-      const { error } = await supabase.auth.admin.deleteUser(userId);
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: { userId }
+      });
+
+      if (error) {
+        toast.error("Error al eliminar usuario: " + error.message);
+        return;
+      }
+
+      if (data?.error) {
+        toast.error("Error: " + data.error);
+        return;
+      }
 
       toast.success("Usuario eliminado exitosamente");
       loadUsers();
     } catch (error: any) {
-      toast.error("Error al eliminar usuario: " + error.message);
+      toast.error("Error inesperado: " + error.message);
     }
   };
 
@@ -379,7 +390,7 @@ const Usuarios = () => {
                     <Button
                       variant="destructive"
                       size="icon"
-                      onClick={() => handleDeleteUser(user.id)}
+                      onClick={() => handleDeleteUser(user.id, user.username)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
