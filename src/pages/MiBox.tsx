@@ -28,6 +28,10 @@ interface Atencion {
   };
 }
 
+interface AtencionConExamenes extends Atencion {
+  examenesRealizados?: string[];
+}
+
 interface AtencionExamen {
   id: string;
   examen_id: string;
@@ -58,8 +62,8 @@ const MiBox = () => {
   const [pacientesEnEspera, setPacientesEnEspera] = useState<Atencion[]>([]);
   // Paciente actualmente en el box
   const [pacienteEnAtencion, setPacienteEnAtencion] = useState<Atencion | null>(null);
-  // Pacientes completados en este box hoy
-  const [pacientesCompletados, setPacientesCompletados] = useState<Atencion[]>([]);
+  // Pacientes completados en este box hoy (con sus exámenes realizados)
+  const [pacientesCompletados, setPacientesCompletados] = useState<AtencionConExamenes[]>([]);
   
   const [atencionExamenes, setAtencionExamenes] = useState<{[atencionId: string]: AtencionExamen[]}>({});
   const [confirmCompletarDialog, setConfirmCompletarDialog] = useState<{open: boolean, atencionId: string | null}>({open: false, atencionId: null});
@@ -173,32 +177,39 @@ const MiBox = () => {
         setPacientesEnEspera([]);
       }
 
-      // 3. Pacientes completados por este box hoy (los que pasaron por este box)
-      const { data: completadosData, error: completadosError } = await supabase
-        .from("atenciones")
-        .select("*, pacientes(id, nombre, rut, tipo_servicio)")
-        .in("estado", ["completado", "incompleto"])
-        .gte("fecha_ingreso", startOfDay.toISOString())
-        .lte("fecha_ingreso", endOfDay.toISOString())
-        .order("fecha_fin_atencion", { ascending: false });
+      // 3. Pacientes atendidos en este box hoy (que tienen exámenes completados de este box)
+      // Buscar en TODAS las atenciones de hoy, no solo las completadas
+      if (boxExamIds.length > 0) {
+        const { data: todasAtenciones, error: todasError } = await supabase
+          .from("atenciones")
+          .select("*, pacientes(id, nombre, rut, tipo_servicio)")
+          .gte("fecha_ingreso", startOfDay.toISOString())
+          .lte("fecha_ingreso", endOfDay.toISOString())
+          .order("numero_ingreso", { ascending: true });
 
-      if (completadosError) throw completadosError;
+        if (todasError) throw todasError;
 
-      // Filtrar solo los que tienen exámenes completados de este box
-      const pacientesAtendidosBox: Atencion[] = [];
-      for (const atencion of completadosData || []) {
-        const { data: examenesCompletados } = await supabase
-          .from("atencion_examenes")
-          .select("id")
-          .eq("atencion_id", atencion.id)
-          .eq("estado", "completado")
-          .in("examen_id", boxExamIds);
+        const pacientesAtendidosBox: AtencionConExamenes[] = [];
+        for (const atencion of todasAtenciones || []) {
+          // Buscar exámenes COMPLETADOS de este box para esta atención
+          const { data: examenesCompletados } = await supabase
+            .from("atencion_examenes")
+            .select("id, examenes(nombre)")
+            .eq("atencion_id", atencion.id)
+            .eq("estado", "completado")
+            .in("examen_id", boxExamIds);
 
-        if (examenesCompletados && examenesCompletados.length > 0) {
-          pacientesAtendidosBox.push(atencion);
+          if (examenesCompletados && examenesCompletados.length > 0) {
+            pacientesAtendidosBox.push({
+              ...atencion,
+              examenesRealizados: examenesCompletados.map((e: any) => e.examenes?.nombre || "")
+            });
+          }
         }
+        setPacientesCompletados(pacientesAtendidosBox);
+      } else {
+        setPacientesCompletados([]);
       }
-      setPacientesCompletados(pacientesAtendidosBox);
 
       // Cargar exámenes para paciente en atención
       if (enAtencionData) {
@@ -566,25 +577,29 @@ const MiBox = () => {
                 </p>
               ) : (
                 pacientesCompletados.map((atencion) => (
-                  <div key={atencion.id} className="border rounded-lg p-3">
+                  <div key={atencion.id} className="border rounded-lg p-3 space-y-2">
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className="text-xs">#{atencion.numero_ingreso}</Badge>
                       <span className="font-medium text-sm">{atencion.pacientes.nombre}</span>
                     </div>
-                    <div className="flex items-center gap-2 mt-1">
+                    <div className="flex items-center gap-2">
                       <Badge 
                         variant={atencion.pacientes.tipo_servicio === "workmed" ? "default" : "secondary"}
                         className="text-xs"
                       >
                         {atencion.pacientes.tipo_servicio}
                       </Badge>
-                      <Badge 
-                        variant={atencion.estado === "completado" ? "default" : "destructive"}
-                        className="text-xs"
-                      >
-                        {atencion.estado}
-                      </Badge>
                     </div>
+                    {/* Exámenes realizados en este box */}
+                    {atencion.examenesRealizados && atencion.examenesRealizados.length > 0 && (
+                      <div className="flex flex-wrap gap-1 pt-1">
+                        {atencion.examenesRealizados.map((examen, idx) => (
+                          <Badge key={idx} variant="secondary" className="text-xs bg-green-100 text-green-800">
+                            ✓ {examen}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))
               )}
