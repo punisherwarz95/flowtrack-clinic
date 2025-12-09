@@ -245,13 +245,9 @@ const Pacientes = () => {
     
     if (isSubmitting) return;
     
-    if (!formData.empresa_id) {
-      toast.error("Debe seleccionar una empresa");
-      return;
-    }
-
-    if (selectedExamenes.length === 0) {
-      toast.error("Debe seleccionar al menos un examen");
+    // Empresa requerida solo para Jenner
+    if (formData.tipo_servicio === "jenner" && !formData.empresa_id) {
+      toast.error("Debe seleccionar una empresa para servicio Jenner");
       return;
     }
 
@@ -343,18 +339,20 @@ const Pacientes = () => {
 
         if (atencionError) throw atencionError;
 
-        // Agregar exámenes a la atención
-        const examenesData = selectedExamenes.map(examenId => ({
-          atencion_id: atencionData.id,
-          examen_id: examenId,
-          estado: 'pendiente' as 'pendiente' | 'completado' | 'incompleto'
-        }));
+        // Agregar exámenes a la atención solo si hay seleccionados
+        if (selectedExamenes.length > 0) {
+          const examenesData = selectedExamenes.map(examenId => ({
+            atencion_id: atencionData.id,
+            examen_id: examenId,
+            estado: 'pendiente' as 'pendiente' | 'completado' | 'incompleto'
+          }));
 
-        const { error: examenesError } = await supabase
-          .from("atencion_examenes")
-          .insert(examenesData);
+          const { error: examenesError } = await supabase
+            .from("atencion_examenes")
+            .insert(examenesData);
 
-        if (examenesError) throw examenesError;
+          if (examenesError) throw examenesError;
+        }
 
         toast.success("Paciente agregado exitosamente");
       }
