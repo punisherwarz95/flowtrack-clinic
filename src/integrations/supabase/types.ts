@@ -175,19 +175,40 @@ export type Database = {
       }
       empresas: {
         Row: {
+          activo: boolean | null
+          centro_costo: string | null
+          contacto: string | null
           created_at: string | null
+          email: string | null
           id: string
           nombre: string
+          razon_social: string | null
+          rut: string | null
+          telefono: string | null
         }
         Insert: {
+          activo?: boolean | null
+          centro_costo?: string | null
+          contacto?: string | null
           created_at?: string | null
+          email?: string | null
           id?: string
           nombre: string
+          razon_social?: string | null
+          rut?: string | null
+          telefono?: string | null
         }
         Update: {
+          activo?: boolean | null
+          centro_costo?: string | null
+          contacto?: string | null
           created_at?: string | null
+          email?: string | null
           id?: string
           nombre?: string
+          razon_social?: string | null
+          rut?: string | null
+          telefono?: string | null
         }
         Relationships: []
       }
