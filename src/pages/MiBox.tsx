@@ -5,13 +5,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
-import { Clock, Play, CheckCircle, XCircle, RefreshCw, Box as BoxIcon } from "lucide-react";
+import { Clock, Play, CheckCircle, XCircle, RefreshCw, Box as BoxIcon, Settings } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface Atencion {
   id: string;
@@ -53,6 +54,7 @@ const STORAGE_KEY = "mediflow_selected_box";
 
 const MiBox = () => {
   useAuth();
+  const { isAdmin } = usePermissions();
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [selectedBoxId, setSelectedBoxId] = useState<string | null>(null);
   const [showBoxSelector, setShowBoxSelector] = useState(false);
@@ -440,10 +442,25 @@ const MiBox = () => {
               </p>
             )}
           </div>
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Actualizar
-          </Button>
+          <div className="flex gap-2">
+            {isAdmin && selectedBoxId && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  setTempSelectedBox(selectedBoxId);
+                  setShowBoxSelector(true);
+                }}
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Cambiar Box
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Actualizar
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
