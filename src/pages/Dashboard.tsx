@@ -46,6 +46,7 @@ const Dashboard = () => {
   const [atencionesIngresadas, setAtencionesIngresadas] = useState<AtencionIngresada[]>([]);
   const [examenes, setExamenes] = useState<Examen[]>([]);
   const [selectedExamenFilter, setSelectedExamenFilter] = useState<string>("all");
+  const [examenesConteo, setExamenesConteo] = useState<Record<string, number>>({});
   const [stats, setStats] = useState({
     enEspera: 0,
     enAtencion: 0,
@@ -126,7 +127,7 @@ const Dashboard = () => {
           .order("numero_ingreso", { ascending: true }),
         supabase
           .from("atencion_examenes")
-          .select("id, atencion_id, atenciones!inner(fecha_ingreso)")
+          .select("id, examen_id, examenes(nombre), atencion_id, atenciones!inner(fecha_ingreso)")
           .gte("atenciones.fecha_ingreso", startOfDay)
           .lte("atenciones.fecha_ingreso", endOfDay),
       ]);
@@ -150,6 +151,14 @@ const Dashboard = () => {
       const pacientesMensualesWM = pacientesMensualesRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "workmed").length || 0;
       const pacientesMensualesJ = pacientesMensualesRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "jenner").length || 0;
       const pacientesMensualesTotal = pacientesMensualesRes.data?.length || 0;
+
+      // Conteo de exámenes por tipo
+      const conteoExamenes: Record<string, number> = {};
+      examenesRealizadosRes.data?.forEach((ae: any) => {
+        const nombreExamen = ae.examenes?.nombre || "Sin nombre";
+        conteoExamenes[nombreExamen] = (conteoExamenes[nombreExamen] || 0) + 1;
+      });
+      setExamenesConteo(conteoExamenes);
 
       setAtencionesIngresadas((atencionesIngresadasRes.data as AtencionIngresada[]) || []);
 
@@ -474,12 +483,28 @@ const Dashboard = () => {
                 <ClipboardCheck className="h-5 w-5 text-primary" />
                 Exámenes del Día
               </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                {format(selectedDate || new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })}
+              </p>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-foreground">{stats.examenesRealizadosHoy}</div>
-              <p className="text-sm text-muted-foreground mt-2">
-                Exámenes asignados - {format(selectedDate || new Date(), "dd/MM/yyyy", { locale: es })}
-              </p>
+              <div className="text-4xl font-bold text-foreground mb-4">{stats.examenesRealizadosHoy}</div>
+              
+              {Object.keys(examenesConteo).length > 0 ? (
+                <div className="space-y-2">
+                  {Object.entries(examenesConteo)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([nombre, cantidad]) => (
+                      <div key={nombre} className="flex items-center justify-between py-1 border-b border-border/50 last:border-0">
+                        <span className="text-sm text-muted-foreground">{nombre}</span>
+                        <Badge variant="secondary">{cantidad}</Badge>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Sin exámenes asignados</p>
+              )}
+              
               <div className="mt-4 pt-4 border-t">
                 <div className="text-2xl font-bold text-foreground">{stats.totalExamenes}</div>
                 <p className="text-sm text-muted-foreground mt-1">
