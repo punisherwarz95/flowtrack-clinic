@@ -491,16 +491,18 @@ const Dashboard = () => {
               <div className="text-4xl font-bold text-foreground mb-4">{stats.examenesRealizadosHoy}</div>
               
               {Object.keys(examenesConteo).length > 0 ? (
-                <div className="space-y-2">
-                  {Object.entries(examenesConteo)
-                    .sort((a, b) => b[1] - a[1])
-                    .map(([nombre, cantidad]) => (
-                      <div key={nombre} className="flex items-center gap-2 py-1 border-b border-border/50 last:border-0">
-                        <span className="text-sm text-muted-foreground">{nombre}</span>
-                        <Badge variant="secondary">{cantidad}</Badge>
-                      </div>
-                    ))}
-                </div>
+                <table className="w-auto">
+                  <tbody>
+                    {Object.entries(examenesConteo)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([nombre, cantidad]) => (
+                        <tr key={nombre} className="border-b border-border/50 last:border-0">
+                          <td className="text-sm text-muted-foreground py-1 pr-3">{nombre}</td>
+                          <td className="py-1"><Badge variant="secondary">{cantidad}</Badge></td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
               ) : (
                 <p className="text-sm text-muted-foreground">Sin exámenes asignados</p>
               )}
