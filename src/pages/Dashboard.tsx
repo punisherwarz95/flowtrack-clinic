@@ -187,6 +187,31 @@ const Dashboard = () => {
     }
   };
 
+  // Calcular conteos para el examen filtrado
+  const conteosFiltro = (() => {
+    if (selectedExamenFilter === "all") {
+      return { completados: 0, pendientes: 0, total: atencionesIngresadas.length };
+    }
+    
+    const pacientesConExamen = atencionesIngresadas.filter(a => 
+      a.atencion_examenes.some(ae => ae.examenes.id === selectedExamenFilter)
+    );
+    
+    let completados = 0;
+    let pendientes = 0;
+    
+    pacientesConExamen.forEach(a => {
+      const examStatus = a.atencion_examenes.find(ae => ae.examenes.id === selectedExamenFilter);
+      if (examStatus?.estado === "completado") {
+        completados++;
+      } else {
+        pendientes++;
+      }
+    });
+    
+    return { completados, pendientes, total: pacientesConExamen.length };
+  })();
+
   // Filter patients by selected exam and status
   const filteredAtenciones = atencionesIngresadas.filter(a => {
     // First filter by exam if selected
@@ -417,7 +442,10 @@ const Dashboard = () => {
                   </Select>
                   
                   {selectedExamenFilter !== "all" && (
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-4">
+                      <Badge variant="outline" className="text-sm">
+                        Total: {conteosFiltro.total}
+                      </Badge>
                       <label className="flex items-center gap-2 cursor-pointer">
                         <div 
                           onClick={() => setFilterCompletado(!filterCompletado)}
@@ -429,7 +457,7 @@ const Dashboard = () => {
                         >
                           {filterCompletado && <Check className="h-3 w-3" />}
                         </div>
-                        <span className="text-sm">Completado</span>
+                        <span className="text-sm">Completado ({conteosFiltro.completados})</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
                         <div 
@@ -442,7 +470,7 @@ const Dashboard = () => {
                         >
                           {filterIncompleto && <Check className="h-3 w-3" />}
                         </div>
-                        <span className="text-sm">Pendiente</span>
+                        <span className="text-sm">Pendiente ({conteosFiltro.pendientes})</span>
                       </label>
                     </div>
                   )}
