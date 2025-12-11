@@ -67,6 +67,15 @@ const Dashboard = () => {
     loadExamenes();
   }, [selectedDate, selectedMonth]);
 
+  // Auto-refresh cada 5 segundos para la tabla de pacientes ingresados
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadStats();
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, [selectedDate, selectedMonth]);
+
   const loadExamenes = async () => {
     const { data } = await supabase.from("examenes").select("id, nombre").order("nombre");
     setExamenes(data || []);
