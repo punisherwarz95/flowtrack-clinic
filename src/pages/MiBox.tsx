@@ -67,6 +67,8 @@ const MiBox = () => {
   const [pacientesEnAtencion, setPacientesEnAtencion] = useState<Atencion[]>([]);
   // Pacientes completados en este box hoy (con sus exámenes realizados)
   const [pacientesCompletados, setPacientesCompletados] = useState<AtencionConExamenes[]>([]);
+  // Pacientes pendientes en otros boxes (no pueden ser llamados)
+  const [pacientesEnOtrosBoxes, setPacientesEnOtrosBoxes] = useState<number>(0);
   
   const [atencionExamenes, setAtencionExamenes] = useState<{[atencionId: string]: AtencionExamen[]}>({});
   const [confirmCompletarDialog, setConfirmCompletarDialog] = useState<{open: boolean, atencionId: string | null}>({open: false, atencionId: null});
@@ -179,8 +181,34 @@ const MiBox = () => {
           }
         }
         setPacientesEnEspera(pacientesConExamenesBox);
+
+        // 2b. Contar pacientes en otros boxes con exámenes pendientes para este box
+        const { data: enOtrosBoxesData } = await supabase
+          .from("atenciones")
+          .select("id")
+          .eq("estado", "en_atencion")
+          .neq("box_id", selectedBoxId)
+          .not("box_id", "is", null)
+          .gte("fecha_ingreso", startOfDay.toISOString())
+          .lte("fecha_ingreso", endOfDay.toISOString());
+
+        let countEnOtrosBoxes = 0;
+        for (const atencion of enOtrosBoxesData || []) {
+          const { data: examenes } = await supabase
+            .from("atencion_examenes")
+            .select("id")
+            .eq("atencion_id", atencion.id)
+            .eq("estado", "pendiente")
+            .in("examen_id", boxExamIds);
+
+          if (examenes && examenes.length > 0) {
+            countEnOtrosBoxes++;
+          }
+        }
+        setPacientesEnOtrosBoxes(countEnOtrosBoxes);
       } else {
         setPacientesEnEspera([]);
+        setPacientesEnOtrosBoxes(0);
       }
 
       // 3. Pacientes atendidos en este box hoy (que tienen exámenes completados de este box)
@@ -472,7 +500,19 @@ const MiBox = () => {
               </p>
             )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-4">
+            {selectedBoxId && (
+              <div className="flex gap-3">
+                <Badge variant="default" className="text-sm px-3 py-1">
+                  {pacientesEnEspera.length} disponibles
+                </Badge>
+                {pacientesEnOtrosBoxes > 0 && (
+                  <Badge variant="secondary" className="text-sm px-3 py-1">
+                    {pacientesEnOtrosBoxes} en otros boxes
+                  </Badge>
+                )}
+              </div>
+            )}
             {isAdmin && selectedBoxId && (
               <Button 
                 variant="outline" 
