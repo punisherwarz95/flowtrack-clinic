@@ -48,7 +48,7 @@ const Dashboard = () => {
   const [selectedExamenFilter, setSelectedExamenFilter] = useState<string>("all");
   const [filterCompletado, setFilterCompletado] = useState<boolean>(true);
   const [filterIncompleto, setFilterIncompleto] = useState<boolean>(true);
-  const [examenesConteo, setExamenesConteo] = useState<Record<string, number>>({});
+  const [examenesConteo, setExamenesConteo] = useState<Record<string, { asignados: number; completados: number }>>({});
   const [stats, setStats] = useState({
     enEspera: 0,
     enAtencion: 0,
@@ -129,7 +129,7 @@ const Dashboard = () => {
           .order("numero_ingreso", { ascending: true }),
         supabase
           .from("atencion_examenes")
-          .select("id, examen_id, examenes(nombre), atencion_id, atenciones!inner(fecha_ingreso)")
+          .select("id, examen_id, estado, examenes(nombre), atencion_id, atenciones!inner(fecha_ingreso)")
           .gte("atenciones.fecha_ingreso", startOfDay)
           .lte("atenciones.fecha_ingreso", endOfDay),
       ]);
@@ -154,11 +154,17 @@ const Dashboard = () => {
       const pacientesMensualesJ = pacientesMensualesRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "jenner").length || 0;
       const pacientesMensualesTotal = pacientesMensualesRes.data?.length || 0;
 
-      // Conteo de exámenes por tipo
-      const conteoExamenes: Record<string, number> = {};
+      // Conteo de exámenes por tipo (asignados vs completados)
+      const conteoExamenes: Record<string, { asignados: number; completados: number }> = {};
       examenesRealizadosRes.data?.forEach((ae: any) => {
         const nombreExamen = ae.examenes?.nombre || "Sin nombre";
-        conteoExamenes[nombreExamen] = (conteoExamenes[nombreExamen] || 0) + 1;
+        if (!conteoExamenes[nombreExamen]) {
+          conteoExamenes[nombreExamen] = { asignados: 0, completados: 0 };
+        }
+        conteoExamenes[nombreExamen].asignados += 1;
+        if (ae.estado === "completado") {
+          conteoExamenes[nombreExamen].completados += 1;
+        }
       });
       setExamenesConteo(conteoExamenes);
 
@@ -538,7 +544,7 @@ const Dashboard = () => {
               
               {Object.keys(examenesConteo).length > 0 ? (
                 (() => {
-                  const sortedExamenes = Object.entries(examenesConteo).sort((a, b) => b[1] - a[1]);
+                  const sortedExamenes = Object.entries(examenesConteo).sort((a, b) => b[1].asignados - a[1].asignados);
                   const itemsPerColumn = Math.ceil(sortedExamenes.length / 3);
                   const columns = [
                     sortedExamenes.slice(0, itemsPerColumn),
@@ -551,10 +557,17 @@ const Dashboard = () => {
                       {columns.map((column, colIndex) => (
                         <table key={colIndex} className="w-auto">
                           <tbody>
-                            {column.map(([nombre, cantidad]) => (
+                            {column.map(([nombre, conteo]) => (
                               <tr key={nombre}>
                                 <td className="text-sm text-muted-foreground py-1 pr-3">{nombre}</td>
-                                <td className="py-1"><Badge variant="secondary">{cantidad}</Badge></td>
+                                <td className="py-1">
+                                  <Badge 
+                                    variant="secondary"
+                                    className={conteo.completados === conteo.asignados ? "bg-green-100 text-green-800 border-green-300" : ""}
+                                  >
+                                    {conteo.completados}/{conteo.asignados}
+                                  </Badge>
+                                </td>
                               </tr>
                             ))}
                           </tbody>
