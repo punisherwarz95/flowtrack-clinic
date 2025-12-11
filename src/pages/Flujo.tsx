@@ -71,6 +71,8 @@ const Flujo = () => {
   const [filtroBox, setFiltroBox] = useState<string>("todos");
   const [filtroBoxAtencion, setFiltroBoxAtencion] = useState<string>("todos");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  // Estado local para marcar exámenes antes de guardar
+  const [examenesSeleccionados, setExamenesSeleccionados] = useState<{[atencionId: string]: Set<string>}>({});
 
   useEffect(() => {
     loadData();
@@ -183,35 +185,48 @@ const Flujo = () => {
   const loadAtencionExamenes = async (atenciones: Atencion[], boxesList: Box[]) => {
     const newAtencionExamenes: {[atencionId: string]: AtencionExamen[]} = {};
 
-    for (const atencion of atenciones) {
+    // Cargar todos los exámenes en paralelo para mejor rendimiento
+    const promises = atenciones.map(async (atencion) => {
       try {
-        let query = supabase
-          .from("atencion_examenes")
-          .select("id, examen_id, estado, examenes(nombre)")
-          .eq("atencion_id", atencion.id)
-          .eq("estado", "pendiente");
-
-        // Si está en atención y con box asignado, limitar a los exámenes del box
+        // Si está en atención con box, filtrar directamente en la query
         if (atencion.estado === "en_atencion" && atencion.box_id) {
           const box = boxesList.find(b => b.id === atencion.box_id);
           const boxExamIds = box?.box_examenes.map(be => be.examen_id) || [];
-          if (boxExamIds.length > 0) {
-            query = query.in("examen_id", boxExamIds);
-          } else {
-            // Si el box no tiene exámenes configurados, no hay nada que mostrar
-            newAtencionExamenes[atencion.id] = [];
-            continue;
+          
+          if (boxExamIds.length === 0) {
+            return { atencionId: atencion.id, examenes: [] };
           }
-        }
 
-        const { data: examenesData, error } = await query;
-        if (error) throw error;
-        newAtencionExamenes[atencion.id] = examenesData || [];
+          const { data: examenesData, error } = await supabase
+            .from("atencion_examenes")
+            .select("id, examen_id, estado, examenes(nombre)")
+            .eq("atencion_id", atencion.id)
+            .eq("estado", "pendiente")
+            .in("examen_id", boxExamIds);
+
+          if (error) throw error;
+          return { atencionId: atencion.id, examenes: examenesData || [] };
+        } else {
+          // Para pacientes en espera, cargar todos los pendientes
+          const { data: examenesData, error } = await supabase
+            .from("atencion_examenes")
+            .select("id, examen_id, estado, examenes(nombre)")
+            .eq("atencion_id", atencion.id)
+            .eq("estado", "pendiente");
+
+          if (error) throw error;
+          return { atencionId: atencion.id, examenes: examenesData || [] };
+        }
       } catch (error) {
         console.error("Error loading atencion examenes:", error);
-        newAtencionExamenes[atencion.id] = [];
+        return { atencionId: atencion.id, examenes: [] };
       }
-    }
+    });
+
+    const results = await Promise.all(promises);
+    results.forEach(({ atencionId, examenes }) => {
+      newAtencionExamenes[atencionId] = examenes;
+    });
 
     setAtencionExamenes(newAtencionExamenes);
   };
@@ -315,44 +330,18 @@ const Flujo = () => {
   };
 
 
-  const handleToggleExamen = async (atencionExamenId: string, currentEstado: string, atencionId: string) => {
-    const nuevoEstado = currentEstado === "pendiente" ? "completado" : "pendiente";
-    
-    // Actualización optimista: cambiar UI inmediatamente
-    setAtencionExamenes(prev => ({
-      ...prev,
-      [atencionId]: prev[atencionId].map(ae => 
-        ae.id === atencionExamenId 
-          ? { ...ae, estado: nuevoEstado }
-          : ae
-      )
-    }));
-
-    try {
-      const { error } = await supabase
-        .from("atencion_examenes")
-        .update({ 
-          estado: nuevoEstado,
-          fecha_realizacion: nuevoEstado === "completado" ? new Date().toISOString() : null
-        })
-        .eq("id", atencionExamenId);
-
-      if (error) throw error;
-      toast.success(`Examen marcado como ${nuevoEstado}`);
-      await loadData();
-    } catch (error) {
-      // Revertir cambio si hay error
-      setAtencionExamenes(prev => ({
-        ...prev,
-        [atencionId]: prev[atencionId].map(ae => 
-          ae.id === atencionExamenId 
-            ? { ...ae, estado: currentEstado }
-            : ae
-        )
-      }));
-      console.error("Error:", error);
-      toast.error("Error al actualizar examen");
-    }
+  // Solo marca/desmarca visualmente, NO guarda en BD hasta Completar/Parcial
+  const handleToggleExamenLocal = (atencionExamenId: string, atencionId: string) => {
+    setExamenesSeleccionados(prev => {
+      const current = prev[atencionId] || new Set<string>();
+      const newSet = new Set(current);
+      if (newSet.has(atencionExamenId)) {
+        newSet.delete(atencionExamenId);
+      } else {
+        newSet.add(atencionExamenId);
+      }
+      return { ...prev, [atencionId]: newSet };
+    });
   };
 
   const handleCambiarEstadoFicha = async (atencionId: string, nuevoEstado: string) => {
@@ -379,25 +368,50 @@ const Flujo = () => {
 
   const handleCompletarAtencion = async (atencionId: string, estado: "completado" | "incompleto") => {
     try {
-      // 1) Si se presiona "Completar" dentro de un box, marcar como completados
-      // los exámenes de ese box para esta atención
       const atencionActual = atenciones.find((a) => a.id === atencionId);
       const currentBoxId = atencionActual?.box_id;
+      const seleccionados = examenesSeleccionados[atencionId] || new Set<string>();
 
-      if (estado === "completado" && currentBoxId) {
+      if (currentBoxId) {
         const boxExamIds = boxes.find((b) => b.id === currentBoxId)?.box_examenes.map((be) => be.examen_id) || [];
-        if (boxExamIds.length > 0) {
-          const { error: updateExamsError } = await supabase
-            .from("atencion_examenes")
-            .update({ estado: "completado", fecha_realizacion: new Date().toISOString() })
-            .eq("atencion_id", atencionId)
-            .in("examen_id", boxExamIds)
-            .eq("estado", "pendiente");
-          if (updateExamsError) throw updateExamsError;
+        const examenesDelBox = atencionExamenes[atencionId]?.filter(ae => 
+          boxExamIds.includes(ae.examen_id)
+        ) || [];
+
+        if (estado === "completado") {
+          // Completar: marcar TODOS los exámenes del box como completados
+          if (examenesDelBox.length > 0) {
+            const idsToComplete = examenesDelBox.map(ae => ae.id);
+            const { error: updateExamsError } = await supabase
+              .from("atencion_examenes")
+              .update({ estado: "completado", fecha_realizacion: new Date().toISOString() })
+              .in("id", idsToComplete);
+            if (updateExamsError) throw updateExamsError;
+          }
+        } else {
+          // Parcial: marcar solo los seleccionados como completados, el resto como incompleto
+          for (const ae of examenesDelBox) {
+            const nuevoEstado = seleccionados.has(ae.id) ? "completado" : "incompleto";
+            const { error } = await supabase
+              .from("atencion_examenes")
+              .update({ 
+                estado: nuevoEstado, 
+                fecha_realizacion: nuevoEstado === "completado" ? new Date().toISOString() : null 
+              })
+              .eq("id", ae.id);
+            if (error) throw error;
+          }
         }
       }
 
-      // 2) Verificar si quedan exámenes pendientes luego de lo anterior
+      // Limpiar selección local
+      setExamenesSeleccionados(prev => {
+        const newState = { ...prev };
+        delete newState[atencionId];
+        return newState;
+      });
+
+      // Verificar si quedan exámenes pendientes
       const { data: examenesPendientesData, error: examenesError } = await supabase
         .from("atencion_examenes")
         .select("id")
@@ -406,46 +420,30 @@ const Flujo = () => {
 
       if (examenesError) throw examenesError;
 
-      // 3) Actualizar el estado de la atención
+      // Actualizar el estado de la atención
       if (examenesPendientesData && examenesPendientesData.length > 0) {
-        // Si quedan exámenes pendientes, devolver a espera
         const { error } = await supabase
           .from("atenciones")
-          .update({
-            estado: "en_espera",
-            box_id: null,
-          })
+          .update({ estado: "en_espera", box_id: null })
           .eq("id", atencionId);
-
         if (error) throw error;
         toast.success("Paciente devuelto a espera - tiene exámenes pendientes");
       } else if (currentBoxId) {
-        // Si NO quedan pendientes pero viene de un box, solo liberar el box
-        // El paciente se queda en "en_atencion" sin box asignado para finalización manual
         const { error } = await supabase
           .from("atenciones")
-          .update({
-            box_id: null,
-          })
+          .update({ box_id: null })
           .eq("id", atencionId);
-
         if (error) throw error;
         toast.success("Exámenes completados - paciente listo para finalizar");
       } else {
-        // Si viene de la sección "Listos para Finalizar" (sin box), finalizar definitivamente
         const { error } = await supabase
           .from("atenciones")
-          .update({
-            estado,
-            fecha_fin_atencion: new Date().toISOString(),
-          })
+          .update({ estado, fecha_fin_atencion: new Date().toISOString() })
           .eq("id", atencionId);
-
         if (error) throw error;
         toast.success(estado === "completado" ? "Atención completada" : "Atención marcada como incompleta");
       }
 
-      // 4) Refrescar datos inmediatamente para reflejar cambios
       await loadData();
     } catch (error: any) {
       console.error("Error:", error);
@@ -918,21 +916,24 @@ const Flujo = () => {
                         Exámenes de este box:
                       </div>
                       <div className="space-y-2">
-                        {atencionExamenes[atencion.id].map((ae) => (
-                          <div key={ae.id} className="flex items-center gap-2">
-                            <Checkbox
-                              id={ae.id}
-                              checked={ae.estado === "completado"}
-                              onCheckedChange={() => handleToggleExamen(ae.id, ae.estado, atencion.id)}
-                            />
-                            <Label htmlFor={ae.id} className="text-sm cursor-pointer flex-1">
-                              {ae.examenes.nombre}
-                            </Label>
-                            <Badge variant={ae.estado === "completado" ? "default" : "secondary"} className="text-xs">
-                              {ae.estado === "completado" ? "✓" : "○"}
-                            </Badge>
-                          </div>
-                        ))}
+                        {atencionExamenes[atencion.id].map((ae) => {
+                          const isSelected = examenesSeleccionados[atencion.id]?.has(ae.id) || false;
+                          return (
+                            <div key={ae.id} className="flex items-center gap-2">
+                              <Checkbox
+                                id={ae.id}
+                                checked={isSelected}
+                                onCheckedChange={() => handleToggleExamenLocal(ae.id, atencion.id)}
+                              />
+                              <Label htmlFor={ae.id} className="text-sm cursor-pointer flex-1">
+                                {ae.examenes.nombre}
+                              </Label>
+                              <Badge variant={isSelected ? "default" : "secondary"} className="text-xs">
+                                {isSelected ? "✓" : "○"}
+                              </Badge>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
