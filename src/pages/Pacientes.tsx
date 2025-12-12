@@ -35,6 +35,7 @@ import { useAuth } from "@/hooks/useAuth";
 interface Patient {
   id: string;
   nombre: string;
+  rut: string | null;
   tipo_servicio: 'workmed' | 'jenner' | null;
   empresa_id: string | null;
   empresas?: {
@@ -254,7 +255,7 @@ const Pacientes = () => {
       nombre: patient.nombre,
       tipo_servicio: patient.tipo_servicio || "workmed",
       empresa_id: patient.empresa_id || "",
-      rut: "",
+      rut: patient.rut || "",
     });
 
     // Cargar exámenes de la última atención (cualquier estado)
@@ -312,10 +313,16 @@ const Pacientes = () => {
     try {
       if (editingPatient) {
         // Actualizar paciente - convertir empresa_id vacío a null
-        const updateData = {
+        const updateData: any = {
           ...formData,
-          empresa_id: formData.empresa_id || null
+          empresa_id: formData.empresa_id || null,
         };
+
+        // Si el RUT viene vacío en el formulario, NO lo tocamos para no borrarlo
+        if (!formData.rut.trim()) {
+          delete updateData.rut;
+        }
+
         const { error: pacienteError } = await supabase
           .from("pacientes")
           .update(updateData)
