@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { MapPin, Phone, Globe } from "lucide-react";
-import jennerLogo from "@/assets/jenner-logo.jpg";
+import jennerLogo from "@/assets/jenner-logo-clean.png";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -848,10 +848,42 @@ export default function PortalPaciente() {
 
   if (step === "identificacion") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10 flex flex-col p-4">
-        <div className="flex-1 flex flex-col items-center justify-center gap-6">
+      <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10 flex flex-col p-4 relative overflow-hidden">
+        {/* Decorative lines - top left */}
+        <div className="absolute top-0 left-0 w-32 h-40 pointer-events-none">
+          <div className="absolute top-4 left-0 w-24 h-1.5 bg-[#003B5C] rounded-r-full"></div>
+          <div className="absolute top-8 left-0 w-20 h-1.5 bg-[#003B5C] rounded-r-full"></div>
+          <div className="absolute top-12 left-0 w-16 h-1.5 bg-[#00B5AD] rounded-r-full"></div>
+          <div className="absolute top-16 left-0 w-12 h-1.5 bg-[#00B5AD] rounded-r-full"></div>
+        </div>
+        
+        {/* Decorative lines - top right */}
+        <div className="absolute top-0 right-0 w-32 h-40 pointer-events-none">
+          <div className="absolute top-4 right-0 w-24 h-1.5 bg-[#003B5C] rounded-l-full"></div>
+          <div className="absolute top-8 right-0 w-20 h-1.5 bg-[#003B5C] rounded-l-full"></div>
+          <div className="absolute top-12 right-0 w-16 h-1.5 bg-[#00B5AD] rounded-l-full"></div>
+          <div className="absolute top-16 right-0 w-12 h-1.5 bg-[#00B5AD] rounded-l-full"></div>
+        </div>
+        
+        {/* Decorative lines - bottom left */}
+        <div className="absolute bottom-0 left-0 w-32 h-40 pointer-events-none">
+          <div className="absolute bottom-16 left-0 w-12 h-1.5 bg-[#00B5AD] rounded-r-full"></div>
+          <div className="absolute bottom-12 left-0 w-16 h-1.5 bg-[#00B5AD] rounded-r-full"></div>
+          <div className="absolute bottom-8 left-0 w-20 h-1.5 bg-[#00B5AD] rounded-r-full"></div>
+          <div className="absolute bottom-4 left-0 w-24 h-1.5 bg-[#00B5AD] rounded-r-full"></div>
+        </div>
+        
+        {/* Decorative lines - bottom right */}
+        <div className="absolute bottom-0 right-0 w-32 h-40 pointer-events-none">
+          <div className="absolute bottom-16 right-0 w-12 h-1.5 bg-[#00B5AD] rounded-l-full"></div>
+          <div className="absolute bottom-12 right-0 w-16 h-1.5 bg-[#00B5AD] rounded-l-full"></div>
+          <div className="absolute bottom-8 right-0 w-20 h-1.5 bg-[#00B5AD] rounded-l-full"></div>
+          <div className="absolute bottom-4 right-0 w-24 h-1.5 bg-[#00B5AD] rounded-l-full"></div>
+        </div>
+        
+        <div className="flex-1 flex flex-col items-center justify-center gap-6 relative z-10">
           {/* Jenner Logo */}
-          <div className="w-full max-w-[200px]">
+          <div className="w-full max-w-[220px]">
             <img 
               src={jennerLogo} 
               alt="Jenner Centro Médico" 
