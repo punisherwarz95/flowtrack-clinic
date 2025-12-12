@@ -758,7 +758,7 @@ const Pacientes = () => {
 
                       <div>
                         <Label className="text-sm font-medium">Paquetes de Exámenes</Label>
-                        <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2 bg-muted/30 mt-1">
+                        <div className="border rounded-md p-3 max-h-64 overflow-y-auto space-y-2 bg-muted/30 mt-1">
                           {paquetes.map((paquete) => (
                             <label key={paquete.id} className="flex items-start gap-2 cursor-pointer">
                               <input
@@ -791,7 +791,7 @@ const Pacientes = () => {
                     {/* Columna derecha - Exámenes */}
                     <div className="space-y-4">
                       <h3 className="font-semibold text-sm text-muted-foreground border-b pb-2">Exámenes a Realizar</h3>
-                      <div className="border rounded-md p-3 max-h-[400px] overflow-y-auto space-y-2 bg-muted/30">
+                      <div className="border rounded-md p-3 max-h-[500px] overflow-y-auto space-y-2 bg-muted/30">
                         {examenes.map((examen) => (
                           <label key={examen.id} className="flex items-center gap-2 cursor-pointer">
                             <input
@@ -862,6 +862,9 @@ const Pacientes = () => {
                      </div>
                      <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground flex-wrap">
                        <span>{patient.empresas?.nombre || "Sin empresa"}</span>
+                       {patient.fecha_nacimiento && (
+                         <span>• Nac: {format(new Date(patient.fecha_nacimiento + "T00:00:00"), "dd/MM/yyyy", { locale: es })}</span>
+                       )}
                        {patient.email && <span>• {patient.email}</span>}
                        {patient.telefono && <span>• {patient.telefono}</span>}
                      </div>
