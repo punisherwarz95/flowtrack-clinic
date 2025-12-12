@@ -42,10 +42,13 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Generate a secure random password for initial admin
+    const securePassword = crypto.randomUUID() + crypto.randomUUID().slice(0, 8);
+    
     // Create the admin user with valid email format
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: 'operaciones@mediflow.local',
-      password: 'sami1005',
+      password: securePassword,
       email_confirm: true,
       user_metadata: {
         username: 'operaciones'
@@ -106,11 +109,14 @@ Deno.serve(async (req) => {
 
     console.log('All permissions assigned')
 
+    console.log('Initial admin password (change immediately):', securePassword);
+    
     return new Response(
       JSON.stringify({ 
-        message: 'Admin user "operaciones" created successfully',
+        message: 'Admin user "operaciones" created successfully. Check server logs for initial password.',
         userId: authData.user.id,
-        created: true
+        created: true,
+        initialPasswordInLogs: true
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

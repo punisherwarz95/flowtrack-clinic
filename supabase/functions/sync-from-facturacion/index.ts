@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
 
   try {
     const syncSecret = req.headers.get('x-sync-secret');
-    const expectedSecret = Deno.env.get('sami1005');
+    const expectedSecret = Deno.env.get('SYNC_WEBHOOK_SECRET');
     
     if (!syncSecret || syncSecret !== expectedSecret) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), 
