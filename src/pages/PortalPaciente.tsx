@@ -73,6 +73,7 @@ export default function PortalPaciente() {
   const [boxLlamado, setBoxLlamado] = useState<string | null>(null);
   const [testModalOpen, setTestModalOpen] = useState(false);
   const [currentTest, setCurrentTest] = useState<ExamenTest | null>(null);
+  const [audioEnabled, setAudioEnabled] = useState(false);
   
   // Form fields for new registration
   const [formData, setFormData] = useState({
@@ -82,6 +83,77 @@ export default function PortalPaciente() {
     email: "",
     telefono: ""
   });
+
+  // Function to play notification sound using Web Audio API
+  const playNotificationSound = useCallback(() => {
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      // Create multiple beeps for attention
+      const playBeep = (startTime: number, frequency: number) => {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = frequency;
+        oscillator.type = "sine";
+        
+        gainNode.gain.setValueAtTime(0.8, audioContext.currentTime + startTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + startTime + 0.3);
+        
+        oscillator.start(audioContext.currentTime + startTime);
+        oscillator.stop(audioContext.currentTime + startTime + 0.3);
+      };
+
+      // Play 3 ascending beeps
+      playBeep(0, 600);
+      playBeep(0.4, 800);
+      playBeep(0.8, 1000);
+      
+      // Close context after sounds finish
+      setTimeout(() => audioContext.close(), 2000);
+      
+      return true;
+    } catch (error) {
+      console.error("Error playing sound:", error);
+      return false;
+    }
+  }, []);
+
+  // Function to vibrate device
+  const vibrateDevice = useCallback(() => {
+    try {
+      if ("vibrate" in navigator) {
+        // Pattern: vibrate 500ms, pause 200ms, repeat 3 times
+        navigator.vibrate([500, 200, 500, 200, 500]);
+        return true;
+      }
+    } catch (error) {
+      console.error("Error vibrating:", error);
+    }
+    return false;
+  }, []);
+
+  // Enable audio on first user interaction
+  const enableAudio = useCallback(() => {
+    if (!audioEnabled) {
+      // Create a silent audio context to unlock audio on iOS/Safari
+      try {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const buffer = audioContext.createBuffer(1, 1, 22050);
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioContext.destination);
+        source.start(0);
+        audioContext.close();
+        setAudioEnabled(true);
+      } catch (error) {
+        console.error("Error enabling audio:", error);
+      }
+    }
+  }, [audioEnabled]);
 
   const formatRut = (value: string) => {
     // Remove non-alphanumeric characters
@@ -364,37 +436,20 @@ export default function PortalPaciente() {
               setLlamadoActivo(true);
               
               // Play notification sound and vibrate
-              try {
-                // Vibrate if supported
-                if ("vibrate" in navigator) {
-                  navigator.vibrate([500, 200, 500, 200, 500]);
+              vibrateDevice();
+              playNotificationSound();
+              
+              // Repeat sound and vibration every 2 seconds for 10 seconds
+              let count = 0;
+              const interval = setInterval(() => {
+                count++;
+                if (count >= 5) {
+                  clearInterval(interval);
+                  return;
                 }
-                
-                // Play sound
-                const audio = new Audio("/notification.mp3");
-                audio.volume = 1;
-                audio.play().catch(() => {
-                  // Fallback: use Web Audio API
-                  const audioContext = new AudioContext();
-                  const oscillator = audioContext.createOscillator();
-                  const gainNode = audioContext.createGain();
-                  
-                  oscillator.connect(gainNode);
-                  gainNode.connect(audioContext.destination);
-                  
-                  oscillator.frequency.value = 800;
-                  oscillator.type = "sine";
-                  gainNode.gain.value = 0.5;
-                  
-                  oscillator.start();
-                  setTimeout(() => {
-                    oscillator.stop();
-                    audioContext.close();
-                  }, 500);
-                });
-              } catch (error) {
-                console.error("Error playing notification:", error);
-              }
+                vibrateDevice();
+                playNotificationSound();
+              }, 2000);
             }
           }
 
@@ -445,7 +500,10 @@ export default function PortalPaciente() {
               />
             </div>
             <Button 
-              onClick={buscarPaciente} 
+              onClick={() => {
+                enableAudio();
+                buscarPaciente();
+              }} 
               className="w-full" 
               size="lg"
               disabled={isLoading}
@@ -530,7 +588,10 @@ export default function PortalPaciente() {
                 Volver
               </Button>
               <Button 
-                onClick={registrarPaciente} 
+                onClick={() => {
+                  enableAudio();
+                  registrarPaciente();
+                }} 
                 className="flex-1" 
                 disabled={isLoading}
               >
