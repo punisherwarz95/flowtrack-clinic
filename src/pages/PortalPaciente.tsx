@@ -265,11 +265,25 @@ export default function PortalPaciente() {
 
       if (error) throw error;
 
+      // Create atencion to get numero_ingreso
+      const { data: newAtencion, error: atencionError } = await supabase
+        .from("atenciones")
+        .insert({
+          paciente_id: newPaciente.id,
+          estado: "en_espera",
+          fecha_ingreso: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (atencionError) throw atencionError;
+
       setPaciente(newPaciente);
+      setAtencion({ ...newAtencion, atencion_examenes: [] });
       
       toast({
         title: "Registro exitoso",
-        description: "Sus datos han sido registrados. Espere a que el recepcionista complete su registro.",
+        description: `Su número de atención es #${newAtencion.numero_ingreso}. Espere a que el recepcionista complete su registro.`,
       });
 
       setStep("portal");
