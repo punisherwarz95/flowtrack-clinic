@@ -116,7 +116,7 @@ export default function PortalPaciente() {
   // Ref to AudioContext for Web Audio API fallback
   const audioContextRef = useRef<AudioContext | null>(null);
   
-  // Form fields for new registration
+  // Form fields for new registration or update
   const [formData, setFormData] = useState({
     nombre: "",
     rut: "",
@@ -125,6 +125,9 @@ export default function PortalPaciente() {
     telefono: "",
     direccion: ""
   });
+  
+  // Track if we're updating an existing patient (vs creating new)
+  const [existingPatientId, setExistingPatientId] = useState<string | null>(null);
 
   // Function to play notification sound using Web Audio API - SHORT beeps
   const playNotificationSound = useCallback(() => {
@@ -377,46 +380,36 @@ export default function PortalPaciente() {
             description: `Su número de atención es #${existingAtencion.numero_ingreso}`,
           });
         } else {
-          // Patient exists but no attention for today, create one
-          const { data: newAtencion, error: atencionError } = await supabase
-            .from("atenciones")
-            .insert({
-              paciente_id: pacienteData.id,
-              estado: "en_espera",
-              fecha_ingreso: new Date().toISOString()
-            })
-            .select(`
-              *,
-              boxes(nombre),
-              atencion_examenes(*, examenes(*))
-            `)
-            .single();
-
-          if (atencionError) throw atencionError;
-
-          setAtencion(newAtencion);
-          
-          // Load empresa if patient has one
-          if (pacienteData.empresa_id) {
-            const { data: empresaData } = await supabase
-              .from("empresas")
-              .select("*")
-              .eq("id", pacienteData.empresa_id)
-              .single();
-            
-            if (empresaData) setEmpresa(empresaData);
-          }
+          // Patient exists but no attention for today
+          // Pre-fill form with existing data and let them update if needed
+          setFormData({
+            nombre: pacienteData.nombre || "",
+            rut: formatRutForDisplay(pacienteData.rut || ""),
+            fecha_nacimiento: pacienteData.fecha_nacimiento || "",
+            email: pacienteData.email || "",
+            telefono: pacienteData.telefono || "",
+            direccion: pacienteData.direccion || ""
+          });
+          setExistingPatientId(pacienteData.id);
           
           toast({
-            title: "Registro de hoy",
-            description: `Su número de atención es #${newAtencion.numero_ingreso}. Espere a que el recepcionista complete su registro.`,
+            title: "Bienvenido de vuelta",
+            description: "Verifique sus datos y actualice si es necesario",
           });
+          
+          setStep("registro");
         }
-        
-        setStep("portal");
       } else {
-        // Patient not found, go to registration
-        setFormData(prev => ({ ...prev, rut: rut }));
+        // Patient not found, go to registration with empty form
+        setFormData({
+          nombre: "",
+          rut: rut,
+          fecha_nacimiento: "",
+          email: "",
+          telefono: "",
+          direccion: ""
+        });
+        setExistingPatientId(null);
         setStep("registro");
       }
     } catch (error: any) {
@@ -510,54 +503,87 @@ export default function PortalPaciente() {
       return;
     }
 
-    // Normalize RUT for storage y generar variantes para evitar duplicados
-    const rutVariants = getRutVariants(formData.rut);
+    // Normalize RUT for storage
     const rutNormalizado = normalizeRut(formData.rut);
 
     setIsLoading(true);
     try {
-      // Check if RUT already exists (cualquier formato conocido)
-      const { data: existingPaciente } = await supabase
-        .from("pacientes")
-        .select("id")
-        .in("rut", rutVariants)
-        .maybeSingle();
+      let pacienteId: string;
+      let pacienteData: Paciente;
 
-      if (existingPaciente) {
+      if (existingPatientId) {
+        // UPDATE existing patient with new data
+        const { data: updatedPaciente, error: updateError } = await supabase
+          .from("pacientes")
+          .update({
+            nombre: formData.nombre.trim(),
+            fecha_nacimiento: formData.fecha_nacimiento || null,
+            email: formData.email.trim() || null,
+            telefono: formData.telefono.trim() || null,
+            direccion: formData.direccion.trim() || null
+            // Note: We don't update RUT as it's the identifier
+          })
+          .eq("id", existingPatientId)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+
+        pacienteId = existingPatientId;
+        pacienteData = updatedPaciente;
+
         toast({
-          title: "RUT ya registrado",
-          description: "Este RUT ya está registrado. Por favor identifíquese.",
-          variant: "destructive"
+          title: "Datos actualizados",
+          description: "Su información ha sido actualizada correctamente",
         });
-        setRut(formData.rut);
-        setStep("identificacion");
-        setIsLoading(false);
-        return;
+      } else {
+        // Check if RUT already exists (should not happen but safety check)
+        const rutVariants = getRutVariants(formData.rut);
+        const { data: existingPaciente } = await supabase
+          .from("pacientes")
+          .select("id")
+          .in("rut", rutVariants)
+          .maybeSingle();
+
+        if (existingPaciente) {
+          toast({
+            title: "RUT ya registrado",
+            description: "Este RUT ya está registrado. Por favor identifíquese.",
+            variant: "destructive"
+          });
+          setRut(formData.rut);
+          setStep("identificacion");
+          setIsLoading(false);
+          return;
+        }
+
+        // Create new patient
+        const { data: newPaciente, error } = await supabase
+          .from("pacientes")
+          .insert({
+            nombre: formData.nombre.trim(),
+            rut: rutNormalizado,
+            fecha_nacimiento: formData.fecha_nacimiento || null,
+            email: formData.email.trim() || null,
+            telefono: formData.telefono.trim() || null,
+            direccion: formData.direccion.trim() || null,
+            empresa_id: null,
+            tipo_servicio: null
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        pacienteId = newPaciente.id;
+        pacienteData = newPaciente;
       }
-
-      // Create new patient sin empresa - SIEMPRE guardamos el RUT normalizado
-      const { data: newPaciente, error } = await supabase
-        .from("pacientes")
-        .insert({
-          nombre: formData.nombre.trim(),
-          rut: rutNormalizado,
-          fecha_nacimiento: formData.fecha_nacimiento || null,
-          email: formData.email.trim() || null,
-          telefono: formData.telefono.trim() || null,
-          direccion: formData.direccion.trim() || null,
-          empresa_id: null,
-          tipo_servicio: null
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
 
       // Create atencion to get numero_ingreso
       const { data: newAtencion, error: atencionError } = await supabase
         .from("atenciones")
         .insert({
-          paciente_id: newPaciente.id,
+          paciente_id: pacienteId,
           estado: "en_espera",
           fecha_ingreso: new Date().toISOString()
         })
@@ -566,11 +592,12 @@ export default function PortalPaciente() {
 
       if (atencionError) throw atencionError;
 
-      setPaciente(newPaciente);
+      setPaciente(pacienteData);
       setAtencion({ ...newAtencion, atencion_examenes: [] });
+      setExistingPatientId(null);
       
       toast({
-        title: "Registro exitoso",
+        title: existingPatientId ? "Bienvenido de vuelta" : "Registro exitoso",
         description: `Su número de atención es #${newAtencion.numero_ingreso}. Espere a que el recepcionista complete su registro.`,
       });
 
@@ -832,8 +859,14 @@ export default function PortalPaciente() {
       <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10 flex items-center justify-center p-4">
         <Card className="w-full max-w-lg">
           <CardHeader className="text-center pb-4">
-            <CardTitle className="text-2xl font-bold">Registro de Paciente</CardTitle>
-            <CardDescription>Complete sus datos para registrarse</CardDescription>
+            <CardTitle className="text-2xl font-bold">
+              {existingPatientId ? "Confirmar Datos" : "Registro de Paciente"}
+            </CardTitle>
+            <CardDescription>
+              {existingPatientId 
+                ? "Verifique y actualice sus datos si es necesario" 
+                : "Complete sus datos para registrarse"}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -855,6 +888,7 @@ export default function PortalPaciente() {
                   value={formData.rut}
                   onChange={handleFormRutChange}
                   className="h-11"
+                  disabled={!!existingPatientId}
                 />
               </div>
               <div>
@@ -919,10 +953,10 @@ export default function PortalPaciente() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Registrando...
+                    {existingPatientId ? "Confirmando..." : "Registrando..."}
                   </>
                 ) : (
-                  "Registrar"
+                  existingPatientId ? "Confirmar y Continuar" : "Registrar"
                 )}
               </Button>
             </div>
