@@ -75,6 +75,7 @@ export default function PortalPaciente() {
   const [currentTest, setCurrentTest] = useState<ExamenTest | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  const [notificationInterval, setNotificationInterval] = useState<NodeJS.Timeout | null>(null);
   
   // Form fields for new registration
   const [formData, setFormData] = useState({
@@ -85,7 +86,7 @@ export default function PortalPaciente() {
     telefono: ""
   });
 
-  // Function to play notification sound using Web Audio API
+  // Function to play notification sound using Web Audio API - SHORT beeps
   const playNotificationSound = useCallback(() => {
     try {
       // Use existing or create new AudioContext
@@ -97,7 +98,7 @@ export default function PortalPaciente() {
         ctx.resume();
       }
       
-      // Create multiple beeps for attention
+      // Create a short attention beep
       const playBeep = (startTime: number, frequency: number) => {
         const oscillator = ctx.createOscillator();
         const gainNode = ctx.createGain();
@@ -108,17 +109,17 @@ export default function PortalPaciente() {
         oscillator.frequency.value = frequency;
         oscillator.type = "sine";
         
-        gainNode.gain.setValueAtTime(0.9, ctx.currentTime + startTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + startTime + 0.4);
+        // Shorter beep - 0.15 seconds
+        gainNode.gain.setValueAtTime(0.7, ctx.currentTime + startTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + startTime + 0.15);
         
         oscillator.start(ctx.currentTime + startTime);
-        oscillator.stop(ctx.currentTime + startTime + 0.4);
+        oscillator.stop(ctx.currentTime + startTime + 0.15);
       };
 
-      // Play 3 ascending beeps - louder and longer
-      playBeep(0, 600);
-      playBeep(0.5, 800);
-      playBeep(1.0, 1000);
+      // Play 2 quick ascending beeps (total ~0.4 seconds)
+      playBeep(0, 800);
+      playBeep(0.2, 1200);
       
       console.log("Sound played successfully");
       return true;
@@ -554,6 +555,45 @@ export default function PortalPaciente() {
     setCurrentTest(null);
   };
 
+  // Function to trigger notification (sound + vibrate)
+  const triggerNotification = useCallback((boxName: string) => {
+    console.log("Triggering notification for box:", boxName);
+    setBoxLlamado(boxName);
+    setLlamadoActivo(true);
+    
+    // Play notification sound and vibrate immediately
+    vibrateDevice();
+    playNotificationSound();
+    
+    // Repeat only 2 more times (total 3), every 1.5 seconds
+    let count = 0;
+    const interval = setInterval(() => {
+      count++;
+      if (count >= 2) {
+        clearInterval(interval);
+        setNotificationInterval(null);
+        return;
+      }
+      vibrateDevice();
+      playNotificationSound();
+    }, 1500);
+    
+    setNotificationInterval(interval);
+  }, [vibrateDevice, playNotificationSound]);
+
+  // Stop notification when user acknowledges
+  const stopNotification = useCallback(() => {
+    setLlamadoActivo(false);
+    if (notificationInterval) {
+      clearInterval(notificationInterval);
+      setNotificationInterval(null);
+    }
+    // Stop vibration
+    if ("vibrate" in navigator) {
+      navigator.vibrate(0);
+    }
+  }, [notificationInterval]);
+
   // Listen for real-time updates when patient is called
   useEffect(() => {
     if (!paciente?.id) return;
@@ -581,24 +621,7 @@ export default function PortalPaciente() {
               .single();
 
             if (boxData) {
-              setBoxLlamado(boxData.nombre);
-              setLlamadoActivo(true);
-              
-              // Play notification sound and vibrate
-              vibrateDevice();
-              playNotificationSound();
-              
-              // Repeat sound and vibration every 2 seconds for 10 seconds
-              let count = 0;
-              const interval = setInterval(() => {
-                count++;
-                if (count >= 5) {
-                  clearInterval(interval);
-                  return;
-                }
-                vibrateDevice();
-                playNotificationSound();
-              }, 2000);
+              triggerNotification(boxData.nombre);
             }
           }
 
@@ -611,15 +634,51 @@ export default function PortalPaciente() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [paciente?.id, atencion?.estado]);
+  }, [paciente?.id, atencion?.estado, triggerNotification]);
 
-  // Refresh data periodically
+  // Polling fallback for mobile (realtime may not work when app is in background)
+  // Check every 3 seconds if the patient was called
   useEffect(() => {
     if (!paciente?.id || step !== "portal") return;
 
-    const interval = setInterval(() => {
-      cargarDatosPaciente(paciente.id);
-    }, 10000);
+    const checkForCall = async () => {
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).toISOString();
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).toISOString();
+
+      const { data: atencionData } = await supabase
+        .from("atenciones")
+        .select("*, boxes(nombre)")
+        .eq("paciente_id", paciente.id)
+        .gte("fecha_ingreso", startOfDay)
+        .lte("fecha_ingreso", endOfDay)
+        .order("fecha_ingreso", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (atencionData) {
+        // If patient was called to a box and we haven't shown the notification yet
+        if (
+          atencionData.estado === "en_atencion" && 
+          atencionData.box_id && 
+          atencionData.boxes?.nombre &&
+          atencion?.estado !== "en_atencion" &&
+          !llamadoActivo
+        ) {
+          triggerNotification(atencionData.boxes.nombre);
+        }
+
+        // Update local state
+        setAtencion({
+          ...atencionData,
+          atencion_examenes: atencion?.atencion_examenes || []
+        });
+      }
+    };
+
+    // Check immediately and then every 3 seconds
+    checkForCall();
+    const interval = setInterval(checkForCall, 3000);
 
     return () => clearInterval(interval);
   }, [paciente?.id, step]);
@@ -811,13 +870,7 @@ export default function PortalPaciente() {
               variant="secondary" 
               size="lg" 
               className="text-xl px-12 py-6 h-auto font-bold shadow-xl"
-              onClick={() => {
-                setLlamadoActivo(false);
-                // Stop any ongoing vibration
-                if ("vibrate" in navigator) {
-                  navigator.vibrate(0);
-                }
-              }}
+              onClick={stopNotification}
             >
               ✓ Entendido
             </Button>
