@@ -110,6 +110,46 @@ const Pacientes = () => {
     loadEmpresas();
     loadExamenes();
     loadPaquetes();
+
+    // Auto-refresh every 5 seconds
+    const interval = setInterval(() => {
+      loadPatients();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [selectedDate]);
+
+  // Real-time updates for atenciones table
+  useEffect(() => {
+    const channel = supabase
+      .channel('pacientes-atenciones-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'atenciones'
+        },
+        () => {
+          loadPatients();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'pacientes'
+        },
+        () => {
+          loadPatients();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [selectedDate]);
 
   const loadPatients = async () => {
