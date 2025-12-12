@@ -76,6 +76,7 @@ export default function PortalPaciente() {
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [notificationInterval, setNotificationInterval] = useState<NodeJS.Timeout | null>(null);
+  const [lastNotificationBox, setLastNotificationBox] = useState<string | null>(null);
   
   // Form fields for new registration
   const [formData, setFormData] = useState({
@@ -560,6 +561,7 @@ export default function PortalPaciente() {
     console.log("Triggering notification for box:", boxName);
     setBoxLlamado(boxName);
     setLlamadoActivo(true);
+    setLastNotificationBox(boxName);
     
     // Play notification sound and vibrate immediately
     vibrateDevice();
@@ -663,7 +665,8 @@ export default function PortalPaciente() {
           atencionData.box_id && 
           atencionData.boxes?.nombre &&
           atencion?.estado !== "en_atencion" &&
-          !llamadoActivo
+          !llamadoActivo &&
+          atencionData.boxes.nombre !== lastNotificationBox
         ) {
           triggerNotification(atencionData.boxes.nombre);
         }
@@ -681,7 +684,7 @@ export default function PortalPaciente() {
     const interval = setInterval(checkForCall, 3000);
 
     return () => clearInterval(interval);
-  }, [paciente?.id, step]);
+  }, [paciente?.id, step, atencion?.estado, llamadoActivo, lastNotificationBox, triggerNotification]);
 
   const isTestCompleted = (testId: string) => {
     return testTracking.some(t => t.examen_test_id === testId);
