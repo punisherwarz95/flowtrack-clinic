@@ -159,11 +159,12 @@ const Flujo = () => {
 
     for (const atencion of atenciones) {
       try {
+        // Incluir pendientes e incompletos
         const { data: atencionExamenes, error } = await supabase
           .from("atencion_examenes")
           .select("examen_id")
           .eq("atencion_id", atencion.id)
-          .eq("estado", "pendiente");
+          .in("estado", ["pendiente", "incompleto"]);
 
         if (error) throw error;
 
@@ -197,22 +198,23 @@ const Flujo = () => {
             return { atencionId: atencion.id, examenes: [] };
           }
 
+          // Incluir pendientes e incompletos para que puedan ser reintentados
           const { data: examenesData, error } = await supabase
             .from("atencion_examenes")
             .select("id, examen_id, estado, examenes(nombre)")
             .eq("atencion_id", atencion.id)
-            .eq("estado", "pendiente")
+            .in("estado", ["pendiente", "incompleto"])
             .in("examen_id", boxExamIds);
 
           if (error) throw error;
           return { atencionId: atencion.id, examenes: examenesData || [] };
         } else {
-          // Para pacientes en espera, cargar todos los pendientes
+          // Para pacientes en espera, cargar todos los pendientes e incompletos
           const { data: examenesData, error } = await supabase
             .from("atencion_examenes")
             .select("id, examen_id, estado, examenes(nombre)")
             .eq("atencion_id", atencion.id)
-            .eq("estado", "pendiente");
+            .in("estado", ["pendiente", "incompleto"]);
 
           if (error) throw error;
           return { atencionId: atencion.id, examenes: examenesData || [] };
@@ -236,11 +238,12 @@ const Flujo = () => {
 
     for (const atencion of atenciones) {
       try {
+        // Incluir pendientes e incompletos
         const { data: atencionExamenes, error } = await supabase
           .from("atencion_examenes")
           .select("examen_id")
           .eq("atencion_id", atencion.id)
-          .eq("estado", "pendiente");
+          .in("estado", ["pendiente", "incompleto"]);
 
         if (error) throw error;
 
@@ -386,44 +389,32 @@ const Flujo = () => {
       const currentBoxId = atencionActual?.box_id;
       const seleccionados = examenesSeleccionados[atencionId] || new Set<string>();
 
-      console.log("=== handleCompletarAtencion ===");
-      console.log("atencionId:", atencionId);
-      console.log("estado:", estado);
-      console.log("currentBoxId:", currentBoxId);
-      console.log("seleccionados:", Array.from(seleccionados));
-
       if (currentBoxId) {
         const box = boxes.find((b) => b.id === currentBoxId);
         const boxExamIds = box?.box_examenes.map((be) => be.examen_id) || [];
         
-        console.log("box encontrado:", box?.nombre);
-        console.log("boxExamIds:", boxExamIds);
-        
         // Si no hay exámenes asociados al box, no hay nada que hacer
         if (boxExamIds.length === 0) {
-          console.log("No hay exámenes asociados a este box");
           toast.error("Este box no tiene exámenes asociados");
           return;
         }
         
-        // Obtener exámenes pendientes del box directamente de la BD para evitar problemas de estado
+        // Obtener exámenes pendientes/incompletos del box directamente de la BD
         const { data: examenesDelBoxDB, error: fetchError } = await supabase
           .from("atencion_examenes")
           .select("id, examen_id, estado")
           .eq("atencion_id", atencionId)
-          .eq("estado", "pendiente")
+          .in("estado", ["pendiente", "incompleto"])
           .in("examen_id", boxExamIds);
 
         if (fetchError) throw fetchError;
         
         const examenesDelBox = examenesDelBoxDB || [];
-        console.log("examenesDelBox encontrados:", examenesDelBox);
 
         if (estado === "completado") {
           // Completar: marcar TODOS los exámenes del box como completados
           if (examenesDelBox.length > 0) {
             const idsToComplete = examenesDelBox.map(ae => ae.id);
-            console.log("Completando todos:", idsToComplete);
             const { error: updateExamsError } = await supabase
               .from("atencion_examenes")
               .update({ estado: "completado", fecha_realizacion: new Date().toISOString() })
@@ -432,10 +423,8 @@ const Flujo = () => {
           }
         } else {
           // Parcial: marcar solo los seleccionados como completados, el resto como incompleto
-          console.log("Modo PARCIAL - procesando exámenes...");
           for (const ae of examenesDelBox) {
             const nuevoEstado = seleccionados.has(ae.id) ? "completado" : "incompleto";
-            console.log(`Examen ${ae.id}: seleccionado=${seleccionados.has(ae.id)}, nuevoEstado=${nuevoEstado}`);
             const { error } = await supabase
               .from("atencion_examenes")
               .update({ 
@@ -455,12 +444,12 @@ const Flujo = () => {
         return newState;
       });
 
-      // Verificar si quedan exámenes pendientes
+      // Verificar si quedan exámenes pendientes o incompletos
       const { data: examenesPendientesData, error: examenesError } = await supabase
         .from("atencion_examenes")
         .select("id")
         .eq("atencion_id", atencionId)
-        .eq("estado", "pendiente");
+        .in("estado", ["pendiente", "incompleto"]);
 
       if (examenesError) throw examenesError;
 
