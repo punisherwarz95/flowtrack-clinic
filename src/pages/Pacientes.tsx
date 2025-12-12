@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Trash2, Pencil, Calendar as CalendarIcon } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Calendar as CalendarIcon, ClipboardList } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
@@ -67,6 +67,15 @@ interface Paquete {
   }>;
 }
 
+interface ExamenCompletado {
+  id: string;
+  examen_id: string;
+  estado: string;
+  examenes: {
+    nombre: string;
+  };
+}
+
 const Pacientes = () => {
   useAuth(); // Protect route
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -81,6 +90,14 @@ const Pacientes = () => {
   const [selectedPaquetes, setSelectedPaquetes] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  
+  // Estado para el diálogo de exámenes completados
+  const [examenesCompletadosDialog, setExamenesCompletadosDialog] = useState<{
+    open: boolean;
+    patientId: string | null;
+    patientName: string;
+    examenes: ExamenCompletado[];
+  }>({ open: false, patientId: null, patientName: "", examenes: [] });
   const [formData, setFormData] = useState({
     nombre: "",
     tipo_servicio: "workmed" as "workmed" | "jenner",
@@ -399,6 +416,98 @@ const Pacientes = () => {
     }
   };
 
+  // Abrir diálogo de exámenes completados
+  const handleViewExamenesCompletados = async (patient: Patient) => {
+    try {
+      const dateToUse = selectedDate || new Date();
+      const startOfDay = new Date(new Date(dateToUse).setHours(0, 0, 0, 0)).toISOString();
+      const endOfDay = new Date(new Date(dateToUse).setHours(23, 59, 59, 999)).toISOString();
+
+      // Buscar atención del día
+      const { data: atencionData, error: atencionError } = await supabase
+        .from("atenciones")
+        .select("id")
+        .eq("paciente_id", patient.id)
+        .gte("fecha_ingreso", startOfDay)
+        .lte("fecha_ingreso", endOfDay)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (atencionError) throw atencionError;
+
+      if (!atencionData) {
+        toast.info("Este paciente no tiene atención registrada hoy");
+        return;
+      }
+
+      // Cargar exámenes completados e incompletos
+      const { data: examenesData, error: examenesError } = await supabase
+        .from("atencion_examenes")
+        .select("id, examen_id, estado, examenes(nombre)")
+        .eq("atencion_id", atencionData.id)
+        .in("estado", ["completado", "incompleto"]);
+
+      if (examenesError) throw examenesError;
+
+      setExamenesCompletadosDialog({
+        open: true,
+        patientId: patient.id,
+        patientName: patient.nombre,
+        examenes: (examenesData || []) as ExamenCompletado[]
+      });
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al cargar exámenes");
+    }
+  };
+
+  // Revertir examen a pendiente
+  const handleRevertirExamen = async (atencionExamenId: string) => {
+    try {
+      const { error } = await supabase
+        .from("atencion_examenes")
+        .update({ estado: "pendiente", fecha_realizacion: null })
+        .eq("id", atencionExamenId);
+
+      if (error) throw error;
+
+      // Actualizar lista local
+      setExamenesCompletadosDialog(prev => ({
+        ...prev,
+        examenes: prev.examenes.filter(e => e.id !== atencionExamenId)
+      }));
+
+      // Si el paciente está completado/incompleto, devolverlo a en_espera
+      if (examenesCompletadosDialog.patientId) {
+        const dateToUse = selectedDate || new Date();
+        const startOfDay = new Date(new Date(dateToUse).setHours(0, 0, 0, 0)).toISOString();
+        const endOfDay = new Date(new Date(dateToUse).setHours(23, 59, 59, 999)).toISOString();
+
+        const { data: atencionData } = await supabase
+          .from("atenciones")
+          .select("id, estado")
+          .eq("paciente_id", examenesCompletadosDialog.patientId)
+          .gte("fecha_ingreso", startOfDay)
+          .lte("fecha_ingreso", endOfDay)
+          .maybeSingle();
+
+        if (atencionData && (atencionData.estado === "completado" || atencionData.estado === "incompleto")) {
+          await supabase
+            .from("atenciones")
+            .update({ estado: "en_espera", box_id: null, fecha_fin_atencion: null })
+            .eq("id", atencionData.id);
+        }
+      }
+
+      toast.success("Examen devuelto a pendiente");
+      loadPatients();
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al revertir examen");
+    }
+  };
+
   const filteredPatients = patients
     .filter(
       (p) =>
@@ -651,6 +760,14 @@ const Pacientes = () => {
                     <Button
                       variant="ghost"
                       size="icon"
+                      onClick={() => handleViewExamenesCompletados(patient)}
+                      title="Ver exámenes completados"
+                    >
+                      <ClipboardList className="h-4 w-4 text-info" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => handleEdit(patient)}
                     >
                       <Pencil className="h-4 w-4 text-primary" />
@@ -683,6 +800,50 @@ const Pacientes = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Diálogo de exámenes completados */}
+        <Dialog 
+          open={examenesCompletadosDialog.open} 
+          onOpenChange={(open) => setExamenesCompletadosDialog(prev => ({ ...prev, open }))}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Exámenes de {examenesCompletadosDialog.patientName}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              {examenesCompletadosDialog.examenes.length === 0 ? (
+                <p className="text-muted-foreground text-center py-4">
+                  No hay exámenes completados o incompletos para este paciente
+                </p>
+              ) : (
+                examenesCompletadosDialog.examenes.map((examen) => (
+                  <div 
+                    key={examen.id} 
+                    className="flex items-center justify-between p-3 border rounded-lg"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{examen.examenes.nombre}</span>
+                      <Badge 
+                        variant={examen.estado === "completado" ? "default" : "secondary"}
+                        className={examen.estado === "completado" ? "bg-green-500" : "bg-orange-500"}
+                      >
+                        {examen.estado === "completado" ? "Completado" : "Incompleto"}
+                      </Badge>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRevertirExamen(examen.id)}
+                      className="text-warning border-warning hover:bg-warning/10"
+                    >
+                      Revertir
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
