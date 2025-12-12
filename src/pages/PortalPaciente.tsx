@@ -202,7 +202,82 @@ export default function PortalPaciente() {
 
       if (pacienteData) {
         setPaciente(pacienteData);
-        await cargarDatosPaciente(pacienteData.id);
+        
+        // Check if patient already has an attention for today
+        const today = new Date();
+        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).toISOString();
+        const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).toISOString();
+
+        const { data: existingAtencion } = await supabase
+          .from("atenciones")
+          .select(`
+            *,
+            boxes(nombre),
+            atencion_examenes(*, examenes(*))
+          `)
+          .eq("paciente_id", pacienteData.id)
+          .gte("fecha_ingreso", startOfDay)
+          .lte("fecha_ingreso", endOfDay)
+          .order("fecha_ingreso", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (existingAtencion) {
+          // Patient already has attention for today, use it
+          setAtencion(existingAtencion);
+          
+          // Load empresa if patient has one
+          if (pacienteData.empresa_id) {
+            const { data: empresaData } = await supabase
+              .from("empresas")
+              .select("*")
+              .eq("id", pacienteData.empresa_id)
+              .single();
+            
+            if (empresaData) setEmpresa(empresaData);
+          }
+          
+          toast({
+            title: "Bienvenido",
+            description: `Su número de atención es #${existingAtencion.numero_ingreso}`,
+          });
+        } else {
+          // Patient exists but no attention for today, create one
+          const { data: newAtencion, error: atencionError } = await supabase
+            .from("atenciones")
+            .insert({
+              paciente_id: pacienteData.id,
+              estado: "en_espera",
+              fecha_ingreso: new Date().toISOString()
+            })
+            .select(`
+              *,
+              boxes(nombre),
+              atencion_examenes(*, examenes(*))
+            `)
+            .single();
+
+          if (atencionError) throw atencionError;
+
+          setAtencion(newAtencion);
+          
+          // Load empresa if patient has one
+          if (pacienteData.empresa_id) {
+            const { data: empresaData } = await supabase
+              .from("empresas")
+              .select("*")
+              .eq("id", pacienteData.empresa_id)
+              .single();
+            
+            if (empresaData) setEmpresa(empresaData);
+          }
+          
+          toast({
+            title: "Registro de hoy",
+            description: `Su número de atención es #${newAtencion.numero_ingreso}. Espere a que el recepcionista complete su registro.`,
+          });
+        }
+        
         setStep("portal");
       } else {
         // Patient not found, go to registration
