@@ -388,9 +388,18 @@ const Flujo = () => {
 
       if (currentBoxId) {
         const boxExamIds = boxes.find((b) => b.id === currentBoxId)?.box_examenes.map((be) => be.examen_id) || [];
-        const examenesDelBox = atencionExamenes[atencionId]?.filter(ae => 
-          boxExamIds.includes(ae.examen_id)
-        ) || [];
+        
+        // Obtener exámenes pendientes del box directamente de la BD para evitar problemas de estado
+        const { data: examenesDelBoxDB, error: fetchError } = await supabase
+          .from("atencion_examenes")
+          .select("id, examen_id, estado")
+          .eq("atencion_id", atencionId)
+          .eq("estado", "pendiente")
+          .in("examen_id", boxExamIds);
+
+        if (fetchError) throw fetchError;
+        
+        const examenesDelBox = examenesDelBoxDB || [];
 
         if (estado === "completado") {
           // Completar: marcar TODOS los exámenes del box como completados
