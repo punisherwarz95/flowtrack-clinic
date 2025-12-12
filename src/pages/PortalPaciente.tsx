@@ -822,20 +822,23 @@ export default function PortalPaciente() {
   // Portal view
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10 p-4">
-      {/* Notification overlay when called - FULL SCREEN with strong visual feedback */}
+      {/* Notification overlay when called - FULL SCREEN with blinking effect */}
       {llamadoActivo && (
         <div 
           className="fixed inset-0 z-[9999] flex items-center justify-center"
           style={{
-            background: 'linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(220, 90%, 40%) 100%)',
-            animation: 'pulse-bg 1s ease-in-out infinite alternate'
+            animation: 'blink-bg 0.8s ease-in-out infinite'
           }}
         >
           <style>
             {`
-              @keyframes pulse-bg {
-                0% { opacity: 1; }
-                100% { opacity: 0.85; }
+              @keyframes blink-bg {
+                0%, 100% { 
+                  background: linear-gradient(135deg, hsl(142, 76%, 36%) 0%, hsl(142, 76%, 28%) 100%);
+                }
+                50% { 
+                  background: linear-gradient(135deg, hsl(142, 76%, 50%) 0%, hsl(142, 76%, 40%) 100%);
+                }
               }
               @keyframes shake {
                 0%, 100% { transform: translateX(0); }
@@ -847,29 +850,36 @@ export default function PortalPaciente() {
                 25% { transform: rotate(-20deg); }
                 75% { transform: rotate(20deg); }
               }
+              @keyframes pulse-box {
+                0%, 100% { transform: scale(1); }
+                50% { transform: scale(1.05); }
+              }
             `}
           </style>
           <div className="text-center text-white p-8 w-full max-w-md">
             <div 
-              className="mb-8"
+              className="mb-6"
               style={{ animation: 'ring-bell 0.5s ease-in-out infinite' }}
             >
-              <Bell className="h-32 w-32 mx-auto drop-shadow-2xl" />
+              <Bell className="h-24 w-24 mx-auto drop-shadow-2xl" />
             </div>
             <h1 
-              className="text-5xl font-black mb-6 drop-shadow-lg"
+              className="text-4xl font-black mb-4 drop-shadow-lg"
               style={{ animation: 'shake 0.5s ease-in-out infinite' }}
             >
               ¡ES SU TURNO!
             </h1>
-            <p className="text-3xl mb-6 font-medium">Diríjase a</p>
-            <div className="bg-white/30 backdrop-blur rounded-3xl p-8 mb-8 shadow-2xl">
-              <p className="text-6xl font-black drop-shadow-md">{boxLlamado}</p>
+            <p className="text-2xl mb-4 font-medium opacity-90">Diríjase a</p>
+            <div 
+              className="bg-white/30 backdrop-blur rounded-3xl p-6 mb-6 shadow-2xl border-4 border-white/50"
+              style={{ animation: 'pulse-box 1s ease-in-out infinite' }}
+            >
+              <p className="text-5xl font-black drop-shadow-md">{boxLlamado}</p>
             </div>
             <Button 
               variant="secondary" 
               size="lg" 
-              className="text-xl px-12 py-6 h-auto font-bold shadow-xl"
+              className="text-xl px-12 py-6 h-auto font-bold shadow-xl bg-white text-green-700 hover:bg-white/90"
               onClick={stopNotification}
             >
               ✓ Entendido
