@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { MapPin, Phone, Globe } from "lucide-react";
 import jennerLogo from "@/assets/jenner-logo-horizontal.jpg";
-import jennerBackground from "@/assets/jenner-background.png";
+import jennerBackground from "@/assets/jenner-background.jpg";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -858,8 +858,8 @@ export default function PortalPaciente() {
           backgroundRepeat: 'no-repeat'
         }}
       >
-        {/* Overlay for better readability */}
-        <div className="absolute inset-0 bg-white/70" />
+        {/* Overlay for better readability - reduced opacity to show more of the background */}
+        <div className="absolute inset-0 bg-white/30" />
         
         <div className="flex-1 flex flex-col items-center justify-center gap-6 relative z-10 p-4">
           <Card className="w-full max-w-md shadow-xl bg-white/95 backdrop-blur">
