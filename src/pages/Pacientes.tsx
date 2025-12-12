@@ -36,6 +36,10 @@ interface Patient {
   id: string;
   nombre: string;
   rut: string | null;
+  email: string | null;
+  telefono: string | null;
+  fecha_nacimiento: string | null;
+  direccion: string | null;
   tipo_servicio: 'workmed' | 'jenner' | null;
   empresa_id: string | null;
   empresas?: {
@@ -103,7 +107,11 @@ const Pacientes = () => {
     nombre: "",
     tipo_servicio: "workmed" as "workmed" | "jenner",
     empresa_id: "",
-    rut: "", // Temporary until types are regenerated
+    rut: "",
+    email: "",
+    telefono: "",
+    fecha_nacimiento: "",
+    direccion: "",
   });
 
   useEffect(() => {
@@ -256,6 +264,10 @@ const Pacientes = () => {
       tipo_servicio: patient.tipo_servicio || "workmed",
       empresa_id: patient.empresa_id || "",
       rut: patient.rut || "",
+      email: patient.email || "",
+      telefono: patient.telefono || "",
+      fecha_nacimiento: patient.fecha_nacimiento || "",
+      direccion: patient.direccion || "",
     });
 
     // Cargar exámenes de la última atención (cualquier estado)
@@ -431,7 +443,7 @@ const Pacientes = () => {
 
       setOpenDialog(false);
       setEditingPatient(null);
-      setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: "", rut: "" });
+      setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: "", rut: "", email: "", telefono: "", fecha_nacimiento: "", direccion: "" });
       setSelectedExamenes([]);
       setSelectedPaquetes([]);
       loadPatients();
@@ -609,7 +621,7 @@ const Pacientes = () => {
               setOpenDialog(open);
               if (!open) {
                 setEditingPatient(null);
-                setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: "", rut: "" });
+                setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: "", rut: "", email: "", telefono: "", fecha_nacimiento: "", direccion: "" });
                 setSelectedExamenes([]);
                 setSelectedPaquetes([]);
               }
@@ -620,26 +632,84 @@ const Pacientes = () => {
                   Nuevo Paciente
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>{editingPatient ? "Editar Paciente" : "Agregar Nuevo Paciente"}</DialogTitle>
                 </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Columna izquierda - Datos del paciente */}
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Columna izquierda - Datos personales del paciente */}
                     <div className="space-y-4">
+                      <h3 className="font-semibold text-sm text-muted-foreground border-b pb-2">Datos Personales</h3>
                       <div>
-                        <Label htmlFor="nombre">Nombre Completo *</Label>
+                        <Label htmlFor="nombre" className="text-sm font-medium">Nombre Completo *</Label>
                         <Input
                           id="nombre"
                           required
                           value={formData.nombre}
                           onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                          className="h-10 mt-1"
                         />
                       </div>
-                      
+                      <div>
+                        <Label htmlFor="rut" className="text-sm font-medium">RUT</Label>
+                        <Input
+                          id="rut"
+                          value={formData.rut}
+                          onChange={(e) => setFormData({ ...formData, rut: e.target.value })}
+                          placeholder="12.345.678-9"
+                          className="h-10 mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="fecha_nacimiento" className="text-sm font-medium">Fecha de Nacimiento</Label>
+                        <Input
+                          id="fecha_nacimiento"
+                          type="date"
+                          value={formData.fecha_nacimiento}
+                          onChange={(e) => setFormData({ ...formData, fecha_nacimiento: e.target.value })}
+                          className="h-10 mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                          placeholder="correo@ejemplo.com"
+                          className="h-10 mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="telefono" className="text-sm font-medium">Teléfono</Label>
+                        <Input
+                          id="telefono"
+                          type="tel"
+                          value={formData.telefono}
+                          onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+                          placeholder="+56 9 1234 5678"
+                          className="h-10 mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="direccion" className="text-sm font-medium">Dirección</Label>
+                        <Input
+                          id="direccion"
+                          value={formData.direccion}
+                          onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
+                          placeholder="Av. Principal 123, Comuna"
+                          className="h-10 mt-1"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Columna central - Servicio y empresa */}
+                    <div className="space-y-4">
+                      <h3 className="font-semibold text-sm text-muted-foreground border-b pb-2">Servicio y Empresa</h3>
                       <div className="space-y-2">
-                        <Label>Tipo de Servicio *</Label>
+                        <Label className="text-sm font-medium">Tipo de Servicio *</Label>
                         <div className="flex gap-4">
                           <label className="flex items-center gap-2 cursor-pointer">
                             <input
@@ -667,7 +737,7 @@ const Pacientes = () => {
                       </div>
 
                       <div>
-                        <Label htmlFor="empresa">
+                        <Label htmlFor="empresa" className="text-sm font-medium">
                           Empresa {formData.tipo_servicio === "jenner" && "*"}
                         </Label>
                         <select
@@ -675,7 +745,7 @@ const Pacientes = () => {
                           required={formData.tipo_servicio === "jenner"}
                           value={formData.empresa_id}
                           onChange={(e) => setFormData({ ...formData, empresa_id: e.target.value })}
-                          className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                          className="w-full h-10 px-3 rounded-md border border-input bg-background mt-1"
                         >
                           <option value="">Seleccione una empresa</option>
                           {empresas.map((empresa) => (
@@ -687,8 +757,8 @@ const Pacientes = () => {
                       </div>
 
                       <div>
-                        <Label>Paquetes de Exámenes</Label>
-                        <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2 bg-muted/30">
+                        <Label className="text-sm font-medium">Paquetes de Exámenes</Label>
+                        <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2 bg-muted/30 mt-1">
                           {paquetes.map((paquete) => (
                             <label key={paquete.id} className="flex items-start gap-2 cursor-pointer">
                               <input
@@ -720,41 +790,39 @@ const Pacientes = () => {
 
                     {/* Columna derecha - Exámenes */}
                     <div className="space-y-4">
-                      <div>
-                        <Label>Exámenes a Realizar</Label>
-                        <div className="border rounded-md p-3 max-h-[400px] overflow-y-auto space-y-2 bg-muted/30">
-                          {examenes.map((examen) => (
-                            <label key={examen.id} className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={selectedExamenes.includes(examen.id)}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedExamenes([...selectedExamenes, examen.id]);
-                                  } else {
-                                    setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
-                                    const paquetesConExamen = paquetes.filter(p => 
-                                      p.paquete_examen_items.some(item => item.examen_id === examen.id)
-                                    );
-                                    const paquetesARemover = paquetesConExamen.filter(p => selectedPaquetes.includes(p.id));
-                                    if (paquetesARemover.length > 0) {
-                                      setSelectedPaquetes(selectedPaquetes.filter(id => 
-                                        !paquetesARemover.map(p => p.id).includes(id)
-                                      ));
-                                    }
+                      <h3 className="font-semibold text-sm text-muted-foreground border-b pb-2">Exámenes a Realizar</h3>
+                      <div className="border rounded-md p-3 max-h-[400px] overflow-y-auto space-y-2 bg-muted/30">
+                        {examenes.map((examen) => (
+                          <label key={examen.id} className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedExamenes.includes(examen.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedExamenes([...selectedExamenes, examen.id]);
+                                } else {
+                                  setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
+                                  const paquetesConExamen = paquetes.filter(p => 
+                                    p.paquete_examen_items.some(item => item.examen_id === examen.id)
+                                  );
+                                  const paquetesARemover = paquetesConExamen.filter(p => selectedPaquetes.includes(p.id));
+                                  if (paquetesARemover.length > 0) {
+                                    setSelectedPaquetes(selectedPaquetes.filter(id => 
+                                      !paquetesARemover.map(p => p.id).includes(id)
+                                    ));
                                   }
-                                }}
-                                className="w-4 h-4"
-                              />
-                              <span className="text-sm">{examen.nombre}</span>
-                            </label>
-                          ))}
-                        </div>
+                                }
+                              }}
+                              className="w-4 h-4"
+                            />
+                            <span className="text-sm">{examen.nombre}</span>
+                          </label>
+                        ))}
                       </div>
                     </div>
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  <Button type="submit" className="w-full h-11" disabled={isSubmitting}>
                     {isSubmitting ? "Guardando..." : (editingPatient ? "Actualizar Paciente" : "Guardar Paciente")}
                   </Button>
                 </form>
@@ -782,15 +850,20 @@ const Pacientes = () => {
                   key={patient.id}
                   className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-accent transition-colors"
                  >
-                   <div>
-                     <div className="flex items-center gap-2">
+                   <div className="flex-1 min-w-0">
+                     <div className="flex items-center gap-2 flex-wrap">
                        {patient.atencion_actual && (
                          <Badge variant="outline" className="font-bold">#{patient.atencion_actual.numero_ingreso}</Badge>
                        )}
                        <div className="font-medium text-foreground">{patient.nombre}</div>
+                       {patient.rut && (
+                         <span className="text-sm text-muted-foreground">({patient.rut})</span>
+                       )}
                      </div>
-                     <div className="text-sm text-muted-foreground">
-                       {patient.empresas?.nombre || "Sin empresa"}
+                     <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground flex-wrap">
+                       <span>{patient.empresas?.nombre || "Sin empresa"}</span>
+                       {patient.email && <span>• {patient.email}</span>}
+                       {patient.telefono && <span>• {patient.telefono}</span>}
                      </div>
                      {patient.atencion_actual && (
                        <div className="text-xs text-muted-foreground mt-1">
