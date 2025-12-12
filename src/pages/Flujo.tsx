@@ -386,8 +386,25 @@ const Flujo = () => {
       const currentBoxId = atencionActual?.box_id;
       const seleccionados = examenesSeleccionados[atencionId] || new Set<string>();
 
+      console.log("=== handleCompletarAtencion ===");
+      console.log("atencionId:", atencionId);
+      console.log("estado:", estado);
+      console.log("currentBoxId:", currentBoxId);
+      console.log("seleccionados:", Array.from(seleccionados));
+
       if (currentBoxId) {
-        const boxExamIds = boxes.find((b) => b.id === currentBoxId)?.box_examenes.map((be) => be.examen_id) || [];
+        const box = boxes.find((b) => b.id === currentBoxId);
+        const boxExamIds = box?.box_examenes.map((be) => be.examen_id) || [];
+        
+        console.log("box encontrado:", box?.nombre);
+        console.log("boxExamIds:", boxExamIds);
+        
+        // Si no hay exámenes asociados al box, no hay nada que hacer
+        if (boxExamIds.length === 0) {
+          console.log("No hay exámenes asociados a este box");
+          toast.error("Este box no tiene exámenes asociados");
+          return;
+        }
         
         // Obtener exámenes pendientes del box directamente de la BD para evitar problemas de estado
         const { data: examenesDelBoxDB, error: fetchError } = await supabase
@@ -400,11 +417,13 @@ const Flujo = () => {
         if (fetchError) throw fetchError;
         
         const examenesDelBox = examenesDelBoxDB || [];
+        console.log("examenesDelBox encontrados:", examenesDelBox);
 
         if (estado === "completado") {
           // Completar: marcar TODOS los exámenes del box como completados
           if (examenesDelBox.length > 0) {
             const idsToComplete = examenesDelBox.map(ae => ae.id);
+            console.log("Completando todos:", idsToComplete);
             const { error: updateExamsError } = await supabase
               .from("atencion_examenes")
               .update({ estado: "completado", fecha_realizacion: new Date().toISOString() })
@@ -413,8 +432,10 @@ const Flujo = () => {
           }
         } else {
           // Parcial: marcar solo los seleccionados como completados, el resto como incompleto
+          console.log("Modo PARCIAL - procesando exámenes...");
           for (const ae of examenesDelBox) {
             const nuevoEstado = seleccionados.has(ae.id) ? "completado" : "incompleto";
+            console.log(`Examen ${ae.id}: seleccionado=${seleccionados.has(ae.id)}, nuevoEstado=${nuevoEstado}`);
             const { error } = await supabase
               .from("atencion_examenes")
               .update({ 
