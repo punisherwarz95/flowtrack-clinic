@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { MapPin, Phone, Globe } from "lucide-react";
+import jennerLogo from "@/assets/jenner-logo.jpg";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -848,7 +849,16 @@ export default function PortalPaciente() {
   if (step === "identificacion") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10 flex flex-col p-4">
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex-1 flex flex-col items-center justify-center gap-6">
+          {/* Jenner Logo */}
+          <div className="w-full max-w-[200px]">
+            <img 
+              src={jennerLogo} 
+              alt="Jenner Centro Médico" 
+              className="w-full h-auto object-contain"
+            />
+          </div>
+          
           <Card className="w-full max-w-md">
             <CardHeader className="text-center">
               <CardTitle className="text-2xl font-bold">Portal del Paciente</CardTitle>
