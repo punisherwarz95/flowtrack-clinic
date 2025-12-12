@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { MapPin, Phone, Globe } from "lucide-react";
-import jennerLogo from "@/assets/jenner-logo-clean.png";
+import jennerLogo from "@/assets/jenner-logo-horizontal.jpg";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -848,42 +848,50 @@ export default function PortalPaciente() {
 
   if (step === "identificacion") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10 flex flex-col p-4 relative overflow-hidden">
-        {/* Decorative lines - top left */}
-        <div className="absolute top-0 left-0 w-32 h-40 pointer-events-none">
-          <div className="absolute top-4 left-0 w-24 h-1.5 bg-[#003B5C] rounded-r-full"></div>
-          <div className="absolute top-8 left-0 w-20 h-1.5 bg-[#003B5C] rounded-r-full"></div>
-          <div className="absolute top-12 left-0 w-16 h-1.5 bg-[#00B5AD] rounded-r-full"></div>
-          <div className="absolute top-16 left-0 w-12 h-1.5 bg-[#00B5AD] rounded-r-full"></div>
-        </div>
+      <div className="min-h-screen bg-white flex flex-col p-4 relative overflow-hidden">
+        {/* Curved decorative lines - top left corner */}
+        <svg className="absolute top-0 left-0 w-40 h-48 pointer-events-none" viewBox="0 0 160 200">
+          {/* Outer curved lines - navy blue */}
+          <path d="M-20,60 Q60,60 60,140" fill="none" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
+          <path d="M-20,48 Q48,48 48,140" fill="none" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
+          <path d="M-20,36 Q36,36 36,140" fill="none" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
+          {/* Inner curved lines - teal */}
+          <path d="M-20,24 Q24,24 24,140" fill="none" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+          <path d="M-20,14 Q14,14 14,140" fill="none" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+        </svg>
         
-        {/* Decorative lines - top right */}
-        <div className="absolute top-0 right-0 w-32 h-40 pointer-events-none">
-          <div className="absolute top-4 right-0 w-24 h-1.5 bg-[#003B5C] rounded-l-full"></div>
-          <div className="absolute top-8 right-0 w-20 h-1.5 bg-[#003B5C] rounded-l-full"></div>
-          <div className="absolute top-12 right-0 w-16 h-1.5 bg-[#00B5AD] rounded-l-full"></div>
-          <div className="absolute top-16 right-0 w-12 h-1.5 bg-[#00B5AD] rounded-l-full"></div>
-        </div>
+        {/* Curved decorative lines - top right corner */}
+        <svg className="absolute top-0 right-0 w-40 h-48 pointer-events-none" viewBox="0 0 160 200">
+          {/* Outer curved lines - navy blue */}
+          <path d="M180,60 Q100,60 100,140" fill="none" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
+          <path d="M180,48 Q112,48 112,140" fill="none" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
+          <path d="M180,36 Q124,36 124,140" fill="none" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
+          {/* Inner curved lines - teal */}
+          <path d="M180,24 Q136,24 136,140" fill="none" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+          <path d="M180,14 Q146,14 146,140" fill="none" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+        </svg>
         
-        {/* Decorative lines - bottom left */}
-        <div className="absolute bottom-0 left-0 w-32 h-40 pointer-events-none">
-          <div className="absolute bottom-16 left-0 w-12 h-1.5 bg-[#00B5AD] rounded-r-full"></div>
-          <div className="absolute bottom-12 left-0 w-16 h-1.5 bg-[#00B5AD] rounded-r-full"></div>
-          <div className="absolute bottom-8 left-0 w-20 h-1.5 bg-[#00B5AD] rounded-r-full"></div>
-          <div className="absolute bottom-4 left-0 w-24 h-1.5 bg-[#00B5AD] rounded-r-full"></div>
-        </div>
+        {/* Curved decorative lines - bottom left corner */}
+        <svg className="absolute bottom-0 left-0 w-40 h-32 pointer-events-none" viewBox="0 0 160 130">
+          {/* Horizontal lines - teal */}
+          <line x1="-10" y1="110" x2="120" y2="110" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+          <line x1="-10" y1="98" x2="100" y2="98" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+          <line x1="-10" y1="86" x2="80" y2="86" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+          <line x1="-10" y1="74" x2="60" y2="74" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+        </svg>
         
-        {/* Decorative lines - bottom right */}
-        <div className="absolute bottom-0 right-0 w-32 h-40 pointer-events-none">
-          <div className="absolute bottom-16 right-0 w-12 h-1.5 bg-[#00B5AD] rounded-l-full"></div>
-          <div className="absolute bottom-12 right-0 w-16 h-1.5 bg-[#00B5AD] rounded-l-full"></div>
-          <div className="absolute bottom-8 right-0 w-20 h-1.5 bg-[#00B5AD] rounded-l-full"></div>
-          <div className="absolute bottom-4 right-0 w-24 h-1.5 bg-[#00B5AD] rounded-l-full"></div>
-        </div>
+        {/* Curved decorative lines - bottom right corner */}
+        <svg className="absolute bottom-0 right-0 w-40 h-32 pointer-events-none" viewBox="0 0 160 130">
+          {/* Horizontal lines - teal */}
+          <line x1="40" y1="110" x2="170" y2="110" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+          <line x1="60" y1="98" x2="170" y2="98" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+          <line x1="80" y1="86" x2="170" y2="86" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+          <line x1="100" y1="74" x2="170" y2="74" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+        </svg>
         
         <div className="flex-1 flex flex-col items-center justify-center gap-6 relative z-10">
           {/* Jenner Logo */}
-          <div className="w-full max-w-[220px]">
+          <div className="w-full max-w-[280px]">
             <img 
               src={jennerLogo} 
               alt="Jenner Centro Médico" 
@@ -891,9 +899,9 @@ export default function PortalPaciente() {
             />
           </div>
           
-          <Card className="w-full max-w-md">
+          <Card className="w-full max-w-md shadow-lg">
             <CardHeader className="text-center">
-              <CardTitle className="text-2xl font-bold">Portal del Paciente</CardTitle>
+              <CardTitle className="text-2xl font-bold text-[#003B5C]">Portal del Paciente</CardTitle>
               <CardDescription>Ingrese su RUT para identificarse</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -913,7 +921,7 @@ export default function PortalPaciente() {
                   enableAudio();
                   buscarPaciente();
                 }} 
-                className="w-full" 
+                className="w-full bg-[#00B5AD] hover:bg-[#009990]" 
                 size="lg"
                 disabled={isLoading}
               >
