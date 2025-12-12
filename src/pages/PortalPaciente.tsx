@@ -155,27 +155,34 @@ export default function PortalPaciente() {
     }
   }, [audioEnabled]);
 
-  const formatRut = (value: string) => {
-    // Remove non-alphanumeric characters
-    let cleaned = value.replace(/[^0-9kK]/g, "").toUpperCase();
+  // Normalize RUT: remove all dots, dashes, spaces and convert to uppercase
+  // Always stores as: 12345678K (no dots, no dash, uppercase)
+  const normalizeRut = (value: string) => {
+    return value.replace(/[^0-9kK]/g, "").toUpperCase();
+  };
+
+  // Format RUT for display (with dots and dash)
+  const formatRutForDisplay = (value: string) => {
+    const cleaned = normalizeRut(value);
     
     if (cleaned.length > 1) {
       const body = cleaned.slice(0, -1);
       const dv = cleaned.slice(-1);
       const formattedBody = body.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-      cleaned = `${formattedBody}-${dv}`;
+      return `${formattedBody}-${dv}`;
     }
     
     return cleaned;
   };
 
   const handleRutChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatRut(e.target.value);
+    // Store normalized version but display formatted
+    const formatted = formatRutForDisplay(e.target.value);
     setRut(formatted);
   };
 
   const handleFormRutChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatRut(e.target.value);
+    const formatted = formatRutForDisplay(e.target.value);
     setFormData(prev => ({ ...prev, rut: formatted }));
   };
 
@@ -189,13 +196,16 @@ export default function PortalPaciente() {
       return;
     }
 
+    // Normalize RUT for search (without dots or dashes)
+    const rutNormalizado = normalizeRut(rut);
+
     setIsLoading(true);
     try {
-      // Search for patient by RUT
+      // Search for patient by normalized RUT
       const { data: pacienteData, error: pacienteError } = await supabase
         .from("pacientes")
         .select("*")
-        .eq("rut", rut.trim())
+        .eq("rut", rutNormalizado)
         .maybeSingle();
 
       if (pacienteError) throw pacienteError;
@@ -375,13 +385,16 @@ export default function PortalPaciente() {
       return;
     }
 
+    // Normalize RUT for storage
+    const rutNormalizado = normalizeRut(formData.rut);
+
     setIsLoading(true);
     try {
-      // Check if RUT already exists
+      // Check if RUT already exists (using normalized format)
       const { data: existingPaciente } = await supabase
         .from("pacientes")
         .select("id")
-        .eq("rut", formData.rut.trim())
+        .eq("rut", rutNormalizado)
         .maybeSingle();
 
       if (existingPaciente) {
@@ -392,15 +405,16 @@ export default function PortalPaciente() {
         });
         setRut(formData.rut);
         setStep("identificacion");
+        setIsLoading(false);
         return;
       }
 
-      // Create new patient without empresa
+      // Create new patient without empresa - store normalized RUT
       const { data: newPaciente, error } = await supabase
         .from("pacientes")
         .insert({
           nombre: formData.nombre.trim(),
-          rut: formData.rut.trim(),
+          rut: rutNormalizado,
           fecha_nacimiento: formData.fecha_nacimiento || null,
           email: formData.email.trim() || null,
           telefono: formData.telefono.trim() || null,
