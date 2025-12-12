@@ -268,6 +268,10 @@ const Flujo = () => {
     }
 
     try {
+      // Obtener los exámenes filtrados por box ANTES de actualizar
+      const box = boxes.find(b => b.id === boxId);
+      const boxExamIds = box?.box_examenes.map(be => be.examen_id) || [];
+
       // Intento atómico: solo pasar a en_atencion si sigue en espera y sin box
       const { data: updated, error: updateError } = await supabase
         .from("atenciones")
@@ -307,6 +311,16 @@ const Flujo = () => {
         return;
       }
 
+      // Actualizar estado local inmediatamente con exámenes filtrados
+      // para evitar parpadeo visual
+      setAtencionExamenes(prev => {
+        const currentExamenes = prev[atencionId] || [];
+        const filteredExamenes = currentExamenes.filter(ae => 
+          boxExamIds.includes(ae.examen_id)
+        );
+        return { ...prev, [atencionId]: filteredExamenes };
+      });
+
       toast.success(`🔔 Paciente ${atenciones.find(a => a.id === atencionId)?.pacientes.nombre} entró a ${boxes.find(b => b.id === boxId)?.nombre}`, {
         duration: 5000,
         style: {
@@ -321,7 +335,7 @@ const Flujo = () => {
         return newState;
       });
 
-      // Forzar recarga inmediata de datos
+      // Forzar recarga de datos para sincronizar con BD
       await loadData();
     } catch (error: any) {
       console.error("Error:", error);
