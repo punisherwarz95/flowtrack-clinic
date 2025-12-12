@@ -849,47 +849,29 @@ export default function PortalPaciente() {
   if (step === "identificacion") {
     return (
       <div className="min-h-screen bg-white flex flex-col p-4 relative overflow-hidden">
-        {/* Curved decorative lines - top left corner */}
-        <svg className="absolute top-0 left-0 w-40 h-48 pointer-events-none" viewBox="0 0 160 200">
-          {/* Outer curved lines - navy blue */}
-          <path d="M-20,60 Q60,60 60,140" fill="none" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
-          <path d="M-20,48 Q48,48 48,140" fill="none" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
-          <path d="M-20,36 Q36,36 36,140" fill="none" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
-          {/* Inner curved lines - teal */}
-          <path d="M-20,24 Q24,24 24,140" fill="none" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
-          <path d="M-20,14 Q14,14 14,140" fill="none" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+        {/* Full-height decorative lines - left side */}
+        <svg className="absolute top-0 left-0 w-16 h-full pointer-events-none" preserveAspectRatio="none">
+          {/* Navy blue lines */}
+          <line x1="8" y1="0" x2="8" y2="100%" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
+          <line x1="20" y1="0" x2="20" y2="100%" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
+          <line x1="32" y1="0" x2="32" y2="100%" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
+          {/* Teal lines */}
+          <line x1="44" y1="0" x2="44" y2="100%" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+          <line x1="54" y1="0" x2="54" y2="100%" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
         </svg>
         
-        {/* Curved decorative lines - top right corner */}
-        <svg className="absolute top-0 right-0 w-40 h-48 pointer-events-none" viewBox="0 0 160 200">
-          {/* Outer curved lines - navy blue */}
-          <path d="M180,60 Q100,60 100,140" fill="none" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
-          <path d="M180,48 Q112,48 112,140" fill="none" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
-          <path d="M180,36 Q124,36 124,140" fill="none" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
-          {/* Inner curved lines - teal */}
-          <path d="M180,24 Q136,24 136,140" fill="none" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
-          <path d="M180,14 Q146,14 146,140" fill="none" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+        {/* Full-height decorative lines - right side */}
+        <svg className="absolute top-0 right-0 w-16 h-full pointer-events-none" preserveAspectRatio="none">
+          {/* Teal lines */}
+          <line x1="10" y1="0" x2="10" y2="100%" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+          <line x1="20" y1="0" x2="20" y2="100%" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+          {/* Navy blue lines */}
+          <line x1="32" y1="0" x2="32" y2="100%" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
+          <line x1="44" y1="0" x2="44" y2="100%" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
+          <line x1="56" y1="0" x2="56" y2="100%" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
         </svg>
         
-        {/* Curved decorative lines - bottom left corner */}
-        <svg className="absolute bottom-0 left-0 w-40 h-32 pointer-events-none" viewBox="0 0 160 130">
-          {/* Horizontal lines - teal */}
-          <line x1="-10" y1="110" x2="120" y2="110" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
-          <line x1="-10" y1="98" x2="100" y2="98" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
-          <line x1="-10" y1="86" x2="80" y2="86" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
-          <line x1="-10" y1="74" x2="60" y2="74" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
-        </svg>
-        
-        {/* Curved decorative lines - bottom right corner */}
-        <svg className="absolute bottom-0 right-0 w-40 h-32 pointer-events-none" viewBox="0 0 160 130">
-          {/* Horizontal lines - teal */}
-          <line x1="40" y1="110" x2="170" y2="110" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
-          <line x1="60" y1="98" x2="170" y2="98" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
-          <line x1="80" y1="86" x2="170" y2="86" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
-          <line x1="100" y1="74" x2="170" y2="74" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
-        </svg>
-        
-        <div className="flex-1 flex flex-col items-center justify-center gap-6 relative z-10">
+        <div className="flex-1 flex flex-col items-center justify-center gap-6 relative z-10 px-8">
           {/* Jenner Logo */}
           <div className="w-full max-w-[280px]">
             <img 
