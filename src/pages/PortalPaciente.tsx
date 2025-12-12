@@ -201,11 +201,12 @@ export default function PortalPaciente() {
 
     setIsLoading(true);
     try {
-      // Search for patient by normalized RUT
+      // Search for patient by normalized RUT, but also support old formatted RUTs
+      const rutOriginal = rut.trim();
       const { data: pacienteData, error: pacienteError } = await supabase
         .from("pacientes")
         .select("*")
-        .eq("rut", rutNormalizado)
+        .or(`rut.eq.${rutNormalizado},rut.eq.${rutOriginal}`)
         .maybeSingle();
 
       if (pacienteError) throw pacienteError;
@@ -390,11 +391,12 @@ export default function PortalPaciente() {
 
     setIsLoading(true);
     try {
-      // Check if RUT already exists (using normalized format)
+      // Check if RUT already exists (using normalized format, but also support old formatted RUTs)
+      const rutOriginal = formData.rut.trim();
       const { data: existingPaciente } = await supabase
         .from("pacientes")
         .select("id")
-        .eq("rut", rutNormalizado)
+        .or(`rut.eq.${rutNormalizado},rut.eq.${rutOriginal}`)
         .maybeSingle();
 
       if (existingPaciente) {
