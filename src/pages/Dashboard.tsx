@@ -357,24 +357,49 @@ const Dashboard = () => {
         <div className="mt-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold text-foreground">Estadísticas Mensuales</h2>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <CalendarIcon className="h-4 w-4" />
-                  {selectedMonth ? format(selectedMonth, "MMMM yyyy", { locale: es }) : "Seleccionar mes"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <Calendar
-                  mode="single"
-                  selected={selectedMonth}
-                  onSelect={setSelectedMonth}
-                  locale={es}
-                  initialFocus
-                  className={cn("p-3 pointer-events-auto")}
-                />
-              </PopoverContent>
-            </Popover>
+            <div className="flex gap-2">
+              <Select
+                value={(selectedMonth || new Date()).getMonth().toString()}
+                onValueChange={(value) => {
+                  const newDate = new Date(selectedMonth || new Date());
+                  newDate.setMonth(parseInt(value));
+                  setSelectedMonth(newDate);
+                }}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Mes" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 12 }, (_, i) => (
+                    <SelectItem key={i} value={i.toString()}>
+                      {format(new Date(2024, i, 1), "MMMM", { locale: es })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={(selectedMonth || new Date()).getFullYear().toString()}
+                onValueChange={(value) => {
+                  const newDate = new Date(selectedMonth || new Date());
+                  newDate.setFullYear(parseInt(value));
+                  setSelectedMonth(newDate);
+                }}
+              >
+                <SelectTrigger className="w-[100px]">
+                  <SelectValue placeholder="Año" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 5 }, (_, i) => {
+                    const year = new Date().getFullYear() - 2 + i;
+                    return (
+                      <SelectItem key={year} value={year.toString()}>
+                        {year}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="grid gap-6 md:grid-cols-3">
             <Card className="border-l-4 border-l-purple-600">
