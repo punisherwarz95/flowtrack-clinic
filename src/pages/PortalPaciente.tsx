@@ -849,29 +849,47 @@ export default function PortalPaciente() {
   if (step === "identificacion") {
     return (
       <div className="min-h-screen bg-white flex flex-col p-4 relative overflow-hidden">
-        {/* Full-height decorative lines - left side */}
-        <svg className="absolute top-0 left-0 w-16 h-full pointer-events-none" preserveAspectRatio="none">
-          {/* Navy blue lines */}
-          <line x1="8" y1="0" x2="8" y2="100%" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
-          <line x1="20" y1="0" x2="20" y2="100%" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
-          <line x1="32" y1="0" x2="32" y2="100%" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
-          {/* Teal lines */}
-          <line x1="44" y1="0" x2="44" y2="100%" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
-          <line x1="54" y1="0" x2="54" y2="100%" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+        {/* Decorative figure-8 curves - top left */}
+        <svg className="absolute top-0 left-0 w-32 h-64 pointer-events-none" viewBox="0 0 120 250">
+          {/* Navy blue curved lines - figure 8 pattern */}
+          <path d="M-10,0 Q40,60 -10,120 Q40,180 -10,240" fill="none" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
+          <path d="M2,0 Q52,60 2,120 Q52,180 2,240" fill="none" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
+          <path d="M14,0 Q64,60 14,120 Q64,180 14,240" fill="none" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
+          {/* Teal curved lines */}
+          <path d="M26,0 Q76,60 26,120 Q76,180 26,240" fill="none" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+          <path d="M36,0 Q86,60 36,120 Q86,180 36,240" fill="none" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
         </svg>
         
-        {/* Full-height decorative lines - right side */}
-        <svg className="absolute top-0 right-0 w-16 h-full pointer-events-none" preserveAspectRatio="none">
-          {/* Teal lines */}
-          <line x1="10" y1="0" x2="10" y2="100%" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
-          <line x1="20" y1="0" x2="20" y2="100%" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
-          {/* Navy blue lines */}
-          <line x1="32" y1="0" x2="32" y2="100%" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
-          <line x1="44" y1="0" x2="44" y2="100%" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
-          <line x1="56" y1="0" x2="56" y2="100%" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
+        {/* Decorative figure-8 curves - top right */}
+        <svg className="absolute top-0 right-0 w-32 h-64 pointer-events-none" viewBox="0 0 120 250">
+          {/* Teal curved lines */}
+          <path d="M130,0 Q80,60 130,120 Q80,180 130,240" fill="none" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+          <path d="M118,0 Q68,60 118,120 Q68,180 118,240" fill="none" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+          {/* Navy blue curved lines - figure 8 pattern */}
+          <path d="M106,0 Q56,60 106,120 Q56,180 106,240" fill="none" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
+          <path d="M94,0 Q44,60 94,120 Q44,180 94,240" fill="none" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
+          <path d="M84,0 Q34,60 84,120 Q34,180 84,240" fill="none" stroke="#003B5C" strokeWidth="6" strokeLinecap="round"/>
         </svg>
         
-        <div className="flex-1 flex flex-col items-center justify-center gap-6 relative z-10 px-8">
+        {/* Decorative serpentine curves - bottom left */}
+        <svg className="absolute bottom-0 left-0 w-48 h-40 pointer-events-none" viewBox="0 0 180 150">
+          {/* Teal serpentine waves */}
+          <path d="M-20,150 C20,150 20,120 60,120 C100,120 100,90 140,90 C180,90 180,60 220,60" fill="none" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+          <path d="M-20,138 C20,138 20,108 60,108 C100,108 100,78 140,78 C180,78 180,48 220,48" fill="none" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+          <path d="M-20,126 C20,126 20,96 60,96 C100,96 100,66 140,66 C180,66 180,36 220,36" fill="none" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+          <path d="M-20,114 C20,114 20,84 60,84 C100,84 100,54 140,54 C180,54 180,24 220,24" fill="none" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+        </svg>
+        
+        {/* Decorative serpentine curves - bottom right */}
+        <svg className="absolute bottom-0 right-0 w-48 h-40 pointer-events-none" viewBox="0 0 180 150">
+          {/* Teal serpentine waves - mirrored */}
+          <path d="M200,150 C160,150 160,120 120,120 C80,120 80,90 40,90 C0,90 0,60 -40,60" fill="none" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+          <path d="M200,138 C160,138 160,108 120,108 C80,108 80,78 40,78 C0,78 0,48 -40,48" fill="none" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+          <path d="M200,126 C160,126 160,96 120,96 C80,96 80,66 40,66 C0,66 0,36 -40,36" fill="none" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+          <path d="M200,114 C160,114 160,84 120,84 C80,84 80,54 40,54 C0,54 0,24 -40,24" fill="none" stroke="#00B5AD" strokeWidth="5" strokeLinecap="round"/>
+        </svg>
+        
+        <div className="flex-1 flex flex-col items-center justify-center gap-6 relative z-10 px-12">
           {/* Jenner Logo */}
           <div className="w-full max-w-[280px]">
             <img 
