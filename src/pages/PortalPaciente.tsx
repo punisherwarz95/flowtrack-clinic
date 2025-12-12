@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,6 +80,9 @@ export default function PortalPaciente() {
   const [lastNotificationBox, setLastNotificationBox] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
+  // Persistent Audio element for mobile - must be unlocked by user interaction
+  const notificationAudioRef = useRef<HTMLAudioElement | null>(null);
+  
   // Form fields for new registration
   const [formData, setFormData] = useState({
     nombre: "",
@@ -125,7 +128,7 @@ export default function PortalPaciente() {
       playBeep(0, 800);
       playBeep(0.2, 1200);
       
-      console.log("Sound played successfully");
+      console.log("Sound played successfully via AudioContext");
       return true;
     } catch (error) {
       console.error("Error playing sound:", error);
@@ -149,6 +152,7 @@ export default function PortalPaciente() {
   }, []);
 
   // Enable audio on first user interaction - CRITICAL for mobile
+  // This must be called from a user gesture (click/tap) to unlock audio on iOS/Android
   const enableAudio = useCallback(() => {
     if (!audioEnabled) {
       try {
@@ -175,6 +179,31 @@ export default function PortalPaciente() {
         oscillator.start(ctx.currentTime);
         oscillator.stop(ctx.currentTime + 0.1);
         
+        // Create persistent Audio element for mobile fallback
+        // This element will be "unlocked" by playing and pausing it during user interaction
+        if (!notificationAudioRef.current) {
+          const audio = new Audio();
+          // Use a data URI for a short beep sound (base64 encoded WAV)
+          audio.src = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleT4HHBER4Pt/BwAKDhUfKD1UVVZSRDU9QUVHSE9VWV1eXWBiaGpsaGVgW1xeYWNnaGhoZ2RjYGBgYGBfXl5dXFxbW1pYV1ZVVFRTUlFQT05NTEtKSUhHRkVEQ0JBQD8+PTw7Ojk4NzY1NDMyMTAvLi0sKyopKCcmJSQjIiEgHx4dHBsaGRgXFhUUExIREA8ODQwLCgkIBwYFBAMCAQD//v38+/r5+Pf29fTz8vHw7+7t7Ovq6ejn5uXk4+Lh4N/e3dzb2tnY19bV1NPS0dDPzs3My8rJyMfGxcTDwsHAv769vLu6ubm4t7a1tLOysbCvrq2sq6qpqKempaSjoqGgn56dnJuamZiXlpWUk5KRkI+OjYyLiomIh4aFhIOCgYB/fn18e3p5eHd2dXRzcnFwb25tbGtqaWhnZmVkY2JhYF9eXVxbWllYV1ZVVFNSUVBPTk1MS0pJSEdGRURDQkFAPz49PDs6OTg3NjU0MzIxMC8uLSwrKikoJyYlJCMiISAfHh0cGxoZGBcWFRQTEhEQDw4NDAsKCQgHBgUEAwIBAP/+/fz7+vn49/b19PPy8fDv7u3s6+rp6Ofm5eTj4uHg397d3Nva2djX1tXU09LR0M/OzczLysnIx8bFxMPCwcC/vr28u7q5uLe2tbSzsrGwr66trKuqqainpqWko6KhoJ+enZybmpmYl5aVlJOSkZCPjo2Mi4qJiIeGhYSDgoGAf359fHt6eXh3dnV0c3JxcG9ubWxramloZ2ZlZGNiYWBfXl1cW1pZWFdWVVRTUlFQT05NTEtKSUhHRkVEQ0JBQD8+PTw7Ojk4NzY1NDMyMTAvLi0sKyopKCcmJSQjIiEgHx4dHBsaGRgXFhUUExIREA8ODQwLCgkIBwYFBAMCAQA=";
+          audio.loop = false;
+          audio.volume = 0.7;
+          // Pre-load the audio
+          audio.load();
+          notificationAudioRef.current = audio;
+        }
+        
+        // CRITICAL: Play and immediately pause to unlock audio on iOS/Android
+        // This must happen within a user gesture handler
+        if (notificationAudioRef.current) {
+          notificationAudioRef.current.play().then(() => {
+            notificationAudioRef.current?.pause();
+            notificationAudioRef.current!.currentTime = 0;
+            console.log("Audio element unlocked for mobile");
+          }).catch(err => {
+            console.log("Could not unlock audio element:", err);
+          });
+        }
+        
         setAudioEnabled(true);
         console.log("Audio enabled successfully");
         
@@ -187,6 +216,20 @@ export default function PortalPaciente() {
       }
     }
   }, [audioEnabled]);
+
+  // Play notification using both AudioContext and Audio element for better mobile compatibility
+  const playMobileNotification = useCallback(() => {
+    // Try AudioContext first
+    playNotificationSound();
+    
+    // Also try the Audio element as fallback for mobile
+    if (notificationAudioRef.current) {
+      notificationAudioRef.current.currentTime = 0;
+      notificationAudioRef.current.play().catch(err => {
+        console.log("Audio element play failed:", err);
+      });
+    }
+  }, [playNotificationSound]);
 
   // Normalize RUT: remove all dots, dashes, spaces and convert to uppercase
   // Always uses: 12345678K (no dots, no dash, uppercase)
@@ -567,9 +610,9 @@ export default function PortalPaciente() {
     setLlamadoActivo(true);
     setLastNotificationBox(boxName);
     
-    // Play notification sound and vibrate immediately
+    // Play notification sound and vibrate immediately - use mobile-compatible function
     vibrateDevice();
-    playNotificationSound();
+    playMobileNotification();
     
     // Repeat only 2 more times (total 3), every 1.5 seconds
     let count = 0;
@@ -581,11 +624,11 @@ export default function PortalPaciente() {
         return;
       }
       vibrateDevice();
-      playNotificationSound();
+      playMobileNotification();
     }, 1500);
     
     setNotificationInterval(interval);
-  }, [vibrateDevice, playNotificationSound]);
+  }, [vibrateDevice, playMobileNotification]);
 
   // Stop notification when user acknowledges
   const stopNotification = useCallback(() => {
@@ -932,7 +975,10 @@ export default function PortalPaciente() {
               variant="secondary" 
               size="lg" 
               className="text-xl px-12 py-6 h-auto font-bold shadow-xl bg-white text-green-700 hover:bg-white/90"
-              onClick={stopNotification}
+              onClick={() => {
+                enableAudio(); // Re-enable audio on user interaction
+                stopNotification();
+              }}
             >
               ✓ Entendido
             </Button>
@@ -981,7 +1027,10 @@ export default function PortalPaciente() {
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={refreshData}
+                  onClick={() => {
+                    enableAudio(); // Also enable audio on any user interaction
+                    refreshData();
+                  }}
                   disabled={isRefreshing}
                   title="Actualizar información"
                 >
