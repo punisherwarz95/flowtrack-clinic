@@ -184,9 +184,40 @@ export default function PortalPaciente() {
   }, [audioEnabled]);
 
   // Normalize RUT: remove all dots, dashes, spaces and convert to uppercase
-  // Always stores as: 12345678K (no dots, no dash, uppercase)
+  // Always uses: 12345678K (no dots, no dash, uppercase)
   const normalizeRut = (value: string) => {
     return value.replace(/[^0-9kK]/g, "").toUpperCase();
+  };
+
+  // Given ANY input, generate all possible stored variants we want to match
+  // - normalized: 12345678K
+  // - with dash: 12345678-K
+  // - with dots + dash: 12.345.678-K
+  const getRutVariants = (value: string): string[] => {
+    const variants = new Set<string>();
+    const cleaned = normalizeRut(value);
+
+    if (!cleaned) return [];
+
+    // 1) Normalizado sin puntos ni guion
+    variants.add(cleaned);
+
+    if (cleaned.length > 1) {
+      const body = cleaned.slice(0, -1);
+      const dv = cleaned.slice(-1);
+
+      // 2) Solo guion
+      variants.add(`${body}-${dv}`);
+
+      // 3) Puntos + guion
+      const bodyWithDots = body.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+      variants.add(`${bodyWithDots}-${dv}`);
+    }
+
+    // 4) También agregar el valor tal como lo escribió el usuario (por compatibilidad)
+    variants.add(value.trim());
+
+    return Array.from(variants).filter(Boolean);
   };
 
   // Format RUT for display (with dots and dash)
@@ -224,17 +255,16 @@ export default function PortalPaciente() {
       return;
     }
 
-    // Normalize RUT for search (without dots or dashes)
-    const rutNormalizado = normalizeRut(rut);
+    // Generar todas las variantes posibles para la búsqueda (compatibilidad hacia atrás)
+    const rutVariants = getRutVariants(rut);
 
     setIsLoading(true);
     try {
-      // Search for patient by normalized RUT, but also support old formatted RUTs
-      const rutOriginal = rut.trim();
+      // Search for patient by any RUT variant
       const { data: pacienteData, error: pacienteError } = await supabase
         .from("pacientes")
         .select("*")
-        .or(`rut.eq.${rutNormalizado},rut.eq.${rutOriginal}`)
+        .in("rut", rutVariants)
         .maybeSingle();
 
       if (pacienteError) throw pacienteError;
@@ -414,17 +444,17 @@ export default function PortalPaciente() {
       return;
     }
 
-    // Normalize RUT for storage
+    // Normalize RUT for storage y generar variantes para evitar duplicados
+    const rutVariants = getRutVariants(formData.rut);
     const rutNormalizado = normalizeRut(formData.rut);
 
     setIsLoading(true);
     try {
-      // Check if RUT already exists (using normalized format, but also support old formatted RUTs)
-      const rutOriginal = formData.rut.trim();
+      // Check if RUT already exists (cualquier formato conocido)
       const { data: existingPaciente } = await supabase
         .from("pacientes")
         .select("id")
-        .or(`rut.eq.${rutNormalizado},rut.eq.${rutOriginal}`)
+        .in("rut", rutVariants)
         .maybeSingle();
 
       if (existingPaciente) {
@@ -439,7 +469,7 @@ export default function PortalPaciente() {
         return;
       }
 
-      // Create new patient without empresa - store normalized RUT
+      // Create new patient sin empresa - SIEMPRE guardamos el RUT normalizado
       const { data: newPaciente, error } = await supabase
         .from("pacientes")
         .insert({
