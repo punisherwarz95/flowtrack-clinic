@@ -18,6 +18,7 @@ interface Paciente {
   fecha_nacimiento: string | null;
   email: string | null;
   telefono: string | null;
+  direccion: string | null;
 }
 
 interface Empresa {
@@ -84,7 +85,8 @@ export default function PortalPaciente() {
     rut: "",
     fecha_nacimiento: "",
     email: "",
-    telefono: ""
+    telefono: "",
+    direccion: ""
   });
 
   // Function to play notification sound using Web Audio API - SHORT beeps
@@ -480,6 +482,7 @@ export default function PortalPaciente() {
           fecha_nacimiento: formData.fecha_nacimiento || null,
           email: formData.email.trim() || null,
           telefono: formData.telefono.trim() || null,
+          direccion: formData.direccion.trim() || null,
           empresa_id: null,
           tipo_servicio: null
         })
@@ -737,64 +740,81 @@ export default function PortalPaciente() {
   if (step === "registro") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
+        <Card className="w-full max-w-lg">
+          <CardHeader className="text-center pb-4">
             <CardTitle className="text-2xl font-bold">Registro de Paciente</CardTitle>
             <CardDescription>Complete sus datos para registrarse</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="nombre">Nombre Completo *</Label>
-              <Input
-                id="nombre"
-                placeholder="Juan Pérez González"
-                value={formData.nombre}
-                onChange={(e) => setFormData(prev => ({ ...prev, nombre: e.target.value }))}
-              />
+          <CardContent className="space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <Label htmlFor="nombre" className="text-sm font-medium mb-1.5 block">Nombre Completo *</Label>
+                <Input
+                  id="nombre"
+                  placeholder="Juan Pérez González"
+                  value={formData.nombre}
+                  onChange={(e) => setFormData(prev => ({ ...prev, nombre: e.target.value }))}
+                  className="h-11"
+                />
+              </div>
+              <div>
+                <Label htmlFor="formRut" className="text-sm font-medium mb-1.5 block">RUT *</Label>
+                <Input
+                  id="formRut"
+                  placeholder="12.345.678-9"
+                  value={formData.rut}
+                  onChange={handleFormRutChange}
+                  className="h-11"
+                />
+              </div>
+              <div>
+                <Label htmlFor="fecha_nacimiento" className="text-sm font-medium mb-1.5 block">Fecha de Nacimiento</Label>
+                <Input
+                  id="fecha_nacimiento"
+                  type="date"
+                  value={formData.fecha_nacimiento}
+                  onChange={(e) => setFormData(prev => ({ ...prev, fecha_nacimiento: e.target.value }))}
+                  className="h-11"
+                />
+              </div>
+              <div>
+                <Label htmlFor="email" className="text-sm font-medium mb-1.5 block">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="correo@ejemplo.com"
+                  value={formData.email}
+                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                  className="h-11"
+                />
+              </div>
+              <div>
+                <Label htmlFor="telefono" className="text-sm font-medium mb-1.5 block">Teléfono</Label>
+                <Input
+                  id="telefono"
+                  type="tel"
+                  placeholder="+56 9 1234 5678"
+                  value={formData.telefono}
+                  onChange={(e) => setFormData(prev => ({ ...prev, telefono: e.target.value }))}
+                  className="h-11"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Label htmlFor="direccion" className="text-sm font-medium mb-1.5 block">Dirección</Label>
+                <Input
+                  id="direccion"
+                  placeholder="Av. Principal 123, Comuna"
+                  value={formData.direccion}
+                  onChange={(e) => setFormData(prev => ({ ...prev, direccion: e.target.value }))}
+                  className="h-11"
+                />
+              </div>
             </div>
-            <div>
-              <Label htmlFor="formRut">RUT *</Label>
-              <Input
-                id="formRut"
-                placeholder="12.345.678-9"
-                value={formData.rut}
-                onChange={handleFormRutChange}
-              />
-            </div>
-            <div>
-              <Label htmlFor="fecha_nacimiento">Fecha de Nacimiento</Label>
-              <Input
-                id="fecha_nacimiento"
-                type="date"
-                value={formData.fecha_nacimiento}
-                onChange={(e) => setFormData(prev => ({ ...prev, fecha_nacimiento: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="correo@ejemplo.com"
-                value={formData.email}
-                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label htmlFor="telefono">Teléfono</Label>
-              <Input
-                id="telefono"
-                type="tel"
-                placeholder="+56 9 1234 5678"
-                value={formData.telefono}
-                onChange={(e) => setFormData(prev => ({ ...prev, telefono: e.target.value }))}
-              />
-            </div>
-            <div className="flex gap-2">
+            <div className="flex gap-3 pt-2">
               <Button 
                 variant="outline" 
                 onClick={() => setStep("identificacion")}
-                className="flex-1"
+                className="flex-1 h-11"
               >
                 Volver
               </Button>
@@ -803,7 +823,7 @@ export default function PortalPaciente() {
                   enableAudio();
                   registrarPaciente();
                 }} 
-                className="flex-1" 
+                className="flex-1 h-11" 
                 disabled={isLoading}
               >
                 {isLoading ? (

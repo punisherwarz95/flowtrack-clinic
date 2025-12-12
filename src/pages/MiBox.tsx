@@ -556,6 +556,11 @@ const MiBox = () => {
                           <Badge variant="outline" className="text-xs">#{atencion.numero_ingreso}</Badge>
                           <span className="font-medium text-sm">{atencion.pacientes.nombre}</span>
                         </div>
+                        {atencion.pacientes.rut && (
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            RUT: {atencion.pacientes.rut}
+                          </div>
+                        )}
                     <Badge 
                       variant={atencion.pacientes.tipo_servicio === "workmed" ? "default" : "secondary"}
                       className="mt-1 text-xs"
@@ -639,6 +644,11 @@ const MiBox = () => {
                       <Badge variant="outline">#{paciente.numero_ingreso}</Badge>
                       <span className="font-semibold">{paciente.pacientes.nombre}</span>
                     </div>
+                    {paciente.pacientes.rut && (
+                      <div className="text-sm text-muted-foreground">
+                        RUT: {paciente.pacientes.rut}
+                      </div>
+                    )}
                     <Badge 
                       variant={paciente.pacientes.tipo_servicio === "workmed" ? "default" : "secondary"}
                     >
@@ -742,6 +752,11 @@ const MiBox = () => {
                       <Badge variant="outline" className="text-xs">#{atencion.numero_ingreso}</Badge>
                       <span className="font-medium text-sm">{atencion.pacientes.nombre}</span>
                     </div>
+                    {atencion.pacientes.rut && (
+                      <div className="text-xs text-muted-foreground">
+                        RUT: {atencion.pacientes.rut}
+                      </div>
+                    )}
                     <div className="flex items-center gap-2">
                       <Badge 
                         variant={atencion.pacientes.tipo_servicio === "workmed" ? "default" : "secondary"}

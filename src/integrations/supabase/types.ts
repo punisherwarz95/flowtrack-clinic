@@ -268,6 +268,7 @@ export type Database = {
       pacientes: {
         Row: {
           created_at: string | null
+          direccion: string | null
           email: string | null
           empresa_id: string | null
           fecha_nacimiento: string | null
@@ -279,6 +280,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          direccion?: string | null
           email?: string | null
           empresa_id?: string | null
           fecha_nacimiento?: string | null
@@ -290,6 +292,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          direccion?: string | null
           email?: string | null
           empresa_id?: string | null
           fecha_nacimiento?: string | null
