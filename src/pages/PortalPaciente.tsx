@@ -74,6 +74,7 @@ export default function PortalPaciente() {
   const [testModalOpen, setTestModalOpen] = useState(false);
   const [currentTest, setCurrentTest] = useState<ExamenTest | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(false);
+  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   
   // Form fields for new registration
   const [formData, setFormData] = useState({
@@ -87,47 +88,53 @@ export default function PortalPaciente() {
   // Function to play notification sound using Web Audio API
   const playNotificationSound = useCallback(() => {
     try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      // Use existing or create new AudioContext
+      const ctx = audioContext || new (window.AudioContext || (window as any).webkitAudioContext)();
+      if (!audioContext) setAudioContext(ctx);
+      
+      // Resume context if suspended (required on mobile)
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
       
       // Create multiple beeps for attention
       const playBeep = (startTime: number, frequency: number) => {
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
         
         oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+        gainNode.connect(ctx.destination);
         
         oscillator.frequency.value = frequency;
         oscillator.type = "sine";
         
-        gainNode.gain.setValueAtTime(0.8, audioContext.currentTime + startTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + startTime + 0.3);
+        gainNode.gain.setValueAtTime(0.9, ctx.currentTime + startTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + startTime + 0.4);
         
-        oscillator.start(audioContext.currentTime + startTime);
-        oscillator.stop(audioContext.currentTime + startTime + 0.3);
+        oscillator.start(ctx.currentTime + startTime);
+        oscillator.stop(ctx.currentTime + startTime + 0.4);
       };
 
-      // Play 3 ascending beeps
+      // Play 3 ascending beeps - louder and longer
       playBeep(0, 600);
-      playBeep(0.4, 800);
-      playBeep(0.8, 1000);
+      playBeep(0.5, 800);
+      playBeep(1.0, 1000);
       
-      // Close context after sounds finish
-      setTimeout(() => audioContext.close(), 2000);
-      
+      console.log("Sound played successfully");
       return true;
     } catch (error) {
       console.error("Error playing sound:", error);
       return false;
     }
-  }, []);
+  }, [audioContext]);
 
   // Function to vibrate device
   const vibrateDevice = useCallback(() => {
     try {
       if ("vibrate" in navigator) {
         // Pattern: vibrate 500ms, pause 200ms, repeat 3 times
-        navigator.vibrate([500, 200, 500, 200, 500]);
+        navigator.vibrate([500, 200, 500, 200, 500, 200, 500]);
+        console.log("Vibration triggered");
         return true;
       }
     } catch (error) {
@@ -136,19 +143,40 @@ export default function PortalPaciente() {
     return false;
   }, []);
 
-  // Enable audio on first user interaction
+  // Enable audio on first user interaction - CRITICAL for mobile
   const enableAudio = useCallback(() => {
     if (!audioEnabled) {
-      // Create a silent audio context to unlock audio on iOS/Safari
       try {
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const buffer = audioContext.createBuffer(1, 1, 22050);
-        const source = audioContext.createBufferSource();
+        // Create AudioContext and play a silent sound to unlock audio on iOS/Safari
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        setAudioContext(ctx);
+        
+        // Create and play a silent buffer to unlock audio
+        const buffer = ctx.createBuffer(1, 1, 22050);
+        const source = ctx.createBufferSource();
         source.buffer = buffer;
-        source.connect(audioContext.destination);
+        source.connect(ctx.destination);
         source.start(0);
-        audioContext.close();
+        
+        // Also play a quick test beep so user knows audio works
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        oscillator.frequency.value = 440;
+        oscillator.type = "sine";
+        gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+        oscillator.start(ctx.currentTime);
+        oscillator.stop(ctx.currentTime + 0.1);
+        
         setAudioEnabled(true);
+        console.log("Audio enabled successfully");
+        
+        // Test vibration too
+        if ("vibrate" in navigator) {
+          navigator.vibrate(100);
+        }
       } catch (error) {
         console.error("Error enabling audio:", error);
       }
@@ -705,29 +733,97 @@ export default function PortalPaciente() {
   // Portal view
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10 p-4">
-      {/* Notification overlay when called */}
+      {/* Notification overlay when called - FULL SCREEN with strong visual feedback */}
       {llamadoActivo && (
-        <div className="fixed inset-0 bg-primary/95 z-50 flex items-center justify-center animate-pulse">
-          <div className="text-center text-primary-foreground p-8">
-            <Bell className="h-24 w-24 mx-auto mb-6 animate-bounce" />
-            <h1 className="text-4xl font-bold mb-4">¡Es su turno!</h1>
-            <p className="text-2xl mb-8">Diríjase a</p>
-            <div className="bg-white/20 rounded-2xl p-6 inline-block">
-              <p className="text-5xl font-black">{boxLlamado}</p>
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center"
+          style={{
+            background: 'linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(220, 90%, 40%) 100%)',
+            animation: 'pulse-bg 1s ease-in-out infinite alternate'
+          }}
+        >
+          <style>
+            {`
+              @keyframes pulse-bg {
+                0% { opacity: 1; }
+                100% { opacity: 0.85; }
+              }
+              @keyframes shake {
+                0%, 100% { transform: translateX(0); }
+                25% { transform: translateX(-10px); }
+                75% { transform: translateX(10px); }
+              }
+              @keyframes ring-bell {
+                0%, 100% { transform: rotate(0deg); }
+                25% { transform: rotate(-20deg); }
+                75% { transform: rotate(20deg); }
+              }
+            `}
+          </style>
+          <div className="text-center text-white p-8 w-full max-w-md">
+            <div 
+              className="mb-8"
+              style={{ animation: 'ring-bell 0.5s ease-in-out infinite' }}
+            >
+              <Bell className="h-32 w-32 mx-auto drop-shadow-2xl" />
+            </div>
+            <h1 
+              className="text-5xl font-black mb-6 drop-shadow-lg"
+              style={{ animation: 'shake 0.5s ease-in-out infinite' }}
+            >
+              ¡ES SU TURNO!
+            </h1>
+            <p className="text-3xl mb-6 font-medium">Diríjase a</p>
+            <div className="bg-white/30 backdrop-blur rounded-3xl p-8 mb-8 shadow-2xl">
+              <p className="text-6xl font-black drop-shadow-md">{boxLlamado}</p>
             </div>
             <Button 
               variant="secondary" 
               size="lg" 
-              className="mt-8"
-              onClick={() => setLlamadoActivo(false)}
+              className="text-xl px-12 py-6 h-auto font-bold shadow-xl"
+              onClick={() => {
+                setLlamadoActivo(false);
+                // Stop any ongoing vibration
+                if ("vibrate" in navigator) {
+                  navigator.vibrate(0);
+                }
+              }}
             >
-              Entendido
+              ✓ Entendido
             </Button>
           </div>
         </div>
       )}
 
       <div className="max-w-lg mx-auto space-y-4">
+        {/* Audio permission banner */}
+        {!audioEnabled && (
+          <Card className="border-amber-500 bg-amber-500/10">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                  <Bell className="h-5 w-5" />
+                  <span className="text-sm font-medium">Active las notificaciones</span>
+                </div>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  className="border-amber-500 text-amber-700 hover:bg-amber-500/20"
+                  onClick={() => {
+                    enableAudio();
+                    toast({
+                      title: "Notificaciones activadas",
+                      description: "Recibirá sonido y vibración cuando lo llamen",
+                    });
+                  }}
+                >
+                  Activar Sonido
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Header */}
         <Card>
           <CardContent className="pt-6">
