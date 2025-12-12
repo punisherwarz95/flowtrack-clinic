@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Bell, ExternalLink, CheckCircle2, Clock, Building2, FileText, AlertCircle, X } from "lucide-react";
+import { Loader2, Bell, ExternalLink, CheckCircle2, Clock, Building2, FileText, AlertCircle, X, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -78,6 +78,7 @@ export default function PortalPaciente() {
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [notificationInterval, setNotificationInterval] = useState<NodeJS.Timeout | null>(null);
   const [lastNotificationBox, setLastNotificationBox] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Form fields for new registration
   const [formData, setFormData] = useState({
@@ -689,6 +690,34 @@ export default function PortalPaciente() {
     return () => clearInterval(interval);
   }, [paciente?.id, step, atencion?.estado, llamadoActivo, lastNotificationBox, triggerNotification]);
 
+  // Manual refresh function
+  const refreshData = useCallback(async () => {
+    if (!paciente?.id || isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await cargarDatosPaciente(paciente.id);
+      toast({
+        title: "Actualizado",
+        description: "Información actualizada correctamente",
+      });
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [paciente?.id, isRefreshing]);
+
+  // Auto-refresh every 10 seconds
+  useEffect(() => {
+    if (!paciente?.id || step !== "portal") return;
+
+    const interval = setInterval(() => {
+      cargarDatosPaciente(paciente.id);
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [paciente?.id, step]);
+
   const isTestCompleted = (testId: string) => {
     return testTracking.some(t => t.examen_test_id === testId);
   };
@@ -948,11 +977,22 @@ export default function PortalPaciente() {
                 <h1 className="text-xl font-bold">{paciente?.nombre}</h1>
                 <p className="text-muted-foreground">{paciente?.rut}</p>
               </div>
-              {atencion?.numero_ingreso && (
-                <Badge variant="secondary" className="text-2xl px-4 py-2">
-                  #{atencion.numero_ingreso}
-                </Badge>
-              )}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={refreshData}
+                  disabled={isRefreshing}
+                  title="Actualizar información"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </Button>
+                {atencion?.numero_ingreso && (
+                  <Badge variant="secondary" className="text-2xl px-4 py-2">
+                    #{atencion.numero_ingreso}
+                  </Badge>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
