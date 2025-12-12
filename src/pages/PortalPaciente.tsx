@@ -11,6 +11,39 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
+// CRITICAL FOR iOS: Create Audio object at module level (outside React component)
+// This ensures the same instance is used and can be properly "unlocked" by user gesture
+const notificationSound = new Audio();
+// Use a data URI for a short beep sound (base64 encoded WAV)
+notificationSound.src = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleT4HHBER4Pt/BwAKDhUfKD1UVVZSRDU9QUVHSE9VWV1eXWBiaGpsaGVgW1xeYWNnaGhoZ2RjYGBgYGBfXl5dXFxbW1pYV1ZVVFRTUlFQT05NTEtKSUhHRkVEQ0JBQD8+PTw7Ojk4NzY1NDMyMTAvLi0sKyopKCcmJSQjIiEgHx4dHBsaGRgXFhUUExIREA8ODQwLCgkIBwYFBAMCAQD//v38+/r5+Pf29fTz8vHw7+7t7Ovq6ejn5uXk4+Lh4N/e3dzb2tnY19bV1NPS0dDPzs3My8rJyMfGxcTDwsHAv769vLu6ubm4t7a1tLOysbCvrq2sq6qpqKempaSjoqGgn56dnJuamZiXlpWUk5KRkI+OjYyLiomIh4aFhIOCgYB/fn18e3p5eHd2dXRzcnFwb25tbGtqaWhnZmVkY2JhYF9eXVxbWllYV1ZVVFNSUVBPTk1MS0pJSEdGRURDQkFAPz49PDs6OTg3NjU0MzIxMC8uLSwrKikoJyYlJCMiISAfHh0cGxoZGBcWFRQTEhEQDw4NDAsKCQgHBgUEAwIBAP/+/fz7+vn49/b19PPy8fDv7u3s6+rp6Ofm5eTj4uHg397d3Nva2djX1tXU09LR0M/OzczLysnIx8bFxMPCwcC/vr28u7q5uLe2tbSzsrGwr66trKuqqainpqWko6KhoJ+enZybmpmYl5aVlJOSkZCPjo2Mi4qJiIeGhYSDgoGAf359fHt6eXh3dnV0c3JxcG9ubWxramloZ2ZlZGNiYWBfXl1cW1pZWFdWVVRTUlFQT05NTEtKSUhHRkVEQ0JBQD8+PTw7Ojk4NzY1NDMyMTAvLi0sKyopKCcmJSQjIiEgHx4dHBsaGRgXFhUUExIREA8ODQwLCgkIBwYFBAMCAQA=";
+notificationSound.volume = 0.7;
+notificationSound.load();
+
+// Track if audio has been unlocked (prevents adding listeners multiple times)
+let audioUnlocked = false;
+
+// Function to unlock audio for iOS - will be called once on first user interaction
+const unlockAudioForIOS = () => {
+  if (audioUnlocked) return;
+  
+  notificationSound.play().then(() => {
+    notificationSound.pause();
+    notificationSound.currentTime = 0;
+    audioUnlocked = true;
+    console.log("iOS Audio desbloqueado exitosamente");
+  }).catch(err => {
+    console.log("Error al desbloquear audio iOS:", err);
+  });
+
+  // IMPORTANT: Remove listeners after first unlock to prevent re-execution
+  window.removeEventListener('click', unlockAudioForIOS);
+  window.removeEventListener('touchstart', unlockAudioForIOS);
+};
+
+// Listen for both click AND touchstart (touchstart is CRITICAL for iOS)
+window.addEventListener('click', unlockAudioForIOS);
+window.addEventListener('touchstart', unlockAudioForIOS);
+
 interface Paciente {
   id: string;
   nombre: string;
@@ -80,8 +113,8 @@ export default function PortalPaciente() {
   const [lastNotificationBox, setLastNotificationBox] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // Persistent Audio element for mobile - must be unlocked by user interaction
-  const notificationAudioRef = useRef<HTMLAudioElement | null>(null);
+  // Ref to AudioContext for Web Audio API fallback
+  const audioContextRef = useRef<AudioContext | null>(null);
   
   // Form fields for new registration
   const [formData, setFormData] = useState({
@@ -159,6 +192,7 @@ export default function PortalPaciente() {
         // Create AudioContext and play a silent sound to unlock audio on iOS/Safari
         const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
         setAudioContext(ctx);
+        audioContextRef.current = ctx;
         
         // Create and play a silent buffer to unlock audio
         const buffer = ctx.createBuffer(1, 1, 22050);
@@ -179,30 +213,15 @@ export default function PortalPaciente() {
         oscillator.start(ctx.currentTime);
         oscillator.stop(ctx.currentTime + 0.1);
         
-        // Create persistent Audio element for mobile fallback
-        // This element will be "unlocked" by playing and pausing it during user interaction
-        if (!notificationAudioRef.current) {
-          const audio = new Audio();
-          // Use a data URI for a short beep sound (base64 encoded WAV)
-          audio.src = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleT4HHBER4Pt/BwAKDhUfKD1UVVZSRDU9QUVHSE9VWV1eXWBiaGpsaGVgW1xeYWNnaGhoZ2RjYGBgYGBfXl5dXFxbW1pYV1ZVVFRTUlFQT05NTEtKSUhHRkVEQ0JBQD8+PTw7Ojk4NzY1NDMyMTAvLi0sKyopKCcmJSQjIiEgHx4dHBsaGRgXFhUUExIREA8ODQwLCgkIBwYFBAMCAQD//v38+/r5+Pf29fTz8vHw7+7t7Ovq6ejn5uXk4+Lh4N/e3dzb2tnY19bV1NPS0dDPzs3My8rJyMfGxcTDwsHAv769vLu6ubm4t7a1tLOysbCvrq2sq6qpqKempaSjoqGgn56dnJuamZiXlpWUk5KRkI+OjYyLiomIh4aFhIOCgYB/fn18e3p5eHd2dXRzcnFwb25tbGtqaWhnZmVkY2JhYF9eXVxbWllYV1ZVVFNSUVBPTk1MS0pJSEdGRURDQkFAPz49PDs6OTg3NjU0MzIxMC8uLSwrKikoJyYlJCMiISAfHh0cGxoZGBcWFRQTEhEQDw4NDAsKCQgHBgUEAwIBAP/+/fz7+vn49/b19PPy8fDv7u3s6+rp6Ofm5eTj4uHg397d3Nva2djX1tXU09LR0M/OzczLysnIx8bFxMPCwcC/vr28u7q5uLe2tbSzsrGwr66trKuqqainpqWko6KhoJ+enZybmpmYl5aVlJOSkZCPjo2Mi4qJiIeGhYSDgoGAf359fHt6eXh3dnV0c3JxcG9ubWxramloZ2ZlZGNiYWBfXl1cW1pZWFdWVVRTUlFQT05NTEtKSUhHRkVEQ0JBQD8+PTw7Ojk4NzY1NDMyMTAvLi0sKyopKCcmJSQjIiEgHx4dHBsaGRgXFhUUExIREA8ODQwLCgkIBwYFBAMCAQA=";
-          audio.loop = false;
-          audio.volume = 0.7;
-          // Pre-load the audio
-          audio.load();
-          notificationAudioRef.current = audio;
-        }
-        
-        // CRITICAL: Play and immediately pause to unlock audio on iOS/Android
+        // CRITICAL FOR iOS: Use the global notificationSound and unlock it
         // This must happen within a user gesture handler
-        if (notificationAudioRef.current) {
-          notificationAudioRef.current.play().then(() => {
-            notificationAudioRef.current?.pause();
-            notificationAudioRef.current!.currentTime = 0;
-            console.log("Audio element unlocked for mobile");
-          }).catch(err => {
-            console.log("Could not unlock audio element:", err);
-          });
-        }
+        notificationSound.play().then(() => {
+          notificationSound.pause();
+          notificationSound.currentTime = 0;
+          console.log("iOS: Global Audio element unlocked via enableAudio");
+        }).catch(err => {
+          console.log("Could not unlock global audio:", err);
+        });
         
         setAudioEnabled(true);
         console.log("Audio enabled successfully");
@@ -217,18 +236,17 @@ export default function PortalPaciente() {
     }
   }, [audioEnabled]);
 
-  // Play notification using both AudioContext and Audio element for better mobile compatibility
+  // Play notification using both AudioContext and the global Audio element for iOS compatibility
   const playMobileNotification = useCallback(() => {
-    // Try AudioContext first
+    // Try AudioContext first (Web Audio API)
     playNotificationSound();
     
-    // Also try the Audio element as fallback for mobile
-    if (notificationAudioRef.current) {
-      notificationAudioRef.current.currentTime = 0;
-      notificationAudioRef.current.play().catch(err => {
-        console.log("Audio element play failed:", err);
-      });
-    }
+    // CRITICAL FOR iOS: Also play the global audio element
+    // This element was "unlocked" on first user interaction (touchstart/click)
+    notificationSound.currentTime = 0;
+    notificationSound.play().catch(err => {
+      console.log("Global audio play failed:", err);
+    });
   }, [playNotificationSound]);
 
   // Normalize RUT: remove all dots, dashes, spaces and convert to uppercase
