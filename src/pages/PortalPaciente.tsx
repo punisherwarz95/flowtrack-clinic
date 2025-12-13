@@ -416,6 +416,9 @@ export default function PortalPaciente() {
             title: "Bienvenido",
             description: `Su número de atención es #${existingAtencion.numero_ingreso}`,
           });
+          
+          // Navigate to portal view
+          setStep("portal");
         } else {
           // Patient exists but no attention for today
           // Pre-fill form with existing data and let them update if needed
