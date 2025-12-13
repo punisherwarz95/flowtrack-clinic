@@ -771,7 +771,7 @@ export default function PortalPaciente() {
   }, [paciente?.id, atencion?.estado, triggerNotification]);
 
   // Polling fallback for mobile (realtime may not work when app is in background)
-  // Check every 3 seconds if the patient was called
+  // Check every 3 seconds ONLY for call notifications, don't reload all data
   useEffect(() => {
     if (!paciente?.id || step !== "portal") return;
 
@@ -782,7 +782,7 @@ export default function PortalPaciente() {
 
       const { data: atencionData } = await supabase
         .from("atenciones")
-        .select("*, boxes(nombre)")
+        .select("estado, box_id, boxes(nombre)")
         .eq("paciente_id", paciente.id)
         .gte("fecha_ingreso", startOfDay)
         .lte("fecha_ingreso", endOfDay)
@@ -801,13 +801,14 @@ export default function PortalPaciente() {
           atencionData.boxes.nombre !== lastNotificationBox
         ) {
           triggerNotification(atencionData.boxes.nombre);
+          // Only update estado and box info, preserve atencion_examenes
+          setAtencion(prev => prev ? {
+            ...prev,
+            estado: atencionData.estado,
+            box_id: atencionData.box_id,
+            boxes: atencionData.boxes
+          } : prev);
         }
-
-        // Update local state
-        setAtencion({
-          ...atencionData,
-          atencion_examenes: atencion?.atencion_examenes || []
-        });
       }
     };
 
