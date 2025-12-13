@@ -96,6 +96,17 @@ const Login = () => {
               {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
             </Button>
           </form>
+          
+          <div className="mt-6 pt-4 border-t text-center">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => navigate("/portal-paciente")}
+            >
+              ¿Eres paciente? Ingresa aquí
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>
