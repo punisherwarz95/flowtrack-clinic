@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
-// CRITICAL FOR iOS: Create Audio object at module level (outside React component)
+// CRITICAL FOR iOS/Android: Create Audio object at module level (outside React component)
 // This ensures the same instance is used and can be properly "unlocked" by user gesture
 const notificationSound = new Audio();
 // Use a data URI for a short beep sound (base64 encoded WAV)
@@ -19,30 +19,25 @@ notificationSound.src = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQ
 notificationSound.volume = 0.7;
 notificationSound.load();
 
-// Track if audio has been unlocked (prevents adding listeners multiple times)
+// Track if audio has been unlocked
 let audioUnlocked = false;
 
-// Function to unlock audio for iOS - will be called once on first user interaction
-const unlockAudioForIOS = () => {
-  if (audioUnlocked) return;
+// Function to unlock audio - MUST be called from user gesture handler
+const unlockAudio = () => {
+  if (audioUnlocked) return true;
   
+  // Play and immediately pause to "unlock" the audio element
   notificationSound.play().then(() => {
     notificationSound.pause();
     notificationSound.currentTime = 0;
     audioUnlocked = true;
-    console.log("iOS Audio desbloqueado exitosamente");
+    console.log("Audio desbloqueado exitosamente");
   }).catch(err => {
-    console.log("Error al desbloquear audio iOS:", err);
+    console.log("Error al desbloquear audio:", err);
   });
-
-  // IMPORTANT: Remove listeners after first unlock to prevent re-execution
-  window.removeEventListener('click', unlockAudioForIOS);
-  window.removeEventListener('touchstart', unlockAudioForIOS);
+  
+  return true;
 };
-
-// Listen for both click AND touchstart (touchstart is CRITICAL for iOS)
-window.addEventListener('click', unlockAudioForIOS);
-window.addEventListener('touchstart', unlockAudioForIOS);
 
 interface Paciente {
   id: string;
@@ -187,6 +182,9 @@ export default function PortalPaciente() {
   // Enable audio on first user interaction - CRITICAL for mobile
   // This must be called from a user gesture (click/tap) to unlock audio on iOS/Android
   const enableAudio = useCallback(() => {
+    // First, unlock the global Audio element (critical for mobile)
+    unlockAudio();
+    
     if (!audioEnabled) {
       try {
         // Create AudioContext and play a silent sound to unlock audio on iOS/Safari
@@ -212,16 +210,6 @@ export default function PortalPaciente() {
         gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
         oscillator.start(ctx.currentTime);
         oscillator.stop(ctx.currentTime + 0.1);
-        
-        // CRITICAL FOR iOS: Use the global notificationSound and unlock it
-        // This must happen within a user gesture handler
-        notificationSound.play().then(() => {
-          notificationSound.pause();
-          notificationSound.currentTime = 0;
-          console.log("iOS: Global Audio element unlocked via enableAudio");
-        }).catch(err => {
-          console.log("Could not unlock global audio:", err);
-        });
         
         setAudioEnabled(true);
         console.log("Audio enabled successfully");
