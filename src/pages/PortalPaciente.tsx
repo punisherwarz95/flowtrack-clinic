@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,6 +74,7 @@ export default function PortalPaciente() {
   const [testModalOpen, setTestModalOpen] = useState(false);
   const [currentTest, setCurrentTest] = useState<ExamenTest | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [boxNombreManual, setBoxNombreManual] = useState<string | null>(null);
   
   // Form fields for new registration
   const [formData, setFormData] = useState({
@@ -86,6 +87,7 @@ export default function PortalPaciente() {
   });
 
   const { toast, dismiss } = useToast();
+  const lastNotificationBoxRef = useRef<string | null>(null);
 
   // Normalize RUT: remove all dots, dashes, spaces and convert to uppercase
   // Always uses: 12345678K (no dots, no dash, uppercase)
@@ -462,13 +464,27 @@ export default function PortalPaciente() {
   // Function to trigger notification (show persistent toast until OK)
   const triggerNotification = useCallback(
     (boxName: string) => {
+      // Evitar múltiples toasts para el mismo box
+      if (lastNotificationBoxRef.current === boxName) {
+        console.log("Notification already shown for box", boxName);
+        return;
+      }
+
       console.log("Triggering notification for box:", boxName);
+      lastNotificationBoxRef.current = boxName;
+
       const { id } = toast({
         title: "¡ES SU TURNO!",
         description: `Está siendo llamado del box ${boxName}`,
         duration: 0,
         action: (
-          <ToastAction altText="Entendido" onClick={() => dismiss(id)}>
+          <ToastAction
+            altText="Entendido"
+            onClick={() => {
+              dismiss(id);
+              lastNotificationBoxRef.current = null;
+            }}
+          >
             OK
           </ToastAction>
         ),
@@ -543,19 +559,38 @@ export default function PortalPaciente() {
         .limit(1)
         .maybeSingle();
 
+      console.log("[PortalPaciente polling] atencionData:", atencionData);
+
       if (atencionData) {
         const typedAtencion = atencionData as Atencion;
 
-        // Detect if patient was JUST called to a box (state changed to en_atencion with a box)
-        const wasJustCalled = 
-          typedAtencion.estado === "en_atencion" && 
-          typedAtencion.box_id && 
-          typedAtencion.boxes?.nombre &&
+        // Detect if patient was JUST called to a box (state changed to en_atencion with a box_id)
+        const wasJustCalled =
+          typedAtencion.estado === "en_atencion" &&
+          typedAtencion.box_id &&
           (lastKnownEstado !== "en_atencion" || lastKnownBoxId !== typedAtencion.box_id);
 
         if (wasJustCalled) {
-          console.log("Patient called to box (polling):", typedAtencion.boxes?.nombre);
-          triggerNotification(typedAtencion.boxes!.nombre);
+          // Asegurar que tenemos nombre de box, aún si el join viene vacío
+          let boxName = typedAtencion.boxes?.nombre || null;
+
+          if (!boxName && typedAtencion.box_id) {
+            const { data: boxData } = await supabase
+              .from("boxes")
+              .select("nombre")
+              .eq("id", typedAtencion.box_id)
+              .single();
+
+            boxName = boxData?.nombre || null;
+            if (boxName) {
+              setBoxNombreManual(boxName);
+            }
+          }
+
+          if (boxName) {
+            console.log("Patient called to box (polling):", boxName);
+            triggerNotification(boxName);
+          }
         }
 
         // Update tracking variables
@@ -825,7 +860,7 @@ export default function PortalPaciente() {
                     }
                   >
                     {atencion.estado === "en_espera" && "En Espera"}
-                    {atencion.estado === "en_atencion" && `En Atención - ${atencion.boxes?.nombre || ""}`}
+                    {atencion.estado === "en_atencion" && `En Atención - ${atencion.boxes?.nombre || boxNombreManual || ""}`}
                     {atencion.estado === "completado" && "Completado"}
                     {atencion.estado === "incompleto" && "Incompleto"}
                   </Badge>
