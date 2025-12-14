@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,34 +10,6 @@ import { Loader2, Bell, ExternalLink, CheckCircle2, Clock, Building2, FileText, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-
-// CRITICAL FOR iOS/Android: Create Audio object at module level (outside React component)
-// This ensures the same instance is used and can be properly "unlocked" by user gesture
-const notificationSound = new Audio();
-// Use a data URI for a short beep sound (base64 encoded WAV)
-notificationSound.src = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleT4HHBER4Pt/BwAKDhUfKD1UVVZSRDU9QUVHSE9VWV1eXWBiaGpsaGVgW1xeYWNnaGhoZ2RjYGBgYGBfXl5dXFxbW1pYV1ZVVFRTUlFQT05NTEtKSUhHRkVEQ0JBQD8+PTw7Ojk4NzY1NDMyMTAvLi0sKyopKCcmJSQjIiEgHx4dHBsaGRgXFhUUExIREA8ODQwLCgkIBwYFBAMCAQD//v38+/r5+Pf29fTz8vHw7+7t7Ovq6ejn5uXk4+Lh4N/e3dzb2tnY19bV1NPS0dDPzs3My8rJyMfGxcTDwsHAv769vLu6ubm4t7a1tLOysbCvrq2sq6qpqKempaSjoqGgn56dnJuamZiXlpWUk5KRkI+OjYyLiomIh4aFhIOCgYB/fn18e3p5eHd2dXRzcnFwb25tbGtqaWhnZmVkY2JhYF9eXVxbWllYV1ZVVFNSUVBPTk1MS0pJSEdGRURDQkFAPz49PDs6OTg3NjU0MzIxMC8uLSwrKikoJyYlJCMiISAfHh0cGxoZGBcWFRQTEhEQDw4NDAsKCQgHBgUEAwIBAP/+/fz7+vn49/b19PPy8fDv7u3s6+rp6Ofm5eTj4uHg397d3Nva2djX1tXU09LR0M/OzczLysnIx8bFxMPCwcC/vr28u7q5uLe2tbSzsrGwr66trKuqqainpqWko6KhoJ+enZybmpmYl5aVlJOSkZCPjo2Mi4qJiIeGhYSDgoGAf359fHt6eXh3dnV0c3JxcG9ubWxramloZ2ZlZGNiYWBfXl1cW1pZWFdWVVRTUlFQT05NTEtKSUhHRkVEQ0JBQD8+PTw7Ojk4NzY1NDMyMTAvLi0sKyopKCcmJSQjIiEgHx4dHBsaGRgXFhUUExIREA8ODQwLCgkIBwYFBAMCAQA=";
-notificationSound.volume = 0.7;
-notificationSound.load();
-
-// Track if audio has been unlocked
-let audioUnlocked = false;
-
-// Function to unlock audio - MUST be called from user gesture handler
-const unlockAudio = () => {
-  if (audioUnlocked) return true;
-  
-  // Play and immediately pause to "unlock" the audio element
-  notificationSound.play().then(() => {
-    notificationSound.pause();
-    notificationSound.currentTime = 0;
-    audioUnlocked = true;
-    console.log("Audio desbloqueado exitosamente");
-  }).catch(err => {
-    console.log("Error al desbloquear audio:", err);
-  });
-  
-  return true;
-};
 
 interface Paciente {
   id: string;
@@ -102,14 +74,8 @@ export default function PortalPaciente() {
   const [boxLlamado, setBoxLlamado] = useState<string | null>(null);
   const [testModalOpen, setTestModalOpen] = useState(false);
   const [currentTest, setCurrentTest] = useState<ExamenTest | null>(null);
-  const [audioEnabled, setAudioEnabled] = useState(false);
-  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
-  const [notificationInterval, setNotificationInterval] = useState<NodeJS.Timeout | null>(null);
   const [lastNotificationBox, setLastNotificationBox] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
-  // Ref to AudioContext for Web Audio API fallback
-  const audioContextRef = useRef<AudioContext | null>(null);
   
   // Form fields for new registration
   const [formData, setFormData] = useState({
@@ -120,122 +86,6 @@ export default function PortalPaciente() {
     telefono: "",
     direccion: ""
   });
-
-  // Function to play notification sound using Web Audio API - SHORT beeps
-  const playNotificationSound = useCallback(() => {
-    try {
-      // Use existing or create new AudioContext
-      const ctx = audioContext || new (window.AudioContext || (window as any).webkitAudioContext)();
-      if (!audioContext) setAudioContext(ctx);
-      
-      // Resume context if suspended (required on mobile)
-      if (ctx.state === 'suspended') {
-        ctx.resume();
-      }
-      
-      // Create a short attention beep
-      const playBeep = (startTime: number, frequency: number) => {
-        const oscillator = ctx.createOscillator();
-        const gainNode = ctx.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(ctx.destination);
-        
-        oscillator.frequency.value = frequency;
-        oscillator.type = "sine";
-        
-        // Shorter beep - 0.15 seconds
-        gainNode.gain.setValueAtTime(0.7, ctx.currentTime + startTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + startTime + 0.15);
-        
-        oscillator.start(ctx.currentTime + startTime);
-        oscillator.stop(ctx.currentTime + startTime + 0.15);
-      };
-
-      // Play 2 quick ascending beeps (total ~0.4 seconds)
-      playBeep(0, 800);
-      playBeep(0.2, 1200);
-      
-      console.log("Sound played successfully via AudioContext");
-      return true;
-    } catch (error) {
-      console.error("Error playing sound:", error);
-      return false;
-    }
-  }, [audioContext]);
-
-  // Function to vibrate device
-  const vibrateDevice = useCallback(() => {
-    try {
-      if ("vibrate" in navigator) {
-        // Pattern: vibrate 500ms, pause 200ms, repeat 3 times
-        navigator.vibrate([500, 200, 500, 200, 500, 200, 500]);
-        console.log("Vibration triggered");
-        return true;
-      }
-    } catch (error) {
-      console.error("Error vibrating:", error);
-    }
-    return false;
-  }, []);
-
-  // Enable audio on first user interaction - CRITICAL for mobile
-  // This must be called from a user gesture (click/tap) to unlock audio on iOS/Android
-  const enableAudio = useCallback(() => {
-    // First, unlock the global Audio element (critical for mobile)
-    unlockAudio();
-    
-    if (!audioEnabled) {
-      try {
-        // Create AudioContext and play a silent sound to unlock audio on iOS/Safari
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        setAudioContext(ctx);
-        audioContextRef.current = ctx;
-        
-        // Create and play a silent buffer to unlock audio
-        const buffer = ctx.createBuffer(1, 1, 22050);
-        const source = ctx.createBufferSource();
-        source.buffer = buffer;
-        source.connect(ctx.destination);
-        source.start(0);
-        
-        // Also play a quick test beep so user knows audio works
-        const oscillator = ctx.createOscillator();
-        const gainNode = ctx.createGain();
-        oscillator.connect(gainNode);
-        gainNode.connect(ctx.destination);
-        oscillator.frequency.value = 440;
-        oscillator.type = "sine";
-        gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-        oscillator.start(ctx.currentTime);
-        oscillator.stop(ctx.currentTime + 0.1);
-        
-        setAudioEnabled(true);
-        console.log("Audio enabled successfully");
-        
-        // Test vibration too
-        if ("vibrate" in navigator) {
-          navigator.vibrate(100);
-        }
-      } catch (error) {
-        console.error("Error enabling audio:", error);
-      }
-    }
-  }, [audioEnabled]);
-
-  // Play notification using both AudioContext and the global Audio element for iOS compatibility
-  const playMobileNotification = useCallback(() => {
-    // Try AudioContext first (Web Audio API)
-    playNotificationSound();
-    
-    // CRITICAL FOR iOS: Also play the global audio element
-    // This element was "unlocked" on first user interaction (touchstart/click)
-    notificationSound.currentTime = 0;
-    notificationSound.play().catch(err => {
-      console.log("Global audio play failed:", err);
-    });
-  }, [playNotificationSound]);
 
   // Normalize RUT: remove all dots, dashes, spaces and convert to uppercase
   // Always uses: 12345678K (no dots, no dash, uppercase)
@@ -609,45 +459,18 @@ export default function PortalPaciente() {
     setCurrentTest(null);
   };
 
-  // Function to trigger notification (sound + vibrate)
+  // Function to trigger notification (show popup)
   const triggerNotification = useCallback((boxName: string) => {
     console.log("Triggering notification for box:", boxName);
     setBoxLlamado(boxName);
     setLlamadoActivo(true);
     setLastNotificationBox(boxName);
-    
-    // Play notification sound and vibrate immediately - use mobile-compatible function
-    vibrateDevice();
-    playMobileNotification();
-    
-    // Repeat only 2 more times (total 3), every 1.5 seconds
-    let count = 0;
-    const interval = setInterval(() => {
-      count++;
-      if (count >= 2) {
-        clearInterval(interval);
-        setNotificationInterval(null);
-        return;
-      }
-      vibrateDevice();
-      playMobileNotification();
-    }, 1500);
-    
-    setNotificationInterval(interval);
-  }, [vibrateDevice, playMobileNotification]);
+  }, []);
 
   // Stop notification when user acknowledges
   const stopNotification = useCallback(() => {
     setLlamadoActivo(false);
-    if (notificationInterval) {
-      clearInterval(notificationInterval);
-      setNotificationInterval(null);
-    }
-    // Stop vibration
-    if ("vibrate" in navigator) {
-      navigator.vibrate(0);
-    }
-  }, [notificationInterval]);
+  }, []);
 
   // Listen for real-time updates when patient is called
   useEffect(() => {
@@ -792,10 +615,7 @@ export default function PortalPaciente() {
               />
             </div>
             <Button 
-              onClick={() => {
-                enableAudio();
-                buscarPaciente();
-              }} 
+              onClick={buscarPaciente} 
               className="w-full" 
               size="lg"
               disabled={isLoading}
@@ -897,10 +717,7 @@ export default function PortalPaciente() {
                 Volver
               </Button>
               <Button 
-                onClick={() => {
-                  enableAudio();
-                  registrarPaciente();
-                }} 
+                onClick={registrarPaciente} 
                 className="flex-1 h-11" 
                 disabled={isLoading}
               >
@@ -923,104 +740,35 @@ export default function PortalPaciente() {
   // Portal view
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10 p-4">
-      {/* Notification overlay when called - FULL SCREEN with blinking effect */}
+      {/* Notification popup when called - FULL SCREEN overlay */}
       {llamadoActivo && (
         <div 
-          className="fixed inset-0 z-[9999] flex items-center justify-center"
-          style={{
-            animation: 'blink-bg 0.8s ease-in-out infinite'
-          }}
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-green-600"
         >
-          <style>
-            {`
-              @keyframes blink-bg {
-                0%, 100% { 
-                  background: linear-gradient(135deg, hsl(142, 76%, 36%) 0%, hsl(142, 76%, 28%) 100%);
-                }
-                50% { 
-                  background: linear-gradient(135deg, hsl(142, 76%, 50%) 0%, hsl(142, 76%, 40%) 100%);
-                }
-              }
-              @keyframes shake {
-                0%, 100% { transform: translateX(0); }
-                25% { transform: translateX(-10px); }
-                75% { transform: translateX(10px); }
-              }
-              @keyframes ring-bell {
-                0%, 100% { transform: rotate(0deg); }
-                25% { transform: rotate(-20deg); }
-                75% { transform: rotate(20deg); }
-              }
-              @keyframes pulse-box {
-                0%, 100% { transform: scale(1); }
-                50% { transform: scale(1.05); }
-              }
-            `}
-          </style>
           <div className="text-center text-white p-8 w-full max-w-md">
-            <div 
-              className="mb-6"
-              style={{ animation: 'ring-bell 0.5s ease-in-out infinite' }}
-            >
-              <Bell className="h-24 w-24 mx-auto drop-shadow-2xl" />
+            <div className="mb-6">
+              <Bell className="h-24 w-24 mx-auto drop-shadow-2xl animate-bounce" />
             </div>
-            <h1 
-              className="text-4xl font-black mb-4 drop-shadow-lg"
-              style={{ animation: 'shake 0.5s ease-in-out infinite' }}
-            >
+            <h1 className="text-4xl font-black mb-4 drop-shadow-lg">
               ¡ES SU TURNO!
             </h1>
-            <p className="text-2xl mb-4 font-medium opacity-90">Diríjase a</p>
-            <div 
-              className="bg-white/30 backdrop-blur rounded-3xl p-6 mb-6 shadow-2xl border-4 border-white/50"
-              style={{ animation: 'pulse-box 1s ease-in-out infinite' }}
-            >
+            <p className="text-2xl mb-4 font-medium opacity-90">Está siendo llamado del</p>
+            <div className="bg-white/30 backdrop-blur rounded-3xl p-6 mb-6 shadow-2xl border-4 border-white/50">
               <p className="text-5xl font-black drop-shadow-md">{boxLlamado}</p>
             </div>
             <Button 
               variant="secondary" 
               size="lg" 
               className="text-xl px-12 py-6 h-auto font-bold shadow-xl bg-white text-green-700 hover:bg-white/90"
-              onClick={() => {
-                enableAudio(); // Re-enable audio on user interaction
-                stopNotification();
-              }}
+              onClick={stopNotification}
             >
-              ✓ Entendido
+              OK
             </Button>
           </div>
         </div>
       )}
 
       <div className="max-w-lg mx-auto space-y-4">
-        {/* Audio permission banner */}
-        {!audioEnabled && (
-          <Card className="border-amber-500 bg-amber-500/10">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
-                  <Bell className="h-5 w-5" />
-                  <span className="text-sm font-medium">Active las notificaciones</span>
-                </div>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  className="border-amber-500 text-amber-700 hover:bg-amber-500/20"
-                  onClick={() => {
-                    enableAudio();
-                    toast({
-                      title: "Notificaciones activadas",
-                      description: "Recibirá sonido y vibración cuando lo llamen",
-                    });
-                  }}
-                >
-                  Activar Sonido
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Header */}
         <Card>
           <CardContent className="pt-6">
@@ -1033,10 +781,7 @@ export default function PortalPaciente() {
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() => {
-                    enableAudio(); // Also enable audio on any user interaction
-                    refreshData();
-                  }}
+                  onClick={refreshData}
                   disabled={isRefreshing}
                   title="Actualizar información"
                 >
