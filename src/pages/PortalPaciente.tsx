@@ -1,7 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { MapPin, Phone, Globe } from "lucide-react";
-import jennerLogo from "@/assets/jenner-logo-horizontal.jpg";
-import jennerBackground from "@/assets/jenner-background.jpg";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,40 +94,6 @@ interface TestTracking {
   completado: boolean;
 }
 
-// Footer component with Jenner contact info
-const JennerFooter = () => (
-  <footer className="w-full py-6 px-4 mt-auto">
-    <div className="max-w-lg mx-auto text-center space-y-4">
-      {/* Logo and slogan */}
-      <div className="space-y-1">
-        <h3 className="text-xl font-bold">
-          <span className="text-[#00B5AD]">jenner</span>
-        </h3>
-        <p className="text-sm text-muted-foreground">centro médico</p>
-        <p className="text-xs text-[#00B5AD] italic">Siempre cuidando de ti</p>
-      </div>
-      
-      {/* Contact info */}
-      <div className="space-y-2 text-sm text-muted-foreground">
-        <div className="flex items-center justify-center gap-2">
-          <MapPin className="h-4 w-4 text-[#00B5AD]" />
-          <span>Av. Salvador Allende Gossens 3432, Iquique, Chile</span>
-        </div>
-        <div className="flex items-center justify-center gap-2">
-          <Phone className="h-4 w-4 text-[#00B5AD]" />
-          <a href="tel:+56572262775" className="hover:text-[#00B5AD]">+56 57 226 2775</a>
-        </div>
-        <div className="flex items-center justify-center gap-2">
-          <Globe className="h-4 w-4 text-[#00B5AD]" />
-          <a href="https://www.centrojenner.cl" target="_blank" rel="noopener noreferrer" className="hover:text-[#00B5AD]">
-            www.centrojenner.cl
-          </a>
-        </div>
-      </div>
-    </div>
-  </footer>
-);
-
 export default function PortalPaciente() {
   const [step, setStep] = useState<"identificacion" | "registro" | "portal">("identificacion");
   const [rut, setRut] = useState("");
@@ -153,7 +116,7 @@ export default function PortalPaciente() {
   // Ref to AudioContext for Web Audio API fallback
   const audioContextRef = useRef<AudioContext | null>(null);
   
-  // Form fields for new registration or update
+  // Form fields for new registration
   const [formData, setFormData] = useState({
     nombre: "",
     rut: "",
@@ -162,9 +125,6 @@ export default function PortalPaciente() {
     telefono: "",
     direccion: ""
   });
-  
-  // Track if we're updating an existing patient (vs creating new)
-  const [existingPatientId, setExistingPatientId] = useState<string | null>(null);
 
   // Function to play notification sound using Web Audio API - SHORT beeps
   const playNotificationSound = useCallback(() => {
@@ -416,40 +376,47 @@ export default function PortalPaciente() {
             title: "Bienvenido",
             description: `Su número de atención es #${existingAtencion.numero_ingreso}`,
           });
-          
-          // Navigate to portal view
-          setStep("portal");
         } else {
-          // Patient exists but no attention for today
-          // Pre-fill form with existing data and let them update if needed
-          setFormData({
-            nombre: pacienteData.nombre || "",
-            rut: formatRutForDisplay(pacienteData.rut || ""),
-            fecha_nacimiento: pacienteData.fecha_nacimiento || "",
-            email: pacienteData.email || "",
-            telefono: pacienteData.telefono || "",
-            direccion: pacienteData.direccion || ""
-          });
-          setExistingPatientId(pacienteData.id);
+          // Patient exists but no attention for today, create one
+          const { data: newAtencion, error: atencionError } = await supabase
+            .from("atenciones")
+            .insert({
+              paciente_id: pacienteData.id,
+              estado: "en_espera",
+              fecha_ingreso: new Date().toISOString()
+            })
+            .select(`
+              *,
+              boxes(nombre),
+              atencion_examenes(*, examenes(*))
+            `)
+            .single();
+
+          if (atencionError) throw atencionError;
+
+          setAtencion(newAtencion);
+          
+          // Load empresa if patient has one
+          if (pacienteData.empresa_id) {
+            const { data: empresaData } = await supabase
+              .from("empresas")
+              .select("*")
+              .eq("id", pacienteData.empresa_id)
+              .single();
+            
+            if (empresaData) setEmpresa(empresaData);
+          }
           
           toast({
-            title: "Bienvenido de vuelta",
-            description: "Verifique sus datos y actualice si es necesario",
+            title: "Registro de hoy",
+            description: `Su número de atención es #${newAtencion.numero_ingreso}. Espere a que el recepcionista complete su registro.`,
           });
-          
-          setStep("registro");
         }
+        
+        setStep("portal");
       } else {
-        // Patient not found, go to registration with empty form
-        setFormData({
-          nombre: "",
-          rut: rut,
-          fecha_nacimiento: "",
-          email: "",
-          telefono: "",
-          direccion: ""
-        });
-        setExistingPatientId(null);
+        // Patient not found, go to registration
+        setFormData(prev => ({ ...prev, rut: rut }));
         setStep("registro");
       }
     } catch (error: any) {
@@ -543,87 +510,54 @@ export default function PortalPaciente() {
       return;
     }
 
-    // Normalize RUT for storage
+    // Normalize RUT for storage y generar variantes para evitar duplicados
+    const rutVariants = getRutVariants(formData.rut);
     const rutNormalizado = normalizeRut(formData.rut);
 
     setIsLoading(true);
     try {
-      let pacienteId: string;
-      let pacienteData: Paciente;
+      // Check if RUT already exists (cualquier formato conocido)
+      const { data: existingPaciente } = await supabase
+        .from("pacientes")
+        .select("id")
+        .in("rut", rutVariants)
+        .maybeSingle();
 
-      if (existingPatientId) {
-        // UPDATE existing patient with new data
-        const { data: updatedPaciente, error: updateError } = await supabase
-          .from("pacientes")
-          .update({
-            nombre: formData.nombre.trim(),
-            fecha_nacimiento: formData.fecha_nacimiento || null,
-            email: formData.email.trim() || null,
-            telefono: formData.telefono.trim() || null,
-            direccion: formData.direccion.trim() || null
-            // Note: We don't update RUT as it's the identifier
-          })
-          .eq("id", existingPatientId)
-          .select()
-          .single();
-
-        if (updateError) throw updateError;
-
-        pacienteId = existingPatientId;
-        pacienteData = updatedPaciente;
-
+      if (existingPaciente) {
         toast({
-          title: "Datos actualizados",
-          description: "Su información ha sido actualizada correctamente",
+          title: "RUT ya registrado",
+          description: "Este RUT ya está registrado. Por favor identifíquese.",
+          variant: "destructive"
         });
-      } else {
-        // Check if RUT already exists (should not happen but safety check)
-        const rutVariants = getRutVariants(formData.rut);
-        const { data: existingPaciente } = await supabase
-          .from("pacientes")
-          .select("id")
-          .in("rut", rutVariants)
-          .maybeSingle();
-
-        if (existingPaciente) {
-          toast({
-            title: "RUT ya registrado",
-            description: "Este RUT ya está registrado. Por favor identifíquese.",
-            variant: "destructive"
-          });
-          setRut(formData.rut);
-          setStep("identificacion");
-          setIsLoading(false);
-          return;
-        }
-
-        // Create new patient
-        const { data: newPaciente, error } = await supabase
-          .from("pacientes")
-          .insert({
-            nombre: formData.nombre.trim(),
-            rut: rutNormalizado,
-            fecha_nacimiento: formData.fecha_nacimiento || null,
-            email: formData.email.trim() || null,
-            telefono: formData.telefono.trim() || null,
-            direccion: formData.direccion.trim() || null,
-            empresa_id: null,
-            tipo_servicio: null
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        pacienteId = newPaciente.id;
-        pacienteData = newPaciente;
+        setRut(formData.rut);
+        setStep("identificacion");
+        setIsLoading(false);
+        return;
       }
+
+      // Create new patient sin empresa - SIEMPRE guardamos el RUT normalizado
+      const { data: newPaciente, error } = await supabase
+        .from("pacientes")
+        .insert({
+          nombre: formData.nombre.trim(),
+          rut: rutNormalizado,
+          fecha_nacimiento: formData.fecha_nacimiento || null,
+          email: formData.email.trim() || null,
+          telefono: formData.telefono.trim() || null,
+          direccion: formData.direccion.trim() || null,
+          empresa_id: null,
+          tipo_servicio: null
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
 
       // Create atencion to get numero_ingreso
       const { data: newAtencion, error: atencionError } = await supabase
         .from("atenciones")
         .insert({
-          paciente_id: pacienteId,
+          paciente_id: newPaciente.id,
           estado: "en_espera",
           fecha_ingreso: new Date().toISOString()
         })
@@ -632,12 +566,11 @@ export default function PortalPaciente() {
 
       if (atencionError) throw atencionError;
 
-      setPaciente(pacienteData);
+      setPaciente(newPaciente);
       setAtencion({ ...newAtencion, atencion_examenes: [] });
-      setExistingPatientId(null);
       
       toast({
-        title: existingPatientId ? "Bienvenido de vuelta" : "Registro exitoso",
+        title: "Registro exitoso",
         description: `Su número de atención es #${newAtencion.numero_ingreso}. Espere a que el recepcionista complete su registro.`,
       });
 
@@ -771,7 +704,7 @@ export default function PortalPaciente() {
   }, [paciente?.id, atencion?.estado, triggerNotification]);
 
   // Polling fallback for mobile (realtime may not work when app is in background)
-  // Check every 3 seconds ONLY for call notifications, don't reload all data
+  // Check every 3 seconds if the patient was called
   useEffect(() => {
     if (!paciente?.id || step !== "portal") return;
 
@@ -782,7 +715,7 @@ export default function PortalPaciente() {
 
       const { data: atencionData } = await supabase
         .from("atenciones")
-        .select("estado, box_id, boxes(nombre)")
+        .select("*, boxes(nombre)")
         .eq("paciente_id", paciente.id)
         .gte("fecha_ingreso", startOfDay)
         .lte("fecha_ingreso", endOfDay)
@@ -801,14 +734,13 @@ export default function PortalPaciente() {
           atencionData.boxes.nombre !== lastNotificationBox
         ) {
           triggerNotification(atencionData.boxes.nombre);
-          // Only update estado and box info, preserve atencion_examenes
-          setAtencion(prev => prev ? {
-            ...prev,
-            estado: atencionData.estado,
-            box_id: atencionData.box_id,
-            boxes: atencionData.boxes
-          } : prev);
         }
+
+        // Update local state
+        setAtencion({
+          ...atencionData,
+          atencion_examenes: atencion?.atencion_examenes || []
+        });
       }
     };
 
@@ -853,175 +785,149 @@ export default function PortalPaciente() {
 
   if (step === "identificacion") {
     return (
-      <div 
-        className="min-h-screen flex flex-col relative"
-        style={{
-          backgroundImage: `url(${jennerBackground})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat'
-        }}
-      >
-        {/* Overlay for better readability - reduced opacity to show more of the background */}
-        <div className="absolute inset-0 bg-white/30" />
-        
-        <div className="flex-1 flex flex-col items-center justify-center gap-6 relative z-10 p-4">
-          <Card className="w-full max-w-md shadow-xl bg-white/95 backdrop-blur">
-            <CardHeader className="text-center">
-              <CardTitle className="text-2xl font-bold text-[#003B5C]">Portal del Paciente</CardTitle>
-              <CardDescription>Ingrese su RUT para identificarse</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="rut">RUT</Label>
-                <Input
-                  id="rut"
-                  placeholder="12.345.678-9"
-                  value={rut}
-                  onChange={handleRutChange}
-                  onKeyDown={(e) => e.key === "Enter" && buscarPaciente()}
-                  className="text-lg"
-                />
-              </div>
-              <Button 
-                onClick={() => {
-                  enableAudio();
-                  buscarPaciente();
-                }} 
-                className="w-full bg-[#00B5AD] hover:bg-[#009990]" 
-                size="lg"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Buscando...
-                  </>
-                ) : (
-                  "Ingresar"
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-        <div className="relative z-10">
-          <JennerFooter />
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-bold">Portal del Paciente</CardTitle>
+            <CardDescription>Ingrese su RUT para identificarse</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="rut">RUT</Label>
+              <Input
+                id="rut"
+                placeholder="12.345.678-9"
+                value={rut}
+                onChange={handleRutChange}
+                onKeyDown={(e) => e.key === "Enter" && buscarPaciente()}
+                className="text-lg"
+              />
+            </div>
+            <Button 
+              onClick={() => {
+                enableAudio();
+                buscarPaciente();
+              }} 
+              className="w-full" 
+              size="lg"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Buscando...
+                </>
+              ) : (
+                "Ingresar"
+              )}
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   if (step === "registro") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10 flex flex-col p-4">
-        <div className="flex-1 flex items-center justify-center">
-          <Card className="w-full max-w-lg">
-            <CardHeader className="text-center pb-4">
-              <CardTitle className="text-2xl font-bold">
-                {existingPatientId ? "Confirmar Datos" : "Registro de Paciente"}
-              </CardTitle>
-              <CardDescription>
-                {existingPatientId 
-                  ? "Verifique y actualice sus datos si es necesario" 
-                  : "Complete sus datos para registrarse"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="sm:col-span-2">
-                  <Label htmlFor="nombre" className="text-sm font-medium mb-1.5 block">Nombre Completo *</Label>
-                  <Input
-                    id="nombre"
-                    placeholder="Juan Pérez González"
-                    value={formData.nombre}
-                    onChange={(e) => setFormData(prev => ({ ...prev, nombre: e.target.value }))}
-                    className="h-11"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="formRut" className="text-sm font-medium mb-1.5 block">RUT *</Label>
-                  <Input
-                    id="formRut"
-                    placeholder="12.345.678-9"
-                    value={formData.rut}
-                    onChange={handleFormRutChange}
-                    className="h-11"
-                    disabled={!!existingPatientId}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="fecha_nacimiento" className="text-sm font-medium mb-1.5 block">Fecha de Nacimiento</Label>
-                  <Input
-                    id="fecha_nacimiento"
-                    type="date"
-                    value={formData.fecha_nacimiento}
-                    onChange={(e) => setFormData(prev => ({ ...prev, fecha_nacimiento: e.target.value }))}
-                    className="h-11"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="email" className="text-sm font-medium mb-1.5 block">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="correo@ejemplo.com"
-                    value={formData.email}
-                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                    className="h-11"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="telefono" className="text-sm font-medium mb-1.5 block">Teléfono</Label>
-                  <Input
-                    id="telefono"
-                    type="tel"
-                    placeholder="+56 9 1234 5678"
-                    value={formData.telefono}
-                    onChange={(e) => setFormData(prev => ({ ...prev, telefono: e.target.value }))}
-                    className="h-11"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <Label htmlFor="direccion" className="text-sm font-medium mb-1.5 block">Dirección</Label>
-                  <Input
-                    id="direccion"
-                    placeholder="Av. Principal 123, Comuna"
-                    value={formData.direccion}
-                    onChange={(e) => setFormData(prev => ({ ...prev, direccion: e.target.value }))}
-                    className="h-11"
-                  />
-                </div>
+      <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10 flex items-center justify-center p-4">
+        <Card className="w-full max-w-lg">
+          <CardHeader className="text-center pb-4">
+            <CardTitle className="text-2xl font-bold">Registro de Paciente</CardTitle>
+            <CardDescription>Complete sus datos para registrarse</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <Label htmlFor="nombre" className="text-sm font-medium mb-1.5 block">Nombre Completo *</Label>
+                <Input
+                  id="nombre"
+                  placeholder="Juan Pérez González"
+                  value={formData.nombre}
+                  onChange={(e) => setFormData(prev => ({ ...prev, nombre: e.target.value }))}
+                  className="h-11"
+                />
               </div>
-              <div className="flex gap-3 pt-2">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setStep("identificacion")}
-                  className="flex-1 h-11"
-                >
-                  Volver
-                </Button>
-                <Button 
-                  onClick={() => {
-                    enableAudio();
-                    registrarPaciente();
-                  }} 
-                  className="flex-1 h-11" 
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {existingPatientId ? "Confirmando..." : "Registrando..."}
-                    </>
-                  ) : (
-                    existingPatientId ? "Confirmar y Continuar" : "Registrar"
-                  )}
-                </Button>
+              <div>
+                <Label htmlFor="formRut" className="text-sm font-medium mb-1.5 block">RUT *</Label>
+                <Input
+                  id="formRut"
+                  placeholder="12.345.678-9"
+                  value={formData.rut}
+                  onChange={handleFormRutChange}
+                  className="h-11"
+                />
               </div>
-            </CardContent>
-          </Card>
-        </div>
-        <JennerFooter />
+              <div>
+                <Label htmlFor="fecha_nacimiento" className="text-sm font-medium mb-1.5 block">Fecha de Nacimiento</Label>
+                <Input
+                  id="fecha_nacimiento"
+                  type="date"
+                  value={formData.fecha_nacimiento}
+                  onChange={(e) => setFormData(prev => ({ ...prev, fecha_nacimiento: e.target.value }))}
+                  className="h-11"
+                />
+              </div>
+              <div>
+                <Label htmlFor="email" className="text-sm font-medium mb-1.5 block">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="correo@ejemplo.com"
+                  value={formData.email}
+                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                  className="h-11"
+                />
+              </div>
+              <div>
+                <Label htmlFor="telefono" className="text-sm font-medium mb-1.5 block">Teléfono</Label>
+                <Input
+                  id="telefono"
+                  type="tel"
+                  placeholder="+56 9 1234 5678"
+                  value={formData.telefono}
+                  onChange={(e) => setFormData(prev => ({ ...prev, telefono: e.target.value }))}
+                  className="h-11"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Label htmlFor="direccion" className="text-sm font-medium mb-1.5 block">Dirección</Label>
+                <Input
+                  id="direccion"
+                  placeholder="Av. Principal 123, Comuna"
+                  value={formData.direccion}
+                  onChange={(e) => setFormData(prev => ({ ...prev, direccion: e.target.value }))}
+                  className="h-11"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setStep("identificacion")}
+                className="flex-1 h-11"
+              >
+                Volver
+              </Button>
+              <Button 
+                onClick={() => {
+                  enableAudio();
+                  registrarPaciente();
+                }} 
+                className="flex-1 h-11" 
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Registrando...
+                  </>
+                ) : (
+                  "Registrar"
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -1298,8 +1204,6 @@ export default function PortalPaciente() {
         >
           Cambiar Paciente
         </Button>
-        
-        <JennerFooter />
       </div>
 
       {/* Test Modal */}
