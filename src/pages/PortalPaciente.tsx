@@ -88,6 +88,8 @@ export default function PortalPaciente() {
 
   const { toast, dismiss } = useToast();
   const lastNotificationBoxRef = useRef<string | null>(null);
+  const prevEstadoRef = useRef<string | null>(null);
+  const prevBoxIdRef = useRef<string | null>(null);
 
   // Normalize RUT: remove all dots, dashes, spaces and convert to uppercase
   // Always uses: 12345678K (no dots, no dash, uppercase)
@@ -493,65 +495,131 @@ export default function PortalPaciente() {
     [toast, dismiss]
   );
 
-  // Listen for real-time updates when patient is called
-  useEffect(() => {
-    if (!paciente?.id) return;
-
-    const channel = supabase
-      .channel("atencion-updates")
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "atenciones",
-          filter: `paciente_id=eq.${paciente.id}`
-        },
-        async (payload) => {
-          const newAtencion = payload.new as any;
-          
-          // Check if patient was just called to a box
-          if (newAtencion.estado === "en_atencion" && newAtencion.box_id && atencion?.estado !== "en_atencion") {
-            // Get box name
-            const { data: boxData } = await supabase
-              .from("boxes")
-              .select("nombre")
-              .eq("id", newAtencion.box_id)
-              .single();
-
-            if (boxData) {
-              triggerNotification(boxData.nombre);
-            }
-          }
-
-          // Update atencion state
-          await cargarDatosPaciente(paciente.id);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [paciente?.id, atencion?.estado, triggerNotification]);
-
-  // Polling fallback for mobile (realtime may not work when app is in background)
-  // Check every 3 seconds if the patient was called
+  // Simple polling approach - fetch data every 3 seconds and check for changes
   useEffect(() => {
     if (!paciente?.id || step !== "portal") return;
 
-    // Keep track of last known box_id to detect changes
-    let lastKnownBoxId: string | null = atencion?.box_id || null;
-    let lastKnownEstado: string | null = atencion?.estado || null;
+    const fetchAtencionData = async () => {
+      try {
+        const today = new Date();
+        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).toISOString();
+        const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).toISOString();
 
-    const checkForCall = async () => {
+        // Simple direct query
+        const { data: atencionData, error } = await supabase
+          .from("atenciones")
+          .select("id, estado, box_id, numero_ingreso, fecha_ingreso")
+          .eq("paciente_id", paciente.id)
+          .gte("fecha_ingreso", startOfDay)
+          .lte("fecha_ingreso", endOfDay)
+          .order("fecha_ingreso", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (error) {
+          console.error("Error fetching atencion:", error);
+          return;
+        }
+
+        if (!atencionData) return;
+
+        console.log("[Portal] Fetched atencion:", atencionData.estado, atencionData.box_id);
+
+        // Check if patient was just called (transition to en_atencion with box_id)
+        const wasJustCalled = 
+          atencionData.estado === "en_atencion" && 
+          atencionData.box_id && 
+          (prevEstadoRef.current !== "en_atencion" || prevBoxIdRef.current !== atencionData.box_id);
+
+        // Update refs BEFORE triggering notification
+        prevEstadoRef.current = atencionData.estado;
+        prevBoxIdRef.current = atencionData.box_id;
+
+        // Fetch box name and exams separately for full data
+        let boxNombre: string | null = null;
+        if (atencionData.box_id) {
+          const { data: boxData } = await supabase
+            .from("boxes")
+            .select("nombre")
+            .eq("id", atencionData.box_id)
+            .single();
+          boxNombre = boxData?.nombre || null;
+          if (boxNombre) setBoxNombreManual(boxNombre);
+        }
+
+        // Fetch exams
+        const { data: examenesData } = await supabase
+          .from("atencion_examenes")
+          .select("id, examen_id, estado, examenes(id, nombre)")
+          .eq("atencion_id", atencionData.id);
+
+        // Build complete atencion object
+        const fullAtencion: Atencion = {
+          id: atencionData.id,
+          estado: atencionData.estado,
+          box_id: atencionData.box_id,
+          numero_ingreso: atencionData.numero_ingreso,
+          fecha_ingreso: atencionData.fecha_ingreso,
+          boxes: boxNombre ? { nombre: boxNombre } : null,
+          atencion_examenes: (examenesData || []).map((ae: any) => ({
+            id: ae.id,
+            examen_id: ae.examen_id,
+            estado: ae.estado,
+            examenes: ae.examenes
+          }))
+        };
+
+        // Update state
+        setAtencion(fullAtencion);
+
+        // Trigger notification if just called
+        if (wasJustCalled && boxNombre) {
+          console.log("[Portal] Patient called to box:", boxNombre);
+          triggerNotification(boxNombre);
+        }
+
+        // Load empresa if needed
+        const { data: pacienteData } = await supabase
+          .from("pacientes")
+          .select("empresa_id")
+          .eq("id", paciente.id)
+          .single();
+
+        if (pacienteData?.empresa_id && !empresa) {
+          const { data: empresaData } = await supabase
+            .from("empresas")
+            .select("id, nombre")
+            .eq("id", pacienteData.empresa_id)
+            .single();
+          if (empresaData) setEmpresa(empresaData);
+        }
+
+      } catch (error) {
+        console.error("[Portal] Error in polling:", error);
+      }
+    };
+
+    // Initial fetch
+    fetchAtencionData();
+
+    // Poll every 3 seconds
+    const interval = setInterval(fetchAtencionData, 3000);
+
+    return () => clearInterval(interval);
+  }, [paciente?.id, step, triggerNotification, empresa]);
+
+  // Manual refresh function
+  const refreshData = useCallback(async () => {
+    if (!paciente?.id || isRefreshing) return;
+    setIsRefreshing(true);
+    try {
       const today = new Date();
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).toISOString();
       const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).toISOString();
 
       const { data: atencionData } = await supabase
         .from("atenciones")
-        .select("*, boxes(nombre), atencion_examenes(*, examenes(*))")
+        .select("id, estado, box_id, numero_ingreso, fecha_ingreso")
         .eq("paciente_id", paciente.id)
         .gte("fecha_ingreso", startOfDay)
         .lte("fecha_ingreso", endOfDay)
@@ -559,62 +627,38 @@ export default function PortalPaciente() {
         .limit(1)
         .maybeSingle();
 
-      console.log("[PortalPaciente polling] atencionData:", atencionData);
-
       if (atencionData) {
-        const typedAtencion = atencionData as Atencion;
-
-        // Detect if patient was JUST called to a box (state changed to en_atencion with a box_id)
-        const wasJustCalled =
-          typedAtencion.estado === "en_atencion" &&
-          typedAtencion.box_id &&
-          (lastKnownEstado !== "en_atencion" || lastKnownBoxId !== typedAtencion.box_id);
-
-        if (wasJustCalled) {
-          // Asegurar que tenemos nombre de box, aún si el join viene vacío
-          let boxName = typedAtencion.boxes?.nombre || null;
-
-          if (!boxName && typedAtencion.box_id) {
-            const { data: boxData } = await supabase
-              .from("boxes")
-              .select("nombre")
-              .eq("id", typedAtencion.box_id)
-              .single();
-
-            boxName = boxData?.nombre || null;
-            if (boxName) {
-              setBoxNombreManual(boxName);
-            }
-          }
-
-          if (boxName) {
-            console.log("Patient called to box (polling):", boxName);
-            triggerNotification(boxName);
-          }
+        let boxNombre: string | null = null;
+        if (atencionData.box_id) {
+          const { data: boxData } = await supabase
+            .from("boxes")
+            .select("nombre")
+            .eq("id", atencionData.box_id)
+            .single();
+          boxNombre = boxData?.nombre || null;
         }
 
-        // Update tracking variables
-        lastKnownBoxId = typedAtencion.box_id;
-        lastKnownEstado = typedAtencion.estado;
+        const { data: examenesData } = await supabase
+          .from("atencion_examenes")
+          .select("id, examen_id, estado, examenes(id, nombre)")
+          .eq("atencion_id", atencionData.id);
 
-        // Always update local state so estado y box se vean correctos
-        setAtencion(typedAtencion);
+        setAtencion({
+          id: atencionData.id,
+          estado: atencionData.estado,
+          box_id: atencionData.box_id,
+          numero_ingreso: atencionData.numero_ingreso,
+          fecha_ingreso: atencionData.fecha_ingreso,
+          boxes: boxNombre ? { nombre: boxNombre } : null,
+          atencion_examenes: (examenesData || []).map((ae: any) => ({
+            id: ae.id,
+            examen_id: ae.examen_id,
+            estado: ae.estado,
+            examenes: ae.examenes
+          }))
+        });
       }
-    };
 
-    // Check immediately and then every 3 seconds
-    checkForCall();
-    const interval = setInterval(checkForCall, 3000);
-
-    return () => clearInterval(interval);
-  }, [paciente?.id, step, atencion?.box_id, atencion?.estado, triggerNotification]);
-
-  // Manual refresh function
-  const refreshData = useCallback(async () => {
-    if (!paciente?.id || isRefreshing) return;
-    setIsRefreshing(true);
-    try {
-      await cargarDatosPaciente(paciente.id);
       toast({
         title: "Actualizado",
         description: "Información actualizada correctamente",
@@ -624,18 +668,7 @@ export default function PortalPaciente() {
     } finally {
       setIsRefreshing(false);
     }
-  }, [paciente?.id, isRefreshing]);
-
-  // Auto-refresh every 10 seconds
-  useEffect(() => {
-    if (!paciente?.id || step !== "portal") return;
-
-    const interval = setInterval(() => {
-      cargarDatosPaciente(paciente.id);
-    }, 10000);
-
-    return () => clearInterval(interval);
-  }, [paciente?.id, step]);
+  }, [paciente?.id, isRefreshing, toast]);
 
   const isTestCompleted = (testId: string) => {
     return testTracking.some(t => t.examen_test_id === testId);
