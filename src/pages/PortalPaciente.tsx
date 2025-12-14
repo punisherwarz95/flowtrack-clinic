@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { Loader2, Bell, ExternalLink, CheckCircle2, Clock, Building2, FileText, AlertCircle, X, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format } from "date-fns";
@@ -70,8 +71,6 @@ export default function PortalPaciente() {
   const [empresa, setEmpresa] = useState<Empresa | null>(null);
   const [examenTests, setExamenTests] = useState<ExamenTest[]>([]);
   const [testTracking, setTestTracking] = useState<TestTracking[]>([]);
-  const [llamadoActivo, setLlamadoActivo] = useState(false);
-  const [boxLlamado, setBoxLlamado] = useState<string | null>(null);
   const [testModalOpen, setTestModalOpen] = useState(false);
   const [currentTest, setCurrentTest] = useState<ExamenTest | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -458,16 +457,18 @@ export default function PortalPaciente() {
     setCurrentTest(null);
   };
 
-  // Function to trigger notification (show popup)
+  // Function to trigger notification (show toast)
   const triggerNotification = useCallback((boxName: string) => {
     console.log("Triggering notification for box:", boxName);
-    setBoxLlamado(boxName);
-    setLlamadoActivo(true);
-  }, []);
-
-  // Stop notification when user acknowledges
-  const stopNotification = useCallback(() => {
-    setLlamadoActivo(false);
+    toast({
+      title: "¡ES SU TURNO!",
+      description: `Está siendo llamado del box ${boxName}`,
+      action: (
+        <ToastAction altText="Entendido">
+          OK
+        </ToastAction>
+      ),
+    });
   }, []);
 
   // Listen for real-time updates when patient is called
@@ -522,9 +523,6 @@ export default function PortalPaciente() {
     let lastKnownEstado: string | null = atencion?.estado || null;
 
     const checkForCall = async () => {
-      // Don't check if notification is already showing
-      if (llamadoActivo) return;
-
       const today = new Date();
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).toISOString();
       const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).toISOString();
@@ -548,19 +546,14 @@ export default function PortalPaciente() {
           (lastKnownEstado !== "en_atencion" || lastKnownBoxId !== atencionData.box_id);
 
         if (wasJustCalled) {
-          console.log("Patient called to box:", atencionData.boxes.nombre);
+          console.log("Patient called to box (polling):", atencionData.boxes.nombre);
           triggerNotification(atencionData.boxes.nombre);
+          await cargarDatosPaciente(paciente.id);
         }
 
         // Update tracking variables
         lastKnownBoxId = atencionData.box_id;
         lastKnownEstado = atencionData.estado;
-
-        // Update local state
-        setAtencion({
-          ...atencionData,
-          atencion_examenes: atencion?.atencion_examenes || []
-        });
       }
     };
 
@@ -569,7 +562,7 @@ export default function PortalPaciente() {
     const interval = setInterval(checkForCall, 3000);
 
     return () => clearInterval(interval);
-  }, [paciente?.id, step, llamadoActivo, triggerNotification]);
+  }, [paciente?.id, step, atencion?.box_id, atencion?.estado, triggerNotification]);
 
   // Manual refresh function
   const refreshData = useCallback(async () => {
@@ -749,33 +742,6 @@ export default function PortalPaciente() {
   // Portal view
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10 p-4">
-      {/* Notification popup when called - FULL SCREEN overlay */}
-      {llamadoActivo && (
-        <div 
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-green-600"
-        >
-          <div className="text-center text-white p-8 w-full max-w-md">
-            <div className="mb-6">
-              <Bell className="h-24 w-24 mx-auto drop-shadow-2xl animate-bounce" />
-            </div>
-            <h1 className="text-4xl font-black mb-4 drop-shadow-lg">
-              ¡ES SU TURNO!
-            </h1>
-            <p className="text-2xl mb-4 font-medium opacity-90">Está siendo llamado del</p>
-            <div className="bg-white/30 backdrop-blur rounded-3xl p-6 mb-6 shadow-2xl border-4 border-white/50">
-              <p className="text-5xl font-black drop-shadow-md">{boxLlamado}</p>
-            </div>
-            <Button 
-              variant="secondary" 
-              size="lg" 
-              className="text-xl px-12 py-6 h-auto font-bold shadow-xl bg-white text-green-700 hover:bg-white/90"
-              onClick={stopNotification}
-            >
-              OK
-            </Button>
-          </div>
-        </div>
-      )}
 
       <div className="max-w-lg mx-auto space-y-4">
         {/* Header */}
