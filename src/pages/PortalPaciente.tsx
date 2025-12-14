@@ -5,9 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
-import { Loader2, Bell, ExternalLink, CheckCircle2, Clock, Building2, FileText, AlertCircle, X, RefreshCw } from "lucide-react";
+import { Loader2, ExternalLink, CheckCircle2, Clock, Building2, FileText, AlertCircle, X, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -84,6 +84,8 @@ export default function PortalPaciente() {
     telefono: "",
     direccion: ""
   });
+
+  const { toast, dismiss } = useToast();
 
   // Normalize RUT: remove all dots, dashes, spaces and convert to uppercase
   // Always uses: 12345678K (no dots, no dash, uppercase)
@@ -457,19 +459,23 @@ export default function PortalPaciente() {
     setCurrentTest(null);
   };
 
-  // Function to trigger notification (show toast)
-  const triggerNotification = useCallback((boxName: string) => {
-    console.log("Triggering notification for box:", boxName);
-    toast({
-      title: "¡ES SU TURNO!",
-      description: `Está siendo llamado del box ${boxName}`,
-      action: (
-        <ToastAction altText="Entendido">
-          OK
-        </ToastAction>
-      ),
-    });
-  }, []);
+  // Function to trigger notification (show persistent toast until OK)
+  const triggerNotification = useCallback(
+    (boxName: string) => {
+      console.log("Triggering notification for box:", boxName);
+      const { id } = toast({
+        title: "¡ES SU TURNO!",
+        description: `Está siendo llamado del box ${boxName}`,
+        duration: 0,
+        action: (
+          <ToastAction altText="Entendido" onClick={() => dismiss(id)}>
+            OK
+          </ToastAction>
+        ),
+      });
+    },
+    [toast, dismiss]
+  );
 
   // Listen for real-time updates when patient is called
   useEffect(() => {
@@ -529,7 +535,7 @@ export default function PortalPaciente() {
 
       const { data: atencionData } = await supabase
         .from("atenciones")
-        .select("*, boxes(nombre)")
+        .select("*, boxes(nombre), atencion_examenes(*, examenes(*))")
         .eq("paciente_id", paciente.id)
         .gte("fecha_ingreso", startOfDay)
         .lte("fecha_ingreso", endOfDay)
@@ -538,22 +544,26 @@ export default function PortalPaciente() {
         .maybeSingle();
 
       if (atencionData) {
+        const typedAtencion = atencionData as Atencion;
+
         // Detect if patient was JUST called to a box (state changed to en_atencion with a box)
         const wasJustCalled = 
-          atencionData.estado === "en_atencion" && 
-          atencionData.box_id && 
-          atencionData.boxes?.nombre &&
-          (lastKnownEstado !== "en_atencion" || lastKnownBoxId !== atencionData.box_id);
+          typedAtencion.estado === "en_atencion" && 
+          typedAtencion.box_id && 
+          typedAtencion.boxes?.nombre &&
+          (lastKnownEstado !== "en_atencion" || lastKnownBoxId !== typedAtencion.box_id);
 
         if (wasJustCalled) {
-          console.log("Patient called to box (polling):", atencionData.boxes.nombre);
-          triggerNotification(atencionData.boxes.nombre);
-          await cargarDatosPaciente(paciente.id);
+          console.log("Patient called to box (polling):", typedAtencion.boxes?.nombre);
+          triggerNotification(typedAtencion.boxes!.nombre);
         }
 
         // Update tracking variables
-        lastKnownBoxId = atencionData.box_id;
-        lastKnownEstado = atencionData.estado;
+        lastKnownBoxId = typedAtencion.box_id;
+        lastKnownEstado = typedAtencion.estado;
+
+        // Always update local state so estado y box se vean correctos
+        setAtencion(typedAtencion);
       }
     };
 
