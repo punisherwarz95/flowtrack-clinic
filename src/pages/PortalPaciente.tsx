@@ -74,7 +74,6 @@ export default function PortalPaciente() {
   const [boxLlamado, setBoxLlamado] = useState<string | null>(null);
   const [testModalOpen, setTestModalOpen] = useState(false);
   const [currentTest, setCurrentTest] = useState<ExamenTest | null>(null);
-  const [lastNotificationBox, setLastNotificationBox] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Form fields for new registration
@@ -464,7 +463,6 @@ export default function PortalPaciente() {
     console.log("Triggering notification for box:", boxName);
     setBoxLlamado(boxName);
     setLlamadoActivo(true);
-    setLastNotificationBox(boxName);
   }, []);
 
   // Stop notification when user acknowledges
@@ -519,7 +517,14 @@ export default function PortalPaciente() {
   useEffect(() => {
     if (!paciente?.id || step !== "portal") return;
 
+    // Keep track of last known box_id to detect changes
+    let lastKnownBoxId: string | null = atencion?.box_id || null;
+    let lastKnownEstado: string | null = atencion?.estado || null;
+
     const checkForCall = async () => {
+      // Don't check if notification is already showing
+      if (llamadoActivo) return;
+
       const today = new Date();
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).toISOString();
       const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).toISOString();
@@ -535,17 +540,21 @@ export default function PortalPaciente() {
         .maybeSingle();
 
       if (atencionData) {
-        // If patient was called to a box and we haven't shown the notification yet
-        if (
+        // Detect if patient was JUST called to a box (state changed to en_atencion with a box)
+        const wasJustCalled = 
           atencionData.estado === "en_atencion" && 
           atencionData.box_id && 
           atencionData.boxes?.nombre &&
-          atencion?.estado !== "en_atencion" &&
-          !llamadoActivo &&
-          atencionData.boxes.nombre !== lastNotificationBox
-        ) {
+          (lastKnownEstado !== "en_atencion" || lastKnownBoxId !== atencionData.box_id);
+
+        if (wasJustCalled) {
+          console.log("Patient called to box:", atencionData.boxes.nombre);
           triggerNotification(atencionData.boxes.nombre);
         }
+
+        // Update tracking variables
+        lastKnownBoxId = atencionData.box_id;
+        lastKnownEstado = atencionData.estado;
 
         // Update local state
         setAtencion({
@@ -560,7 +569,7 @@ export default function PortalPaciente() {
     const interval = setInterval(checkForCall, 3000);
 
     return () => clearInterval(interval);
-  }, [paciente?.id, step, atencion?.estado, llamadoActivo, lastNotificationBox, triggerNotification]);
+  }, [paciente?.id, step, llamadoActivo, triggerNotification]);
 
   // Manual refresh function
   const refreshData = useCallback(async () => {
