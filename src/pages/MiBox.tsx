@@ -170,7 +170,7 @@ const MiBox = () => {
             .from("atencion_examenes")
             .select("id, examenes(nombre)")
             .eq("atencion_id", atencion.id)
-            .eq("estado", "pendiente")
+            .in("estado", ["pendiente", "incompleto"])
             .in("examen_id", boxExamIds);
 
           if (examenes && examenes.length > 0) {
@@ -198,7 +198,7 @@ const MiBox = () => {
             .from("atencion_examenes")
             .select("id")
             .eq("atencion_id", atencion.id)
-            .eq("estado", "pendiente")
+            .in("estado", ["pendiente", "incompleto"])
             .in("examen_id", boxExamIds);
 
           if (examenes && examenes.length > 0) {
@@ -262,7 +262,7 @@ const MiBox = () => {
       .from("atencion_examenes")
       .select("id, examen_id, estado, examenes(nombre)")
       .eq("atencion_id", atencionId)
-      .eq("estado", "pendiente")
+      .in("estado", ["pendiente", "incompleto"])
       .in("examen_id", boxExamIds);
 
     if (error) {
@@ -372,7 +372,7 @@ const MiBox = () => {
         .from("atencion_examenes")
         .select("id")
         .eq("atencion_id", atencionId)
-        .eq("estado", "pendiente");
+        .in("estado", ["pendiente", "incompleto"]);
 
       if (examenesPendientesData && examenesPendientesData.length > 0) {
         // Si quedan exámenes pendientes, devolver a espera
