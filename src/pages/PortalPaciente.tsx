@@ -495,7 +495,7 @@ export default function PortalPaciente() {
     [toast, dismiss]
   );
 
-  // Simple polling approach - fetch data every 3 seconds and check for changes
+  // Simple polling approach - same logic as Flujo uses
   useEffect(() => {
     if (!paciente?.id || step !== "portal") return;
 
@@ -505,10 +505,10 @@ export default function PortalPaciente() {
         const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).toISOString();
         const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).toISOString();
 
-        // Simple direct query
+        // Use same query pattern as Flujo - single query with joins
         const { data: atencionData, error } = await supabase
           .from("atenciones")
-          .select("id, estado, box_id, numero_ingreso, fecha_ingreso")
+          .select("*, boxes(*), atencion_examenes(*, examenes(*))")
           .eq("paciente_id", paciente.id)
           .gte("fecha_ingreso", startOfDay)
           .lte("fecha_ingreso", endOfDay)
@@ -523,7 +523,9 @@ export default function PortalPaciente() {
 
         if (!atencionData) return;
 
-        console.log("[Portal] Fetched atencion:", atencionData.estado, atencionData.box_id);
+        const boxNombre = atencionData.boxes?.nombre || null;
+        
+        console.log("[Portal] Fetched:", atencionData.estado, "box:", boxNombre);
 
         // Check if patient was just called (transition to en_atencion with box_id)
         const wasJustCalled = 
@@ -535,25 +537,7 @@ export default function PortalPaciente() {
         prevEstadoRef.current = atencionData.estado;
         prevBoxIdRef.current = atencionData.box_id;
 
-        // Fetch box name and exams separately for full data
-        let boxNombre: string | null = null;
-        if (atencionData.box_id) {
-          const { data: boxData } = await supabase
-            .from("boxes")
-            .select("nombre")
-            .eq("id", atencionData.box_id)
-            .single();
-          boxNombre = boxData?.nombre || null;
-          if (boxNombre) setBoxNombreManual(boxNombre);
-        }
-
-        // Fetch exams
-        const { data: examenesData } = await supabase
-          .from("atencion_examenes")
-          .select("id, examen_id, estado, examenes(id, nombre)")
-          .eq("atencion_id", atencionData.id);
-
-        // Build complete atencion object
+        // Build atencion object matching interface
         const fullAtencion: Atencion = {
           id: atencionData.id,
           estado: atencionData.estado,
@@ -561,7 +545,7 @@ export default function PortalPaciente() {
           numero_ingreso: atencionData.numero_ingreso,
           fecha_ingreso: atencionData.fecha_ingreso,
           boxes: boxNombre ? { nombre: boxNombre } : null,
-          atencion_examenes: (examenesData || []).map((ae: any) => ({
+          atencion_examenes: (atencionData.atencion_examenes || []).map((ae: any) => ({
             id: ae.id,
             examen_id: ae.examen_id,
             estado: ae.estado,
@@ -571,6 +555,7 @@ export default function PortalPaciente() {
 
         // Update state
         setAtencion(fullAtencion);
+        if (boxNombre) setBoxNombreManual(boxNombre);
 
         // Trigger notification if just called
         if (wasJustCalled && boxNombre) {
