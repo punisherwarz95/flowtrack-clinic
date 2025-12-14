@@ -683,9 +683,9 @@ const Flujo = () => {
                             </CollapsibleTrigger>
                             <CollapsibleContent className="mt-2 space-y-2 data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up">
                               {(() => {
-                                const examenPorBox: { [boxNombre: string]: string[] } = {};
+                                const examenPorBox: { [boxNombre: string]: { nombre: string; estado: string }[] } = {};
                                 atencionExamenes[atencion.id]
-                                  ?.filter((ae) => ae.estado === "pendiente")
+                                  ?.filter((ae) => ae.estado === "pendiente" || ae.estado === "incompleto")
                                   .forEach((ae) => {
                                     const boxConExamen = boxes.find((box) =>
                                       box.box_examenes.some((be) => be.examen_id === ae.examen_id)
@@ -694,7 +694,7 @@ const Flujo = () => {
                                     if (!examenPorBox[boxNombre]) {
                                       examenPorBox[boxNombre] = [];
                                     }
-                                    examenPorBox[boxNombre].push(ae.examenes.nombre);
+                                    examenPorBox[boxNombre].push({ nombre: ae.examenes.nombre, estado: ae.estado });
                                   });
                                 return Object.entries(examenPorBox).map(([boxNombre, examenes]) => (
                                   <div key={boxNombre} className="pl-4 border-l-2 border-primary/30">
@@ -703,8 +703,12 @@ const Flujo = () => {
                                     </div>
                                     <div className="flex flex-wrap gap-1">
                                       {examenes.map((examen, idx) => (
-                                        <Badge key={idx} variant="secondary" className="text-xs py-0 px-2">
-                                          {examen}
+                                        <Badge 
+                                          key={idx} 
+                                          variant={examen.estado === "incompleto" ? "outline" : "secondary"} 
+                                          className={`text-xs py-0 px-2 ${examen.estado === "incompleto" ? "border-warning text-warning" : ""}`}
+                                        >
+                                          {examen.nombre}{examen.estado === "incompleto" ? " (I)" : ""}
                                         </Badge>
                                       ))}
                                     </div>
