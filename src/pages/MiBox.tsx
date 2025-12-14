@@ -365,7 +365,7 @@ const MiBox = () => {
           .update({ estado: "completado", fecha_realizacion: new Date().toISOString() })
           .eq("atencion_id", atencionId)
           .in("examen_id", boxExamIds)
-          .eq("estado", "pendiente");
+          .in("estado", ["pendiente", "incompleto"]);
       }
 
       const { data: examenesPendientesData } = await supabase
