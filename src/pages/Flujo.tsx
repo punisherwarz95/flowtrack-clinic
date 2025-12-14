@@ -162,16 +162,18 @@ const Flujo = () => {
         // Incluir pendientes e incompletos
         const { data: atencionExamenes, error } = await supabase
           .from("atencion_examenes")
-          .select("examen_id")
+          .select("examen_id, estado")
           .eq("atencion_id", atencion.id)
           .in("estado", ["pendiente", "incompleto"]);
 
         if (error) throw error;
 
-        const examenesIds = atencionExamenes?.map(ae => ae.examen_id) || [];
-        const nombresExamenes = examenesList
-          .filter(ex => examenesIds.includes(ex.id))
-          .map(ex => ex.nombre);
+        const nombresExamenes = (atencionExamenes || []).map(ae => {
+          const examen = examenesList.find(ex => ex.id === ae.examen_id);
+          const nombre = examen?.nombre || "";
+          // Agregar indicador si es incompleto
+          return ae.estado === "incompleto" ? `${nombre} (I)` : nombre;
+        }).filter(n => n);
 
         newExamenesPendientes[atencion.id] = nombresExamenes;
       } catch (error) {
