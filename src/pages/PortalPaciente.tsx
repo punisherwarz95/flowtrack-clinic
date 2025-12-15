@@ -74,7 +74,6 @@ export default function PortalPaciente() {
   const [testModalOpen, setTestModalOpen] = useState(false);
   const [currentTest, setCurrentTest] = useState<ExamenTest | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [boxNombreManual, setBoxNombreManual] = useState<string | null>(null);
   
   // Form fields for new registration
   const [formData, setFormData] = useState({
@@ -91,44 +90,32 @@ export default function PortalPaciente() {
   const prevEstadoRef = useRef<string | null>(null);
   const prevBoxIdRef = useRef<string | null>(null);
 
-  // Normalize RUT: remove all dots, dashes, spaces and convert to uppercase
-  // Always uses: 12345678K (no dots, no dash, uppercase)
+  // Normalize RUT
   const normalizeRut = (value: string) => {
     return value.replace(/[^0-9kK]/g, "").toUpperCase();
   };
 
-  // Given ANY input, generate all possible stored variants we want to match
-  // - normalized: 12345678K
-  // - with dash: 12345678-K
-  // - with dots + dash: 12.345.678-K
   const getRutVariants = (value: string): string[] => {
     const variants = new Set<string>();
     const cleaned = normalizeRut(value);
 
     if (!cleaned) return [];
 
-    // 1) Normalizado sin puntos ni guion
     variants.add(cleaned);
 
     if (cleaned.length > 1) {
       const body = cleaned.slice(0, -1);
       const dv = cleaned.slice(-1);
-
-      // 2) Solo guion
       variants.add(`${body}-${dv}`);
-
-      // 3) Puntos + guion
       const bodyWithDots = body.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
       variants.add(`${bodyWithDots}-${dv}`);
     }
 
-    // 4) También agregar el valor tal como lo escribió el usuario (por compatibilidad)
     variants.add(value.trim());
 
     return Array.from(variants).filter(Boolean);
   };
 
-  // Format RUT for display (with dots and dash)
   const formatRutForDisplay = (value: string) => {
     const cleaned = normalizeRut(value);
     
@@ -143,7 +130,6 @@ export default function PortalPaciente() {
   };
 
   const handleRutChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Store normalized version but display formatted
     const formatted = formatRutForDisplay(e.target.value);
     setRut(formatted);
   };
@@ -163,12 +149,10 @@ export default function PortalPaciente() {
       return;
     }
 
-    // Generar todas las variantes posibles para la búsqueda (compatibilidad hacia atrás)
     const rutVariants = getRutVariants(rut);
 
     setIsLoading(true);
     try {
-      // Search for patient by any RUT variant
       const { data: pacienteData, error: pacienteError } = await supabase
         .from("pacientes")
         .select("*")
@@ -180,18 +164,14 @@ export default function PortalPaciente() {
       if (pacienteData) {
         setPaciente(pacienteData);
         
-        // Check if patient already has an attention for today
         const today = new Date();
         const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).toISOString();
         const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).toISOString();
 
+        // Misma query que Flujo - un solo select con joins
         const { data: existingAtencion } = await supabase
           .from("atenciones")
-          .select(`
-            *,
-            boxes(nombre),
-            atencion_examenes(*, examenes(*))
-          `)
+          .select("*, pacientes(id, nombre, rut, tipo_servicio), boxes(*)")
           .eq("paciente_id", pacienteData.id)
           .gte("fecha_ingreso", startOfDay)
           .lte("fecha_ingreso", endOfDay)
@@ -200,10 +180,31 @@ export default function PortalPaciente() {
           .maybeSingle();
 
         if (existingAtencion) {
-          // Patient already has attention for today, use it
-          setAtencion(existingAtencion);
+          // Cargar exámenes por separado
+          const { data: examenesData } = await supabase
+            .from("atencion_examenes")
+            .select("id, examen_id, estado, examenes(id, nombre)")
+            .eq("atencion_id", existingAtencion.id);
+
+          const atencionCompleta: Atencion = {
+            id: existingAtencion.id,
+            estado: existingAtencion.estado,
+            box_id: existingAtencion.box_id,
+            numero_ingreso: existingAtencion.numero_ingreso,
+            fecha_ingreso: existingAtencion.fecha_ingreso,
+            boxes: existingAtencion.boxes,
+            atencion_examenes: (examenesData || []).map((ae: any) => ({
+              id: ae.id,
+              examen_id: ae.examen_id,
+              estado: ae.estado,
+              examenes: ae.examenes
+            }))
+          };
+
+          setAtencion(atencionCompleta);
+          prevEstadoRef.current = existingAtencion.estado;
+          prevBoxIdRef.current = existingAtencion.box_id;
           
-          // Load empresa if patient has one
           if (pacienteData.empresa_id) {
             const { data: empresaData } = await supabase
               .from("empresas")
@@ -219,7 +220,6 @@ export default function PortalPaciente() {
             description: `Su número de atención es #${existingAtencion.numero_ingreso}`,
           });
         } else {
-          // Patient exists but no attention for today, create one
           const { data: newAtencion, error: atencionError } = await supabase
             .from("atenciones")
             .insert({
@@ -227,18 +227,18 @@ export default function PortalPaciente() {
               estado: "en_espera",
               fecha_ingreso: new Date().toISOString()
             })
-            .select(`
-              *,
-              boxes(nombre),
-              atencion_examenes(*, examenes(*))
-            `)
+            .select("*, boxes(*)")
             .single();
 
           if (atencionError) throw atencionError;
 
-          setAtencion(newAtencion);
+          setAtencion({
+            ...newAtencion,
+            atencion_examenes: []
+          });
+          prevEstadoRef.current = "en_espera";
+          prevBoxIdRef.current = null;
           
-          // Load empresa if patient has one
           if (pacienteData.empresa_id) {
             const { data: empresaData } = await supabase
               .from("empresas")
@@ -257,7 +257,6 @@ export default function PortalPaciente() {
         
         setStep("portal");
       } else {
-        // Patient not found, go to registration
         setFormData(prev => ({ ...prev, rut: rut }));
         setStep("registro");
       }
@@ -273,75 +272,6 @@ export default function PortalPaciente() {
     }
   };
 
-  const cargarDatosPaciente = async (pacienteId: string) => {
-    try {
-      // Get today's attention
-      const today = new Date();
-      const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
-      const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString();
-
-      const { data: atencionData, error: atencionError } = await supabase
-        .from("atenciones")
-        .select(`
-          *,
-          boxes(nombre),
-          atencion_examenes(*, examenes(*))
-        `)
-        .eq("paciente_id", pacienteId)
-        .gte("fecha_ingreso", startOfDay)
-        .lte("fecha_ingreso", endOfDay)
-        .order("fecha_ingreso", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (atencionError) throw atencionError;
-
-      if (atencionData) {
-        setAtencion(atencionData);
-        
-        // Load empresa if paciente has one
-        const { data: pacienteCompleto } = await supabase
-          .from("pacientes")
-          .select("empresa_id")
-          .eq("id", pacienteId)
-          .single();
-
-        if (pacienteCompleto?.empresa_id) {
-          const { data: empresaData } = await supabase
-            .from("empresas")
-            .select("*")
-            .eq("id", pacienteCompleto.empresa_id)
-            .single();
-          
-          if (empresaData) setEmpresa(empresaData);
-        }
-
-        // Load tests for assigned exams
-        const examenIds = atencionData.atencion_examenes.map((ae: AtencionExamen) => ae.examen_id);
-        if (examenIds.length > 0) {
-          const { data: testsData } = await supabase
-            .from("examen_tests" as any)
-            .select("*")
-            .in("examen_id", examenIds)
-            .eq("activo", true)
-            .order("orden") as { data: ExamenTest[] | null };
-
-          if (testsData) setExamenTests(testsData);
-
-          // Load tracking
-          const { data: trackingData } = await supabase
-            .from("paciente_test_tracking" as any)
-            .select("*")
-            .eq("atencion_id", atencionData.id) as { data: TestTracking[] | null };
-
-          if (trackingData) setTestTracking(trackingData);
-        }
-      }
-    } catch (error) {
-      console.error("Error cargando datos:", error);
-    }
-  };
-
   const registrarPaciente = async () => {
     if (!formData.nombre.trim() || !formData.rut.trim()) {
       toast({
@@ -352,13 +282,11 @@ export default function PortalPaciente() {
       return;
     }
 
-    // Normalize RUT for storage y generar variantes para evitar duplicados
     const rutVariants = getRutVariants(formData.rut);
     const rutNormalizado = normalizeRut(formData.rut);
 
     setIsLoading(true);
     try {
-      // Check if RUT already exists (cualquier formato conocido)
       const { data: existingPaciente } = await supabase
         .from("pacientes")
         .select("id")
@@ -377,7 +305,6 @@ export default function PortalPaciente() {
         return;
       }
 
-      // Create new patient sin empresa - SIEMPRE guardamos el RUT normalizado
       const { data: newPaciente, error } = await supabase
         .from("pacientes")
         .insert({
@@ -395,7 +322,6 @@ export default function PortalPaciente() {
 
       if (error) throw error;
 
-      // Create atencion to get numero_ingreso
       const { data: newAtencion, error: atencionError } = await supabase
         .from("atenciones")
         .insert({
@@ -409,7 +335,9 @@ export default function PortalPaciente() {
       if (atencionError) throw atencionError;
 
       setPaciente(newPaciente);
-      setAtencion({ ...newAtencion, atencion_examenes: [] });
+      setAtencion({ ...newAtencion, atencion_examenes: [], boxes: null });
+      prevEstadoRef.current = "en_espera";
+      prevBoxIdRef.current = null;
       
       toast({
         title: "Registro exitoso",
@@ -433,7 +361,6 @@ export default function PortalPaciente() {
     setCurrentTest(test);
     setTestModalOpen(true);
 
-    // Track that the test was opened
     if (atencion) {
       try {
         await supabase
@@ -446,7 +373,6 @@ export default function PortalPaciente() {
             onConflict: "atencion_id,examen_test_id"
           });
 
-        // Update local tracking
         setTestTracking(prev => {
           const exists = prev.find(t => t.examen_test_id === test.id);
           if (exists) return prev;
@@ -463,52 +389,47 @@ export default function PortalPaciente() {
     setCurrentTest(null);
   };
 
-  // Function to trigger notification (show persistent toast until OK)
-  const triggerNotification = useCallback(
-    (boxName: string) => {
-      // Evitar múltiples toasts para el mismo box
-      if (lastNotificationBoxRef.current === boxName) {
-        console.log("Notification already shown for box", boxName);
-        return;
-      }
+  // Mostrar notificación cuando el paciente es llamado
+  const mostrarNotificacionLlamado = useCallback((boxName: string) => {
+    if (lastNotificationBoxRef.current === boxName) {
+      return;
+    }
 
-      console.log("Triggering notification for box:", boxName);
-      lastNotificationBoxRef.current = boxName;
+    console.log("[Portal] Mostrando notificación para box:", boxName);
+    lastNotificationBoxRef.current = boxName;
 
-      const { id } = toast({
-        title: "¡ES SU TURNO!",
-        description: `Está siendo llamado del box ${boxName}`,
-        duration: 0,
-        action: (
-          <ToastAction
-            altText="Entendido"
-            onClick={() => {
-              dismiss(id);
-              lastNotificationBoxRef.current = null;
-            }}
-          >
-            OK
-          </ToastAction>
-        ),
-      });
-    },
-    [toast, dismiss]
-  );
+    const { id } = toast({
+      title: "¡ES SU TURNO!",
+      description: `Diríjase al box: ${boxName}`,
+      duration: 0, // Persistente hasta que el usuario cierre
+      action: (
+        <ToastAction
+          altText="Entendido"
+          onClick={() => {
+            dismiss(id);
+            lastNotificationBoxRef.current = null;
+          }}
+        >
+          OK
+        </ToastAction>
+      ),
+    });
+  }, [toast, dismiss]);
 
-  // Simple polling approach - same logic as Flujo uses
+  // Polling con la MISMA lógica que Flujo
   useEffect(() => {
     if (!paciente?.id || step !== "portal") return;
 
-    const fetchAtencionData = async () => {
+    const cargarDatos = async () => {
       try {
         const today = new Date();
         const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).toISOString();
         const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).toISOString();
 
-        // Use same query pattern as Flujo - single query with joins
+        // Query IDÉNTICA a Flujo - un solo select con join a boxes
         const { data: atencionData, error } = await supabase
           .from("atenciones")
-          .select("*, boxes(*), atencion_examenes(*, examenes(*))")
+          .select("*, pacientes(id, nombre, rut, tipo_servicio), boxes(*)")
           .eq("paciente_id", paciente.id)
           .gte("fecha_ingreso", startOfDay)
           .lte("fecha_ingreso", endOfDay)
@@ -517,35 +438,42 @@ export default function PortalPaciente() {
           .maybeSingle();
 
         if (error) {
-          console.error("Error fetching atencion:", error);
+          console.error("[Portal] Error:", error);
           return;
         }
 
         if (!atencionData) return;
 
+        // Obtener nombre del box directamente del join (como Flujo)
         const boxNombre = atencionData.boxes?.nombre || null;
         
-        console.log("[Portal] Fetched:", atencionData.estado, "box:", boxNombre);
+        console.log("[Portal] Estado:", atencionData.estado, "Box:", boxNombre);
 
-        // Check if patient was just called (transition to en_atencion with box_id)
-        const wasJustCalled = 
+        // Detectar si el paciente fue llamado (transición a en_atencion con box)
+        const fueRecienLlamado = 
           atencionData.estado === "en_atencion" && 
           atencionData.box_id && 
           (prevEstadoRef.current !== "en_atencion" || prevBoxIdRef.current !== atencionData.box_id);
 
-        // Update refs BEFORE triggering notification
+        // Actualizar refs ANTES de mostrar notificación
         prevEstadoRef.current = atencionData.estado;
         prevBoxIdRef.current = atencionData.box_id;
 
-        // Build atencion object matching interface
-        const fullAtencion: Atencion = {
+        // Cargar exámenes
+        const { data: examenesData } = await supabase
+          .from("atencion_examenes")
+          .select("id, examen_id, estado, examenes(id, nombre)")
+          .eq("atencion_id", atencionData.id);
+
+        // Construir objeto de atención
+        const atencionCompleta: Atencion = {
           id: atencionData.id,
           estado: atencionData.estado,
           box_id: atencionData.box_id,
           numero_ingreso: atencionData.numero_ingreso,
           fecha_ingreso: atencionData.fecha_ingreso,
           boxes: boxNombre ? { nombre: boxNombre } : null,
-          atencion_examenes: (atencionData.atencion_examenes || []).map((ae: any) => ({
+          atencion_examenes: (examenesData || []).map((ae: any) => ({
             id: ae.id,
             examen_id: ae.examen_id,
             estado: ae.estado,
@@ -553,47 +481,46 @@ export default function PortalPaciente() {
           }))
         };
 
-        // Update state
-        setAtencion(fullAtencion);
-        if (boxNombre) setBoxNombreManual(boxNombre);
+        setAtencion(atencionCompleta);
 
-        // Trigger notification if just called
-        if (wasJustCalled && boxNombre) {
-          console.log("[Portal] Patient called to box:", boxNombre);
-          triggerNotification(boxNombre);
+        // Mostrar notificación si fue llamado
+        if (fueRecienLlamado && boxNombre) {
+          mostrarNotificacionLlamado(boxNombre);
         }
 
-        // Load empresa if needed
-        const { data: pacienteData } = await supabase
-          .from("pacientes")
-          .select("empresa_id")
-          .eq("id", paciente.id)
-          .single();
-
-        if (pacienteData?.empresa_id && !empresa) {
-          const { data: empresaData } = await supabase
-            .from("empresas")
-            .select("id, nombre")
-            .eq("id", pacienteData.empresa_id)
+        // Cargar empresa si no está cargada
+        if (!empresa) {
+          const { data: pacienteData } = await supabase
+            .from("pacientes")
+            .select("empresa_id")
+            .eq("id", paciente.id)
             .single();
-          if (empresaData) setEmpresa(empresaData);
+
+          if (pacienteData?.empresa_id) {
+            const { data: empresaData } = await supabase
+              .from("empresas")
+              .select("id, nombre")
+              .eq("id", pacienteData.empresa_id)
+              .single();
+            if (empresaData) setEmpresa(empresaData);
+          }
         }
 
       } catch (error) {
-        console.error("[Portal] Error in polling:", error);
+        console.error("[Portal] Error en polling:", error);
       }
     };
 
-    // Initial fetch
-    fetchAtencionData();
+    // Carga inicial
+    cargarDatos();
 
-    // Poll every 3 seconds
-    const interval = setInterval(fetchAtencionData, 3000);
+    // Polling cada 3 segundos (igual que antes)
+    const interval = setInterval(cargarDatos, 3000);
 
     return () => clearInterval(interval);
-  }, [paciente?.id, step, triggerNotification, empresa]);
+  }, [paciente?.id, step, mostrarNotificacionLlamado, empresa]);
 
-  // Manual refresh function
+  // Refrescar manual
   const refreshData = useCallback(async () => {
     if (!paciente?.id || isRefreshing) return;
     setIsRefreshing(true);
@@ -604,7 +531,7 @@ export default function PortalPaciente() {
 
       const { data: atencionData } = await supabase
         .from("atenciones")
-        .select("id, estado, box_id, numero_ingreso, fecha_ingreso")
+        .select("*, boxes(*)")
         .eq("paciente_id", paciente.id)
         .gte("fecha_ingreso", startOfDay)
         .lte("fecha_ingreso", endOfDay)
@@ -613,16 +540,6 @@ export default function PortalPaciente() {
         .maybeSingle();
 
       if (atencionData) {
-        let boxNombre: string | null = null;
-        if (atencionData.box_id) {
-          const { data: boxData } = await supabase
-            .from("boxes")
-            .select("nombre")
-            .eq("id", atencionData.box_id)
-            .single();
-          boxNombre = boxData?.nombre || null;
-        }
-
         const { data: examenesData } = await supabase
           .from("atencion_examenes")
           .select("id, examen_id, estado, examenes(id, nombre)")
@@ -634,7 +551,7 @@ export default function PortalPaciente() {
           box_id: atencionData.box_id,
           numero_ingreso: atencionData.numero_ingreso,
           fecha_ingreso: atencionData.fecha_ingreso,
-          boxes: boxNombre ? { nombre: boxNombre } : null,
+          boxes: atencionData.boxes,
           atencion_examenes: (examenesData || []).map((ae: any) => ({
             id: ae.id,
             examen_id: ae.examen_id,
@@ -649,7 +566,7 @@ export default function PortalPaciente() {
         description: "Información actualizada correctamente",
       });
     } catch (error) {
-      console.error("Error refreshing data:", error);
+      console.error("Error refreshing:", error);
     } finally {
       setIsRefreshing(false);
     }
@@ -878,7 +795,7 @@ export default function PortalPaciente() {
                     }
                   >
                     {atencion.estado === "en_espera" && "En Espera"}
-                    {atencion.estado === "en_atencion" && `En Atención - ${atencion.boxes?.nombre || boxNombreManual || ""}`}
+                    {atencion.estado === "en_atencion" && `En Atención - ${atencion.boxes?.nombre || ""}`}
                     {atencion.estado === "completado" && "Completado"}
                     {atencion.estado === "incompleto" && "Incompleto"}
                   </Badge>
