@@ -490,12 +490,7 @@ export default function PortalPaciente() {
 
   // Mostrar notificación cuando el paciente es llamado
   const mostrarNotificacionLlamado = useCallback((boxName: string) => {
-    if (lastNotificationBoxRef.current === boxName) {
-      return;
-    }
-
     console.log("[Portal] Mostrando notificación para box:", boxName);
-    lastNotificationBoxRef.current = boxName;
 
     // Reproducir sonido y vibrar (Android)
     reproducirSonido();
@@ -510,7 +505,6 @@ export default function PortalPaciente() {
           altText="Entendido"
           onClick={() => {
             dismiss(id);
-            lastNotificationBoxRef.current = null;
           }}
         >
           OK
