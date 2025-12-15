@@ -89,6 +89,105 @@ export default function PortalPaciente() {
   const lastNotificationBoxRef = useRef<string | null>(null);
   const prevEstadoRef = useRef<string | null>(null);
   const prevBoxIdRef = useRef<string | null>(null);
+  
+  // Audio para Android
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioUnlockedRef = useRef<boolean>(false);
+
+  // Desbloquear audio en el primer toque (requerido para Android)
+  useEffect(() => {
+    const unlockAudio = () => {
+      if (audioUnlockedRef.current) return;
+      
+      try {
+        // Crear AudioContext
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioContextClass) {
+          audioContextRef.current = new AudioContextClass();
+          // Reproducir un sonido silencioso para desbloquear
+          const oscillator = audioContextRef.current.createOscillator();
+          const gainNode = audioContextRef.current.createGain();
+          gainNode.gain.value = 0; // Silencioso
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContextRef.current.destination);
+          oscillator.start();
+          oscillator.stop(audioContextRef.current.currentTime + 0.001);
+          audioUnlockedRef.current = true;
+          console.log("[Portal] Audio desbloqueado para Android");
+        }
+      } catch (e) {
+        console.log("[Portal] Error desbloqueando audio:", e);
+      }
+    };
+
+    // Escuchar primer toque/click
+    document.addEventListener("touchstart", unlockAudio, { once: true });
+    document.addEventListener("click", unlockAudio, { once: true });
+
+    return () => {
+      document.removeEventListener("touchstart", unlockAudio);
+      document.removeEventListener("click", unlockAudio);
+    };
+  }, []);
+
+  // Función para reproducir sonido de notificación
+  const reproducirSonido = useCallback(() => {
+    if (!audioContextRef.current || audioContextRef.current.state === "closed") {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContextClass) {
+        audioContextRef.current = new AudioContextClass();
+      }
+    }
+
+    const ctx = audioContextRef.current;
+    if (!ctx) return;
+
+    // Resumir si está suspendido
+    if (ctx.state === "suspended") {
+      ctx.resume();
+    }
+
+    try {
+      // Reproducir 3 beeps
+      const beepDuration = 0.15;
+      const beepGap = 0.1;
+      
+      for (let i = 0; i < 3; i++) {
+        const startTime = ctx.currentTime + i * (beepDuration + beepGap);
+        
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        
+        oscillator.type = "sine";
+        oscillator.frequency.value = 880; // Nota A5
+        
+        gainNode.gain.setValueAtTime(0.3, startTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + beepDuration);
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        
+        oscillator.start(startTime);
+        oscillator.stop(startTime + beepDuration);
+      }
+      console.log("[Portal] Sonido reproducido");
+    } catch (e) {
+      console.log("[Portal] Error reproduciendo sonido:", e);
+    }
+  }, []);
+
+  // Función para vibrar (Android)
+  const vibrar = useCallback(() => {
+    if ("vibrate" in navigator) {
+      try {
+        // Patrón de vibración: vibrar-pausa-vibrar-pausa-vibrar
+        navigator.vibrate([200, 100, 200, 100, 200]);
+        console.log("[Portal] Vibración activada");
+      } catch (e) {
+        console.log("[Portal] Error vibrando:", e);
+      }
+    }
+  }, []);
 
   // Normalize RUT
   const normalizeRut = (value: string) => {
@@ -398,6 +497,10 @@ export default function PortalPaciente() {
     console.log("[Portal] Mostrando notificación para box:", boxName);
     lastNotificationBoxRef.current = boxName;
 
+    // Reproducir sonido y vibrar (Android)
+    reproducirSonido();
+    vibrar();
+
     const { id } = toast({
       title: "¡ES SU TURNO!",
       description: `Diríjase al box: ${boxName}`,
@@ -414,7 +517,7 @@ export default function PortalPaciente() {
         </ToastAction>
       ),
     });
-  }, [toast, dismiss]);
+  }, [toast, dismiss, reproducirSonido, vibrar]);
 
   // Polling con la MISMA lógica que Flujo
   useEffect(() => {
