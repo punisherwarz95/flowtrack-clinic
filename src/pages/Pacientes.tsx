@@ -868,7 +868,7 @@ const Pacientes = () => {
                        {patient.email && <span>• {patient.email}</span>}
                        {patient.telefono && <span>• {patient.telefono}</span>}
                      </div>
-                     {patient.atencion_actual && (
+                     {patient.atencion_actual?.fecha_ingreso && (
                        <div className="text-xs text-muted-foreground mt-1">
                          Ingresó hoy: {format(new Date(patient.atencion_actual.fecha_ingreso), "HH:mm", { locale: es })}
                        </div>
