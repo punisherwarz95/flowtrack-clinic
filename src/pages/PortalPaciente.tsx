@@ -99,6 +99,8 @@ export default function PortalPaciente() {
   const lastNotificationBoxRef = useRef<string | null>(null);
   const prevEstadoRef = useRef<string | null>(null);
   const prevBoxIdRef = useRef<string | null>(null);
+  const prevDataHashRef = useRef<string>("");
+  const prevBoxesHashRef = useRef<string>("");
   
   // Audio para Android
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -539,8 +541,13 @@ export default function PortalPaciente() {
           .select("*, box_examenes(examen_id)")
           .eq("activo", true);
         
-        if (boxesData) {
-          setBoxes(boxesData);
+        // Solo actualizar boxes si hay cambios
+        const boxesHash = JSON.stringify(boxesData || []);
+        if (boxesHash !== prevBoxesHashRef.current) {
+          prevBoxesHashRef.current = boxesHash;
+          if (boxesData) {
+            setBoxes(boxesData);
+          }
         }
 
         // Query IDÉNTICA a Flujo - un solo select con join a boxes
@@ -563,8 +570,6 @@ export default function PortalPaciente() {
 
         // Obtener nombre del box directamente del join (como Flujo)
         const boxNombre = atencionData.boxes?.nombre || null;
-        
-        console.log("[Portal] Estado:", atencionData.estado, "Box:", boxNombre);
 
         // Detectar si el paciente fue llamado (transición a en_atencion con box)
         const fueRecienLlamado = 
@@ -582,34 +587,48 @@ export default function PortalPaciente() {
           .select("id, examen_id, estado, examenes(id, nombre)")
           .eq("atencion_id", atencionData.id);
 
-        // Construir objeto de atención
-        const atencionCompleta: Atencion = {
-          id: atencionData.id,
+        // Crear hash para comparar si hay cambios
+        const dataHash = JSON.stringify({
           estado: atencionData.estado,
           box_id: atencionData.box_id,
           numero_ingreso: atencionData.numero_ingreso,
-          fecha_ingreso: atencionData.fecha_ingreso,
-          boxes: boxNombre ? { nombre: boxNombre } : null,
-          atencion_examenes: (examenesData || []).map((ae: any) => ({
-            id: ae.id,
-            examen_id: ae.examen_id,
-            estado: ae.estado,
-            examenes: ae.examenes
-          }))
-        };
+          boxNombre,
+          examenes: examenesData
+        });
 
-        setAtencion(atencionCompleta);
+        // Solo actualizar si hay cambios reales
+        if (dataHash !== prevDataHashRef.current) {
+          prevDataHashRef.current = dataHash;
 
-        // Calcular boxes pendientes (como Flujo)
-        const examenesPendientesIds = (examenesData || [])
-          .filter((ae: any) => ae.estado === "pendiente" || ae.estado === "incompleto")
-          .map((ae: any) => ae.examen_id);
+          // Construir objeto de atención
+          const atencionCompleta: Atencion = {
+            id: atencionData.id,
+            estado: atencionData.estado,
+            box_id: atencionData.box_id,
+            numero_ingreso: atencionData.numero_ingreso,
+            fecha_ingreso: atencionData.fecha_ingreso,
+            boxes: boxNombre ? { nombre: boxNombre } : null,
+            atencion_examenes: (examenesData || []).map((ae: any) => ({
+              id: ae.id,
+              examen_id: ae.examen_id,
+              estado: ae.estado,
+              examenes: ae.examenes
+            }))
+          };
 
-        const boxesPendientes = (boxesData || [])
-          .filter(box => box.box_examenes.some((be: any) => examenesPendientesIds.includes(be.examen_id)))
-          .map(box => box.nombre);
-        
-        setPendingBoxes(boxesPendientes);
+          setAtencion(atencionCompleta);
+
+          // Calcular boxes pendientes (como Flujo)
+          const examenesPendientesIds = (examenesData || [])
+            .filter((ae: any) => ae.estado === "pendiente" || ae.estado === "incompleto")
+            .map((ae: any) => ae.examen_id);
+
+          const boxesPendientes = (boxesData || [])
+            .filter(box => box.box_examenes.some((be: any) => examenesPendientesIds.includes(be.examen_id)))
+            .map(box => box.nombre);
+          
+          setPendingBoxes(boxesPendientes);
+        }
 
         // Mostrar notificación si fue llamado
         if (fueRecienLlamado && boxNombre) {
@@ -894,7 +913,7 @@ export default function PortalPaciente() {
                 {/* Pending Boxes */}
                 {pendingBoxes.length > 0 && (
                   <div className="text-sm text-primary mt-2 font-medium">
-                    Boxes pendientes: {pendingBoxes.join(", ")}
+                    Boxes pendientes: {pendingBoxes.map(b => `Box ${b}`).join(", ")}
                   </div>
                 )}
 
@@ -978,7 +997,7 @@ export default function PortalPaciente() {
                     }`}
                   >
                     {atencion.estado === "en_espera" && "En Espera"}
-                    {atencion.estado === "en_atencion" && `En ${atencion.boxes?.nombre || "Box"}`}
+                    {atencion.estado === "en_atencion" && `En Box ${atencion.boxes?.nombre || ""}`}
                     {atencion.estado === "completado" && "Completado"}
                     {atencion.estado === "incompleto" && "Incompleto"}
                   </Badge>
