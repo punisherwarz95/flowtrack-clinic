@@ -96,6 +96,15 @@ const Login = () => {
               {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
             </Button>
           </form>
+          <div className="mt-4 pt-4 border-t">
+            <Button 
+              variant="outline" 
+              className="w-full" 
+              onClick={() => navigate("/portal-paciente")}
+            >
+              Portal Paciente
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>
