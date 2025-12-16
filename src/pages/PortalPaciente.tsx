@@ -7,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
-import { Loader2, ExternalLink, CheckCircle2, Clock, Building2, FileText, AlertCircle, X, RefreshCw } from "lucide-react";
+import { Loader2, ExternalLink, CheckCircle2, Clock, Building2, FileText, AlertCircle, X, RefreshCw, ChevronDown } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -20,6 +21,7 @@ interface Paciente {
   email: string | null;
   telefono: string | null;
   direccion: string | null;
+  tipo_servicio?: string | null;
 }
 
 interface Empresa {
@@ -37,6 +39,12 @@ interface AtencionExamen {
   examen_id: string;
   estado: string;
   examenes: Examen;
+}
+
+interface Box {
+  id: string;
+  nombre: string;
+  box_examenes: Array<{ examen_id: string }>;
 }
 
 interface Atencion {
@@ -69,6 +77,8 @@ export default function PortalPaciente() {
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [atencion, setAtencion] = useState<Atencion | null>(null);
   const [empresa, setEmpresa] = useState<Empresa | null>(null);
+  const [boxes, setBoxes] = useState<Box[]>([]);
+  const [pendingBoxes, setPendingBoxes] = useState<string[]>([]);
   const [examenTests, setExamenTests] = useState<ExamenTest[]>([]);
   const [testTracking, setTestTracking] = useState<TestTracking[]>([]);
   const [testModalOpen, setTestModalOpen] = useState(false);
@@ -523,6 +533,16 @@ export default function PortalPaciente() {
         const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).toISOString();
         const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).toISOString();
 
+        // Cargar boxes con sus exámenes (como Flujo)
+        const { data: boxesData } = await supabase
+          .from("boxes")
+          .select("*, box_examenes(examen_id)")
+          .eq("activo", true);
+        
+        if (boxesData) {
+          setBoxes(boxesData);
+        }
+
         // Query IDÉNTICA a Flujo - un solo select con join a boxes
         const { data: atencionData, error } = await supabase
           .from("atenciones")
@@ -580,6 +600,17 @@ export default function PortalPaciente() {
 
         setAtencion(atencionCompleta);
 
+        // Calcular boxes pendientes (como Flujo)
+        const examenesPendientesIds = (examenesData || [])
+          .filter((ae: any) => ae.estado === "pendiente" || ae.estado === "incompleto")
+          .map((ae: any) => ae.examen_id);
+
+        const boxesPendientes = (boxesData || [])
+          .filter(box => box.box_examenes.some((be: any) => examenesPendientesIds.includes(be.examen_id)))
+          .map(box => box.nombre);
+        
+        setPendingBoxes(boxesPendientes);
+
         // Mostrar notificación si fue llamado
         if (fueRecienLlamado && boxNombre) {
           mostrarNotificacionLlamado(boxNombre);
@@ -589,17 +620,22 @@ export default function PortalPaciente() {
         if (!empresa) {
           const { data: pacienteData } = await supabase
             .from("pacientes")
-            .select("empresa_id")
+            .select("empresa_id, tipo_servicio")
             .eq("id", paciente.id)
             .single();
 
-          if (pacienteData?.empresa_id) {
-            const { data: empresaData } = await supabase
-              .from("empresas")
-              .select("id, nombre")
-              .eq("id", pacienteData.empresa_id)
-              .single();
-            if (empresaData) setEmpresa(empresaData);
+          if (pacienteData) {
+            // Actualizar tipo_servicio del paciente
+            setPaciente(prev => prev ? { ...prev, tipo_servicio: pacienteData.tipo_servicio } : null);
+            
+            if (pacienteData.empresa_id) {
+              const { data: empresaData } = await supabase
+                .from("empresas")
+                .select("id, nombre")
+                .eq("id", pacienteData.empresa_id)
+                .single();
+              if (empresaData) setEmpresa(empresaData);
+            }
           }
         }
 
@@ -821,15 +857,105 @@ export default function PortalPaciente() {
     <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10 p-4">
 
       <div className="max-w-lg mx-auto space-y-4">
-        {/* Header */}
-        <Card>
+        {/* Patient Card - Similar to Flujo */}
+        <Card className="border-border">
           <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-xl font-bold">{paciente?.nombre}</h1>
-                <p className="text-muted-foreground">{paciente?.rut}</p>
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="font-bold text-lg">
+                    #{atencion?.numero_ingreso || "--"}
+                  </Badge>
+                  <div className="font-medium text-lg text-foreground">
+                    {paciente?.nombre}
+                  </div>
+                </div>
+                
+                <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
+                  <span>{paciente?.rut}</span>
+                  {atencion?.fecha_ingreso && (
+                    <span>• Ingreso: {format(new Date(atencion.fecha_ingreso), "HH:mm", { locale: es })}</span>
+                  )}
+                  {paciente?.tipo_servicio && (
+                    <Badge variant="outline" className="text-xs">
+                      {paciente.tipo_servicio === "workmed" ? "WM" : "J"}
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Empresa */}
+                {empresa && (
+                  <div className="flex items-center gap-2 mt-2 text-sm">
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                    <span>{empresa.nombre}</span>
+                  </div>
+                )}
+
+                {/* Pending Boxes */}
+                {pendingBoxes.length > 0 && (
+                  <div className="text-sm text-primary mt-2 font-medium">
+                    Boxes pendientes: {pendingBoxes.join(", ")}
+                  </div>
+                )}
+
+                {/* Exams grouped by box - Like Flujo */}
+                {atencion && atencion.atencion_examenes.length > 0 && (
+                  <Collapsible className="mt-3" defaultOpen>
+                    <CollapsibleTrigger className="flex items-center gap-1 text-sm text-primary hover:underline">
+                      <ChevronDown className="h-4 w-4" />
+                      <span className="font-medium">
+                        Ver exámenes ({atencion.atencion_examenes.filter(ae => ae.estado === "pendiente" || ae.estado === "incompleto").length} pendientes)
+                      </span>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-2 space-y-3 data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up">
+                      {(() => {
+                        const examenPorBox: { [boxNombre: string]: { nombre: string; estado: string }[] } = {};
+                        
+                        atencion.atencion_examenes.forEach((ae) => {
+                          const boxConExamen = boxes.find((box) =>
+                            box.box_examenes.some((be) => be.examen_id === ae.examen_id)
+                          );
+                          const boxNombre = boxConExamen?.nombre || "Sin box";
+                          if (!examenPorBox[boxNombre]) {
+                            examenPorBox[boxNombre] = [];
+                          }
+                          examenPorBox[boxNombre].push({ nombre: ae.examenes.nombre, estado: ae.estado });
+                        });
+
+                        return Object.entries(examenPorBox).map(([boxNombre, examenes]) => (
+                          <div key={boxNombre} className="pl-3 border-l-2 border-primary/30">
+                            <div className="text-xs font-semibold text-muted-foreground mb-1.5">
+                              {boxNombre}
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {examenes.map((examen, idx) => (
+                                <Badge 
+                                  key={idx} 
+                                  variant={examen.estado === "completado" ? "default" : examen.estado === "incompleto" ? "outline" : "secondary"}
+                                  className={`text-xs py-0.5 px-2 ${
+                                    examen.estado === "completado" 
+                                      ? "bg-green-600" 
+                                      : examen.estado === "incompleto" 
+                                        ? "border-amber-500 text-amber-600" 
+                                        : ""
+                                  }`}
+                                >
+                                  {examen.estado === "completado" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                                  {examen.nombre}
+                                  {examen.estado === "incompleto" ? " (I)" : ""}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        ));
+                      })()}
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
               </div>
-              <div className="flex items-center gap-2">
+              
+              {/* Status Badge */}
+              <div className="flex flex-col items-end gap-2">
                 <Button
                   variant="outline"
                   size="icon"
@@ -839,102 +965,48 @@ export default function PortalPaciente() {
                 >
                   <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 </Button>
-                {atencion?.numero_ingreso && (
-                  <Badge variant="secondary" className="text-2xl px-4 py-2">
-                    #{atencion.numero_ingreso}
-                  </Badge>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Company info */}
-        {empresa ? (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <Building2 className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Empresa</p>
-                  <p className="font-medium">{empresa.nombre}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="border-amber-500/50 bg-amber-500/10">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3 text-amber-700 dark:text-amber-400">
-                <AlertCircle className="h-5 w-5" />
-                <p>Esperando asignación de empresa por recepción</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Status */}
-        {atencion && (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <Clock className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Estado</p>
+                {atencion && (
                   <Badge 
                     variant={
                       atencion.estado === "completado" ? "default" :
                       atencion.estado === "en_atencion" ? "secondary" : "outline"
                     }
-                    className={
+                    className={`text-xs ${
                       atencion.estado === "completado" ? "bg-green-600" :
-                      atencion.estado === "en_atencion" ? "bg-blue-600 text-white" : ""
-                    }
+                      atencion.estado === "en_atencion" ? "bg-blue-600 text-white" : 
+                      atencion.estado === "incompleto" ? "bg-amber-500 text-white" : ""
+                    }`}
                   >
                     {atencion.estado === "en_espera" && "En Espera"}
-                    {atencion.estado === "en_atencion" && `En Atención - ${atencion.boxes?.nombre || ""}`}
+                    {atencion.estado === "en_atencion" && `En ${atencion.boxes?.nombre || "Box"}`}
                     {atencion.estado === "completado" && "Completado"}
                     {atencion.estado === "incompleto" && "Incompleto"}
                   </Badge>
+                )}
+              </div>
+            </div>
+            
+            {/* No company warning */}
+            {!empresa && (
+              <div className="mt-3 p-2 rounded bg-amber-500/10 border border-amber-500/30">
+                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 text-sm">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>Esperando asignación de empresa por recepción</span>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            )}
 
-        {/* Exams */}
-        {atencion && atencion.atencion_examenes.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Exámenes
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {atencion.atencion_examenes.map((ae) => (
-                <div 
-                  key={ae.id} 
-                  className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
-                >
-                  <span>{ae.examenes.nombre}</span>
-                  {ae.estado === "completado" ? (
-                    <Badge className="bg-green-600">
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      Completado
-                    </Badge>
-                  ) : ae.estado === "incompleto" ? (
-                    <Badge variant="secondary" className="bg-amber-500 text-white">
-                      Incompleto
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline">Pendiente</Badge>
-                  )}
+            {/* No exams warning */}
+            {atencion && atencion.atencion_examenes.length === 0 && (
+              <div className="mt-3 p-2 rounded bg-muted/50 border border-border">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                  <FileText className="h-4 w-4" />
+                  <span>Sus exámenes aparecerán aquí cuando estén asignados</span>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Tests / Forms */}
         {examenTests.length > 0 && (
@@ -983,6 +1055,8 @@ export default function PortalPaciente() {
             setPaciente(null);
             setAtencion(null);
             setEmpresa(null);
+            setBoxes([]);
+            setPendingBoxes([]);
             setRut("");
             setStep("identificacion");
           }}
