@@ -11,6 +11,9 @@ import { Loader2, ExternalLink, CheckCircle2, Clock, Building2, FileText, AlertC
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { normalizeRut, formatRutForDisplay, getRutVariants } from "@/lib/utils";
+import { useNotificationSound } from "@/hooks/useNotificationSound";
+import { usePatientPortal } from "@/hooks/usePatientPortal";
 
 interface Paciente {
   id: string;
@@ -86,148 +89,30 @@ export default function PortalPaciente() {
   });
 
   const { toast, dismiss } = useToast();
-  const lastNotificationBoxRef = useRef<string | null>(null);
-  const prevEstadoRef = useRef<string | null>(null);
-  const prevBoxIdRef = useRef<string | null>(null);
-  
-  // Audio para Android
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const audioUnlockedRef = useRef<boolean>(false);
 
-  // Desbloquear audio en el primer toque (requerido para Android)
-  useEffect(() => {
-    const unlockAudio = () => {
-      if (audioUnlockedRef.current) return;
-      
-      try {
-        // Crear AudioContext
-        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-        if (AudioContextClass) {
-          audioContextRef.current = new AudioContextClass();
-          // Reproducir un sonido silencioso para desbloquear
-          const oscillator = audioContextRef.current.createOscillator();
-          const gainNode = audioContextRef.current.createGain();
-          gainNode.gain.value = 0; // Silencioso
-          oscillator.connect(gainNode);
-          gainNode.connect(audioContextRef.current.destination);
-          oscillator.start();
-          oscillator.stop(audioContextRef.current.currentTime + 0.001);
-          audioUnlockedRef.current = true;
-          console.log("[Portal] Audio desbloqueado para Android");
-        }
-      } catch (e) {
-        console.log("[Portal] Error desbloqueando audio:", e);
-      }
-    };
+  // Notification & sound hook (encapsula audio unlock, play, vibrate y permiso)
+  const { play, vibrate, requestNotificationPermission, permission } = useNotificationSound();
 
-    // Escuchar primer toque/click
-    document.addEventListener("touchstart", unlockAudio, { once: true });
-    document.addEventListener("click", unlockAudio, { once: true });
-
-    return () => {
-      document.removeEventListener("touchstart", unlockAudio);
-      document.removeEventListener("click", unlockAudio);
-    };
-  }, []);
-
-  // Función para reproducir sonido de notificación
-  const reproducirSonido = useCallback(() => {
-    if (!audioContextRef.current || audioContextRef.current.state === "closed") {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioContextClass) {
-        audioContextRef.current = new AudioContextClass();
-      }
+  const notifyBox = useCallback((boxName: string) => {
+    play();
+    vibrate();
+    if (permission === "granted") {
+      try { new Notification("¡ES SU TURNO!", { body: `Diríjase al box: ${boxName}` }); } catch (err) { console.debug("Notification failed", err); }
     }
+    const { id } = toast({
+      title: "¡ES SU TURNO!",
+      description: `Diríjase al box: ${boxName}`,
+      duration: 0,
+      action: (
+        <ToastAction altText="Entendido" onClick={() => dismiss(id)}>OK</ToastAction>
+      )
+    });
+    return id;
+  }, [play, vibrate, permission, toast, dismiss]);
 
-    const ctx = audioContextRef.current;
-    if (!ctx) return;
-
-    // Resumir si está suspendido
-    if (ctx.state === "suspended") {
-      ctx.resume();
-    }
-
-    try {
-      // Reproducir 3 beeps
-      const beepDuration = 0.15;
-      const beepGap = 0.1;
-      
-      for (let i = 0; i < 3; i++) {
-        const startTime = ctx.currentTime + i * (beepDuration + beepGap);
-        
-        const oscillator = ctx.createOscillator();
-        const gainNode = ctx.createGain();
-        
-        oscillator.type = "sine";
-        oscillator.frequency.value = 880; // Nota A5
-        
-        gainNode.gain.setValueAtTime(0.3, startTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + beepDuration);
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(ctx.destination);
-        
-        oscillator.start(startTime);
-        oscillator.stop(startTime + beepDuration);
-      }
-      console.log("[Portal] Sonido reproducido");
-    } catch (e) {
-      console.log("[Portal] Error reproduciendo sonido:", e);
-    }
-  }, []);
-
-  // Función para vibrar (Android)
-  const vibrar = useCallback(() => {
-    if ("vibrate" in navigator) {
-      try {
-        // Patrón de vibración: vibrar-pausa-vibrar-pausa-vibrar
-        navigator.vibrate([200, 100, 200, 100, 200]);
-        console.log("[Portal] Vibración activada");
-      } catch (e) {
-        console.log("[Portal] Error vibrando:", e);
-      }
-    }
-  }, []);
+  const { atencion: portalAtencion, loadAtencion: loadPortalAtencion } = usePatientPortal(paciente?.id, notifyBox);
 
   // Normalize RUT
-  const normalizeRut = (value: string) => {
-    return value.replace(/[^0-9kK]/g, "").toUpperCase();
-  };
-
-  const getRutVariants = (value: string): string[] => {
-    const variants = new Set<string>();
-    const cleaned = normalizeRut(value);
-
-    if (!cleaned) return [];
-
-    variants.add(cleaned);
-
-    if (cleaned.length > 1) {
-      const body = cleaned.slice(0, -1);
-      const dv = cleaned.slice(-1);
-      variants.add(`${body}-${dv}`);
-      const bodyWithDots = body.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-      variants.add(`${bodyWithDots}-${dv}`);
-    }
-
-    variants.add(value.trim());
-
-    return Array.from(variants).filter(Boolean);
-  };
-
-  const formatRutForDisplay = (value: string) => {
-    const cleaned = normalizeRut(value);
-    
-    if (cleaned.length > 1) {
-      const body = cleaned.slice(0, -1);
-      const dv = cleaned.slice(-1);
-      const formattedBody = body.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-      return `${formattedBody}-${dv}`;
-    }
-    
-    return cleaned;
-  };
-
   const handleRutChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatRutForDisplay(e.target.value);
     setRut(formatted);
@@ -262,103 +147,18 @@ export default function PortalPaciente() {
 
       if (pacienteData) {
         setPaciente(pacienteData);
-        
-        const today = new Date();
-        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).toISOString();
-        const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).toISOString();
-
-        // Misma query que Flujo - un solo select con joins
-        const { data: existingAtencion } = await supabase
-          .from("atenciones")
-          .select("*, pacientes(id, nombre, rut, tipo_servicio), boxes(*)")
-          .eq("paciente_id", pacienteData.id)
-          .gte("fecha_ingreso", startOfDay)
-          .lte("fecha_ingreso", endOfDay)
-          .order("fecha_ingreso", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (existingAtencion) {
-          // Cargar exámenes por separado
-          const { data: examenesData } = await supabase
-            .from("atencion_examenes")
-            .select("id, examen_id, estado, examenes(id, nombre)")
-            .eq("atencion_id", existingAtencion.id);
-
-          const atencionCompleta: Atencion = {
-            id: existingAtencion.id,
-            estado: existingAtencion.estado,
-            box_id: existingAtencion.box_id,
-            numero_ingreso: existingAtencion.numero_ingreso,
-            fecha_ingreso: existingAtencion.fecha_ingreso,
-            boxes: existingAtencion.boxes,
-            atencion_examenes: (examenesData || []).map((ae: any) => ({
-              id: ae.id,
-              examen_id: ae.examen_id,
-              estado: ae.estado,
-              examenes: ae.examenes
-            }))
-          };
-
-          setAtencion(atencionCompleta);
-          prevEstadoRef.current = existingAtencion.estado;
-          prevBoxIdRef.current = existingAtencion.box_id;
-          
-          if (pacienteData.empresa_id) {
-            const { data: empresaData } = await supabase
-              .from("empresas")
-              .select("*")
-              .eq("id", pacienteData.empresa_id)
-              .single();
-            
-            if (empresaData) setEmpresa(empresaData);
-          }
-          
-          toast({
-            title: "Bienvenido",
-            description: `Su número de atención es #${existingAtencion.numero_ingreso}`,
-          });
-        } else {
-          const { data: newAtencion, error: atencionError } = await supabase
-            .from("atenciones")
-            .insert({
-              paciente_id: pacienteData.id,
-              estado: "en_espera",
-              fecha_ingreso: new Date().toISOString()
-            })
-            .select("*, boxes(*)")
-            .single();
-
-          if (atencionError) throw atencionError;
-
-          setAtencion({
-            ...newAtencion,
-            atencion_examenes: []
-          });
-          prevEstadoRef.current = "en_espera";
-          prevBoxIdRef.current = null;
-          
-          if (pacienteData.empresa_id) {
-            const { data: empresaData } = await supabase
-              .from("empresas")
-              .select("*")
-              .eq("id", pacienteData.empresa_id)
-              .single();
-            
-            if (empresaData) setEmpresa(empresaData);
-          }
-          
-          toast({
-            title: "Registro de hoy",
-            description: `Su número de atención es #${newAtencion.numero_ingreso}. Espere a que el recepcionista complete su registro.`,
-          });
-        }
-        
         setStep("portal");
-      } else {
-        setFormData(prev => ({ ...prev, rut: rut }));
-        setStep("registro");
-      }
+        // Let the hook load the atencion to avoid races
+        try {
+          await loadPortalAtencion?.();
+          toast({ title: "Bienvenido", description: `Verifique su número de atención en pantalla` });
+        } catch (err) {
+          console.error("Error cargando atención tras buscar paciente:", err);
+        }
+       } else {
+         setFormData(prev => ({ ...prev, rut: rut }));
+         setStep("registro");
+       }
     } catch (error: any) {
       console.error("Error buscando paciente:", error);
       toast({
@@ -434,9 +234,13 @@ export default function PortalPaciente() {
       if (atencionError) throw atencionError;
 
       setPaciente(newPaciente);
-      setAtencion({ ...newAtencion, atencion_examenes: [], boxes: null });
-      prevEstadoRef.current = "en_espera";
-      prevBoxIdRef.current = null;
+      // Set paciente and let hook pick up the new atencion (realtime)
+      try {
+        await loadPortalAtencion?.();
+      } catch (err) {
+        // fallback: set immediate value to show user
+        setAtencion({ ...newAtencion, atencion_examenes: [], boxes: null });
+      }
       
       toast({
         title: "Registro exitoso",
@@ -490,30 +294,29 @@ export default function PortalPaciente() {
 
   // Mostrar notificación cuando el paciente es llamado
   const mostrarNotificacionLlamado = useCallback((boxName: string) => {
-    console.log("[Portal] Mostrando notificación para box:", boxName);
-
-    // Reproducir sonido y vibrar (Android)
-    reproducirSonido();
-    vibrar();
-
+    play();
+    vibrate();
+    if (permission === "granted") {
+      try { new Notification("¡ES SU TURNO!", { body: `Diríjase al box: ${boxName}` }); } catch {}
+    }
     const { id } = toast({
       title: "¡ES SU TURNO!",
       description: `Diríjase al box: ${boxName}`,
-      duration: 0, // Persistente hasta que el usuario cierre
+      duration: 0,
       action: (
-        <ToastAction
-          altText="Entendido"
-          onClick={() => {
-            dismiss(id);
-          }}
-        >
-          OK
-        </ToastAction>
+        <ToastAction altText="Entendido" onClick={() => dismiss(id)}>OK</ToastAction>
       ),
     });
-  }, [toast, dismiss, reproducirSonido, vibrar]);
+  }, [play, vibrate, permission, toast, dismiss]);
 
-  // Polling con la MISMA lógica que Flujo
+  // Keep atencion in sync with portalAtencion (realtime hook)
+  useEffect(() => {
+    if (portalAtencion) {
+      setAtencion(portalAtencion);
+    }
+  }, [portalAtencion]);
+
+  // Polling with the MISMA lógica que Flujo
   useEffect(() => {
     if (!paciente?.id || step !== "portal") return;
 
@@ -616,62 +419,93 @@ export default function PortalPaciente() {
 
     return () => clearInterval(interval);
   }, [paciente?.id, step, mostrarNotificacionLlamado, empresa]);
+  
+  // Keep empresa in sync when atencion changes
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!paciente?.id || !atencion) return;
+        if (!empresa) {
+          const { data: pacienteData } = await supabase
+            .from("pacientes")
+            .select("empresa_id")
+            .eq("id", paciente.id)
+            .single();
+
+          if (pacienteData?.empresa_id) {
+            const { data: empresaData } = await supabase
+              .from("empresas")
+              .select("id, nombre")
+              .eq("id", pacienteData.empresa_id)
+              .single();
+            if (empresaData) setEmpresa(empresaData);
+          }
+        }
+      } catch (error) {
+        console.error("Error cargando empresa:", error);
+      }
+    })();
+  }, [atencion, paciente?.id, empresa]);
 
   // Refrescar manual
   const refreshData = useCallback(async () => {
     if (!paciente?.id || isRefreshing) return;
     setIsRefreshing(true);
     try {
-      const today = new Date();
-      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).toISOString();
-      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).toISOString();
-
-      const { data: atencionData } = await supabase
-        .from("atenciones")
-        .select("*, boxes(*)")
-        .eq("paciente_id", paciente.id)
-        .gte("fecha_ingreso", startOfDay)
-        .lte("fecha_ingreso", endOfDay)
-        .order("fecha_ingreso", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (atencionData) {
-        const { data: examenesData } = await supabase
-          .from("atencion_examenes")
-          .select("id, examen_id, estado, examenes(id, nombre)")
-          .eq("atencion_id", atencionData.id);
-
-        setAtencion({
-          id: atencionData.id,
-          estado: atencionData.estado,
-          box_id: atencionData.box_id,
-          numero_ingreso: atencionData.numero_ingreso,
-          fecha_ingreso: atencionData.fecha_ingreso,
-          boxes: atencionData.boxes,
-          atencion_examenes: (examenesData || []).map((ae: any) => ({
-            id: ae.id,
-            examen_id: ae.examen_id,
-            estado: ae.estado,
-            examenes: ae.examenes
-          }))
-        });
-      }
-
-      toast({
-        title: "Actualizado",
-        description: "Información actualizada correctamente",
-      });
+      // Use hook loader to refresh attention
+      await loadPortalAtencion?.();
+      toast({ title: "Actualizado", description: "Información actualizada correctamente" });
     } catch (error) {
       console.error("Error refreshing:", error);
     } finally {
       setIsRefreshing(false);
     }
-  }, [paciente?.id, isRefreshing, toast]);
+  }, [paciente?.id, isRefreshing, toast, loadPortalAtencion]);
 
   const isTestCompleted = (testId: string) => {
     return testTracking.some(t => t.examen_test_id === testId);
   };
+
+  // Load examenTests & tracking when atencion available
+  useEffect(() => {
+    (async () => {
+      if (!atencion) return;
+      try {
+        const examenIds = (atencion.atencion_examenes as any[] || []).map(a => a.examen_id).filter(Boolean);
+        if (examenIds.length === 0) {
+          setExamenTests([]);
+        } else {
+          const { data: tests } = await supabase
+            .from("examen_tests")
+            .select("id, nombre, url, examen_id")
+            .in("examen_id", examenIds)
+            .limit(50);
+          if (tests) setExamenTests(tests as ExamenTest[]);
+        }
+
+        const { data: tracking } = await supabase
+          .from("paciente_test_tracking" as any)
+          .select("examen_test_id, abierto_at, completado")
+          .eq("atencion_id", atencion.id);
+
+        if (tracking) setTestTracking(tracking as TestTracking[]);
+      } catch (error) {
+        // ignore missing tables/errors
+      }
+    })();
+  }, [atencion]);
+  
+  // Permission button handlers
+  const handleRequestPermission = useCallback(async () => {
+    await requestNotificationPermission();
+    toast({ title: "Permiso actualizado", description: `Permiso: ${Notification.permission}` });
+  }, [requestNotificationPermission, toast]);
+  
+  const handleTestSound = useCallback(() => {
+    play();
+    vibrate();
+    toast({ title: "Prueba enviada", description: "Se reprodujo sonido y vibró si está disponible." });
+  }, [play, vibrate, toast]);
 
   if (step === "identificacion") {
     return (
@@ -839,6 +673,22 @@ export default function PortalPaciente() {
                 >
                   <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleRequestPermission}
+                  title="Permitir notificaciones"
+                >
+                  🔔
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleTestSound}
+                  title="Probar sonido/vibración"
+                >
+                  📳
+                </Button>
                 {atencion?.numero_ingreso && (
                   <Badge variant="secondary" className="text-2xl px-4 py-2">
                     #{atencion.numero_ingreso}
@@ -848,6 +698,21 @@ export default function PortalPaciente() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Show current box notification if portalAtencion indicates en_atencion and box */}
+        {portalAtencion?.estado === 'en_atencion' && portalAtencion?.boxes?.nombre && (
+          <Card className="border-emerald-500/40 bg-emerald-500/5">
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Llamado a box</p>
+                  <p className="font-medium">{portalAtencion.boxes.nombre}</p>
+                </div>
+                <Button onClick={() => mostrarNotificacionLlamado(portalAtencion.boxes.nombre)}>Notificar</Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Company info */}
         {empresa ? (
