@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import portalBackground from "@/assets/portal-background.jpeg";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -730,7 +731,7 @@ export default function PortalPaciente() {
 
   if (step === "identificacion") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10 flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundImage: `url(${portalBackground})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold">Portal del Paciente</CardTitle>
@@ -771,7 +772,7 @@ export default function PortalPaciente() {
 
   if (step === "registro") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10 flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundImage: `url(${portalBackground})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
         <Card className="w-full max-w-lg">
           <CardHeader className="text-center pb-4">
             <CardTitle className="text-2xl font-bold">Registro de Paciente</CardTitle>
@@ -873,7 +874,7 @@ export default function PortalPaciente() {
 
   // Portal view
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10 p-4">
+    <div className="min-h-screen p-4" style={{ backgroundImage: `url(${portalBackground})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
 
       <div className="max-w-lg mx-auto space-y-4">
         {/* Patient Card - Similar to Flujo */}
