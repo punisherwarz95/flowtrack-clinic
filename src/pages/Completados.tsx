@@ -222,11 +222,13 @@ const Completados = () => {
                         Empresa: {atencion.pacientes.empresas?.nombre || "Sin empresa"}
                       </div>
                       <div className="text-xs text-muted-foreground mt-2">
-                        <div>Ingreso: {format(new Date(atencion.fecha_ingreso), "dd/MM/yyyy HH:mm", { locale: es })}</div>
-                        <div>Finalizado: {format(new Date(atencion.fecha_fin_atencion), "dd/MM/yyyy HH:mm", { locale: es })}</div>
-                        <div className="font-medium mt-1">
-                          Tiempo en centro: {Math.floor((new Date(atencion.fecha_fin_atencion).getTime() - new Date(atencion.fecha_ingreso).getTime()) / 60000)} min
-                        </div>
+                        <div>Ingreso: {atencion.fecha_ingreso ? format(new Date(atencion.fecha_ingreso), "dd/MM/yyyy HH:mm", { locale: es }) : "Sin fecha"}</div>
+                        <div>Finalizado: {atencion.fecha_fin_atencion ? format(new Date(atencion.fecha_fin_atencion), "dd/MM/yyyy HH:mm", { locale: es }) : "Sin fecha"}</div>
+                        {atencion.fecha_ingreso && atencion.fecha_fin_atencion && (
+                          <div className="font-medium mt-1">
+                            Tiempo en centro: {Math.floor((new Date(atencion.fecha_fin_atencion).getTime() - new Date(atencion.fecha_ingreso).getTime()) / 60000)} min
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
