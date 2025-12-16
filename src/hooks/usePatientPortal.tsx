@@ -8,6 +8,11 @@ export function usePatientPortal(pacienteId?: string | null, onCalled?: (boxName
   const prevBoxIdRef = useRef<string | null>(null);
   const lastNotificationRef = useRef<{ box: string | null; ts: number | null }>({ box: null, ts: null });
   const runningPromiseRef = useRef<Promise<any> | null>(null);
+  const iosPollRef = useRef<{ timer: any | null; count: number }>({ timer: null, count: 0 });
+
+  const isIOS = typeof navigator !== "undefined" && /iP(hone|od|ad)|Macintosh/.test(navigator.userAgent) && "ontouchend" in document;
+  const IOS_POLL_INTERVAL = 4000; // ms
+  const IOS_POLL_MAX = 15; // ~1 minute
 
   const loadAtencion = useCallback(async () => {
     if (!pacienteId) return null;
@@ -78,6 +83,15 @@ export function usePatientPortal(pacienteId?: string | null, onCalled?: (boxName
 
         setAtencion(atencionCompleta);
 
+        // If we are on iOS and we detected a change to en_atencion, clear polling
+        if (isIOS && fueRecienLlamado) {
+          if (iosPollRef.current.timer) {
+            clearTimeout(iosPollRef.current.timer);
+            iosPollRef.current = { timer: null, count: 0 };
+            console.debug("[usePatientPortal] iOS polling stopped after detection");
+          }
+        }
+
         if (fueRecienLlamado && boxNombre) {
           const now = Date.now();
           if (lastNotificationRef.current.box !== boxNombre || (now - (lastNotificationRef.current.ts || 0)) > 60_000) {
@@ -111,8 +125,48 @@ export function usePatientPortal(pacienteId?: string | null, onCalled?: (boxName
       )
       .subscribe();
 
+    // iOS polling fallback: sometimes Safari/iOS misses realtime events -> poll a few times
+    if (isIOS) {
+      const startPolling = () => {
+        if (iosPollRef.current.timer) return; // already polling
+        const poll = async () => {
+          iosPollRef.current.count += 1;
+          try {
+            const result = await loadAtencion();
+            // If we detected 'en_atencion' inside loadAtencion it will clear the timer
+            if (!iosPollRef.current.timer && iosPollRef.current.count === 0) return;
+            if (iosPollRef.current.count >= IOS_POLL_MAX) {
+              // stop polling after max attempts
+              if (iosPollRef.current.timer) { clearTimeout(iosPollRef.current.timer); iosPollRef.current = { timer: null, count: 0 }; }
+              return;
+            }
+            iosPollRef.current.timer = setTimeout(poll, IOS_POLL_INTERVAL);
+          } catch (err) {
+            console.debug("[usePatientPortal] iOS poll error", err);
+            if (iosPollRef.current.timer) { clearTimeout(iosPollRef.current.timer); iosPollRef.current = { timer: null, count: 0 }; }
+          }
+        };
+        // start first poll shortly after subscribe
+        iosPollRef.current.timer = setTimeout(poll, IOS_POLL_INTERVAL);
+        iosPollRef.current.count = 0;
+        console.debug("[usePatientPortal] iOS polling started");
+      };
+
+      startPolling();
+    }
+
     return () => supabase.removeChannel(channel);
   }, [pacienteId, loadAtencion]);
+
+  useEffect(() => {
+    return () => {
+      // cleanup poll timer on unmount
+      if (iosPollRef.current.timer) {
+        clearTimeout(iosPollRef.current.timer);
+        iosPollRef.current = { timer: null, count: 0 };
+      }
+    };
+  }, []);
 
   return { atencion, loadAtencion, loading };
 }
