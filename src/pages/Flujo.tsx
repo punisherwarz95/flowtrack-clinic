@@ -719,7 +719,7 @@ const Flujo = () => {
                           </Collapsible>
                         )}
                         <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
-                          <span>Ingreso: {format(new Date(atencion.fecha_ingreso), "HH:mm", { locale: es })}</span>
+                          <span>Ingreso: {atencion.fecha_ingreso ? format(new Date(atencion.fecha_ingreso), "HH:mm", { locale: es }) : "--:--"}</span>
                           <Badge variant="outline" className="text-xs">
                             {atencion.pacientes.tipo_servicio === "workmed" ? "WM" : "J"}
                           </Badge>
@@ -892,7 +892,7 @@ const Flujo = () => {
                         </Collapsible>
                       )}
                       <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
-                        <span>Ingreso: {format(new Date(atencion.fecha_ingreso), "HH:mm", { locale: es })}</span>
+                        <span>Ingreso: {atencion.fecha_ingreso ? format(new Date(atencion.fecha_ingreso), "HH:mm", { locale: es }) : "--:--"}</span>
                         <Badge variant="outline" className="text-xs">
                           {atencion.pacientes.tipo_servicio === "workmed" ? "WM" : "J"}
                         </Badge>
