@@ -88,6 +88,8 @@ export default function PortalPaciente() {
     direccion: ""
   });
 
+  const [debugLines, setDebugLines] = useState<string[]>([]);
+
   const { toast, dismiss } = useToast();
 
   // Notification & sound hook (encapsula audio unlock, play, vibrate y permiso)
@@ -507,6 +509,18 @@ export default function PortalPaciente() {
     toast({ title: "Prueba enviada", description: "Se reprodujo sonido y vibró si está disponible." });
   }, [play, vibrate, toast]);
 
+  // allow hook to send debug messages to UI (useful for iOS where inspector might be unavailable)
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__portal_debug = (m: string) => {
+      setDebugLines((prev) => [...prev.slice(-49), `${new Date().toLocaleTimeString()} ${m}`]);
+    };
+    return () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__portal_debug = undefined;
+    };
+  }, []);
+
   if (step === "identificacion") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10 flex items-center justify-center p-4">
@@ -875,7 +889,25 @@ export default function PortalPaciente() {
         >
           Cambiar Paciente
         </Button>
-      </div>
+
+      {/* Debug panel - DEV only */}
+      {import.meta.env.DEV && (
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle className="text-sm">Debug (solo dev)</CardTitle>
+            <CardDescription className="text-xs">Mensajes de sincronización y polling</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="max-h-40 overflow-auto text-xs font-mono bg-black/5 p-2 rounded">
+              {debugLines.length === 0 ? (
+                <div className="text-muted-foreground">No hay eventos</div>
+              ) : (
+                debugLines.map((d, i) => <div key={i}>{d}</div>)
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Test Modal */}
       <Dialog open={testModalOpen} onOpenChange={setTestModalOpen}>
