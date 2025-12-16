@@ -862,7 +862,7 @@ const Pacientes = () => {
                      </div>
                      <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground flex-wrap">
                        <span>{patient.empresas?.nombre || "Sin empresa"}</span>
-                       {patient.fecha_nacimiento && (
+                       {patient.fecha_nacimiento && patient.fecha_nacimiento.length > 0 && !isNaN(new Date(patient.fecha_nacimiento + "T00:00:00").getTime()) && (
                          <span>• Nac: {format(new Date(patient.fecha_nacimiento + "T00:00:00"), "dd/MM/yyyy", { locale: es })}</span>
                        )}
                        {patient.email && <span>• {patient.email}</span>}
