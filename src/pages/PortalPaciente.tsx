@@ -689,6 +689,27 @@ export default function PortalPaciente() {
                 >
                   📳
                 </Button>
+                {import.meta.env.DEV && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => {
+                      // Simulate a call locally, set attention to en_atencion and notify
+                      const mockBoxName = "BOX (SIMULADO)";
+                      setAtencion((prev) => ({
+                        ...(prev as any || {}),
+                        estado: "en_atencion",
+                        box_id: "__simulated__",
+                        boxes: { nombre: mockBoxName }
+                      } as Atencion));
+                      // Ensure portalAtencion isn't required for notify; directly call notifyBox
+                      notifyBox(mockBoxName);
+                    }}
+                    title="Simular llamada"
+                  >
+                    Simular llamada
+                  </Button>
+                )}
                 {atencion?.numero_ingreso && (
                   <Badge variant="secondary" className="text-2xl px-4 py-2">
                     #{atencion.numero_ingreso}
