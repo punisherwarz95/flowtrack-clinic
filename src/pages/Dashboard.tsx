@@ -18,6 +18,9 @@ interface AtencionIngresada {
   id: string;
   numero_ingreso: number;
   estado: string;
+  boxes: {
+    nombre: string;
+  } | null;
   pacientes: {
     nombre: string;
     tipo_servicio: string;
@@ -118,6 +121,9 @@ const Dashboard = () => {
             id,
             numero_ingreso,
             estado,
+            boxes (
+              nombre
+            ),
             pacientes (
               nombre,
               tipo_servicio,
@@ -526,6 +532,7 @@ const Dashboard = () => {
                         <TableHead>Empresa</TableHead>
                         <TableHead>Tipo</TableHead>
                         <TableHead>Estado</TableHead>
+                        <TableHead>Box</TableHead>
                         <TableHead>Exámenes</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -562,6 +569,9 @@ const Dashboard = () => {
                                 ? "En Atención"
                                 : "Completado"}
                             </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {atencion.boxes?.nombre || "-"}
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-wrap gap-1">
