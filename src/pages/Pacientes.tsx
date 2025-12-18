@@ -717,7 +717,14 @@ const Pacientes = () => {
                               name="tipo_servicio"
                               value="workmed"
                               checked={formData.tipo_servicio === "workmed"}
-                              onChange={(e) => setFormData({ ...formData, tipo_servicio: e.target.value as "workmed" | "jenner" })}
+                              onChange={(e) => {
+                                const workmedEmpresa = empresas.find(emp => emp.nombre.toUpperCase() === "WORKMED");
+                                setFormData({ 
+                                  ...formData, 
+                                  tipo_servicio: e.target.value as "workmed" | "jenner",
+                                  empresa_id: workmedEmpresa?.id || ""
+                                });
+                              }}
                               className="w-4 h-4"
                             />
                             <span>Workmed</span>
