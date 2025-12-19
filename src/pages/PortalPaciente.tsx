@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import portalBackground from "@/assets/portal-background.jpeg";
+
+// Portal Paciente v0.0.5 - Punto de referencia estable
+// Cambios: Fix para compatibilidad con Xiaomi Android 12+
+const PORTAL_VERSION = "0.0.5";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -143,63 +147,76 @@ export default function PortalPaciente() {
     };
   }, []);
 
-  // Función para reproducir sonido de notificación
+  // Función para reproducir sonido de notificación (v0.0.5 - defensiva para Android 12+)
   const reproducirSonido = useCallback(() => {
-    if (!audioContextRef.current || audioContextRef.current.state === "closed") {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioContextClass) {
-        audioContextRef.current = new AudioContextClass();
+    // Ejecutar de forma asíncrona para no bloquear el renderizado
+    setTimeout(() => {
+      try {
+        if (!audioContextRef.current || audioContextRef.current.state === "closed") {
+          const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+          if (AudioContextClass) {
+            audioContextRef.current = new AudioContextClass();
+          }
+        }
+
+        const ctx = audioContextRef.current;
+        if (!ctx) {
+          console.log("[Portal v" + PORTAL_VERSION + "] AudioContext no disponible");
+          return;
+        }
+
+        // Resumir si está suspendido
+        if (ctx.state === "suspended") {
+          ctx.resume().catch(() => {
+            console.log("[Portal v" + PORTAL_VERSION + "] No se pudo resumir AudioContext");
+          });
+        }
+
+        // Reproducir 3 beeps
+        const beepDuration = 0.15;
+        const beepGap = 0.1;
+        
+        for (let i = 0; i < 3; i++) {
+          const startTime = ctx.currentTime + i * (beepDuration + beepGap);
+          
+          const oscillator = ctx.createOscillator();
+          const gainNode = ctx.createGain();
+          
+          oscillator.type = "sine";
+          oscillator.frequency.value = 880; // Nota A5
+          
+          gainNode.gain.setValueAtTime(0.3, startTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + beepDuration);
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(ctx.destination);
+          
+          oscillator.start(startTime);
+          oscillator.stop(startTime + beepDuration);
+        }
+        console.log("[Portal v" + PORTAL_VERSION + "] Sonido reproducido");
+      } catch (e) {
+        console.log("[Portal v" + PORTAL_VERSION + "] Error reproduciendo sonido:", e);
+        // No propagar el error para evitar crash
       }
-    }
-
-    const ctx = audioContextRef.current;
-    if (!ctx) return;
-
-    // Resumir si está suspendido
-    if (ctx.state === "suspended") {
-      ctx.resume();
-    }
-
-    try {
-      // Reproducir 3 beeps
-      const beepDuration = 0.15;
-      const beepGap = 0.1;
-      
-      for (let i = 0; i < 3; i++) {
-        const startTime = ctx.currentTime + i * (beepDuration + beepGap);
-        
-        const oscillator = ctx.createOscillator();
-        const gainNode = ctx.createGain();
-        
-        oscillator.type = "sine";
-        oscillator.frequency.value = 880; // Nota A5
-        
-        gainNode.gain.setValueAtTime(0.3, startTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + beepDuration);
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(ctx.destination);
-        
-        oscillator.start(startTime);
-        oscillator.stop(startTime + beepDuration);
-      }
-      console.log("[Portal] Sonido reproducido");
-    } catch (e) {
-      console.log("[Portal] Error reproduciendo sonido:", e);
-    }
+    }, 0);
   }, []);
 
-  // Función para vibrar (Android)
+  // Función para vibrar (Android) - v0.0.5 - defensiva para Xiaomi Android 12+
   const vibrar = useCallback(() => {
-    if ("vibrate" in navigator) {
+    // Ejecutar de forma asíncrona para no bloquear el renderizado
+    setTimeout(() => {
       try {
-        // Patrón de vibración: vibrar-pausa-vibrar-pausa-vibrar
-        navigator.vibrate([200, 100, 200, 100, 200]);
-        console.log("[Portal] Vibración activada");
+        if ("vibrate" in navigator && typeof navigator.vibrate === "function") {
+          // Patrón de vibración más simple para mejor compatibilidad
+          const result = navigator.vibrate([200, 100, 200]);
+          console.log("[Portal v" + PORTAL_VERSION + "] Vibración:", result ? "OK" : "No soportado");
+        }
       } catch (e) {
-        console.log("[Portal] Error vibrando:", e);
+        console.log("[Portal v" + PORTAL_VERSION + "] Error vibrando:", e);
+        // No propagar el error para evitar crash
       }
-    }
+    }, 50); // Pequeño delay para dispositivos problemáticos
   }, []);
 
   // Normalize RUT
@@ -501,29 +518,36 @@ export default function PortalPaciente() {
     setCurrentTest(null);
   };
 
-  // Mostrar notificación cuando el paciente es llamado
+  // Mostrar notificación cuando el paciente es llamado - v0.0.5 defensiva
   const mostrarNotificacionLlamado = useCallback((boxName: string) => {
-    console.log("[Portal] Mostrando notificación para box:", boxName);
+    console.log("[Portal v" + PORTAL_VERSION + "] Mostrando notificación para box:", boxName);
 
-    // Reproducir sonido y vibrar (Android)
+    // Primero mostrar el toast (lo más importante)
+    let toastId: string | undefined;
+    try {
+      const result = toast({
+        title: "¡ES SU TURNO!",
+        description: `Diríjase al box: ${boxName}`,
+        duration: 0, // Persistente hasta que el usuario cierre
+        action: (
+          <ToastAction
+            altText="Entendido"
+            onClick={() => {
+              if (toastId) dismiss(toastId);
+            }}
+          >
+            OK
+          </ToastAction>
+        ),
+      });
+      toastId = result.id;
+    } catch (e) {
+      console.error("[Portal v" + PORTAL_VERSION + "] Error mostrando toast:", e);
+    }
+
+    // Luego intentar sonido y vibración (en segundo plano, sin bloquear)
     reproducirSonido();
     vibrar();
-
-    const { id } = toast({
-      title: "¡ES SU TURNO!",
-      description: `Diríjase al box: ${boxName}`,
-      duration: 0, // Persistente hasta que el usuario cierre
-      action: (
-        <ToastAction
-          altText="Entendido"
-          onClick={() => {
-            dismiss(id);
-          }}
-        >
-          OK
-        </ToastAction>
-      ),
-    });
   }, [toast, dismiss, reproducirSonido, vibrar]);
 
   // Polling con la MISMA lógica que Flujo
@@ -1108,6 +1132,11 @@ export default function PortalPaciente() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Indicador de versión - v0.0.5 */}
+      <div className="fixed bottom-2 left-2 text-xs text-muted-foreground/50 select-none pointer-events-none">
+        v{PORTAL_VERSION}
+      </div>
     </div>
   );
 }
