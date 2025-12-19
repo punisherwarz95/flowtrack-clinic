@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import portalBackground from "@/assets/portal-background.jpeg";
+import { PORTAL_BEEP_DATA_URI } from "@/lib/portalNotificationSound";
 
-// Portal Paciente v0.0.5 - Punto de referencia estable
-// Cambios: Fix para compatibilidad con Xiaomi Android 12+
-const PORTAL_VERSION = "0.0.5";
+// Portal Paciente v0.0.6 - Punto de referencia estable
+// Fix Xiaomi Android 12+: usar <audio> data-uri (sin AudioContext)
+const PORTAL_VERSION = "0.0.6";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -115,20 +116,19 @@ export default function PortalPaciente() {
   useEffect(() => {
     const unlockAudio = () => {
       if (audioUnlockedRef.current) return;
-      
       try {
-        // Crear AudioContext
+        // Xiaomi Android 12+: evitar WebAudio (causa pantalla blanca en algunos equipos)
+        if (isXiaomiAndroid12Plus) {
+          if (!notificationAudioRef.current) notificationAudioRef.current = new Audio(PORTAL_BEEP_DATA_URI);
+          const a = notificationAudioRef.current;
+          if (a) { a.muted = true; Promise.resolve(a.play()).then(() => { a.pause(); a.currentTime = 0; a.muted = false; audioUnlockedRef.current = true; console.log("[Portal] Audio <audio> desbloqueado (Xiaomi)"); }).catch((e) => console.log("[Portal] No se pudo desbloquear <audio>:", e)); }
+          return;
+        }
         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
         if (AudioContextClass) {
           audioContextRef.current = new AudioContextClass();
-          // Reproducir un sonido silencioso para desbloquear
-          const oscillator = audioContextRef.current.createOscillator();
-          const gainNode = audioContextRef.current.createGain();
-          gainNode.gain.value = 0; // Silencioso
-          oscillator.connect(gainNode);
-          gainNode.connect(audioContextRef.current.destination);
-          oscillator.start();
-          oscillator.stop(audioContextRef.current.currentTime + 0.001);
+          const ctx = audioContextRef.current;
+          const o = ctx.createOscillator(); const g = ctx.createGain(); g.gain.value = 0; o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.001);
           audioUnlockedRef.current = true;
           console.log("[Portal] Audio desbloqueado para Android");
         }
@@ -145,13 +145,38 @@ export default function PortalPaciente() {
       document.removeEventListener("touchstart", unlockAudio);
       document.removeEventListener("click", unlockAudio);
     };
+
+
   }, []);
 
-  // Función para reproducir sonido de notificación (v0.0.5 - defensiva para Android 12+)
+  // Función para reproducir sonido de notificación (v0.0.6 - workaround Xiaomi Android 12+)
   const reproducirSonido = useCallback(() => {
     // Ejecutar de forma asíncrona para no bloquear el renderizado
     setTimeout(() => {
       try {
+        if (isXiaomiAndroid12Plus) {
+          if (!notificationAudioRef.current) notificationAudioRef.current = new Audio(PORTAL_BEEP_DATA_URI);
+          const a = notificationAudioRef.current;
+          if (!a) return;
+
+          const playOnce = () => {
+            try {
+              a.pause();
+              a.currentTime = 0;
+              const p = a.play();
+              if (p && typeof (p as any).catch === "function") (p as any).catch(() => {});
+            } catch {
+              // ignore
+            }
+          };
+
+          playOnce();
+          setTimeout(playOnce, 220);
+          setTimeout(playOnce, 440);
+          console.log("[Portal v" + PORTAL_VERSION + "] Sonido <audio> reproducido (Xiaomi)");
+          return;
+        }
+
         if (!audioContextRef.current || audioContextRef.current.state === "closed") {
           const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
           if (AudioContextClass) {
@@ -1133,7 +1158,7 @@ export default function PortalPaciente() {
         </DialogContent>
       </Dialog>
 
-      {/* Indicador de versión - v0.0.5 */}
+      {/* Indicador de versión - v0.0.6 */}
       <div className="fixed bottom-2 left-2 text-xs text-muted-foreground/50 select-none pointer-events-none">
         v{PORTAL_VERSION}
       </div>
