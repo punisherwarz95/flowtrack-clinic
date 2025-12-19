@@ -111,6 +111,15 @@ export default function PortalPaciente() {
   // Audio para Android
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioUnlockedRef = useRef<boolean>(false);
+  const notificationAudioRef = useRef<HTMLAudioElement | null>(null);
+  
+  const isXiaomiAndroid12Plus = useMemo(() => {
+    const ua = navigator.userAgent || "";
+    const isXiaomi = /Xiaomi|Redmi|Miui|\bMI\b/i.test(ua);
+    const m = ua.match(/Android\s(\d+)/i);
+    const major = m ? Number(m[1]) : 0;
+    return isXiaomi && major >= 12;
+  }, []);
 
   // Desbloquear audio en el primer toque (requerido para Android)
   useEffect(() => {
