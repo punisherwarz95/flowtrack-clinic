@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, Box, ClipboardCheck, Calendar as CalendarIcon, Users, Check } from "lucide-react";
+import { Activity, ClipboardCheck, Calendar as CalendarIcon, Users, Check, Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import Navigation from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
@@ -42,60 +42,97 @@ interface Examen {
   nombre: string;
 }
 
+interface Empresa {
+  id: string;
+  nombre: string;
+}
+
 const Dashboard = () => {
   const { loading: authLoading } = useAuth();
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  
+  // Filtro diario (sección 1)
+  const [selectedDateDaily, setSelectedDateDaily] = useState<Date | undefined>(new Date());
+  
+  // Filtro mensual (sección 2)
   const [selectedMonth, setSelectedMonth] = useState<Date | undefined>(new Date());
-  const [atencionesIngresadas, setAtencionesIngresadas] = useState<AtencionIngresada[]>([]);
-  const [examenes, setExamenes] = useState<Examen[]>([]);
+  
+  // Filtro tabla pacientes (sección 3) - fecha independiente
+  const [selectedDateTable, setSelectedDateTable] = useState<Date | undefined>(new Date());
   const [selectedExamenFilter, setSelectedExamenFilter] = useState<string>("all");
+  const [selectedEmpresaFilter, setSelectedEmpresaFilter] = useState<string>("all");
+  const [selectedTipoFilter, setSelectedTipoFilter] = useState<string>("all");
   const [filterCompletado, setFilterCompletado] = useState<boolean>(true);
   const [filterIncompleto, setFilterIncompleto] = useState<boolean>(true);
-  const [examenesConteo, setExamenesConteo] = useState<Record<string, { asignados: number; completados: number }>>({});
-  const [stats, setStats] = useState({
+  
+  const [atencionesIngresadas, setAtencionesIngresadas] = useState<AtencionIngresada[]>([]);
+  const [examenes, setExamenes] = useState<Examen[]>([]);
+  const [empresas, setEmpresas] = useState<Empresa[]>([]);
+  
+  // Stats diarias
+  const [examenesConteoDiario, setExamenesConteoDiario] = useState<Record<string, { asignados: number; completados: number }>>({});
+  const [statsDaily, setStatsDaily] = useState({
     enEspera: 0,
     enAtencion: 0,
     completados: 0,
-    totalBoxes: 0,
     totalExamenes: 0,
     examenesRealizadosHoy: 0,
     enEsperaDistribucion: { workmed: 0, jenner: 0 },
     enAtencionDistribucion: { workmed: 0, jenner: 0 },
     completadosDistribucion: { workmed: 0, jenner: 0 },
+  });
+  
+  // Stats mensuales
+  const [examenesConteoMensual, setExamenesConteoMensual] = useState<Record<string, { asignados: number; completados: number }>>({});
+  const [statsMonthly, setStatsMonthly] = useState({
     pacientesMensuales: { total: 0, workmed: 0, jenner: 0 },
+    examenesRealizadosMes: 0,
   });
 
   useEffect(() => {
-    loadStats();
     loadExamenes();
-  }, [selectedDate, selectedMonth]);
+    loadEmpresas();
+  }, []);
 
-  // Auto-refresh cada 5 segundos para la tabla de pacientes ingresados
+  useEffect(() => {
+    loadDailyStats();
+  }, [selectedDateDaily]);
+
+  useEffect(() => {
+    loadMonthlyStats();
+  }, [selectedMonth]);
+
+  useEffect(() => {
+    loadTableData();
+  }, [selectedDateTable]);
+
+  // Auto-refresh cada 5 segundos
   useEffect(() => {
     const interval = setInterval(() => {
-      loadStats();
+      loadDailyStats();
+      loadMonthlyStats();
+      loadTableData();
     }, 5000);
     
     return () => clearInterval(interval);
-  }, [selectedDate, selectedMonth]);
+  }, [selectedDateDaily, selectedMonth, selectedDateTable]);
 
   const loadExamenes = async () => {
     const { data } = await supabase.from("examenes").select("id, nombre").order("nombre");
     setExamenes(data || []);
   };
 
-  const loadStats = async () => {
+  const loadEmpresas = async () => {
+    const { data } = await supabase.from("empresas").select("id, nombre").eq("activo", true).order("nombre");
+    setEmpresas(data || []);
+  };
+
+  const loadDailyStats = async () => {
     try {
-      const dateToUse = selectedDate || new Date();
-      const startOfDay = new Date(dateToUse.setHours(0, 0, 0, 0)).toISOString();
-      const endOfDay = new Date(dateToUse.setHours(23, 59, 59, 999)).toISOString();
+      const dateToUse = selectedDateDaily || new Date();
+      const startOfDay = new Date(dateToUse.getFullYear(), dateToUse.getMonth(), dateToUse.getDate(), 0, 0, 0, 0).toISOString();
+      const endOfDay = new Date(dateToUse.getFullYear(), dateToUse.getMonth(), dateToUse.getDate(), 23, 59, 59, 999).toISOString();
 
-      // Calcular inicio y fin del mes seleccionado
-      const monthToUse = selectedMonth || new Date();
-      const startOfMonth = new Date(monthToUse.getFullYear(), monthToUse.getMonth(), 1, 0, 0, 0, 0).toISOString();
-      const endOfMonth = new Date(monthToUse.getFullYear(), monthToUse.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
-
-      const [atencionesRes, completadosRes, boxesRes, examenesRes, pacientesMensualesRes, atencionesIngresadasRes, examenesRealizadosRes] = await Promise.all([
+      const [atencionesRes, completadosRes, examenesRes, examenesRealizadosRes] = await Promise.all([
         supabase
           .from("atenciones")
           .select("estado, pacientes(tipo_servicio)")
@@ -108,40 +145,7 @@ const Dashboard = () => {
           .eq("estado", "completado")
           .gte("fecha_ingreso", startOfDay)
           .lte("fecha_ingreso", endOfDay),
-        supabase.from("boxes").select("id", { count: "exact", head: true }).eq("activo", true),
         supabase.from("examenes").select("id", { count: "exact", head: true }),
-        supabase
-          .from("atenciones")
-          .select("id, pacientes(tipo_servicio)")
-          .gte("fecha_ingreso", startOfMonth)
-          .lte("fecha_ingreso", endOfMonth),
-        supabase
-          .from("atenciones")
-          .select(`
-            id,
-            numero_ingreso,
-            estado,
-            boxes (
-              nombre
-            ),
-            pacientes (
-              nombre,
-              tipo_servicio,
-              empresas (
-                nombre
-              )
-            ),
-            atencion_examenes (
-              estado,
-              examenes (
-                id,
-                nombre
-              )
-            )
-          `)
-          .gte("fecha_ingreso", startOfDay)
-          .lte("fecha_ingreso", endOfDay)
-          .order("numero_ingreso", { ascending: true }),
         supabase
           .from("atencion_examenes")
           .select("id, examen_id, estado, examenes(nombre), atencion_id, atenciones!inner(fecha_ingreso)")
@@ -152,24 +156,14 @@ const Dashboard = () => {
       const enEsperaData = atencionesRes.data?.filter((a: any) => a.estado === "en_espera") || [];
       const enAtencionData = atencionesRes.data?.filter((a: any) => a.estado === "en_atencion") || [];
 
-      // Distribución en espera
       const enEsperaWM = enEsperaData.filter((a: any) => a.pacientes?.tipo_servicio === "workmed").length;
       const enEsperaJ = enEsperaData.filter((a: any) => a.pacientes?.tipo_servicio === "jenner").length;
-
-      // Distribución en atención
       const enAtencionWM = enAtencionData.filter((a: any) => a.pacientes?.tipo_servicio === "workmed").length;
       const enAtencionJ = enAtencionData.filter((a: any) => a.pacientes?.tipo_servicio === "jenner").length;
-
-      // Distribución completados
       const completadosWM = completadosRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "workmed").length || 0;
       const completadosJ = completadosRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "jenner").length || 0;
 
-      // Contadores mensuales
-      const pacientesMensualesWM = pacientesMensualesRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "workmed").length || 0;
-      const pacientesMensualesJ = pacientesMensualesRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "jenner").length || 0;
-      const pacientesMensualesTotal = pacientesMensualesRes.data?.length || 0;
-
-      // Conteo de exámenes por tipo (asignados vs completados)
+      // Conteo de exámenes diarios
       const conteoExamenes: Record<string, { asignados: number; completados: number }> = {};
       examenesRealizadosRes.data?.forEach((ae: any) => {
         const nombreExamen = ae.examenes?.nombre || "Sin nombre";
@@ -181,24 +175,107 @@ const Dashboard = () => {
           conteoExamenes[nombreExamen].completados += 1;
         }
       });
-      setExamenesConteo(conteoExamenes);
+      setExamenesConteoDiario(conteoExamenes);
 
-      setAtencionesIngresadas((atencionesIngresadasRes.data as AtencionIngresada[]) || []);
-
-      setStats({
+      setStatsDaily({
         enEspera: enEsperaData.length,
         enAtencion: enAtencionData.length,
         completados: completadosRes.data?.length || 0,
-        totalBoxes: boxesRes.count || 0,
         totalExamenes: examenesRes.count || 0,
         examenesRealizadosHoy: examenesRealizadosRes.data?.length || 0,
         enEsperaDistribucion: { workmed: enEsperaWM, jenner: enEsperaJ },
         enAtencionDistribucion: { workmed: enAtencionWM, jenner: enAtencionJ },
         completadosDistribucion: { workmed: completadosWM, jenner: completadosJ },
-        pacientesMensuales: { total: pacientesMensualesTotal, workmed: pacientesMensualesWM, jenner: pacientesMensualesJ },
       });
     } catch (error) {
-      console.error("Error cargando estadísticas:", error);
+      console.error("Error cargando estadísticas diarias:", error);
+    }
+  };
+
+  const loadMonthlyStats = async () => {
+    try {
+      const monthToUse = selectedMonth || new Date();
+      const startOfMonth = new Date(monthToUse.getFullYear(), monthToUse.getMonth(), 1, 0, 0, 0, 0).toISOString();
+      const endOfMonth = new Date(monthToUse.getFullYear(), monthToUse.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
+
+      const [pacientesMensualesRes, examenesRealizadosRes] = await Promise.all([
+        supabase
+          .from("atenciones")
+          .select("id, pacientes(tipo_servicio)")
+          .gte("fecha_ingreso", startOfMonth)
+          .lte("fecha_ingreso", endOfMonth),
+        supabase
+          .from("atencion_examenes")
+          .select("id, examen_id, estado, examenes(nombre), atencion_id, atenciones!inner(fecha_ingreso)")
+          .gte("atenciones.fecha_ingreso", startOfMonth)
+          .lte("atenciones.fecha_ingreso", endOfMonth),
+      ]);
+
+      const pacientesMensualesWM = pacientesMensualesRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "workmed").length || 0;
+      const pacientesMensualesJ = pacientesMensualesRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "jenner").length || 0;
+      const pacientesMensualesTotal = pacientesMensualesRes.data?.length || 0;
+
+      // Conteo de exámenes mensuales
+      const conteoExamenes: Record<string, { asignados: number; completados: number }> = {};
+      examenesRealizadosRes.data?.forEach((ae: any) => {
+        const nombreExamen = ae.examenes?.nombre || "Sin nombre";
+        if (!conteoExamenes[nombreExamen]) {
+          conteoExamenes[nombreExamen] = { asignados: 0, completados: 0 };
+        }
+        conteoExamenes[nombreExamen].asignados += 1;
+        if (ae.estado === "completado") {
+          conteoExamenes[nombreExamen].completados += 1;
+        }
+      });
+      setExamenesConteoMensual(conteoExamenes);
+
+      setStatsMonthly({
+        pacientesMensuales: { total: pacientesMensualesTotal, workmed: pacientesMensualesWM, jenner: pacientesMensualesJ },
+        examenesRealizadosMes: examenesRealizadosRes.data?.length || 0,
+      });
+    } catch (error) {
+      console.error("Error cargando estadísticas mensuales:", error);
+    }
+  };
+
+  const loadTableData = async () => {
+    try {
+      const dateToUse = selectedDateTable || new Date();
+      const startOfDay = new Date(dateToUse.getFullYear(), dateToUse.getMonth(), dateToUse.getDate(), 0, 0, 0, 0).toISOString();
+      const endOfDay = new Date(dateToUse.getFullYear(), dateToUse.getMonth(), dateToUse.getDate(), 23, 59, 59, 999).toISOString();
+
+      const { data } = await supabase
+        .from("atenciones")
+        .select(`
+          id,
+          numero_ingreso,
+          estado,
+          boxes (
+            nombre
+          ),
+          pacientes (
+            nombre,
+            tipo_servicio,
+            empresas (
+              id,
+              nombre
+            )
+          ),
+          atencion_examenes (
+            estado,
+            examenes (
+              id,
+              nombre
+            )
+          )
+        `)
+        .gte("fecha_ingreso", startOfDay)
+        .lte("fecha_ingreso", endOfDay)
+        .order("numero_ingreso", { ascending: true });
+
+      setAtencionesIngresadas((data as AtencionIngresada[]) || []);
+    } catch (error) {
+      console.error("Error cargando tabla de pacientes:", error);
     }
   };
 
@@ -227,9 +304,19 @@ const Dashboard = () => {
     return { completados, pendientes, total: pacientesConExamen.length };
   })();
 
-  // Filter patients by selected exam and status
+  // Filter patients by selected filters
   const filteredAtenciones = atencionesIngresadas.filter(a => {
-    // First filter by exam if selected
+    // Filter by empresa
+    if (selectedEmpresaFilter !== "all") {
+      if ((a.pacientes as any).empresas?.id !== selectedEmpresaFilter) return false;
+    }
+    
+    // Filter by tipo servicio
+    if (selectedTipoFilter !== "all") {
+      if (a.pacientes.tipo_servicio !== selectedTipoFilter) return false;
+    }
+    
+    // Filter by exam if selected
     if (selectedExamenFilter !== "all") {
       const hasExam = a.atencion_examenes.some(ae => ae.examenes.id === selectedExamenFilter);
       if (!hasExam) return false;
@@ -245,122 +332,176 @@ const Dashboard = () => {
     return true;
   });
 
+  const renderExamenesGrid = (conteo: Record<string, { asignados: number; completados: number }>, totalExamenes: number) => {
+    if (Object.keys(conteo).length === 0) {
+      return <p className="text-sm text-muted-foreground">Sin exámenes asignados</p>;
+    }
+
+    const sortedExamenes = Object.entries(conteo).sort((a, b) => b[1].asignados - a[1].asignados);
+    const itemsPerColumn = Math.ceil(sortedExamenes.length / 3);
+    const columns = [
+      sortedExamenes.slice(0, itemsPerColumn),
+      sortedExamenes.slice(itemsPerColumn, itemsPerColumn * 2),
+      sortedExamenes.slice(itemsPerColumn * 2),
+    ].filter(col => col.length > 0);
+
+    return (
+      <>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {columns.map((column, colIndex) => (
+            <table key={colIndex} className="w-auto">
+              <tbody>
+                {column.map(([nombre, c]) => (
+                  <tr key={nombre}>
+                    <td className="text-sm text-muted-foreground py-1 pr-3">{nombre}</td>
+                    <td className="py-1">
+                      <Badge 
+                        variant="secondary"
+                        className={c.completados === c.asignados ? "bg-green-100 text-green-800 border-green-300" : ""}
+                      >
+                        {c.completados}/{c.asignados}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ))}
+        </div>
+        <div className="mt-4 pt-4 border-t">
+          <div className="text-2xl font-bold text-foreground">{totalExamenes}</div>
+          <p className="text-sm text-muted-foreground mt-1">
+            Total exámenes asignados
+          </p>
+        </div>
+      </>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
       
       <main className="container mx-auto px-4 py-8">
+        {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard</h1>
-              <p className="text-muted-foreground">
-                Vista general del sistema de gestión de pacientes
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <CalendarIcon className="h-4 w-4" />
-                    {selectedDate ? format(selectedDate, "PPP", { locale: es }) : "Seleccionar fecha"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={setSelectedDate}
-                    locale={es}
-                    initialFocus
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard Centro Médico Jenner</h1>
+          <p className="text-muted-foreground">
+            Vista general del sistema de gestión de pacientes
+          </p>
+        </div>
+
+        {/* SECCIÓN 1: Estadísticas Diarias */}
+        <section className="mb-10">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-foreground">Estadísticas Diarias</h2>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <CalendarIcon className="h-4 w-4" />
+                  {selectedDateDaily ? format(selectedDateDaily, "PPP", { locale: es }) : "Seleccionar fecha"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={selectedDateDaily}
+                  onSelect={setSelectedDateDaily}
+                  locale={es}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
-        </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
-          <Card className="border-l-4 border-l-primary col-span-full lg:col-span-1">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Pacientes
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-6">
+            <Card className="border-l-4 border-l-primary">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Total Pacientes
+                </CardTitle>
+                <Users className="h-5 w-5 text-primary" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-foreground">
+                  {statsDaily.enEspera + statsDaily.enAtencion + statsDaily.completados}
+                </div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  {format(selectedDateDaily || new Date(), "dd/MM/yyyy", { locale: es })}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-l-4 border-l-warning">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  En Espera
+                </CardTitle>
+                <Activity className="h-5 w-5 text-warning" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-foreground">{statsDaily.enEspera}</div>
+                <div className="mt-2 flex gap-2 text-xs text-muted-foreground">
+                  <span>WM: {statsDaily.enEsperaDistribucion.workmed.toString().padStart(2, "0")}</span>
+                  <span>J: {statsDaily.enEsperaDistribucion.jenner.toString().padStart(2, "0")}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-l-4 border-l-info">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  En Atención
+                </CardTitle>
+                <Activity className="h-5 w-5 text-info" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-foreground">{statsDaily.enAtencion}</div>
+                <div className="mt-2 flex gap-2 text-xs text-muted-foreground">
+                  <span>WM: {statsDaily.enAtencionDistribucion.workmed.toString().padStart(2, "0")}</span>
+                  <span>J: {statsDaily.enAtencionDistribucion.jenner.toString().padStart(2, "0")}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-l-4 border-l-green-600">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Completados
+                </CardTitle>
+                <ClipboardCheck className="h-5 w-5 text-green-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-foreground">{statsDaily.completados}</div>
+                <div className="mt-2 flex gap-2 text-xs text-muted-foreground">
+                  <span>WM: {statsDaily.completadosDistribucion.workmed.toString().padStart(2, "0")}</span>
+                  <span>J: {statsDaily.completadosDistribucion.jenner.toString().padStart(2, "0")}</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Exámenes del Día */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ClipboardCheck className="h-5 w-5 text-primary" />
+                Exámenes del Día
               </CardTitle>
-              <Users className="h-5 w-5 text-primary" />
+              <p className="text-sm text-muted-foreground">
+                {format(selectedDateDaily || new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })}
+              </p>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">
-                {stats.enEspera + stats.enAtencion + stats.completados}
-              </div>
-              <div className="mt-2 text-xs text-muted-foreground">
-                Hoy
-              </div>
+              <div className="text-4xl font-bold text-foreground mb-4">{statsDaily.examenesRealizadosHoy}</div>
+              {renderExamenesGrid(examenesConteoDiario, statsDaily.examenesRealizadosHoy)}
             </CardContent>
           </Card>
+        </section>
 
-          <Card className="border-l-4 border-l-warning">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                En Espera
-              </CardTitle>
-              <Activity className="h-5 w-5 text-warning" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-foreground">{stats.enEspera}</div>
-              <div className="mt-2 flex gap-2 text-xs text-muted-foreground">
-                <span>WM: {stats.enEsperaDistribucion.workmed.toString().padStart(2, "0")}</span>
-                <span>J: {stats.enEsperaDistribucion.jenner.toString().padStart(2, "0")}</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-l-4 border-l-info">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                En Atención
-              </CardTitle>
-              <Activity className="h-5 w-5 text-info" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-foreground">{stats.enAtencion}</div>
-              <div className="mt-2 flex gap-2 text-xs text-muted-foreground">
-                <span>WM: {stats.enAtencionDistribucion.workmed.toString().padStart(2, "0")}</span>
-                <span>J: {stats.enAtencionDistribucion.jenner.toString().padStart(2, "0")}</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-l-4 border-l-green-600">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Completados Hoy
-              </CardTitle>
-              <ClipboardCheck className="h-5 w-5 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-foreground">{stats.completados}</div>
-              <div className="mt-2 flex gap-2 text-xs text-muted-foreground">
-                <span>WM: {stats.completadosDistribucion.workmed.toString().padStart(2, "0")}</span>
-                <span>J: {stats.completadosDistribucion.jenner.toString().padStart(2, "0")}</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-l-4 border-l-secondary">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Boxes Activos
-              </CardTitle>
-              <Box className="h-5 w-5 text-secondary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-foreground">{stats.totalBoxes}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="mt-8">
+        {/* SECCIÓN 2: Estadísticas Mensuales */}
+        <section className="mb-10">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold text-foreground">Estadísticas Mensuales</h2>
             <div className="flex gap-2">
@@ -407,7 +548,8 @@ const Dashboard = () => {
               </Select>
             </div>
           </div>
-          <div className="grid gap-6 md:grid-cols-3">
+
+          <div className="grid gap-6 md:grid-cols-3 mb-6">
             <Card className="border-l-4 border-l-purple-600">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -416,7 +558,7 @@ const Dashboard = () => {
                 <Users className="h-5 w-5 text-purple-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-foreground">{stats.pacientesMensuales.total}</div>
+                <div className="text-3xl font-bold text-foreground">{statsMonthly.pacientesMensuales.total}</div>
                 <div className="mt-2 text-xs text-muted-foreground">
                   {format(selectedMonth || new Date(), "MMMM yyyy", { locale: es })}
                 </div>
@@ -431,7 +573,7 @@ const Dashboard = () => {
                 <Users className="h-5 w-5 text-blue-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-foreground">{stats.pacientesMensuales.workmed}</div>
+                <div className="text-3xl font-bold text-foreground">{statsMonthly.pacientesMensuales.workmed}</div>
                 <div className="mt-2 text-xs text-muted-foreground">
                   {format(selectedMonth || new Date(), "MMMM yyyy", { locale: es })}
                 </div>
@@ -446,29 +588,93 @@ const Dashboard = () => {
                 <Users className="h-5 w-5 text-amber-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-foreground">{stats.pacientesMensuales.jenner}</div>
+                <div className="text-3xl font-bold text-foreground">{statsMonthly.pacientesMensuales.jenner}</div>
                 <div className="mt-2 text-xs text-muted-foreground">
                   {format(selectedMonth || new Date(), "MMMM yyyy", { locale: es })}
                 </div>
               </CardContent>
             </Card>
           </div>
-        </div>
 
-        <div className="mt-8">
+          {/* Exámenes del Mes */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5 text-primary" />
-                    Pacientes Ingresados
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {format(selectedDate || new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })}
-                  </p>
+              <CardTitle className="flex items-center gap-2">
+                <ClipboardCheck className="h-5 w-5 text-primary" />
+                Exámenes del Mes
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                {format(selectedMonth || new Date(), "MMMM 'de' yyyy", { locale: es })}
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold text-foreground mb-4">{statsMonthly.examenesRealizadosMes}</div>
+              {renderExamenesGrid(examenesConteoMensual, statsMonthly.examenesRealizadosMes)}
+            </CardContent>
+          </Card>
+        </section>
+
+        {/* SECCIÓN 3: Pacientes Ingresados */}
+        <section>
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5 text-primary" />
+                      Pacientes Ingresados
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {format(selectedDateTable || new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })}
+                    </p>
+                  </div>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="gap-2">
+                        <CalendarIcon className="h-4 w-4" />
+                        {selectedDateTable ? format(selectedDateTable, "dd/MM/yyyy", { locale: es }) : "Fecha"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDateTable}
+                        onSelect={setSelectedDateTable}
+                        locale={es}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
-                <div className="flex items-center gap-4">
+                
+                {/* Filtros */}
+                <div className="flex flex-wrap items-center gap-4">
+                  <Select value={selectedEmpresaFilter} onValueChange={setSelectedEmpresaFilter}>
+                    <SelectTrigger className="w-[180px]">
+                      <Building2 className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Filtrar por empresa" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas las empresas</SelectItem>
+                      {empresas.map((empresa) => (
+                        <SelectItem key={empresa.id} value={empresa.id}>{empresa.nombre}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={selectedTipoFilter} onValueChange={setSelectedTipoFilter}>
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue placeholder="Filtrar por tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los tipos</SelectItem>
+                      <SelectItem value="workmed">Workmed</SelectItem>
+                      <SelectItem value="jenner">Jenner</SelectItem>
+                    </SelectContent>
+                  </Select>
+
                   <Select value={selectedExamenFilter} onValueChange={setSelectedExamenFilter}>
                     <SelectTrigger className="w-[200px]">
                       <SelectValue placeholder="Filtrar por examen" />
@@ -520,7 +726,7 @@ const Dashboard = () => {
             <CardContent>
               {filteredAtenciones.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">
-                  No hay pacientes ingresados en esta fecha
+                  No hay pacientes ingresados con los filtros seleccionados
                 </p>
               ) : (
                 <div className="overflow-x-auto">
@@ -598,69 +804,7 @@ const Dashboard = () => {
               )}
             </CardContent>
           </Card>
-        </div>
-
-        <div className="mt-8">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ClipboardCheck className="h-5 w-5 text-primary" />
-                Exámenes del Día
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {format(selectedDate || new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })}
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="text-4xl font-bold text-foreground mb-4">{stats.examenesRealizadosHoy}</div>
-              
-              {Object.keys(examenesConteo).length > 0 ? (
-                (() => {
-                  const sortedExamenes = Object.entries(examenesConteo).sort((a, b) => b[1].asignados - a[1].asignados);
-                  const itemsPerColumn = Math.ceil(sortedExamenes.length / 3);
-                  const columns = [
-                    sortedExamenes.slice(0, itemsPerColumn),
-                    sortedExamenes.slice(itemsPerColumn, itemsPerColumn * 2),
-                    sortedExamenes.slice(itemsPerColumn * 2),
-                  ].filter(col => col.length > 0);
-                  
-                  return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {columns.map((column, colIndex) => (
-                        <table key={colIndex} className="w-auto">
-                          <tbody>
-                            {column.map(([nombre, conteo]) => (
-                              <tr key={nombre}>
-                                <td className="text-sm text-muted-foreground py-1 pr-3">{nombre}</td>
-                                <td className="py-1">
-                                  <Badge 
-                                    variant="secondary"
-                                    className={conteo.completados === conteo.asignados ? "bg-green-100 text-green-800 border-green-300" : ""}
-                                  >
-                                    {conteo.completados}/{conteo.asignados}
-                                  </Badge>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      ))}
-                    </div>
-                  );
-                })()
-              ) : (
-                <p className="text-sm text-muted-foreground">Sin exámenes asignados</p>
-              )}
-              
-              <div className="mt-4 pt-4 border-t">
-                <div className="text-2xl font-bold text-foreground">{stats.totalExamenes}</div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Exámenes configurados en el sistema
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        </section>
       </main>
     </div>
   );
