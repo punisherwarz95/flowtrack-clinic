@@ -145,124 +145,159 @@ const Flujo = () => {
       setBoxes(boxesRes.data || []);
       setExamenes(examenesRes.data || []);
 
-      await loadPendingBoxesForAtenciones(atencionesRes.data || [], boxesRes.data || []);
-      await loadAtencionExamenes(atencionesRes.data || [], boxesRes.data || []);
-      await loadExamenesPendientes(atencionesRes.data || [], examenesRes.data || []);
+      // Cargar datos optimizados en paralelo (v0.0.1)
+      await Promise.all([
+        loadPendingBoxesOptimized(atencionesRes.data || [], boxesRes.data || []),
+        loadAtencionExamenesOptimized(atencionesRes.data || [], boxesRes.data || []),
+        loadExamenesPendientesOptimized(atencionesRes.data || [], examenesRes.data || [])
+      ]);
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al cargar datos");
     }
   };
 
-  const loadExamenesPendientes = async (atenciones: Atencion[], examenesList: Examen[]) => {
-    const newExamenesPendientes: {[atencionId: string]: string[]} = {};
-
-    for (const atencion of atenciones) {
-      try {
-        // Incluir pendientes e incompletos
-        const { data: atencionExamenes, error } = await supabase
-          .from("atencion_examenes")
-          .select("examen_id, estado")
-          .eq("atencion_id", atencion.id)
-          .in("estado", ["pendiente", "incompleto"]);
-
-        if (error) throw error;
-
-        const nombresExamenes = (atencionExamenes || []).map(ae => {
-          const examen = examenesList.find(ex => ex.id === ae.examen_id);
-          const nombre = examen?.nombre || "";
-          // Agregar indicador si es incompleto
-          return ae.estado === "incompleto" ? `${nombre} (I)` : nombre;
-        }).filter(n => n);
-
-        newExamenesPendientes[atencion.id] = nombresExamenes;
-      } catch (error) {
-        console.error("Error loading examenes pendientes:", error);
-        newExamenesPendientes[atencion.id] = [];
-      }
+  // OPTIMIZACIÓN v0.0.1: Una sola consulta para todos los exámenes pendientes
+  const loadExamenesPendientesOptimized = async (atenciones: Atencion[], examenesList: Examen[]) => {
+    if (atenciones.length === 0) {
+      setExamenesPendientes({});
+      return;
     }
 
-    setExamenesPendientes(newExamenesPendientes);
+    try {
+      const atencionIds = atenciones.map(a => a.id);
+      
+      // UNA sola consulta para todos los exámenes pendientes/incompletos
+      const { data: allExamenes, error } = await supabase
+        .from("atencion_examenes")
+        .select("atencion_id, examen_id, estado")
+        .in("atencion_id", atencionIds)
+        .in("estado", ["pendiente", "incompleto"]);
+
+      if (error) throw error;
+
+      // Agrupar en memoria
+      const newExamenesPendientes: {[atencionId: string]: string[]} = {};
+      
+      // Inicializar todos con array vacío
+      atencionIds.forEach(id => {
+        newExamenesPendientes[id] = [];
+      });
+
+      // Procesar resultados
+      (allExamenes || []).forEach(ae => {
+        const examen = examenesList.find(ex => ex.id === ae.examen_id);
+        const nombre = examen?.nombre || "";
+        if (nombre) {
+          const nombreConEstado = ae.estado === "incompleto" ? `${nombre} (I)` : nombre;
+          newExamenesPendientes[ae.atencion_id].push(nombreConEstado);
+        }
+      });
+
+      setExamenesPendientes(newExamenesPendientes);
+    } catch (error) {
+      console.error("Error loading examenes pendientes:", error);
+      setExamenesPendientes({});
+    }
   };
 
-  const loadAtencionExamenes = async (atenciones: Atencion[], boxesList: Box[]) => {
-    const newAtencionExamenes: {[atencionId: string]: AtencionExamen[]} = {};
+  // OPTIMIZACIÓN v0.0.1: Una sola consulta para todos los atencion_examenes
+  const loadAtencionExamenesOptimized = async (atenciones: Atencion[], boxesList: Box[]) => {
+    if (atenciones.length === 0) {
+      setAtencionExamenes({});
+      return;
+    }
 
-    // Cargar todos los exámenes en paralelo para mejor rendimiento
-    const promises = atenciones.map(async (atencion) => {
-      try {
-        // Si está en atención con box, filtrar directamente en la query
-        if (atencion.estado === "en_atencion" && atencion.box_id) {
+    try {
+      const atencionIds = atenciones.map(a => a.id);
+      
+      // UNA sola consulta para todos los exámenes
+      const { data: allExamenes, error } = await supabase
+        .from("atencion_examenes")
+        .select("id, atencion_id, examen_id, estado, examenes(nombre)")
+        .in("atencion_id", atencionIds)
+        .in("estado", ["pendiente", "incompleto"]);
+
+      if (error) throw error;
+
+      // Agrupar y filtrar en memoria
+      const newAtencionExamenes: {[atencionId: string]: AtencionExamen[]} = {};
+      
+      // Inicializar todos con array vacío
+      atencionIds.forEach(id => {
+        newAtencionExamenes[id] = [];
+      });
+
+      // Procesar resultados
+      (allExamenes || []).forEach(ae => {
+        const atencion = atenciones.find(a => a.id === ae.atencion_id);
+        
+        // Si está en atención con box, filtrar por exámenes del box
+        if (atencion?.estado === "en_atencion" && atencion.box_id) {
           const box = boxesList.find(b => b.id === atencion.box_id);
           const boxExamIds = box?.box_examenes.map(be => be.examen_id) || [];
           
-          if (boxExamIds.length === 0) {
-            return { atencionId: atencion.id, examenes: [] };
+          if (boxExamIds.includes(ae.examen_id)) {
+            newAtencionExamenes[ae.atencion_id].push(ae as AtencionExamen);
           }
-
-          // Incluir pendientes e incompletos para que puedan ser reintentados
-          const { data: examenesData, error } = await supabase
-            .from("atencion_examenes")
-            .select("id, examen_id, estado, examenes(nombre)")
-            .eq("atencion_id", atencion.id)
-            .in("estado", ["pendiente", "incompleto"])
-            .in("examen_id", boxExamIds);
-
-          if (error) throw error;
-          return { atencionId: atencion.id, examenes: examenesData || [] };
         } else {
-          // Para pacientes en espera, cargar todos los pendientes e incompletos
-          const { data: examenesData, error } = await supabase
-            .from("atencion_examenes")
-            .select("id, examen_id, estado, examenes(nombre)")
-            .eq("atencion_id", atencion.id)
-            .in("estado", ["pendiente", "incompleto"]);
-
-          if (error) throw error;
-          return { atencionId: atencion.id, examenes: examenesData || [] };
+          // Para pacientes en espera, incluir todos
+          newAtencionExamenes[ae.atencion_id].push(ae as AtencionExamen);
         }
-      } catch (error) {
-        console.error("Error loading atencion examenes:", error);
-        return { atencionId: atencion.id, examenes: [] };
-      }
-    });
+      });
 
-    const results = await Promise.all(promises);
-    results.forEach(({ atencionId, examenes }) => {
-      newAtencionExamenes[atencionId] = examenes;
-    });
-
-    setAtencionExamenes(newAtencionExamenes);
+      setAtencionExamenes(newAtencionExamenes);
+    } catch (error) {
+      console.error("Error loading atencion examenes:", error);
+      setAtencionExamenes({});
+    }
   };
 
-  const loadPendingBoxesForAtenciones = async (atenciones: Atencion[], boxesList: Box[]) => {
-    const newPendingBoxes: {[atencionId: string]: string[]} = {};
+  // OPTIMIZACIÓN v0.0.1: Reutilizar datos de loadExamenesPendientes
+  const loadPendingBoxesOptimized = async (atenciones: Atencion[], boxesList: Box[]) => {
+    if (atenciones.length === 0) {
+      setPendingBoxes({});
+      return;
+    }
 
-    for (const atencion of atenciones) {
-      try {
-        // Incluir pendientes e incompletos
-        const { data: atencionExamenes, error } = await supabase
-          .from("atencion_examenes")
-          .select("examen_id")
-          .eq("atencion_id", atencion.id)
-          .in("estado", ["pendiente", "incompleto"]);
+    try {
+      const atencionIds = atenciones.map(a => a.id);
+      
+      // UNA sola consulta (podría compartir con loadExamenesPendientes si se refactoriza más)
+      const { data: allExamenes, error } = await supabase
+        .from("atencion_examenes")
+        .select("atencion_id, examen_id")
+        .in("atencion_id", atencionIds)
+        .in("estado", ["pendiente", "incompleto"]);
 
-        if (error) throw error;
+      if (error) throw error;
 
-        const examenesIds = atencionExamenes?.map(ae => ae.examen_id) || [];
+      // Agrupar exámenes por atención
+      const examenesPorAtencion: {[atencionId: string]: string[]} = {};
+      atencionIds.forEach(id => {
+        examenesPorAtencion[id] = [];
+      });
+      
+      (allExamenes || []).forEach(ae => {
+        examenesPorAtencion[ae.atencion_id].push(ae.examen_id);
+      });
 
+      // Calcular boxes pendientes en memoria
+      const newPendingBoxes: {[atencionId: string]: string[]} = {};
+      
+      atencionIds.forEach(atencionId => {
+        const examenesIds = examenesPorAtencion[atencionId];
         const boxesConExamenes = boxesList.filter(box => 
           box.box_examenes.some(be => examenesIds.includes(be.examen_id))
         );
+        newPendingBoxes[atencionId] = boxesConExamenes.map(b => b.nombre);
+      });
 
-        newPendingBoxes[atencion.id] = boxesConExamenes.map(b => b.nombre);
-      } catch (error) {
-        console.error("Error loading pending boxes:", error);
-        newPendingBoxes[atencion.id] = [];
-      }
+      setPendingBoxes(newPendingBoxes);
+    } catch (error) {
+      console.error("Error loading pending boxes:", error);
+      setPendingBoxes({});
     }
-
-    setPendingBoxes(newPendingBoxes);
   };
 
   const handleIniciarAtencion = async (atencionId: string) => {
@@ -1009,6 +1044,11 @@ const Flujo = () => {
           </Card>
         </div>
       </main>
+      
+      {/* Versión */}
+      <div className="fixed bottom-2 right-2 text-xs text-muted-foreground/50">
+        Flujo v0.0.1
+      </div>
     </div>
   );
 };
