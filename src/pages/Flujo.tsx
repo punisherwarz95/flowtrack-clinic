@@ -74,25 +74,80 @@ const Flujo = () => {
   // Estado local para marcar exámenes antes de guardar
   const [examenesSeleccionados, setExamenesSeleccionados] = useState<{[atencionId: string]: Set<string>}>({});
 
+  // OPTIMIZACIÓN v0.0.2: Realtime inteligente - actualiza solo lo necesario
+  const handleRealtimeAtencionChange = async (payload: any) => {
+    const { eventType, new: newRecord, old: oldRecord } = payload;
+    const recordId = newRecord?.id || oldRecord?.id;
+    
+    if (!recordId) {
+      await loadData();
+      return;
+    }
+
+    // Si es un cambio de estado o box_id, necesitamos recargar
+    if (eventType === 'UPDATE') {
+      const atencion = atenciones.find(a => a.id === recordId);
+      const hasStatusChange = newRecord?.estado !== atencion?.estado;
+      const hasBoxChange = newRecord?.box_id !== atencion?.box_id;
+      
+      if (hasStatusChange || hasBoxChange) {
+        // Recargar todo si cambia estado o box
+        await loadData();
+      } else {
+        // Actualizar solo el registro específico en memoria
+        setAtenciones(prev => prev.map(a => 
+          a.id === recordId ? { ...a, ...newRecord } : a
+        ));
+      }
+    } else if (eventType === 'INSERT') {
+      // Nueva atención: recargar para obtener datos completos con joins
+      await loadData();
+    } else if (eventType === 'DELETE') {
+      // Eliminar de memoria
+      setAtenciones(prev => prev.filter(a => a.id !== recordId));
+    }
+  };
+
+  const handleRealtimeExamenChange = async (payload: any) => {
+    const { new: newRecord, old: oldRecord } = payload;
+    const atencionId = newRecord?.atencion_id || oldRecord?.atencion_id;
+    
+    if (!atencionId) {
+      await loadData();
+      return;
+    }
+
+    // Solo recargar los datos de exámenes para esta atención específica
+    const atencion = atenciones.find(a => a.id === atencionId);
+    if (atencion) {
+      // Recargar solo las funciones de exámenes
+      await Promise.all([
+        loadPendingBoxesOptimized(atenciones, boxes),
+        loadAtencionExamenesOptimized(atenciones, boxes),
+        loadExamenesPendientesOptimized(atenciones, examenes)
+      ]);
+    }
+  };
+
   useEffect(() => {
     loadData();
     
     const channel = supabase
-      .channel("atenciones-changes")
+      .channel("atenciones-changes-v2")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "atenciones" },
-        () => loadData()
+        handleRealtimeAtencionChange
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "atencion_examenes" },
-        () => loadData()
+        handleRealtimeExamenChange
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "pacientes" },
-        () => loadData()
+        () => loadData() // Pacientes cambian poco, recarga completa está bien
       )
       .subscribe();
 
@@ -101,11 +156,11 @@ const Flujo = () => {
     };
   }, [selectedDate]);
 
-  // Auto-refresh cada 10 segundos solo para tabla "En Espera"
+  // OPTIMIZACIÓN v0.0.2: Auto-refresh cada 30 segundos (realtime maneja cambios frecuentes)
   useEffect(() => {
     const interval = setInterval(() => {
       loadData();
-    }, 10000);
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [selectedDate]);
@@ -1047,7 +1102,7 @@ const Flujo = () => {
       
       {/* Versión */}
       <div className="fixed bottom-2 right-2 text-xs text-muted-foreground/50">
-        Flujo v0.0.1
+        Flujo v0.0.2
       </div>
     </div>
   );
