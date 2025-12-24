@@ -198,26 +198,48 @@ const Dashboard = () => {
       const startOfMonth = new Date(monthToUse.getFullYear(), monthToUse.getMonth(), 1, 0, 0, 0, 0).toISOString();
       const endOfMonth = new Date(monthToUse.getFullYear(), monthToUse.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
 
-      const [pacientesMensualesRes, examenesRealizadosRes] = await Promise.all([
-        supabase
-          .from("atenciones")
-          .select("id, pacientes(tipo_servicio)")
-          .gte("fecha_ingreso", startOfMonth)
-          .lte("fecha_ingreso", endOfMonth),
-        supabase
-          .from("atencion_examenes")
-          .select("id, examen_id, estado, examenes(nombre), atencion_id, atenciones!inner(fecha_ingreso)")
-          .gte("atenciones.fecha_ingreso", startOfMonth)
-          .lte("atenciones.fecha_ingreso", endOfMonth),
-      ]);
+      // Obtener pacientes mensuales
+      const pacientesMensualesRes = await supabase
+        .from("atenciones")
+        .select("id, pacientes(tipo_servicio)")
+        .gte("fecha_ingreso", startOfMonth)
+        .lte("fecha_ingreso", endOfMonth);
 
       const pacientesMensualesWM = pacientesMensualesRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "workmed").length || 0;
       const pacientesMensualesJ = pacientesMensualesRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "jenner").length || 0;
       const pacientesMensualesTotal = pacientesMensualesRes.data?.length || 0;
 
+      // Obtener todos los exámenes mensuales con paginación para evitar límite de 1000
+      let allExamenes: any[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("atencion_examenes")
+          .select("id, examen_id, estado, examenes(nombre), atencion_id, atenciones!inner(fecha_ingreso)")
+          .gte("atenciones.fecha_ingreso", startOfMonth)
+          .lte("atenciones.fecha_ingreso", endOfMonth)
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+
+        if (error) {
+          console.error("Error fetching examenes:", error);
+          break;
+        }
+
+        if (data && data.length > 0) {
+          allExamenes = [...allExamenes, ...data];
+          hasMore = data.length === pageSize;
+          page++;
+        } else {
+          hasMore = false;
+        }
+      }
+
       // Conteo de exámenes mensuales
       const conteoExamenes: Record<string, { asignados: number; completados: number }> = {};
-      examenesRealizadosRes.data?.forEach((ae: any) => {
+      allExamenes.forEach((ae: any) => {
         const nombreExamen = ae.examenes?.nombre || "Sin nombre";
         if (!conteoExamenes[nombreExamen]) {
           conteoExamenes[nombreExamen] = { asignados: 0, completados: 0 };
@@ -231,7 +253,7 @@ const Dashboard = () => {
 
       setStatsMonthly({
         pacientesMensuales: { total: pacientesMensualesTotal, workmed: pacientesMensualesWM, jenner: pacientesMensualesJ },
-        examenesRealizadosMes: examenesRealizadosRes.data?.length || 0,
+        examenesRealizadosMes: allExamenes.length,
       });
     } catch (error) {
       console.error("Error cargando estadísticas mensuales:", error);
