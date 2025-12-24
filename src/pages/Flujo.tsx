@@ -16,6 +16,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useAuth } from "@/hooks/useAuth";
+import { GlobalChat } from "@/components/GlobalChat";
 
 interface Atencion {
   id: string;
@@ -1101,9 +1102,12 @@ const Flujo = () => {
       </main>
       
       {/* Versión */}
-      <div className="fixed bottom-2 right-2 text-xs text-muted-foreground/50">
+      <div className="fixed bottom-2 right-16 text-xs text-muted-foreground/50">
         Flujo v0.0.2
       </div>
+      
+      {/* Chat Global */}
+      <GlobalChat selectedDate={selectedDate} />
     </div>
   );
 };
