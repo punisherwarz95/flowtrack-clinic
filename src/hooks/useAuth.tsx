@@ -10,32 +10,36 @@ export const useAuth = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Set up auth state listener
+    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
 
-        if (!session && event !== 'INITIAL_SESSION') {
-          navigate("/login");
+        // Handle token refresh failures - clear invalid tokens
+        if (event === 'TOKEN_REFRESHED' && !session) {
+          localStorage.removeItem('sb-szqnsuxmbvxxdzlbdglz-auth-token');
         }
       }
     );
 
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-
-      if (!session) {
-        navigate("/login");
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        // Clear corrupted/expired tokens
+        localStorage.removeItem('sb-szqnsuxmbvxxdzlbdglz-auth-token');
+        setSession(null);
+        setUser(null);
+      } else {
+        setSession(session);
+        setUser(session?.user ?? null);
       }
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, []);
 
   const signOut = async () => {
     // Limpiar box seleccionado al cerrar sesión
