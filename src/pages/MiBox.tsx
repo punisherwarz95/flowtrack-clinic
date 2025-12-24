@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
+import { GlobalChat } from "@/components/GlobalChat";
 
 interface Atencion {
   id: string;
@@ -782,6 +783,9 @@ const MiBox = () => {
           </Card>
         </div>
       </main>
+      
+      {/* Chat Global */}
+      <GlobalChat />
     </div>
   );
 };
