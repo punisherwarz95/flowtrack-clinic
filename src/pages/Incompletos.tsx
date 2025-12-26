@@ -46,10 +46,11 @@ const Incompletos = () => {
   useAuth(); // Protect route
   const [atenciones, setAtenciones] = useState<AtencionIncompleta[]>([]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: new Date(),
+    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1), // Inicio del mes
     to: new Date()
   });
   const [distribucion, setDistribucion] = useState({ workmed: 0, jenner: 0 });
+  const [totalExamenesIncompletos, setTotalExamenesIncompletos] = useState(0);
   const [reactivateDialog, setReactivateDialog] = useState<{open: boolean, atencion: AtencionIncompleta | null}>({open: false, atencion: null});
   const [isLoading, setIsLoading] = useState(false);
 
@@ -140,6 +141,12 @@ const Incompletos = () => {
       const workmedCount = todasAtenciones.filter(a => a.pacientes.tipo_servicio === "workmed").length;
       const jennerCount = todasAtenciones.filter(a => a.pacientes.tipo_servicio === "jenner").length;
       setDistribucion({ workmed: workmedCount, jenner: jennerCount });
+      
+      // Calcular total de exámenes incompletos
+      const totalIncompletos = todasAtenciones.reduce((acc, atencion) => {
+        return acc + atencion.atencion_examenes.filter(ae => ae.estado === "incompleto").length;
+      }, 0);
+      setTotalExamenesIncompletos(totalIncompletos);
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al cargar atenciones incompletas");
@@ -269,9 +276,12 @@ const Incompletos = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-3">
+            <CardTitle className="flex items-center gap-3 flex-wrap">
               <AlertCircle className="h-5 w-5 text-amber-600" />
-              <span>Total Incompletas: {atenciones.length}</span>
+              <span>Atenciones con Incompletos: {atenciones.length}</span>
+              <Badge variant="secondary" className="bg-amber-200 text-amber-800">
+                {totalExamenesIncompletos} exámenes incompletos
+              </Badge>
               <div className="flex gap-2 text-sm font-normal text-muted-foreground">
                 <span>WM: {distribucion.workmed.toString().padStart(2, "0")}</span>
                 <span>J: {distribucion.jenner.toString().padStart(2, "0")}</span>
