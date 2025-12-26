@@ -72,37 +72,73 @@ const Incompletos = () => {
 
   const loadAtenciones = async () => {
     try {
-      let query = supabase
+      // Primero obtenemos las atenciones con estado "incompleto"
+      let queryIncompletas = supabase
         .from("atenciones")
         .select("*, pacientes(id, nombre, rut, tipo_servicio, empresas(nombre)), atencion_examenes(id, estado, examen_id, examenes(nombre))")
         .eq("estado", "incompleto")
-        .order("fecha_fin_atencion", { ascending: false });
+        .order("fecha_ingreso", { ascending: false });
+
+      // También buscamos atenciones que tengan exámenes individuales con estado "incompleto"
+      // (pueden estar en estado "completado" pero tener exámenes incompletos)
+      let queryConExamenesIncompletos = supabase
+        .from("atenciones")
+        .select("*, pacientes(id, nombre, rut, tipo_servicio, empresas(nombre)), atencion_examenes(id, estado, examen_id, examenes(nombre))")
+        .neq("estado", "incompleto") // Excluir las que ya tienen estado incompleto
+        .order("fecha_ingreso", { ascending: false });
 
       if (dateRange?.from) {
         const startDate = new Date(dateRange.from);
         startDate.setHours(0, 0, 0, 0);
-        query = query.gte("fecha_ingreso", startDate.toISOString());
+        queryIncompletas = queryIncompletas.gte("fecha_ingreso", startDate.toISOString());
+        queryConExamenesIncompletos = queryConExamenesIncompletos.gte("fecha_ingreso", startDate.toISOString());
       }
 
       if (dateRange?.to) {
         const endDate = new Date(dateRange.to);
         endDate.setHours(23, 59, 59, 999);
-        query = query.lte("fecha_ingreso", endDate.toISOString());
+        queryIncompletas = queryIncompletas.lte("fecha_ingreso", endDate.toISOString());
+        queryConExamenesIncompletos = queryConExamenesIncompletos.lte("fecha_ingreso", endDate.toISOString());
       } else if (dateRange?.from) {
-        // Si solo hay fecha de inicio, usar el mismo día como fin
         const endDate = new Date(dateRange.from);
         endDate.setHours(23, 59, 59, 999);
-        query = query.lte("fecha_ingreso", endDate.toISOString());
+        queryIncompletas = queryIncompletas.lte("fecha_ingreso", endDate.toISOString());
+        queryConExamenesIncompletos = queryConExamenesIncompletos.lte("fecha_ingreso", endDate.toISOString());
       }
 
-      const { data, error } = await query;
+      const [resultIncompletas, resultConExamenes] = await Promise.all([
+        queryIncompletas,
+        queryConExamenesIncompletos
+      ]);
 
-      if (error) throw error;
-      setAtenciones(data || []);
+      if (resultIncompletas.error) throw resultIncompletas.error;
+      if (resultConExamenes.error) throw resultConExamenes.error;
+
+      // Filtrar las atenciones que tienen al menos un examen incompleto
+      const atencionesConExamenesIncompletos = (resultConExamenes.data || []).filter(
+        atencion => atencion.atencion_examenes.some(ae => ae.estado === "incompleto")
+      );
+
+      // Combinar ambos resultados sin duplicados
+      const todasAtenciones = [...(resultIncompletas.data || [])];
+      const idsExistentes = new Set(todasAtenciones.map(a => a.id));
+      
+      atencionesConExamenesIncompletos.forEach(atencion => {
+        if (!idsExistentes.has(atencion.id)) {
+          todasAtenciones.push(atencion);
+        }
+      });
+
+      // Ordenar por fecha de ingreso descendente
+      todasAtenciones.sort((a, b) => 
+        new Date(b.fecha_ingreso || 0).getTime() - new Date(a.fecha_ingreso || 0).getTime()
+      );
+
+      setAtenciones(todasAtenciones);
       
       // Calcular distribución por tipo de servicio
-      const workmedCount = data?.filter(a => a.pacientes.tipo_servicio === "workmed").length || 0;
-      const jennerCount = data?.filter(a => a.pacientes.tipo_servicio === "jenner").length || 0;
+      const workmedCount = todasAtenciones.filter(a => a.pacientes.tipo_servicio === "workmed").length;
+      const jennerCount = todasAtenciones.filter(a => a.pacientes.tipo_servicio === "jenner").length;
       setDistribucion({ workmed: workmedCount, jenner: jennerCount });
     } catch (error) {
       console.error("Error:", error);
@@ -255,7 +291,7 @@ const Incompletos = () => {
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <Badge variant="outline" className="font-bold">#{atencion.numero_ingreso}</Badge>
                         <div className="font-medium text-foreground">
                           {atencion.pacientes.nombre}
@@ -263,7 +299,14 @@ const Incompletos = () => {
                         <Badge variant="outline" className="text-xs">
                           {atencion.pacientes.tipo_servicio === "workmed" ? "WM" : "J"}
                         </Badge>
-                        <Badge className="bg-amber-600">Incompleto</Badge>
+                        {atencion.estado === "incompleto" ? (
+                          <Badge className="bg-amber-600">Atención Incompleta</Badge>
+                        ) : (
+                          <Badge className="bg-orange-500">Exámenes Incompletos</Badge>
+                        )}
+                        <Badge variant="secondary" className="text-xs">
+                          Estado: {atencion.estado}
+                        </Badge>
                       </div>
                       <div className="text-sm text-muted-foreground">
                         RUT: {atencion.pacientes.rut || "Sin RUT"}
@@ -273,7 +316,9 @@ const Incompletos = () => {
                       </div>
                       <div className="text-xs text-muted-foreground mt-2">
                         <div>Ingreso: {atencion.fecha_ingreso ? format(new Date(atencion.fecha_ingreso), "dd/MM/yyyy HH:mm", { locale: es }) : "Sin fecha"}</div>
-                        <div>Marcado incompleto: {atencion.fecha_fin_atencion ? format(new Date(atencion.fecha_fin_atencion), "dd/MM/yyyy HH:mm", { locale: es }) : "Sin fecha"}</div>
+                        {atencion.estado === "incompleto" && atencion.fecha_fin_atencion && (
+                          <div>Marcado incompleto: {format(new Date(atencion.fecha_fin_atencion), "dd/MM/yyyy HH:mm", { locale: es })}</div>
+                        )}
                       </div>
                       {atencion.observaciones && (
                         <div className="text-xs text-muted-foreground mt-1 italic">
