@@ -29,9 +29,14 @@ export const usePermissions = () => {
       const userIsAdmin = roles?.some((r) => r.role === "admin") ?? false;
       setIsAdmin(userIsAdmin);
 
-      // If admin, has access to everything
+      // If admin, load all active module paths
       if (userIsAdmin) {
-        setPermissions(["/", "/flujo", "/mi-box", "/pacientes", "/completados", "/empresas", "/boxes", "/examenes", "/usuarios"]);
+        const { data: modulos } = await supabase
+          .from("modulos")
+          .select("path")
+          .eq("activo", true);
+        
+        setPermissions(modulos?.map((m) => m.path) ?? []);
         setLoading(false);
         return;
       }

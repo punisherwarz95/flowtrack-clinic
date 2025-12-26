@@ -294,6 +294,36 @@ export type Database = {
           },
         ]
       }
+      modulos: {
+        Row: {
+          activo: boolean | null
+          created_at: string | null
+          icon: string | null
+          id: string
+          label: string
+          orden: number | null
+          path: string
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string | null
+          icon?: string | null
+          id?: string
+          label: string
+          orden?: number | null
+          path: string
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string | null
+          icon?: string | null
+          id?: string
+          label?: string
+          orden?: number | null
+          path?: string
+        }
+        Relationships: []
+      }
       pacientes: {
         Row: {
           created_at: string | null

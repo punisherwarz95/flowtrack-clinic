@@ -24,20 +24,16 @@ interface User {
   permissions: string[];
 }
 
-const menuOptions = [
-  { path: "/", label: "Dashboard" },
-  { path: "/flujo", label: "Flujo" },
-  { path: "/mi-box", label: "Mi Box" },
-  { path: "/pacientes", label: "Pacientes" },
-  { path: "/completados", label: "Completados" },
-  { path: "/empresas", label: "Empresas" },
-  { path: "/boxes", label: "Boxes" },
-  { path: "/examenes", label: "Exámenes" },
-  { path: "/usuarios", label: "Usuarios" },
-];
+interface Modulo {
+  id: string;
+  path: string;
+  label: string;
+  orden: number;
+}
 
 const Usuarios = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [modulos, setModulos] = useState<Modulo[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newUsername, setNewUsername] = useState("");
@@ -52,37 +48,30 @@ const Usuarios = () => {
   const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
-    loadUsers();
+    loadData();
   }, []);
 
-  const loadUsers = async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      // Get all profiles
-      const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("created_at", { ascending: true });
+      // Load modules and users in parallel
+      const [modulosResult, profilesResult, rolesResult, permissionsResult] = await Promise.all([
+        supabase.from("modulos").select("*").eq("activo", true).order("orden", { ascending: true }),
+        supabase.from("profiles").select("*").order("created_at", { ascending: true }),
+        supabase.from("user_roles").select("*"),
+        supabase.from("menu_permissions").select("*")
+      ]);
 
-      if (profilesError) throw profilesError;
+      if (modulosResult.error) throw modulosResult.error;
+      if (profilesResult.error) throw profilesResult.error;
+      if (rolesResult.error) throw rolesResult.error;
+      if (permissionsResult.error) throw permissionsResult.error;
 
-      // Get roles for all users
-      const { data: roles, error: rolesError } = await supabase
-        .from("user_roles")
-        .select("*");
+      setModulos(modulosResult.data || []);
 
-      if (rolesError) throw rolesError;
-
-      // Get permissions for all users
-      const { data: permissions, error: permissionsError } = await supabase
-        .from("menu_permissions")
-        .select("*");
-
-      if (permissionsError) throw permissionsError;
-
-      const usersData: User[] = profiles.map((profile) => {
-        const userRoles = roles.filter((r) => r.user_id === profile.id);
-        const userPermissions = permissions.filter((p) => p.user_id === profile.id);
+      const usersData: User[] = profilesResult.data.map((profile) => {
+        const userRoles = rolesResult.data.filter((r) => r.user_id === profile.id);
+        const userPermissions = permissionsResult.data.filter((p) => p.user_id === profile.id);
         
         return {
           id: profile.id,
@@ -94,7 +83,7 @@ const Usuarios = () => {
 
       setUsers(usersData);
     } catch (error: any) {
-      toast.error("Error al cargar usuarios: " + error.message);
+      toast.error("Error al cargar datos: " + error.message);
     } finally {
       setLoading(false);
     }
@@ -144,7 +133,7 @@ const Usuarios = () => {
       setNewPassword("");
       setNewIsAdmin(false);
       setNewPermissions([]);
-      loadUsers();
+      loadData();
     } catch (error: any) {
       console.error('Unexpected error:', error);
       toast.error("Error inesperado al crear usuario: " + error.message);
@@ -180,7 +169,7 @@ const Usuarios = () => {
       }
 
       toast.success("Usuario eliminado exitosamente");
-      loadUsers();
+      loadData();
     } catch (error: any) {
       toast.error("Error inesperado: " + error.message);
     }
@@ -220,7 +209,7 @@ const Usuarios = () => {
       toast.success("Permisos actualizados exitosamente");
       setEditingUser(null);
       setEditPermissions([]);
-      loadUsers();
+      loadData();
     } catch (error: any) {
       toast.error("Error al actualizar permisos: " + error.message);
     }
@@ -347,15 +336,15 @@ const Usuarios = () => {
                   <div className="space-y-2">
                     <Label>Permisos de Menú</Label>
                     <div className="grid grid-cols-2 gap-2 p-3 border rounded-md">
-                      {menuOptions.map((menu) => (
-                        <div key={menu.path} className="flex items-center space-x-2">
+                      {modulos.map((modulo) => (
+                        <div key={modulo.path} className="flex items-center space-x-2">
                           <Checkbox
-                            id={`new-${menu.path}`}
-                            checked={newPermissions.includes(menu.path)}
-                            onCheckedChange={() => toggleNewPermission(menu.path)}
+                            id={`new-${modulo.path}`}
+                            checked={newPermissions.includes(modulo.path)}
+                            onCheckedChange={() => toggleNewPermission(modulo.path)}
                           />
-                          <Label htmlFor={`new-${menu.path}`} className="cursor-pointer">
-                            {menu.label}
+                          <Label htmlFor={`new-${modulo.path}`} className="cursor-pointer">
+                            {modulo.label}
                           </Label>
                         </div>
                       ))}
@@ -408,14 +397,14 @@ const Usuarios = () => {
                       <div className="space-y-4">
                         <Label>Permisos de Menú</Label>
                         <div className="grid grid-cols-2 gap-2">
-                          {menuOptions.map((menu) => (
-                            <div key={menu.path} className="flex items-center space-x-2">
+                          {modulos.map((modulo) => (
+                            <div key={modulo.path} className="flex items-center space-x-2">
                               <Checkbox
-                                id={`${user.id}-${menu.path}`}
-                                checked={editPermissions.includes(menu.path)}
-                                onCheckedChange={() => togglePermission(menu.path)}
+                                id={`${user.id}-${modulo.path}`}
+                                checked={editPermissions.includes(modulo.path)}
+                                onCheckedChange={() => togglePermission(modulo.path)}
                               />
-                              <Label htmlFor={`${user.id}-${menu.path}`}>{menu.label}</Label>
+                              <Label htmlFor={`${user.id}-${modulo.path}`}>{modulo.label}</Label>
                             </div>
                           ))}
                         </div>
@@ -442,13 +431,13 @@ const Usuarios = () => {
                           <div className="flex flex-wrap gap-2 mt-2">
                             {user.permissions.length > 0 ? (
                               user.permissions.map((path) => {
-                                const menu = menuOptions.find((m) => m.path === path);
+                                const modulo = modulos.find((m) => m.path === path);
                                 return (
                                   <span
                                     key={path}
                                     className="px-2 py-1 bg-accent text-accent-foreground rounded text-sm"
                                   >
-                                    {menu?.label || path}
+                                    {modulo?.label || path}
                                   </span>
                                 );
                               })
