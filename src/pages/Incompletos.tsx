@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
-import { AlertCircle, Calendar as CalendarIcon, RotateCcw } from "lucide-react";
+import { AlertCircle, Calendar as CalendarIcon, RotateCcw, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -12,6 +12,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
+import { DateRange } from "react-day-picker";
 
 interface AtencionIncompleta {
   id: string;
@@ -43,7 +45,10 @@ interface AtencionIncompleta {
 const Incompletos = () => {
   useAuth(); // Protect route
   const [atenciones, setAtenciones] = useState<AtencionIncompleta[]>([]);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: new Date(),
+    to: new Date()
+  });
   const [distribucion, setDistribucion] = useState({ workmed: 0, jenner: 0 });
   const [reactivateDialog, setReactivateDialog] = useState<{open: boolean, atencion: AtencionIncompleta | null}>({open: false, atencion: null});
   const [isLoading, setIsLoading] = useState(false);
@@ -63,21 +68,31 @@ const Incompletos = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [selectedDate]);
+  }, [dateRange]);
 
   const loadAtenciones = async () => {
     try {
-      const startOfDay = selectedDate ? new Date(selectedDate.setHours(0, 0, 0, 0)).toISOString() : null;
-      const endOfDay = selectedDate ? new Date(selectedDate.setHours(23, 59, 59, 999)).toISOString() : null;
-
       let query = supabase
         .from("atenciones")
         .select("*, pacientes(id, nombre, rut, tipo_servicio, empresas(nombre)), atencion_examenes(id, estado, examen_id, examenes(nombre))")
         .eq("estado", "incompleto")
         .order("fecha_fin_atencion", { ascending: false });
 
-      if (startOfDay && endOfDay) {
-        query = query.gte("fecha_ingreso", startOfDay).lte("fecha_ingreso", endOfDay);
+      if (dateRange?.from) {
+        const startDate = new Date(dateRange.from);
+        startDate.setHours(0, 0, 0, 0);
+        query = query.gte("fecha_ingreso", startDate.toISOString());
+      }
+
+      if (dateRange?.to) {
+        const endDate = new Date(dateRange.to);
+        endDate.setHours(23, 59, 59, 999);
+        query = query.lte("fecha_ingreso", endDate.toISOString());
+      } else if (dateRange?.from) {
+        // Si solo hay fecha de inicio, usar el mismo día como fin
+        const endDate = new Date(dateRange.from);
+        endDate.setHours(23, 59, 59, 999);
+        query = query.lte("fecha_ingreso", endDate.toISOString());
       }
 
       const { data, error } = await query;
@@ -93,6 +108,18 @@ const Incompletos = () => {
       console.error("Error:", error);
       toast.error("Error al cargar atenciones incompletas");
     }
+  };
+
+  const handleClearDateRange = () => {
+    setDateRange(undefined);
+  };
+
+  const getDateRangeLabel = () => {
+    if (!dateRange?.from) return "Todas las fechas";
+    if (!dateRange.to || dateRange.from.getTime() === dateRange.to.getTime()) {
+      return format(dateRange.from, "PPP", { locale: es });
+    }
+    return `${format(dateRange.from, "dd/MM/yyyy", { locale: es })} - ${format(dateRange.to, "dd/MM/yyyy", { locale: es })}`;
   };
 
   const handleOpenReactivateDialog = (atencion: AtencionIncompleta) => {
@@ -175,23 +202,32 @@ const Incompletos = () => {
               <h1 className="text-3xl font-bold text-foreground mb-2">Atenciones Incompletas</h1>
               <p className="text-muted-foreground">Pacientes con exámenes pendientes por completar</p>
             </div>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <CalendarIcon className="h-4 w-4" />
-                  {selectedDate ? format(selectedDate, "PPP", { locale: es }) : "Seleccionar fecha"}
+            <div className="flex items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("gap-2", !dateRange && "text-muted-foreground")}>
+                    <CalendarIcon className="h-4 w-4" />
+                    {getDateRangeLabel()}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    mode="range"
+                    selected={dateRange}
+                    onSelect={setDateRange}
+                    locale={es}
+                    initialFocus
+                    numberOfMonths={2}
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+              {dateRange && (
+                <Button variant="ghost" size="icon" onClick={handleClearDateRange} title="Ver todas las fechas">
+                  <X className="h-4 w-4" />
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={setSelectedDate}
-                  locale={es}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
+              )}
+            </div>
           </div>
         </div>
 
@@ -209,7 +245,7 @@ const Incompletos = () => {
           <CardContent className="space-y-3">
             {atenciones.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No hay atenciones incompletas para esta fecha
+                No hay atenciones incompletas para el rango de fechas seleccionado
               </div>
             ) : (
               atenciones.map((atencion) => (
