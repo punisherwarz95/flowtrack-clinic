@@ -663,31 +663,73 @@ const Flujo = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-3 justify-start">
+              <div className="grid gap-3">
                 {listosParaFinalizar.map((atencion) => (
                   <div
                     key={atencion.id}
-                    className="flex items-center gap-3 p-3 rounded-lg border border-success/30 bg-success/5"
+                    className="p-4 rounded-lg border border-success/30 bg-success/5"
                   >
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="font-bold">#{atencion.numero_ingreso}</Badge>
-                      <span className="font-medium text-foreground">{atencion.pacientes.nombre}</span>
-                      <Badge variant="outline" className="text-xs">
-                        {atencion.pacientes.tipo_servicio === "workmed" ? "WM" : "J"}
-                      </Badge>
-                      {atencion.boxes && (
-                        <span className="text-xs text-muted-foreground">({atencion.boxes.nombre})</span>
-                      )}
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="font-bold">#{atencion.numero_ingreso}</Badge>
+                          <span className="font-medium text-foreground">{atencion.pacientes.nombre}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {atencion.pacientes.tipo_servicio === "workmed" ? "WM" : "J"}
+                          </Badge>
+                          {atencion.boxes && (
+                            <span className="text-xs text-muted-foreground">({atencion.boxes.nombre})</span>
+                          )}
+                        </div>
+                        <div className="mt-2">
+                          <div className="flex items-center gap-1 mb-1">
+                            <FileText className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-xs font-medium text-muted-foreground">Estado Ficha:</span>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-1.5">
+                              <Checkbox
+                                id={`listo-pendiente-${atencion.id}`}
+                                checked={atencion.estado_ficha === 'pendiente'}
+                                onCheckedChange={() => handleCambiarEstadoFicha(atencion.id, 'pendiente')}
+                              />
+                              <Label htmlFor={`listo-pendiente-${atencion.id}`} className="text-xs cursor-pointer">
+                                Pendiente
+                              </Label>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Checkbox
+                                id={`listo-en_mano-${atencion.id}`}
+                                checked={atencion.estado_ficha === 'en_mano_paciente'}
+                                onCheckedChange={() => handleCambiarEstadoFicha(atencion.id, 'en_mano_paciente')}
+                              />
+                              <Label htmlFor={`listo-en_mano-${atencion.id}`} className="text-xs cursor-pointer">
+                                Con Paciente
+                              </Label>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Checkbox
+                                id={`listo-completada-${atencion.id}`}
+                                checked={atencion.estado_ficha === 'completada'}
+                                onCheckedChange={() => handleCambiarEstadoFicha(atencion.id, 'completada')}
+                              />
+                              <Label htmlFor={`listo-completada-${atencion.id}`} className="text-xs cursor-pointer">
+                                Recibida
+                              </Label>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={() => handleCompletarAtencion(atencion.id, "completado")}
+                        className="gap-2 bg-success hover:bg-success/90"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                        Finalizar
+                      </Button>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="default"
-                      onClick={() => handleCompletarAtencion(atencion.id, "completado")}
-                      className="gap-2 bg-success hover:bg-success/90"
-                    >
-                      <CheckCircle className="h-4 w-4" />
-                      Finalizar
-                    </Button>
                   </div>
                 ))}
               </div>
