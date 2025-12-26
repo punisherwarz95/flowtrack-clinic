@@ -11,6 +11,7 @@ import Flujo from "./pages/Flujo";
 import MiBox from "./pages/MiBox";
 import Pacientes from "./pages/Pacientes";
 import Completados from "./pages/Completados";
+import Incompletos from "./pages/Incompletos";
 import Empresas from "./pages/Empresas";
 import Boxes from "./pages/Boxes";
 import Examenes from "./pages/Examenes";
@@ -39,6 +40,7 @@ const App = () => (
             <Route path="/mi-box" element={<ProtectedRoute path="/mi-box"><MiBox /></ProtectedRoute>} />
             <Route path="/pacientes" element={<ProtectedRoute path="/pacientes"><Pacientes /></ProtectedRoute>} />
             <Route path="/completados" element={<ProtectedRoute path="/completados"><Completados /></ProtectedRoute>} />
+            <Route path="/incompletos" element={<ProtectedRoute path="/incompletos"><Incompletos /></ProtectedRoute>} />
             <Route path="/empresas" element={<ProtectedRoute path="/empresas"><Empresas /></ProtectedRoute>} />
             <Route path="/boxes" element={<ProtectedRoute path="/boxes"><Boxes /></ProtectedRoute>} />
             <Route path="/boxes/:boxId" element={<ProtectedRoute path="/boxes"><BoxView /></ProtectedRoute>} />
