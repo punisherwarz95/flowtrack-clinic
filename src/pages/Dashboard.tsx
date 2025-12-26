@@ -66,7 +66,7 @@ const Dashboard = () => {
   
   const [atencionesIngresadas, setAtencionesIngresadas] = useState<AtencionIngresada[]>([]);
   const [examenes, setExamenes] = useState<Examen[]>([]);
-  const [empresas, setEmpresas] = useState<Empresa[]>([]);
+  
   
   // Stats diarias
   const [examenesConteoDiario, setExamenesConteoDiario] = useState<Record<string, { asignados: number; completados: number }>>({});
@@ -90,7 +90,6 @@ const Dashboard = () => {
 
   useEffect(() => {
     loadExamenes();
-    loadEmpresas();
   }, []);
 
   useEffect(() => {
@@ -121,10 +120,17 @@ const Dashboard = () => {
     setExamenes(data || []);
   };
 
-  const loadEmpresas = async () => {
-    const { data } = await supabase.from("empresas").select("id, nombre").eq("activo", true).order("nombre");
-    setEmpresas(data || []);
-  };
+  // Extraer empresas únicas de las atenciones cargadas
+  const empresasDelDia = (() => {
+    const empresasMap = new Map<string, Empresa>();
+    atencionesIngresadas.forEach(a => {
+      const empresa = (a.pacientes as any).empresas;
+      if (empresa?.id && empresa?.nombre) {
+        empresasMap.set(empresa.id, { id: empresa.id, nombre: empresa.nombre });
+      }
+    });
+    return Array.from(empresasMap.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  })();
 
   const loadDailyStats = async () => {
     try {
@@ -680,7 +686,7 @@ const Dashboard = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todas las empresas</SelectItem>
-                      {empresas.map((empresa) => (
+                      {empresasDelDia.map((empresa) => (
                         <SelectItem key={empresa.id} value={empresa.id}>{empresa.nombre}</SelectItem>
                       ))}
                     </SelectContent>
