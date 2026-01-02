@@ -105,7 +105,7 @@ const Pacientes = () => {
   }>({ open: false, patientId: null, patientName: "", examenes: [] });
   const [formData, setFormData] = useState({
     nombre: "",
-    tipo_servicio: "workmed" as "workmed" | "jenner",
+    tipo_servicio: "" as "workmed" | "jenner" | "",
     empresa_id: "",
     rut: "",
     email: "",
@@ -261,7 +261,7 @@ const Pacientes = () => {
     setEditingPatient(patient.id);
     setFormData({
       nombre: patient.nombre,
-      tipo_servicio: patient.tipo_servicio || "workmed",
+      tipo_servicio: patient.tipo_servicio || "",
       empresa_id: patient.empresa_id || "",
       rut: patient.rut || "",
       email: patient.email || "",
@@ -314,6 +314,12 @@ const Pacientes = () => {
     e.preventDefault();
     
     if (isSubmitting) return;
+    
+    // Tipo de servicio obligatorio
+    if (!formData.tipo_servicio) {
+      toast.error("Debe seleccionar un tipo de servicio");
+      return;
+    }
     
     // Empresa requerida solo para Jenner
     if (formData.tipo_servicio === "jenner" && !formData.empresa_id) {
@@ -401,6 +407,7 @@ const Pacientes = () => {
         // Insertar paciente - convertir empresa_id vacío a null
         const insertData = {
           ...formData,
+          tipo_servicio: formData.tipo_servicio as "workmed" | "jenner",
           empresa_id: formData.empresa_id || null
         };
         const { data: pacienteData, error: pacienteError } = await supabase
@@ -443,7 +450,7 @@ const Pacientes = () => {
 
       setOpenDialog(false);
       setEditingPatient(null);
-      setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: "", rut: "", email: "", telefono: "", fecha_nacimiento: "", direccion: "" });
+      setFormData({ nombre: "", tipo_servicio: "", empresa_id: "", rut: "", email: "", telefono: "", fecha_nacimiento: "", direccion: "" });
       setSelectedExamenes([]);
       setSelectedPaquetes([]);
       loadPatients();
@@ -710,36 +717,43 @@ const Pacientes = () => {
                       <h3 className="font-semibold text-sm text-muted-foreground border-b pb-2">Servicio y Empresa</h3>
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Tipo de Servicio *</Label>
-                        <div className="flex gap-4">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="tipo_servicio"
-                              value="workmed"
-                              checked={formData.tipo_servicio === "workmed"}
-                              onChange={(e) => {
-                                const workmedEmpresa = empresas.find(emp => emp.nombre.toUpperCase() === "WORKMED");
-                                setFormData({ 
-                                  ...formData, 
-                                  tipo_servicio: e.target.value as "workmed" | "jenner",
-                                  empresa_id: workmedEmpresa?.id || ""
-                                });
-                              }}
-                              className="w-4 h-4"
-                            />
-                            <span>Workmed</span>
-                          </label>
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="tipo_servicio"
-                              value="jenner"
-                              checked={formData.tipo_servicio === "jenner"}
-                              onChange={(e) => setFormData({ ...formData, tipo_servicio: e.target.value as "workmed" | "jenner" })}
-                              className="w-4 h-4"
-                            />
-                            <span>Jenner</span>
-                          </label>
+                        <div className="flex flex-col gap-2">
+                          <div className="flex gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="tipo_servicio"
+                                value="workmed"
+                                checked={formData.tipo_servicio === "workmed"}
+                                onChange={(e) => {
+                                  const workmedEmpresa = empresas.find(emp => emp.nombre.toUpperCase() === "WORKMED");
+                                  setFormData(prev => ({ 
+                                    ...prev, 
+                                    tipo_servicio: e.target.value as "workmed" | "jenner",
+                                    empresa_id: workmedEmpresa?.id || ""
+                                  }));
+                                }}
+                                className="w-4 h-4"
+                              />
+                              <span>Workmed</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="tipo_servicio"
+                                value="jenner"
+                                checked={formData.tipo_servicio === "jenner"}
+                                onChange={(e) => setFormData(prev => ({ ...prev, tipo_servicio: e.target.value as "workmed" | "jenner" }))}
+                                className="w-4 h-4"
+                              />
+                              <span>Jenner</span>
+                            </label>
+                          </div>
+                          {!formData.tipo_servicio && editingPatient && (
+                            <p className="text-sm text-amber-600">
+                              ⚠️ Paciente del portal. Seleccione un tipo de servicio.
+                            </p>
+                          )}
                         </div>
                       </div>
 
