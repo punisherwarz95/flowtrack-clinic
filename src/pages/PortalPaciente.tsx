@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import portalBackground from "@/assets/portal-background.jpeg";
 
-// Portal Paciente v0.0.5 - Punto de referencia estable
-// Cambios: Fix para compatibilidad con Xiaomi Android 12+
-const PORTAL_VERSION = "0.0.5";
+// Portal Paciente v0.0.6 - Mejoras formulario registro
+// Cambios: Auto-formateo nombre, fecha híbrida, teléfono +56, validaciones obligatorias
+const PORTAL_VERSION = "0.0.6";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,11 +12,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
-import { Loader2, ExternalLink, CheckCircle2, Clock, Building2, FileText, AlertCircle, X, RefreshCw, ChevronDown } from "lucide-react";
+import { Loader2, ExternalLink, CheckCircle2, Clock, Building2, FileText, AlertCircle, X, RefreshCw, ChevronDown, CalendarIcon } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { format } from "date-fns";
+import { format, parse, isValid } from "date-fns";
 import { es } from "date-fns/locale";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 
 interface Paciente {
   id: string;
@@ -95,6 +98,7 @@ export default function PortalPaciente() {
     nombre: "",
     rut: "",
     fecha_nacimiento: "",
+    fecha_nacimiento_display: "",
     email: "",
     telefono: "",
     direccion: ""
@@ -401,11 +405,115 @@ export default function PortalPaciente() {
     }
   };
 
+  // Validar email
+  const isValidEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
+  // Validar nombre (mínimo 1 nombre y 2 apellidos = 3 palabras)
+  const isValidNombre = (nombre: string) => {
+    const palabras = nombre.trim().split(/\s+/).filter(p => p.length > 0);
+    return palabras.length >= 3;
+  };
+
+  // Handler para nombre - auto mayúsculas
+  const handleNombreChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.toUpperCase();
+    setFormData(prev => ({ ...prev, nombre: value }));
+  };
+
+  // Handler para teléfono - solo 9 dígitos
+  const handleTelefonoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, "").slice(0, 9);
+    setFormData(prev => ({ ...prev, telefono: value }));
+  };
+
+  // Formatear teléfono para display (9 1234 5678)
+  const formatTelefonoDisplay = (value: string) => {
+    if (!value) return "";
+    const cleaned = value.replace(/\D/g, "");
+    if (cleaned.length <= 1) return cleaned;
+    if (cleaned.length <= 5) return `${cleaned.slice(0, 1)} ${cleaned.slice(1)}`;
+    return `${cleaned.slice(0, 1)} ${cleaned.slice(1, 5)} ${cleaned.slice(5)}`;
+  };
+
+  // Handler para fecha manual (DD/MM/AAAA)
+  const handleFechaNacimientoManual = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/[^\d]/g, "");
+    
+    // Auto-formatear con slashes
+    if (value.length >= 2) {
+      value = value.slice(0, 2) + "/" + value.slice(2);
+    }
+    if (value.length >= 5) {
+      value = value.slice(0, 5) + "/" + value.slice(5);
+    }
+    value = value.slice(0, 10); // Max DD/MM/AAAA
+    
+    setFormData(prev => ({ ...prev, fecha_nacimiento_display: value }));
+    
+    // Intentar parsear y guardar en formato ISO
+    if (value.length === 10) {
+      const parsed = parse(value, "dd/MM/yyyy", new Date());
+      if (isValid(parsed) && parsed <= new Date()) {
+        setFormData(prev => ({ ...prev, fecha_nacimiento: format(parsed, "yyyy-MM-dd") }));
+      } else {
+        setFormData(prev => ({ ...prev, fecha_nacimiento: "" }));
+      }
+    } else {
+      setFormData(prev => ({ ...prev, fecha_nacimiento: "" }));
+    }
+  };
+
+  // Handler para selección de calendario
+  const handleCalendarSelect = (date: Date | undefined) => {
+    if (date) {
+      setFormData(prev => ({
+        ...prev,
+        fecha_nacimiento: format(date, "yyyy-MM-dd"),
+        fecha_nacimiento_display: format(date, "dd/MM/yyyy")
+      }));
+    }
+  };
+
   const registrarPaciente = async () => {
-    if (!formData.nombre.trim() || !formData.rut.trim()) {
+    // Validaciones
+    const errores: string[] = [];
+    
+    if (!formData.nombre.trim()) {
+      errores.push("Nombre es obligatorio");
+    } else if (!isValidNombre(formData.nombre)) {
+      errores.push("Ingrese al menos un nombre y dos apellidos");
+    }
+    
+    if (!formData.rut.trim()) {
+      errores.push("RUT es obligatorio");
+    }
+    
+    if (!formData.fecha_nacimiento) {
+      errores.push("Fecha de nacimiento es obligatoria");
+    }
+    
+    if (!formData.email.trim()) {
+      errores.push("Email es obligatorio");
+    } else if (!isValidEmail(formData.email)) {
+      errores.push("Email no tiene formato válido");
+    }
+    
+    if (!formData.telefono) {
+      errores.push("Teléfono es obligatorio");
+    } else if (formData.telefono.length !== 9) {
+      errores.push("El teléfono debe tener 9 dígitos");
+    }
+    
+    if (!formData.direccion.trim()) {
+      errores.push("Dirección es obligatoria");
+    }
+
+    if (errores.length > 0) {
       toast({
-        title: "Error",
-        description: "Nombre y RUT son obligatorios",
+        title: "Campos incompletos",
+        description: errores[0],
         variant: "destructive"
       });
       return;
@@ -413,6 +521,7 @@ export default function PortalPaciente() {
 
     const rutVariants = getRutVariants(formData.rut);
     const rutNormalizado = normalizeRut(formData.rut);
+    const telefonoCompleto = `+56${formData.telefono}`;
 
     setIsLoading(true);
     try {
@@ -437,12 +546,12 @@ export default function PortalPaciente() {
       const { data: newPaciente, error } = await supabase
         .from("pacientes")
         .insert({
-          nombre: formData.nombre.trim(),
+          nombre: formData.nombre.trim().toUpperCase(),
           rut: rutNormalizado,
-          fecha_nacimiento: formData.fecha_nacimiento || null,
-          email: formData.email.trim() || null,
-          telefono: formData.telefono.trim() || null,
-          direccion: formData.direccion.trim() || null,
+          fecha_nacimiento: formData.fecha_nacimiento,
+          email: formData.email.trim().toLowerCase(),
+          telefono: telefonoCompleto,
+          direccion: formData.direccion.trim(),
           empresa_id: null,
           tipo_servicio: null
         })
@@ -808,11 +917,12 @@ export default function PortalPaciente() {
                 <Label htmlFor="nombre" className="text-sm font-medium mb-1.5 block">Nombre Completo *</Label>
                 <Input
                   id="nombre"
-                  placeholder="Juan Pérez González"
+                  placeholder="JUAN ANTONIO PÉREZ GONZÁLEZ"
                   value={formData.nombre}
-                  onChange={(e) => setFormData(prev => ({ ...prev, nombre: e.target.value }))}
-                  className="h-11"
+                  onChange={handleNombreChange}
+                  className="h-11 uppercase"
                 />
+                <p className="text-xs text-muted-foreground mt-1">Ingrese al menos un nombre y dos apellidos</p>
               </div>
               <div>
                 <Label htmlFor="formRut" className="text-sm font-medium mb-1.5 block">RUT *</Label>
@@ -825,17 +935,37 @@ export default function PortalPaciente() {
                 />
               </div>
               <div>
-                <Label htmlFor="fecha_nacimiento" className="text-sm font-medium mb-1.5 block">Fecha de Nacimiento</Label>
-                <Input
-                  id="fecha_nacimiento"
-                  type="date"
-                  value={formData.fecha_nacimiento}
-                  onChange={(e) => setFormData(prev => ({ ...prev, fecha_nacimiento: e.target.value }))}
-                  className="h-11"
-                />
+                <Label htmlFor="fecha_nacimiento" className="text-sm font-medium mb-1.5 block">Fecha de Nacimiento *</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="fecha_nacimiento"
+                    placeholder="DD/MM/AAAA"
+                    value={formData.fecha_nacimiento_display}
+                    onChange={handleFechaNacimientoManual}
+                    className="h-11 flex-1"
+                    maxLength={10}
+                  />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="icon" className="h-11 w-11 shrink-0">
+                        <CalendarIcon className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <Calendar
+                        mode="single"
+                        selected={formData.fecha_nacimiento ? new Date(formData.fecha_nacimiento + "T12:00:00") : undefined}
+                        onSelect={handleCalendarSelect}
+                        disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
               <div>
-                <Label htmlFor="email" className="text-sm font-medium mb-1.5 block">Email</Label>
+                <Label htmlFor="email" className="text-sm font-medium mb-1.5 block">Email *</Label>
                 <Input
                   id="email"
                   type="email"
@@ -846,18 +976,22 @@ export default function PortalPaciente() {
                 />
               </div>
               <div>
-                <Label htmlFor="telefono" className="text-sm font-medium mb-1.5 block">Teléfono</Label>
-                <Input
-                  id="telefono"
-                  type="tel"
-                  placeholder="+56 9 1234 5678"
-                  value={formData.telefono}
-                  onChange={(e) => setFormData(prev => ({ ...prev, telefono: e.target.value }))}
-                  className="h-11"
-                />
+                <Label htmlFor="telefono" className="text-sm font-medium mb-1.5 block">Teléfono *</Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-muted-foreground bg-muted px-3 py-2.5 rounded-md border h-11 flex items-center">+56</span>
+                  <Input
+                    id="telefono"
+                    type="tel"
+                    placeholder="9 1234 5678"
+                    value={formatTelefonoDisplay(formData.telefono)}
+                    onChange={handleTelefonoChange}
+                    className="h-11 flex-1"
+                    maxLength={13}
+                  />
+                </div>
               </div>
               <div className="sm:col-span-2">
-                <Label htmlFor="direccion" className="text-sm font-medium mb-1.5 block">Dirección</Label>
+                <Label htmlFor="direccion" className="text-sm font-medium mb-1.5 block">Dirección *</Label>
                 <Input
                   id="direccion"
                   placeholder="Av. Principal 123, Comuna"
