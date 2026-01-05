@@ -175,7 +175,7 @@ const Flujo = () => {
         .from("atenciones")
         .select("*, pacientes(id, nombre, rut, tipo_servicio), boxes(*)")
         .in("estado", ["en_espera", "en_atencion"])
-        .order("fecha_ingreso", { ascending: true });
+        .order("numero_ingreso", { ascending: true });
 
       if (startOfDay && endOfDay) {
         atencionesQuery = atencionesQuery.gte("fecha_ingreso", startOfDay).lte("fecha_ingreso", endOfDay);
