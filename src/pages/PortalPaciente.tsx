@@ -481,9 +481,9 @@ export default function PortalPaciente() {
     return `${formData.calle.trim()} ${formData.numeracion.trim()} ${formData.ciudad.trim()}`.trim();
   };
 
-  // Handler para campos de nombre - auto mayúsculas
+  // Handler para campos de nombre - auto mayúsculas, sin espacios
   const handleNombreFieldChange = (field: 'primerNombre' | 'apellidoPaterno' | 'apellidoMaterno') => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.toUpperCase();
+    const value = e.target.value.replace(/\s/g, '').toUpperCase();
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
