@@ -637,7 +637,8 @@ export default function PortalPaciente() {
     try {
       // Si ya tenemos un paciente creado (nuevo flujo), actualizarlo
       if (paciente && paciente.nombre === "PENDIENTE DE REGISTRO") {
-        const { data: updatedPaciente, error: updateError } = await supabase
+        // Usar update sin .single() para evitar error "Cannot coerce"
+        const { error: updateError } = await supabase
           .from("pacientes")
           .update({
             nombre: getNombreCompleto(),
@@ -647,11 +648,24 @@ export default function PortalPaciente() {
             telefono: telefonoCompleto,
             direccion: getDireccionCompleta()
           })
-          .eq("id", paciente.id)
-          .select()
-          .single();
+          .eq("id", paciente.id);
 
         if (updateError) throw updateError;
+
+        // Recuperar el paciente actualizado con select separado + limit(1)
+        const { data: updatedPacientes, error: selectError } = await supabase
+          .from("pacientes")
+          .select("*")
+          .eq("id", paciente.id)
+          .limit(1);
+
+        if (selectError) throw selectError;
+        
+        const updatedPaciente = updatedPacientes && updatedPacientes.length > 0 ? updatedPacientes[0] : null;
+        
+        if (!updatedPaciente) {
+          throw new Error("No se pudo confirmar el guardado. Por favor reingrese su RUT.");
+        }
 
         setPaciente(updatedPaciente);
         
@@ -663,13 +677,18 @@ export default function PortalPaciente() {
         setStep("portal");
       } else {
         // Flujo antiguo: verificar si existe y crear nuevo (fallback)
-        const { data: existingPaciente } = await supabase
+        // Usar order + limit(1) en lugar de maybeSingle para evitar error con duplicados
+        const { data: existingPacientes } = await supabase
           .from("pacientes")
-          .select("id")
+          .select("id, nombre")
           .eq("rut", rutFormateado)
-          .maybeSingle();
+          .order("created_at", { ascending: false })
+          .limit(1);
 
-        if (existingPaciente) {
+        const existingPaciente = existingPacientes && existingPacientes.length > 0 ? existingPacientes[0] : null;
+
+        // Si existe un paciente con ese RUT que NO es placeholder, redirigir
+        if (existingPaciente && existingPaciente.nombre !== "PENDIENTE DE REGISTRO") {
           toast({
             title: "RUT ya registrado",
             description: "Este RUT ya está registrado. Por favor identifíquese.",
@@ -679,6 +698,67 @@ export default function PortalPaciente() {
           setStep("identificacion");
           setIsLoading(false);
           return;
+        }
+        
+        // Si existe un placeholder, actualizarlo en lugar de crear uno nuevo
+        if (existingPaciente && existingPaciente.nombre === "PENDIENTE DE REGISTRO") {
+          const { error: updateError } = await supabase
+            .from("pacientes")
+            .update({
+              nombre: getNombreCompleto(),
+              fecha_nacimiento: formData.fecha_nacimiento,
+              email: formData.email.trim().toLowerCase(),
+              telefono: telefonoCompleto,
+              direccion: getDireccionCompleta()
+            })
+            .eq("id", existingPaciente.id);
+
+          if (updateError) throw updateError;
+
+          // Recuperar paciente actualizado
+          const { data: updatedPacientes } = await supabase
+            .from("pacientes")
+            .select("*")
+            .eq("id", existingPaciente.id)
+            .limit(1);
+
+          const updatedPaciente = updatedPacientes && updatedPacientes.length > 0 ? updatedPacientes[0] : null;
+          
+          if (!updatedPaciente) {
+            throw new Error("No se pudo confirmar el guardado. Por favor reingrese su RUT.");
+          }
+
+          // Buscar atención existente del día
+          const today = new Date();
+          const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).toISOString();
+          const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).toISOString();
+
+          const { data: existingAtenciones } = await supabase
+            .from("atenciones")
+            .select("*")
+            .eq("paciente_id", existingPaciente.id)
+            .gte("fecha_ingreso", startOfDay)
+            .lte("fecha_ingreso", endOfDay)
+            .order("fecha_ingreso", { ascending: false })
+            .limit(1);
+
+          const existingAtencion = existingAtenciones && existingAtenciones.length > 0 ? existingAtenciones[0] : null;
+
+          if (existingAtencion) {
+            setPaciente(updatedPaciente);
+            setAtencion({ ...existingAtencion, atencion_examenes: [], boxes: null });
+            prevEstadoRef.current = existingAtencion.estado;
+            prevBoxIdRef.current = existingAtencion.box_id;
+            
+            toast({
+              title: "Registro completado",
+              description: `Su número de atención es #${existingAtencion.numero_ingreso}. Espere a que el recepcionista complete su registro.`,
+            });
+
+            setStep("portal");
+            setIsLoading(false);
+            return;
+          }
         }
 
         const { data: newPaciente, error } = await supabase
