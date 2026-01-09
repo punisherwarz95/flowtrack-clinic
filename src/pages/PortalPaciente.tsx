@@ -332,15 +332,8 @@ export default function PortalPaciente() {
           prevEstadoRef.current = existingAtencion.estado;
           prevBoxIdRef.current = existingAtencion.box_id;
           
-          if (pacienteData.empresa_id) {
-            const { data: empresaData } = await supabase
-              .from("empresas")
-              .select("*")
-              .eq("id", pacienteData.empresa_id)
-              .single();
-            
-            if (empresaData) setEmpresa(empresaData);
-          }
+          // Ya no cargamos empresa automáticamente - recepción la asigna manualmente
+          // porque el paciente puede venir por diferentes empresas
           
           toast({
             title: "Bienvenido",
@@ -366,15 +359,8 @@ export default function PortalPaciente() {
           prevEstadoRef.current = "en_espera";
           prevBoxIdRef.current = null;
           
-          if (pacienteData.empresa_id) {
-            const { data: empresaData } = await supabase
-              .from("empresas")
-              .select("*")
-              .eq("id", pacienteData.empresa_id)
-              .single();
-            
-            if (empresaData) setEmpresa(empresaData);
-          }
+          // Ya no cargamos empresa automáticamente - recepción la asigna manualmente
+          // porque el paciente puede venir por diferentes empresas
           
           toast({
             title: "Registro de hoy",
