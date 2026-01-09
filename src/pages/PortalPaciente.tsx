@@ -262,13 +262,13 @@ export default function PortalPaciente() {
 
       if (pacienteError) throw pacienteError;
 
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).toISOString();
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).toISOString();
+
       if (pacienteData) {
         setPaciente(pacienteData);
         
-        const today = new Date();
-        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).toISOString();
-        const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).toISOString();
-
         // Misma query que Flujo - un solo select con joins
         const { data: existingAtencion } = await supabase
           .from("atenciones")
@@ -358,7 +358,48 @@ export default function PortalPaciente() {
         
         setStep("portal");
       } else {
+        // NUEVO FLUJO: Crear paciente placeholder y atención inmediatamente
+        // Esto garantiza que el paciente obtenga su número de atención antes de completar el registro
+        const { data: newPaciente, error: createError } = await supabase
+          .from("pacientes")
+          .insert({
+            nombre: "PENDIENTE DE REGISTRO",
+            rut: rutFormateado,
+            fecha_nacimiento: null,
+            email: null,
+            telefono: null,
+            direccion: null,
+            empresa_id: null,
+            tipo_servicio: null
+          })
+          .select()
+          .single();
+
+        if (createError) throw createError;
+
+        // Crear atención inmediatamente para obtener número de ingreso
+        const { data: newAtencion, error: atencionError } = await supabase
+          .from("atenciones")
+          .insert({
+            paciente_id: newPaciente.id,
+            estado: "en_espera",
+            fecha_ingreso: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (atencionError) throw atencionError;
+
+        // Mostrar número de atención inmediatamente
+        toast({
+          title: `Su número de atención es #${newAtencion.numero_ingreso}`,
+          description: "Por favor complete sus datos a continuación",
+        });
+
+        // Ir a registro con el RUT ya establecido y guardar referencias
         setFormData(prev => ({ ...prev, rut: rut }));
+        setPaciente(newPaciente);
+        setAtencion({ ...newAtencion, atencion_examenes: [], boxes: null });
         setStep("registro");
       }
     } catch (error: any) {
@@ -492,65 +533,93 @@ export default function PortalPaciente() {
 
     setIsLoading(true);
     try {
-      // Verificar si ya existe un paciente con este RUT (formato estándar)
-      const { data: existingPaciente } = await supabase
-        .from("pacientes")
-        .select("id")
-        .eq("rut", rutFormateado)
-        .maybeSingle();
+      // Si ya tenemos un paciente creado (nuevo flujo), actualizarlo
+      if (paciente && paciente.nombre === "PENDIENTE DE REGISTRO") {
+        const { data: updatedPaciente, error: updateError } = await supabase
+          .from("pacientes")
+          .update({
+            nombre: formData.nombre.trim().toUpperCase(),
+            rut: rutFormateado,
+            fecha_nacimiento: formData.fecha_nacimiento,
+            email: formData.email.trim().toLowerCase(),
+            telefono: telefonoCompleto,
+            direccion: formData.direccion.trim()
+          })
+          .eq("id", paciente.id)
+          .select()
+          .single();
 
-      if (existingPaciente) {
+        if (updateError) throw updateError;
+
+        setPaciente(updatedPaciente);
+        
         toast({
-          title: "RUT ya registrado",
-          description: "Este RUT ya está registrado. Por favor identifíquese.",
-          variant: "destructive"
+          title: "Registro completado",
+          description: `Su número de atención es #${atencion?.numero_ingreso}. Espere a que el recepcionista complete su registro.`,
         });
-        setRut(formData.rut);
-        setStep("identificacion");
-        setIsLoading(false);
-        return;
+
+        setStep("portal");
+      } else {
+        // Flujo antiguo: verificar si existe y crear nuevo (fallback)
+        const { data: existingPaciente } = await supabase
+          .from("pacientes")
+          .select("id")
+          .eq("rut", rutFormateado)
+          .maybeSingle();
+
+        if (existingPaciente) {
+          toast({
+            title: "RUT ya registrado",
+            description: "Este RUT ya está registrado. Por favor identifíquese.",
+            variant: "destructive"
+          });
+          setRut(formData.rut);
+          setStep("identificacion");
+          setIsLoading(false);
+          return;
+        }
+
+        const { data: newPaciente, error } = await supabase
+          .from("pacientes")
+          .insert({
+            nombre: formData.nombre.trim().toUpperCase(),
+            rut: rutFormateado,
+            fecha_nacimiento: formData.fecha_nacimiento,
+            email: formData.email.trim().toLowerCase(),
+            telefono: telefonoCompleto,
+            direccion: formData.direccion.trim(),
+            empresa_id: null,
+            tipo_servicio: null
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        const { data: newAtencion, error: atencionError } = await supabase
+          .from("atenciones")
+          .insert({
+            paciente_id: newPaciente.id,
+            estado: "en_espera",
+            fecha_ingreso: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (atencionError) throw atencionError;
+
+        setPaciente(newPaciente);
+        setAtencion({ ...newAtencion, atencion_examenes: [], boxes: null });
+        prevEstadoRef.current = "en_espera";
+        prevBoxIdRef.current = null;
+        
+        toast({
+          title: "Registro exitoso",
+          description: `Su número de atención es #${newAtencion.numero_ingreso}. Espere a que el recepcionista complete su registro.`,
+        });
+
+        setStep("portal");
       }
-
-      const { data: newPaciente, error } = await supabase
-        .from("pacientes")
-        .insert({
-          nombre: formData.nombre.trim().toUpperCase(),
-          rut: rutFormateado,
-          fecha_nacimiento: formData.fecha_nacimiento,
-          email: formData.email.trim().toLowerCase(),
-          telefono: telefonoCompleto,
-          direccion: formData.direccion.trim(),
-          empresa_id: null,
-          tipo_servicio: null
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      const { data: newAtencion, error: atencionError } = await supabase
-        .from("atenciones")
-        .insert({
-          paciente_id: newPaciente.id,
-          estado: "en_espera",
-          fecha_ingreso: new Date().toISOString()
-        })
-        .select()
-        .single();
-
-      if (atencionError) throw atencionError;
-
-      setPaciente(newPaciente);
-      setAtencion({ ...newAtencion, atencion_examenes: [], boxes: null });
-      prevEstadoRef.current = "en_espera";
-      prevBoxIdRef.current = null;
-      
-      toast({
-        title: "Registro exitoso",
-        description: `Su número de atención es #${newAtencion.numero_ingreso}. Espere a que el recepcionista complete su registro.`,
-      });
-
-      setStep("portal");
     } catch (error: any) {
       console.error("Error registrando paciente:", error);
       toast({
