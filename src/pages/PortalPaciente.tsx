@@ -295,6 +295,34 @@ export default function PortalPaciente() {
       if (pacienteData) {
         setPaciente(pacienteData);
         
+        // Si el paciente tiene nombre "PENDIENTE DE REGISTRO", llevarlo al formulario
+        // para que complete sus datos (caso: recargó la página antes de terminar)
+        if (pacienteData.nombre === "PENDIENTE DE REGISTRO") {
+          // Buscar su atención existente
+          const { data: existingAtencion } = await supabase
+            .from("atenciones")
+            .select("*, boxes(*)")
+            .eq("paciente_id", pacienteData.id)
+            .gte("fecha_ingreso", startOfDay)
+            .lte("fecha_ingreso", endOfDay)
+            .order("fecha_ingreso", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (existingAtencion) {
+            setAtencion({ ...existingAtencion, atencion_examenes: [] });
+            toast({
+              title: `Su número de atención es #${existingAtencion.numero_ingreso}`,
+              description: "Por favor complete sus datos a continuación",
+            });
+          }
+
+          // Ir a registro con el RUT ya establecido
+          setFormData(prev => ({ ...prev, rut: rut }));
+          setStep("registro");
+          return;
+        }
+        
         // Misma query que Flujo - un solo select con joins
         const { data: existingAtencion } = await supabase
           .from("atenciones")
