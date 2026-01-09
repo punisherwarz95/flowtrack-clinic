@@ -52,6 +52,15 @@ interface Patient {
   } | null;
 }
 
+// Función para verificar si un paciente tiene datos completos
+const isPacienteIncompleto = (patient: Patient): boolean => {
+  return !patient.tipo_servicio || 
+         patient.nombre === "PENDIENTE DE REGISTRO" ||
+         !patient.fecha_nacimiento ||
+         !patient.email ||
+         !patient.telefono;
+};
+
 interface Empresa {
   id: string;
   nombre: string;
@@ -868,66 +877,99 @@ const Pacientes = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {filteredPatients.map((patient) => (
-                <div
-                  key={patient.id}
-                  className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-accent transition-colors"
-                 >
-                   <div className="flex-1 min-w-0">
-                     <div className="flex items-center gap-2 flex-wrap">
-                       {patient.atencion_actual && (
-                         <Badge variant="outline" className="font-bold">#{patient.atencion_actual.numero_ingreso}</Badge>
-                       )}
-                       <div className="font-medium text-foreground">{patient.nombre}</div>
-                       {patient.rut && (
-                         <span className="text-sm text-muted-foreground">({patient.rut})</span>
-                       )}
-                     </div>
-                     <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground flex-wrap">
-                       <span>{patient.empresas?.nombre || "Sin empresa"}</span>
-                       {patient.fecha_nacimiento && patient.fecha_nacimiento.length > 0 && !isNaN(new Date(patient.fecha_nacimiento + "T00:00:00").getTime()) && (
-                         <span>• Nac: {format(new Date(patient.fecha_nacimiento + "T00:00:00"), "dd/MM/yyyy", { locale: es })}</span>
-                       )}
-                       {patient.email && <span>• {patient.email}</span>}
-                       {patient.telefono && <span>• {patient.telefono}</span>}
-                     </div>
-                     {patient.atencion_actual?.fecha_ingreso && (
-                       <div className="text-xs text-muted-foreground mt-1">
-                         Ingresó hoy: {format(new Date(patient.atencion_actual.fecha_ingreso), "HH:mm", { locale: es })}
-                       </div>
-                     )}
-                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right text-sm">
-                      <div className={`font-medium ${patient.tipo_servicio === 'workmed' ? 'text-blue-600' : 'text-green-600'}`}>
-                        {patient.tipo_servicio === 'workmed' ? 'Workmed' : 'Jenner'}
+              {filteredPatients.map((patient) => {
+                const incompleto = isPacienteIncompleto(patient);
+                
+                return (
+                  <div
+                    key={patient.id}
+                    className={cn(
+                      "flex items-center justify-between p-4 rounded-lg border transition-colors",
+                      incompleto 
+                        ? "border-amber-300 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-700" 
+                        : "border-border hover:bg-accent"
+                    )}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {patient.atencion_actual && (
+                          <Badge variant="outline" className="font-bold">#{patient.atencion_actual.numero_ingreso}</Badge>
+                        )}
+                        {incompleto && (
+                          <Badge variant="secondary" className="bg-amber-500 text-white hover:bg-amber-600">
+                            Esperando datos
+                          </Badge>
+                        )}
+                        <div className="font-medium text-foreground">
+                          {patient.nombre === "PENDIENTE DE REGISTRO" ? (
+                            <span className="italic text-muted-foreground">Pendiente de registro</span>
+                          ) : (
+                            patient.nombre
+                          )}
+                        </div>
+                        {patient.rut && (
+                          <span className="text-sm text-muted-foreground">({patient.rut})</span>
+                        )}
                       </div>
+                      <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground flex-wrap">
+                        {incompleto ? (
+                          <span className="text-amber-600 dark:text-amber-400">
+                            El paciente está completando sus datos en el portal...
+                          </span>
+                        ) : (
+                          <>
+                            <span>{patient.empresas?.nombre || "Sin empresa"}</span>
+                            {patient.fecha_nacimiento && patient.fecha_nacimiento.length > 0 && !isNaN(new Date(patient.fecha_nacimiento + "T00:00:00").getTime()) && (
+                              <span>• Nac: {format(new Date(patient.fecha_nacimiento + "T00:00:00"), "dd/MM/yyyy", { locale: es })}</span>
+                            )}
+                            {patient.email && <span>• {patient.email}</span>}
+                            {patient.telefono && <span>• {patient.telefono}</span>}
+                          </>
+                        )}
+                      </div>
+                      {patient.atencion_actual?.fecha_ingreso && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Ingresó hoy: {format(new Date(patient.atencion_actual.fecha_ingreso), "HH:mm", { locale: es })}
+                        </div>
+                      )}
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleViewExamenesCompletados(patient)}
-                      title="Ver exámenes completados"
-                    >
-                      <ClipboardList className="h-4 w-4 text-info" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEdit(patient)}
-                    >
-                      <Pencil className="h-4 w-4 text-primary" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setPacienteToDelete(patient.id)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    <div className="flex items-center gap-3">
+                      {!incompleto && (
+                        <>
+                          <div className="text-right text-sm">
+                            <div className={`font-medium ${patient.tipo_servicio === 'workmed' ? 'text-blue-600' : 'text-green-600'}`}>
+                              {patient.tipo_servicio === 'workmed' ? 'Workmed' : 'Jenner'}
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleViewExamenesCompletados(patient)}
+                            title="Ver exámenes completados"
+                          >
+                            <ClipboardList className="h-4 w-4 text-info" />
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEdit(patient)}
+                        title={incompleto ? "Completar datos del paciente" : "Editar paciente"}
+                      >
+                        <Pencil className="h-4 w-4 text-primary" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setPacienteToDelete(patient.id)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
