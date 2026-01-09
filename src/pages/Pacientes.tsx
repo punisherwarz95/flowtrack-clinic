@@ -52,10 +52,10 @@ interface Patient {
   } | null;
 }
 
-// Función para verificar si un paciente tiene datos completos
+// Función para verificar si un paciente tiene datos del portal pendientes
+// Solo verifica datos que el paciente completa en el portal (no tipo_servicio que lo asigna el staff)
 const isPacienteIncompleto = (patient: Patient): boolean => {
-  return !patient.tipo_servicio || 
-         patient.nombre === "PENDIENTE DE REGISTRO" ||
+  return patient.nombre === "PENDIENTE DE REGISTRO" ||
          !patient.fecha_nacimiento ||
          !patient.email ||
          !patient.telefono;
