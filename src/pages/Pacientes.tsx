@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
+import { cn, formatRutStandard } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 
 interface Patient {
@@ -330,10 +330,11 @@ const Pacientes = () => {
     setIsSubmitting(true);
     try {
       if (editingPatient) {
-        // Actualizar paciente - convertir empresa_id vacío a null
+        // Actualizar paciente - convertir empresa_id vacío a null y formatear RUT
         const updateData: any = {
           ...formData,
           empresa_id: formData.empresa_id || null,
+          rut: formData.rut.trim() ? formatRutStandard(formData.rut) : undefined,
         };
 
         // Si el RUT viene vacío en el formulario, NO lo tocamos para no borrarlo
@@ -404,11 +405,12 @@ const Pacientes = () => {
           }
         }
       } else {
-        // Insertar paciente - convertir empresa_id vacío a null
+        // Insertar paciente - convertir empresa_id vacío a null y formatear RUT
         const insertData = {
           ...formData,
           tipo_servicio: formData.tipo_servicio as "workmed" | "jenner",
-          empresa_id: formData.empresa_id || null
+          empresa_id: formData.empresa_id || null,
+          rut: formData.rut.trim() ? formatRutStandard(formData.rut) : null,
         };
         const { data: pacienteData, error: pacienteError } = await supabase
           .from("pacientes")

@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import portalBackground from "@/assets/portal-background.jpeg";
 
-// Portal Paciente v0.0.6 - Mejoras formulario registro
-// Cambios: Auto-formateo nombre, fecha híbrida, teléfono +56, validaciones obligatorias
-const PORTAL_VERSION = "0.0.6";
+// Portal Paciente v0.0.7 - RUT formato estándar 00.000.000-0
+// Cambios: Estandarización de formato RUT en BD, búsqueda simplificada
+const PORTAL_VERSION = "0.0.7";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,7 @@ import { format, parse, isValid } from "date-fns";
 import { es } from "date-fns/locale";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { cn } from "@/lib/utils";
+import { cn, formatRutStandard, normalizeRut as normalizeRutUtil } from "@/lib/utils";
 
 interface Paciente {
   id: string;
@@ -223,43 +223,9 @@ export default function PortalPaciente() {
     }, 50); // Pequeño delay para dispositivos problemáticos
   }, []);
 
-  // Normalize RUT
-  const normalizeRut = (value: string) => {
-    return value.replace(/[^0-9kK]/g, "").toUpperCase();
-  };
-
-  const getRutVariants = (value: string): string[] => {
-    const variants = new Set<string>();
-    const cleaned = normalizeRut(value);
-
-    if (!cleaned) return [];
-
-    variants.add(cleaned);
-
-    if (cleaned.length > 1) {
-      const body = cleaned.slice(0, -1);
-      const dv = cleaned.slice(-1);
-      variants.add(`${body}-${dv}`);
-      const bodyWithDots = body.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-      variants.add(`${bodyWithDots}-${dv}`);
-    }
-
-    variants.add(value.trim());
-
-    return Array.from(variants).filter(Boolean);
-  };
-
+  // Usar formatRutStandard de utils para display (mismo formato estándar)
   const formatRutForDisplay = (value: string) => {
-    const cleaned = normalizeRut(value);
-    
-    if (cleaned.length > 1) {
-      const body = cleaned.slice(0, -1);
-      const dv = cleaned.slice(-1);
-      const formattedBody = body.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-      return `${formattedBody}-${dv}`;
-    }
-    
-    return cleaned;
+    return formatRutStandard(value);
   };
 
   const handleRutChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -282,14 +248,16 @@ export default function PortalPaciente() {
       return;
     }
 
-    const rutVariants = getRutVariants(rut);
+    // Convertir RUT al formato estándar para búsqueda
+    const rutFormateado = formatRutStandard(rut);
 
     setIsLoading(true);
     try {
+      // Buscar por RUT en formato estándar
       const { data: pacienteData, error: pacienteError } = await supabase
         .from("pacientes")
         .select("*")
-        .in("rut", rutVariants)
+        .eq("rut", rutFormateado)
         .maybeSingle();
 
       if (pacienteError) throw pacienteError;
@@ -519,16 +487,16 @@ export default function PortalPaciente() {
       return;
     }
 
-    const rutVariants = getRutVariants(formData.rut);
-    const rutNormalizado = normalizeRut(formData.rut);
+    const rutFormateado = formatRutStandard(formData.rut);
     const telefonoCompleto = `+56${formData.telefono}`;
 
     setIsLoading(true);
     try {
+      // Verificar si ya existe un paciente con este RUT (formato estándar)
       const { data: existingPaciente } = await supabase
         .from("pacientes")
         .select("id")
-        .in("rut", rutVariants)
+        .eq("rut", rutFormateado)
         .maybeSingle();
 
       if (existingPaciente) {
@@ -547,7 +515,7 @@ export default function PortalPaciente() {
         .from("pacientes")
         .insert({
           nombre: formData.nombre.trim().toUpperCase(),
-          rut: rutNormalizado,
+          rut: rutFormateado,
           fecha_nacimiento: formData.fecha_nacimiento,
           email: formData.email.trim().toLowerCase(),
           telefono: telefonoCompleto,
