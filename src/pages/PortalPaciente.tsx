@@ -706,6 +706,7 @@ export default function PortalPaciente() {
             .from("pacientes")
             .update({
               nombre: getNombreCompleto(),
+              rut: rutFormateado,
               fecha_nacimiento: formData.fecha_nacimiento,
               email: formData.email.trim().toLowerCase(),
               telefono: telefonoCompleto,
