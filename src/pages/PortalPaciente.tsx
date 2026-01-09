@@ -668,7 +668,7 @@ export default function PortalPaciente() {
         }
 
         // Actualizar el paciente (sea placeholder o existente)
-        const { error: updateError } = await supabase
+        const { data: updateData, error: updateError } = await supabase
           .from("pacientes")
           .update({
             nombre: getNombreCompleto(),
@@ -678,9 +678,21 @@ export default function PortalPaciente() {
             telefono: telefonoCompleto,
             direccion: getDireccionCompleta()
           })
-          .eq("id", pacienteActual.id);
+          .eq("id", pacienteActual.id)
+          .select("id");
 
         if (updateError) throw updateError;
+
+        // Verificar que el UPDATE afectó al menos una fila
+        if (!updateData || updateData.length === 0) {
+          toast({
+            title: "No se pudo guardar",
+            description: "El registro no pudo ser actualizado. Verifique que todos los campos estén completos e intente nuevamente.",
+            variant: "destructive"
+          });
+          setIsLoading(false);
+          return;
+        }
 
         // Recuperar el paciente actualizado
         const { data: updatedPacientes, error: selectError } = await supabase
@@ -695,6 +707,17 @@ export default function PortalPaciente() {
         
         if (!updatedPaciente) {
           throw new Error("No se pudo confirmar el guardado. Por favor reingrese su RUT.");
+        }
+
+        // Verificar que el nombre ya no sea PENDIENTE DE REGISTRO
+        if (updatedPaciente.nombre === "PENDIENTE DE REGISTRO") {
+          toast({
+            title: "Registro incompleto",
+            description: "Los datos no se guardaron correctamente. Por favor intente nuevamente.",
+            variant: "destructive"
+          });
+          setIsLoading(false);
+          return;
         }
 
         setPaciente(updatedPaciente);
