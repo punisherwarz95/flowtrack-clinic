@@ -279,14 +279,18 @@ export default function PortalPaciente() {
 
     setIsLoading(true);
     try {
-      // Buscar por RUT en formato estándar
-      const { data: pacienteData, error: pacienteError } = await supabase
+      // Buscar por RUT en formato estándar - usando limit(1) para evitar error de múltiples resultados
+      const { data: pacientesData, error: pacienteError } = await supabase
         .from("pacientes")
         .select("*")
         .eq("rut", rutFormateado)
-        .maybeSingle();
+        .order("created_at", { ascending: false })
+        .limit(1);
 
       if (pacienteError) throw pacienteError;
+      
+      // Tomar el primer resultado (el más reciente si hay duplicados)
+      const pacienteData = pacientesData && pacientesData.length > 0 ? pacientesData[0] : null;
 
       const today = new Date();
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).toISOString();
