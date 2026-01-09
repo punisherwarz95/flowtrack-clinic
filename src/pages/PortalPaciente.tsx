@@ -877,27 +877,8 @@ export default function PortalPaciente() {
         }
 
         // Cargar empresa si no está cargada
-        if (!empresa) {
-          const { data: pacienteData } = await supabase
-            .from("pacientes")
-            .select("empresa_id, tipo_servicio")
-            .eq("id", paciente.id)
-            .single();
-
-          if (pacienteData) {
-            // Actualizar tipo_servicio del paciente
-            setPaciente(prev => prev ? { ...prev, tipo_servicio: pacienteData.tipo_servicio } : null);
-            
-            if (pacienteData.empresa_id) {
-              const { data: empresaData } = await supabase
-                .from("empresas")
-                .select("id, nombre")
-                .eq("id", pacienteData.empresa_id)
-                .single();
-              if (empresaData) setEmpresa(empresaData);
-            }
-          }
-        }
+        // Ya no cargamos empresa ni tipo_servicio automáticamente
+        // Recepción los asigna manualmente porque el paciente puede venir por diferentes empresas
 
       } catch (error) {
         console.error("[Portal] Error en polling:", error);
@@ -911,7 +892,7 @@ export default function PortalPaciente() {
     const interval = setInterval(cargarDatos, 3000);
 
     return () => clearInterval(interval);
-  }, [paciente?.id, step, mostrarNotificacionLlamado, empresa]);
+  }, [paciente?.id, step, mostrarNotificacionLlamado]);
 
   // Refrescar manual
   const refreshData = useCallback(async () => {
