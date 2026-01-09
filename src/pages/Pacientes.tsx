@@ -477,19 +477,43 @@ const Pacientes = () => {
     if (!pacienteToDelete) return;
 
     try {
-      const { error } = await supabase
-        .from("pacientes")
-        .delete()
-        .eq("id", pacienteToDelete);
+      const dateToUse = selectedDate || new Date();
+      const startOfDay = new Date(new Date(dateToUse).setHours(0, 0, 0, 0)).toISOString();
+      const endOfDay = new Date(new Date(dateToUse).setHours(23, 59, 59, 999)).toISOString();
 
-      if (error) throw error;
-      
-      toast.success("Paciente eliminado exitosamente");
+      // En vez de eliminar el paciente (lo que borraría su historial por cascada),
+      // eliminamos SOLO la atención del día seleccionado.
+      const { data: atencionData, error: atencionError } = await supabase
+        .from("atenciones")
+        .select("id, numero_ingreso")
+        .eq("paciente_id", pacienteToDelete)
+        .gte("fecha_ingreso", startOfDay)
+        .lte("fecha_ingreso", endOfDay)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (atencionError) throw atencionError;
+
+      if (!atencionData) {
+        toast.info("Este paciente no tiene atención en la fecha seleccionada");
+        setPacienteToDelete(null);
+        return;
+      }
+
+      const { error: deleteError } = await supabase
+        .from("atenciones")
+        .delete()
+        .eq("id", atencionData.id);
+
+      if (deleteError) throw deleteError;
+
+      toast.success(`Atención #${atencionData.numero_ingreso ?? "--"} eliminada`);
       setPacienteToDelete(null);
       loadPatients();
     } catch (error: any) {
       console.error("Error:", error);
-      toast.error(error.message || "Error al eliminar paciente");
+      toast.error(error.message || "Error al eliminar atención");
     }
   };
 
@@ -959,13 +983,16 @@ const Pacientes = () => {
                       >
                         <Pencil className="h-4 w-4 text-primary" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setPacienteToDelete(patient.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      {patient.atencion_actual && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setPacienteToDelete(patient.id)}
+                          title="Eliminar atención del día"
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 );
@@ -979,12 +1006,12 @@ const Pacientes = () => {
             <AlertDialogHeader>
               <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
               <AlertDialogDescription>
-                Esta acción no se puede deshacer. Se eliminará permanentemente el paciente y todas sus atenciones.
+                Se eliminará la atención del día seleccionado. El historial del paciente (atenciones anteriores) no se elimina.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete}>Eliminar</AlertDialogAction>
+              <AlertDialogAction onClick={handleDelete}>Eliminar atención</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
