@@ -93,16 +93,42 @@ export default function PortalPaciente() {
   const [currentTest, setCurrentTest] = useState<ExamenTest | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
+  // Lista de ciudades de Chile para validación
+  const ciudadesChile = [
+    "Arica", "Iquique", "Alto Hospicio", "Antofagasta", "Calama", "Tocopilla",
+    "Copiapó", "Vallenar", "La Serena", "Coquimbo", "Ovalle", "Illapel",
+    "Valparaíso", "Viña del Mar", "Quilpué", "Villa Alemana", "Quillota", "San Antonio", "Los Andes", "San Felipe",
+    "Santiago", "Puente Alto", "Maipú", "La Florida", "Las Condes", "Peñalolén", "San Bernardo", "Providencia", "Ñuñoa", "Lo Barnechea", "Vitacura", "La Reina", "Macul", "El Bosque", "La Pintana", "San Ramón", "La Granja", "Recoleta", "Independencia", "Conchalí", "Huechuraba", "Renca", "Cerro Navia", "Lo Prado", "Pudahuel", "Quinta Normal", "Estación Central", "Cerrillos", "Pedro Aguirre Cerda", "Lo Espejo", "San Miguel", "La Cisterna", "San Joaquín", "Colina", "Lampa", "Buin", "Paine", "Melipilla", "Talagante", "Peñaflor",
+    "Rancagua", "San Fernando", "Rengo", "Machalí",
+    "Talca", "Curicó", "Linares", "Constitución",
+    "Chillán", "Chillán Viejo", "Los Ángeles", "Concepción", "Talcahuano", "Hualpén", "Coronel", "San Pedro de la Paz", "Tomé", "Penco", "Lota",
+    "Temuco", "Padre Las Casas", "Villarrica", "Pucón", "Angol",
+    "Valdivia", "Osorno", "La Unión",
+    "Puerto Montt", "Puerto Varas", "Castro", "Ancud", "Quellón",
+    "Coyhaique", "Puerto Aysén",
+    "Punta Arenas", "Puerto Natales"
+  ];
+
   // Form fields for new registration
   const [formData, setFormData] = useState({
-    nombre: "",
+    // Campos separados para nombre
+    primerNombre: "",
+    apellidoPaterno: "",
+    apellidoMaterno: "",
     rut: "",
     fecha_nacimiento: "",
     fecha_nacimiento_display: "",
     email: "",
     telefono: "",
-    direccion: ""
+    // Campos separados para dirección
+    calle: "",
+    numeracion: "",
+    ciudad: ""
   });
+
+  // Estado para sugerencias de ciudades
+  const [ciudadSugerencias, setCiudadSugerencias] = useState<string[]>([]);
+  const [showCiudadSugerencias, setShowCiudadSugerencias] = useState(false);
 
   const { toast, dismiss } = useToast();
   const lastNotificationBoxRef = useRef<string | null>(null);
@@ -419,16 +445,62 @@ export default function PortalPaciente() {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
-  // Validar nombre (mínimo 1 nombre y 2 apellidos = 3 palabras)
-  const isValidNombre = (nombre: string) => {
-    const palabras = nombre.trim().split(/\s+/).filter(p => p.length > 0);
-    return palabras.length >= 3;
+  // Validar que los 3 campos de nombre estén completos
+  const isValidNombreCompleto = () => {
+    return formData.primerNombre.trim().length > 0 && 
+           formData.apellidoPaterno.trim().length > 0 && 
+           formData.apellidoMaterno.trim().length > 0;
   };
 
-  // Handler para nombre - auto mayúsculas
-  const handleNombreChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Concatenar nombre completo
+  const getNombreCompleto = () => {
+    return `${formData.primerNombre.trim()} ${formData.apellidoPaterno.trim()} ${formData.apellidoMaterno.trim()}`.trim();
+  };
+
+  // Validar ciudad de Chile
+  const isValidCiudad = (ciudad: string) => {
+    return ciudadesChile.some(c => c.toLowerCase() === ciudad.toLowerCase().trim());
+  };
+
+  // Concatenar dirección completa
+  const getDireccionCompleta = () => {
+    return `${formData.calle.trim()} ${formData.numeracion.trim()} ${formData.ciudad.trim()}`.trim();
+  };
+
+  // Handler para campos de nombre - auto mayúsculas
+  const handleNombreFieldChange = (field: 'primerNombre' | 'apellidoPaterno' | 'apellidoMaterno') => (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.toUpperCase();
-    setFormData(prev => ({ ...prev, nombre: value }));
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Handler para calle - auto mayúsculas
+  const handleCalleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.toUpperCase();
+    setFormData(prev => ({ ...prev, calle: value }));
+  };
+
+  // Handler para ciudad con autocompletado
+  const handleCiudadChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setFormData(prev => ({ ...prev, ciudad: value }));
+    
+    if (value.length >= 2) {
+      const filtradas = ciudadesChile.filter(c => 
+        c.toLowerCase().startsWith(value.toLowerCase())
+      ).slice(0, 5);
+      setCiudadSugerencias(filtradas);
+      setShowCiudadSugerencias(filtradas.length > 0);
+    } else {
+      setCiudadSugerencias([]);
+      setShowCiudadSugerencias(false);
+    }
+  };
+
+  // Seleccionar ciudad de sugerencias
+  const seleccionarCiudad = (ciudad: string) => {
+    setFormData(prev => ({ ...prev, ciudad }));
+    setShowCiudadSugerencias(false);
+    setCiudadSugerencias([]);
   };
 
   // Handler para teléfono - solo 9 dígitos
@@ -489,10 +561,14 @@ export default function PortalPaciente() {
     // Validaciones
     const errores: string[] = [];
     
-    if (!formData.nombre.trim()) {
+    if (!formData.primerNombre.trim()) {
       errores.push("Nombre es obligatorio");
-    } else if (!isValidNombre(formData.nombre)) {
-      errores.push("Ingrese al menos un nombre y dos apellidos");
+    }
+    if (!formData.apellidoPaterno.trim()) {
+      errores.push("Apellido paterno es obligatorio");
+    }
+    if (!formData.apellidoMaterno.trim()) {
+      errores.push("Apellido materno es obligatorio");
     }
     
     if (!formData.rut.trim()) {
@@ -515,8 +591,16 @@ export default function PortalPaciente() {
       errores.push("El teléfono debe tener 9 dígitos");
     }
     
-    if (!formData.direccion.trim()) {
-      errores.push("Dirección es obligatoria");
+    if (!formData.calle.trim()) {
+      errores.push("Calle es obligatoria");
+    }
+    if (!formData.numeracion.trim()) {
+      errores.push("Numeración es obligatoria");
+    }
+    if (!formData.ciudad.trim()) {
+      errores.push("Ciudad es obligatoria");
+    } else if (!isValidCiudad(formData.ciudad)) {
+      errores.push("Ingrese una ciudad válida de Chile");
     }
 
     if (errores.length > 0) {
@@ -538,12 +622,12 @@ export default function PortalPaciente() {
         const { data: updatedPaciente, error: updateError } = await supabase
           .from("pacientes")
           .update({
-            nombre: formData.nombre.trim().toUpperCase(),
+            nombre: getNombreCompleto(),
             rut: rutFormateado,
             fecha_nacimiento: formData.fecha_nacimiento,
             email: formData.email.trim().toLowerCase(),
             telefono: telefonoCompleto,
-            direccion: formData.direccion.trim()
+            direccion: getDireccionCompleta()
           })
           .eq("id", paciente.id)
           .select()
@@ -582,12 +666,12 @@ export default function PortalPaciente() {
         const { data: newPaciente, error } = await supabase
           .from("pacientes")
           .insert({
-            nombre: formData.nombre.trim().toUpperCase(),
+            nombre: getNombreCompleto(),
             rut: rutFormateado,
             fecha_nacimiento: formData.fecha_nacimiento,
             email: formData.email.trim().toLowerCase(),
             telefono: telefonoCompleto,
-            direccion: formData.direccion.trim(),
+            direccion: getDireccionCompleta(),
             empresa_id: null,
             tipo_servicio: null
           })
@@ -950,16 +1034,35 @@ export default function PortalPaciente() {
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="sm:col-span-2">
-                <Label htmlFor="nombre" className="text-sm font-medium mb-1.5 block">Nombre Completo *</Label>
+              <div>
+                <Label htmlFor="primerNombre" className="text-sm font-medium mb-1.5 block">Nombre *</Label>
                 <Input
-                  id="nombre"
-                  placeholder="JUAN ANTONIO PÉREZ GONZÁLEZ"
-                  value={formData.nombre}
-                  onChange={handleNombreChange}
+                  id="primerNombre"
+                  placeholder="JUAN"
+                  value={formData.primerNombre}
+                  onChange={handleNombreFieldChange('primerNombre')}
                   className="h-11 uppercase"
                 />
-                <p className="text-xs text-muted-foreground mt-1">Ingrese al menos un nombre y dos apellidos</p>
+              </div>
+              <div>
+                <Label htmlFor="apellidoPaterno" className="text-sm font-medium mb-1.5 block">Apellido Paterno *</Label>
+                <Input
+                  id="apellidoPaterno"
+                  placeholder="PÉREZ"
+                  value={formData.apellidoPaterno}
+                  onChange={handleNombreFieldChange('apellidoPaterno')}
+                  className="h-11 uppercase"
+                />
+              </div>
+              <div>
+                <Label htmlFor="apellidoMaterno" className="text-sm font-medium mb-1.5 block">Apellido Materno *</Label>
+                <Input
+                  id="apellidoMaterno"
+                  placeholder="GONZÁLEZ"
+                  value={formData.apellidoMaterno}
+                  onChange={handleNombreFieldChange('apellidoMaterno')}
+                  className="h-11 uppercase"
+                />
               </div>
               <div>
                 <Label htmlFor="formRut" className="text-sm font-medium mb-1.5 block">RUT *</Label>
@@ -1027,15 +1130,54 @@ export default function PortalPaciente() {
                   />
                 </div>
               </div>
-              <div className="sm:col-span-2">
-                <Label htmlFor="direccion" className="text-sm font-medium mb-1.5 block">Dirección *</Label>
+              <div>
+                <Label htmlFor="calle" className="text-sm font-medium mb-1.5 block">Calle *</Label>
                 <Input
-                  id="direccion"
-                  placeholder="Av. Principal 123, Comuna"
-                  value={formData.direccion}
-                  onChange={(e) => setFormData(prev => ({ ...prev, direccion: e.target.value }))}
+                  id="calle"
+                  placeholder="AV. PRINCIPAL"
+                  value={formData.calle}
+                  onChange={handleCalleChange}
+                  className="h-11 uppercase"
+                />
+              </div>
+              <div>
+                <Label htmlFor="numeracion" className="text-sm font-medium mb-1.5 block">Numeración *</Label>
+                <Input
+                  id="numeracion"
+                  placeholder="123"
+                  value={formData.numeracion}
+                  onChange={(e) => setFormData(prev => ({ ...prev, numeracion: e.target.value }))}
                   className="h-11"
                 />
+              </div>
+              <div className="sm:col-span-2 relative">
+                <Label htmlFor="ciudad" className="text-sm font-medium mb-1.5 block">Ciudad *</Label>
+                <Input
+                  id="ciudad"
+                  placeholder="Santiago"
+                  value={formData.ciudad}
+                  onChange={handleCiudadChange}
+                  onBlur={() => setTimeout(() => setShowCiudadSugerencias(false), 200)}
+                  onFocus={() => {
+                    if (ciudadSugerencias.length > 0) setShowCiudadSugerencias(true);
+                  }}
+                  className="h-11"
+                />
+                {showCiudadSugerencias && ciudadSugerencias.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-background border border-input rounded-md shadow-lg">
+                    {ciudadSugerencias.map((ciudad, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        className="w-full text-left px-3 py-2 hover:bg-accent hover:text-accent-foreground cursor-pointer text-sm"
+                        onMouseDown={() => seleccionarCiudad(ciudad)}
+                      >
+                        {ciudad}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">Ingrese una ciudad de Chile</p>
               </div>
             </div>
             <div className="flex gap-3 pt-2">
