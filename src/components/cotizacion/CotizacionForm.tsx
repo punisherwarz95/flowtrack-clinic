@@ -363,12 +363,46 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
   }, [items]);
 
   const handleSave = async (estado: string = "borrador", generatePdf: boolean = false) => {
-    if (!empresaForm.nombre) {
-      toast.error("Ingrese el nombre de la empresa");
-      return;
+    // Validar campos requeridos
+    const errores: string[] = [];
+    
+    if (!empresaForm.nombre?.trim()) {
+      errores.push("Nombre de la empresa");
+    }
+    if (!empresaForm.rut?.trim()) {
+      errores.push("RUT de la empresa");
+    }
+    if (!empresaForm.contacto?.trim()) {
+      errores.push("Nombre de contacto");
+    }
+    if (!empresaForm.email?.trim()) {
+      errores.push("Email de contacto");
+    }
+    if (!empresaForm.telefono?.trim()) {
+      errores.push("Teléfono de contacto");
     }
     if (items.length === 0) {
-      toast.error("Agregue al menos un ítem a la cotización");
+      errores.push("Al menos un ítem en la cotización");
+    }
+    
+    // Validar que cada ítem tenga margen seleccionado
+    const itemsSinMargen = items.filter(item => !item.margen_id);
+    if (itemsSinMargen.length > 0) {
+      errores.push(`Margen de utilidad para ${itemsSinMargen.length} ítem(s)`);
+    }
+
+    if (errores.length > 0) {
+      toast.error(
+        <div>
+          <strong>Complete los siguientes campos obligatorios:</strong>
+          <ul className="mt-2 list-disc list-inside">
+            {errores.map((error, i) => (
+              <li key={i}>{error}</li>
+            ))}
+          </ul>
+        </div>,
+        { duration: 5000 }
+      );
       return;
     }
 
