@@ -650,12 +650,12 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
             </div>
             <div className="w-48">
               <Label>Margen</Label>
-              <Select value={itemMargenId} onValueChange={setItemMargenId}>
+              <Select value={itemMargenId || "none"} onValueChange={(v) => setItemMargenId(v === "none" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Sin margen" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin margen</SelectItem>
+                  <SelectItem value="none">Sin margen</SelectItem>
                   {margenes.map((m) => (
                     <SelectItem key={m.id} value={m.id}>
                       {m.nombre} ({m.porcentaje}%)
@@ -725,14 +725,14 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
                       </div>
                       <div className="w-40">
                         <Select
-                          value={item.margen_id || ""}
-                          onValueChange={(v) => handleUpdateItem(item.id, "margen_id", v)}
+                          value={item.margen_id || "none"}
+                          onValueChange={(v) => handleUpdateItem(item.id, "margen_id", v === "none" ? "" : v)}
                         >
                           <SelectTrigger className="h-8">
                             <SelectValue placeholder="Sin margen" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Sin margen</SelectItem>
+                            <SelectItem value="none">Sin margen</SelectItem>
                             {margenes.map((m) => (
                               <SelectItem key={m.id} value={m.id}>
                                 {m.nombre} ({m.porcentaje}%)
