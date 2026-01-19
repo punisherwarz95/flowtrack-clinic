@@ -202,6 +202,175 @@ export type Database = {
           },
         ]
       }
+      cotizacion_items: {
+        Row: {
+          cantidad: number
+          cotizacion_id: string
+          created_at: string | null
+          detalle_examenes: Json | null
+          examen_id: string | null
+          id: string
+          item_numero: number
+          iva_porcentaje: number | null
+          margen_id: string | null
+          margen_nombre: string | null
+          margen_porcentaje: number | null
+          nombre_prestacion: string
+          paquete_id: string | null
+          tipo_item: string
+          valor_con_iva: number | null
+          valor_final: number | null
+          valor_iva: number | null
+          valor_margen: number | null
+          valor_total_neto: number
+          valor_unitario_neto: number
+        }
+        Insert: {
+          cantidad?: number
+          cotizacion_id: string
+          created_at?: string | null
+          detalle_examenes?: Json | null
+          examen_id?: string | null
+          id?: string
+          item_numero: number
+          iva_porcentaje?: number | null
+          margen_id?: string | null
+          margen_nombre?: string | null
+          margen_porcentaje?: number | null
+          nombre_prestacion: string
+          paquete_id?: string | null
+          tipo_item: string
+          valor_con_iva?: number | null
+          valor_final?: number | null
+          valor_iva?: number | null
+          valor_margen?: number | null
+          valor_total_neto?: number
+          valor_unitario_neto?: number
+        }
+        Update: {
+          cantidad?: number
+          cotizacion_id?: string
+          created_at?: string | null
+          detalle_examenes?: Json | null
+          examen_id?: string | null
+          id?: string
+          item_numero?: number
+          iva_porcentaje?: number | null
+          margen_id?: string | null
+          margen_nombre?: string | null
+          margen_porcentaje?: number | null
+          nombre_prestacion?: string
+          paquete_id?: string | null
+          tipo_item?: string
+          valor_con_iva?: number | null
+          valor_final?: number | null
+          valor_iva?: number | null
+          valor_margen?: number | null
+          valor_total_neto?: number
+          valor_unitario_neto?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotizacion_items_cotizacion_id_fkey"
+            columns: ["cotizacion_id"]
+            isOneToOne: false
+            referencedRelation: "cotizaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotizacion_items_examen_id_fkey"
+            columns: ["examen_id"]
+            isOneToOne: false
+            referencedRelation: "examenes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotizacion_items_margen_id_fkey"
+            columns: ["margen_id"]
+            isOneToOne: false
+            referencedRelation: "margenes_cotizacion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotizacion_items_paquete_id_fkey"
+            columns: ["paquete_id"]
+            isOneToOne: false
+            referencedRelation: "paquetes_examenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cotizaciones: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          empresa_contacto: string | null
+          empresa_email: string | null
+          empresa_id: string | null
+          empresa_nombre: string | null
+          empresa_razon_social: string | null
+          empresa_rut: string | null
+          empresa_telefono: string | null
+          estado: string | null
+          fecha_cotizacion: string
+          id: string
+          numero_cotizacion: number
+          observaciones: string | null
+          subtotal_neto: number | null
+          total_con_iva: number | null
+          total_con_margen: number | null
+          total_iva: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          empresa_contacto?: string | null
+          empresa_email?: string | null
+          empresa_id?: string | null
+          empresa_nombre?: string | null
+          empresa_razon_social?: string | null
+          empresa_rut?: string | null
+          empresa_telefono?: string | null
+          estado?: string | null
+          fecha_cotizacion?: string
+          id?: string
+          numero_cotizacion?: number
+          observaciones?: string | null
+          subtotal_neto?: number | null
+          total_con_iva?: number | null
+          total_con_margen?: number | null
+          total_iva?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          empresa_contacto?: string | null
+          empresa_email?: string | null
+          empresa_id?: string | null
+          empresa_nombre?: string | null
+          empresa_razon_social?: string | null
+          empresa_rut?: string | null
+          empresa_telefono?: string | null
+          estado?: string | null
+          fecha_cotizacion?: string
+          id?: string
+          numero_cotizacion?: number
+          observaciones?: string | null
+          subtotal_neto?: number | null
+          total_con_iva?: number | null
+          total_con_margen?: number | null
+          total_iva?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotizaciones_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       empresas: {
         Row: {
           activo: boolean | null
@@ -243,6 +412,8 @@ export type Database = {
       }
       examenes: {
         Row: {
+          codigo: string | null
+          costo_neto: number | null
           created_at: string | null
           descripcion: string | null
           duracion_estimada: number | null
@@ -250,6 +421,8 @@ export type Database = {
           nombre: string
         }
         Insert: {
+          codigo?: string | null
+          costo_neto?: number | null
           created_at?: string | null
           descripcion?: string | null
           duracion_estimada?: number | null
@@ -257,11 +430,40 @@ export type Database = {
           nombre: string
         }
         Update: {
+          codigo?: string | null
+          costo_neto?: number | null
           created_at?: string | null
           descripcion?: string | null
           duracion_estimada?: number | null
           id?: string
           nombre?: string
+        }
+        Relationships: []
+      }
+      margenes_cotizacion: {
+        Row: {
+          activo: boolean | null
+          created_at: string | null
+          id: string
+          nombre: string
+          orden: number | null
+          porcentaje: number
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string | null
+          id?: string
+          nombre: string
+          orden?: number | null
+          porcentaje?: number
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string | null
+          id?: string
+          nombre?: string
+          orden?: number | null
+          porcentaje?: number
         }
         Relationships: []
       }
