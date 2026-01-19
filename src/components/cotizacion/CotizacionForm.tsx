@@ -7,9 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Trash2, Building2, Package, ClipboardList, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, Building2, Package, ClipboardList, ChevronDown, ChevronUp, FileDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { generateCotizacionPDF } from "./CotizacionPDF";
 
 interface Empresa {
   id: string;
@@ -361,7 +362,7 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
     return { subtotalNeto, totalIva, totalConIva, totalMargenes, totalFinal };
   }, [items]);
 
-  const handleSave = async (estado: string = "borrador") => {
+  const handleSave = async (estado: string = "borrador", generatePdf: boolean = false) => {
     if (!empresaForm.nombre) {
       toast.error("Ingrese el nombre de la empresa");
       return;
@@ -410,16 +411,20 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
         observaciones: observaciones || null,
       };
 
-      let cotizacionId2: string;
+      let savedCotizacionId: string;
+      let numeroCotizacion: number;
 
       if (cotizacionId) {
-        const { error } = await supabase
+        const { data: updated, error } = await supabase
           .from("cotizaciones")
           .update(cotizacionData)
-          .eq("id", cotizacionId);
+          .eq("id", cotizacionId)
+          .select("id, numero_cotizacion, fecha_cotizacion")
+          .single();
 
         if (error) throw error;
-        cotizacionId2 = cotizacionId;
+        savedCotizacionId = cotizacionId;
+        numeroCotizacion = updated.numero_cotizacion;
 
         // Delete existing items
         await supabase.from("cotizacion_items").delete().eq("cotizacion_id", cotizacionId);
@@ -427,16 +432,17 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
         const { data: newCotizacion, error } = await supabase
           .from("cotizaciones")
           .insert(cotizacionData)
-          .select()
+          .select("id, numero_cotizacion, fecha_cotizacion")
           .single();
 
         if (error) throw error;
-        cotizacionId2 = newCotizacion.id;
+        savedCotizacionId = newCotizacion.id;
+        numeroCotizacion = newCotizacion.numero_cotizacion;
       }
 
       // Insert items
       const itemsToInsert = items.map((item) => ({
-        cotizacion_id: cotizacionId2,
+        cotizacion_id: savedCotizacionId,
         item_numero: item.item_numero,
         tipo_item: item.tipo_item,
         paquete_id: item.paquete_id,
@@ -458,6 +464,32 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
       const { error: itemsError } = await supabase.from("cotizacion_items").insert(itemsToInsert);
 
       if (itemsError) throw itemsError;
+
+      // Generate PDF if requested
+      if (generatePdf) {
+        generateCotizacionPDF({
+          numero_cotizacion: numeroCotizacion,
+          fecha_cotizacion: new Date().toISOString(),
+          empresa_nombre: empresaForm.nombre,
+          empresa_rut: empresaForm.rut || null,
+          empresa_telefono: empresaForm.telefono || null,
+          empresa_contacto: empresaForm.contacto || null,
+          observaciones: observaciones || null,
+          items: items.map((item) => ({
+            item_numero: item.item_numero,
+            nombre_prestacion: item.nombre_prestacion,
+            detalle_examenes: item.detalle_examenes,
+            valor_unitario_neto: item.valor_unitario_neto,
+            cantidad: item.cantidad,
+            valor_final: item.valor_final,
+          })),
+          subtotal_neto: totals.subtotalNeto,
+          total_iva: totals.totalIva,
+          total_con_iva: totals.totalConIva,
+          total_con_margen: totals.totalFinal,
+        });
+        toast.success("PDF generado exitosamente");
+      }
 
       toast.success(cotizacionId ? "Cotización actualizada" : "Cotización creada exitosamente");
       onSuccess();
@@ -856,8 +888,9 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
         <Button variant="secondary" onClick={() => handleSave("borrador")} disabled={saving}>
           {saving ? "Guardando..." : "Guardar Borrador"}
         </Button>
-        <Button onClick={() => handleSave("enviada")} disabled={saving}>
-          {saving ? "Guardando..." : "Guardar y Enviar"}
+        <Button onClick={() => handleSave("borrador", true)} disabled={saving} className="gap-2">
+          <FileDown className="h-4 w-4" />
+          {saving ? "Guardando..." : "Guardar y Generar PDF"}
         </Button>
       </div>
     </div>
