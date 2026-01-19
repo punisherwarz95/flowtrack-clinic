@@ -692,7 +692,7 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
                   />
                 </div>
                 <div>
-                  <Label>RUT</Label>
+                  <Label>RUT *</Label>
                   <Input
                     value={empresaForm.rut}
                     onChange={(e) => setEmpresaForm({ ...empresaForm, rut: e.target.value })}
@@ -707,14 +707,14 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
                   />
                 </div>
                 <div>
-                  <Label>Contacto</Label>
+                  <Label>Contacto *</Label>
                   <Input
                     value={empresaForm.contacto}
                     onChange={(e) => setEmpresaForm({ ...empresaForm, contacto: e.target.value })}
                   />
                 </div>
                 <div>
-                  <Label>Email</Label>
+                  <Label>Email *</Label>
                   <Input
                     type="email"
                     value={empresaForm.email}
@@ -722,7 +722,7 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
                   />
                 </div>
                 <div>
-                  <Label>Teléfono</Label>
+                  <Label>Teléfono *</Label>
                   <Input
                     value={empresaForm.telefono}
                     onChange={(e) => setEmpresaForm({ ...empresaForm, telefono: e.target.value })}
