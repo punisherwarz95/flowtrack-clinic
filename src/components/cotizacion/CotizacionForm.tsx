@@ -440,13 +440,13 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
         numeroCotizacion = newCotizacion.numero_cotizacion;
       }
 
-      // Insert items
+      // Insert items - convert empty strings to null for UUID fields
       const itemsToInsert = items.map((item) => ({
         cotizacion_id: savedCotizacionId,
         item_numero: item.item_numero,
         tipo_item: item.tipo_item,
-        paquete_id: item.paquete_id,
-        examen_id: item.examen_id,
+        paquete_id: item.paquete_id || null,
+        examen_id: item.examen_id || null,
         nombre_prestacion: item.nombre_prestacion,
         detalle_examenes: item.detalle_examenes,
         valor_unitario_neto: item.valor_unitario_neto,
@@ -454,8 +454,8 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
         valor_total_neto: item.valor_total_neto,
         valor_iva: item.valor_iva,
         valor_con_iva: item.valor_con_iva,
-        margen_id: item.margen_id,
-        margen_nombre: item.margen_nombre,
+        margen_id: item.margen_id || null,
+        margen_nombre: item.margen_nombre || null,
         margen_porcentaje: item.margen_porcentaje,
         valor_margen: item.valor_margen,
         valor_final: item.valor_final,
