@@ -406,6 +406,36 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
       return;
     }
 
+    // Detectar ítems duplicados
+    const itemCounts = new Map<string, { nombre: string; count: number }>();
+    items.forEach(item => {
+      const key = item.paquete_id || item.examen_id || item.nombre_prestacion;
+      if (key) {
+        const existing = itemCounts.get(key);
+        if (existing) {
+          existing.count++;
+        } else {
+          itemCounts.set(key, { nombre: item.nombre_prestacion, count: 1 });
+        }
+      }
+    });
+
+    const duplicados = Array.from(itemCounts.values()).filter(item => item.count > 1);
+    if (duplicados.length > 0) {
+      toast.warning(
+        <div>
+          <strong>⚠️ Se detectaron ítems repetidos:</strong>
+          <ul className="mt-2 list-disc list-inside">
+            {duplicados.map((dup, i) => (
+              <li key={i}>{dup.nombre} (x{dup.count})</li>
+            ))}
+          </ul>
+          <p className="mt-2 text-sm">Revise si esto es intencional antes de continuar.</p>
+        </div>,
+        { duration: 6000 }
+      );
+    }
+
     setSaving(true);
     try {
       let empresaId = selectedEmpresa?.id || null;
