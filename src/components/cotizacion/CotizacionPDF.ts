@@ -137,85 +137,6 @@ export const generateCotizacionPDF = (data: CotizacionData) => {
     return startY + 45;
   };
 
-  const drawTable = (startY: number): number => {
-    // Prepare table data
-    const tableData: any[] = [];
-
-    data.items.forEach((item) => {
-      // Main item row
-      tableData.push([
-        { content: item.item_numero.toString(), styles: { fontStyle: "bold" } },
-        {
-          content: item.nombre_prestacion.toUpperCase(),
-          styles: { fontStyle: "bold" },
-        },
-        { content: `$ ${item.valor_unitario_neto.toLocaleString("es-CL")}`, styles: { halign: "right" } },
-        { content: item.cantidad.toString(), styles: { halign: "center" } },
-        { content: formatCurrency(item.valor_final), styles: { halign: "right", fontStyle: "bold" } },
-      ]);
-
-      // Sub-items (detail examenes) - only if there are multiple
-      if (item.detalle_examenes && item.detalle_examenes.length > 1) {
-        item.detalle_examenes.forEach((examen) => {
-          tableData.push([
-            { content: "", styles: { fillColor: [255, 255, 255] } },
-            {
-              content: examen.nombre,
-              styles: {
-                fontSize: 7,
-                textColor: [100, 100, 100],
-                fontStyle: "normal",
-                cellPadding: { left: 10, top: 1, bottom: 1, right: 2 },
-              },
-            },
-            { content: "", styles: { fillColor: [255, 255, 255] } },
-            { content: "", styles: { fillColor: [255, 255, 255] } },
-            { content: "", styles: { fillColor: [255, 255, 255] } },
-          ]);
-        });
-      }
-    });
-
-    autoTable(doc, {
-      startY: startY,
-      head: [["Item", "Prestaciones", "Valor unit.", "Cantidad", "Valor Total"]],
-      body: tableData,
-      theme: "plain",
-      headStyles: {
-        fillColor: COLORS.tableHeader,
-        textColor: [255, 255, 255],
-        fontStyle: "bold",
-        fontSize: 9,
-        halign: "center",
-      },
-      columnStyles: {
-        0: { cellWidth: 15, halign: "center" },
-        1: { cellWidth: "auto" },
-        2: { cellWidth: 30, halign: "right" },
-        3: { cellWidth: 25, halign: "center" },
-        4: { cellWidth: 30, halign: "right" },
-      },
-      styles: {
-        fontSize: 8,
-        cellPadding: 3,
-        lineColor: [200, 200, 200],
-        lineWidth: 0.1,
-      },
-      alternateRowStyles: {
-        fillColor: [250, 250, 250],
-      },
-      margin: { left: margin, right: margin },
-      didDrawPage: (hookData) => {
-        // Add header on new pages
-        if (hookData.pageNumber > 1) {
-          drawHeader(5);
-        }
-      },
-    });
-
-    return (doc as any).lastAutoTable.finalY;
-  };
-
   const drawTotals = (startY: number) => {
     const rightCol = pageWidth - margin - 60;
     const valueCol = pageWidth - margin - 10;
@@ -266,20 +187,118 @@ export const generateCotizacionPDF = (data: CotizacionData) => {
     doc.text("57 226 2772 - 9 9543 1823", margin + 8, footerY + 26);
   };
 
-  // Generate PDF
-  let currentY = drawHeader(5);
-  currentY = drawClientInfo(currentY);
-  currentY = drawTable(currentY + 5);
+  // Generate PDF - First page: draw client info only (header will be drawn by didDrawPage)
+  // We need to manually draw header and client info for the first page since didDrawPage 
+  // is called BEFORE the table content, but we want client info only on page 1
+  
+  // Track if this is the first page
+  let isFirstPageDrawn = false;
+  
+  // Override the drawTable to handle first page specially
+  const tableStartY = 95; // After header (55) + client info (40)
+  
+  // Draw initial header and client info manually for page 1
+  drawHeader(5);
+  drawClientInfo(50);
+  
+  // Prepare table data
+  const tableData: any[] = [];
+
+  data.items.forEach((item) => {
+    tableData.push([
+      { content: item.item_numero.toString(), styles: { fontStyle: "bold" } },
+      {
+        content: item.nombre_prestacion.toUpperCase(),
+        styles: { fontStyle: "bold" },
+      },
+      { content: `$ ${item.valor_unitario_neto.toLocaleString("es-CL")}`, styles: { halign: "right" } },
+      { content: item.cantidad.toString(), styles: { halign: "center" } },
+      { content: formatCurrency(item.valor_final), styles: { halign: "right", fontStyle: "bold" } },
+    ]);
+
+    if (item.detalle_examenes && item.detalle_examenes.length > 1) {
+      item.detalle_examenes.forEach((examen) => {
+        tableData.push([
+          { content: "", styles: { fillColor: [255, 255, 255] } },
+          {
+            content: examen.nombre,
+            styles: {
+              fontSize: 7,
+              textColor: [100, 100, 100],
+              fontStyle: "normal",
+              cellPadding: { left: 10, top: 1, bottom: 1, right: 2 },
+            },
+          },
+          { content: "", styles: { fillColor: [255, 255, 255] } },
+          { content: "", styles: { fillColor: [255, 255, 255] } },
+          { content: "", styles: { fillColor: [255, 255, 255] } },
+        ]);
+      });
+    }
+  });
+
+  autoTable(doc, {
+    startY: tableStartY,
+    head: [["Item", "Prestaciones", "Valor unit.", "Cantidad", "Valor Total"]],
+    body: tableData,
+    theme: "plain",
+    headStyles: {
+      fillColor: COLORS.tableHeader,
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      fontSize: 9,
+      halign: "center",
+    },
+    columnStyles: {
+      0: { cellWidth: 15, halign: "center" },
+      1: { cellWidth: "auto" },
+      2: { cellWidth: 30, halign: "right" },
+      3: { cellWidth: 25, halign: "center" },
+      4: { cellWidth: 30, halign: "right" },
+    },
+    styles: {
+      fontSize: 8,
+      cellPadding: 3,
+      lineColor: [200, 200, 200],
+      lineWidth: 0.1,
+    },
+    alternateRowStyles: {
+      fillColor: [250, 250, 250],
+    },
+    margin: { left: margin, right: margin, top: 60 },
+    didDrawPage: (hookData) => {
+      // Only draw header on pages after the first
+      if (hookData.pageNumber > 1) {
+        drawHeader(5);
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...COLORS.text);
+        doc.text(`Cotización N° ${data.numero_cotizacion} - ${data.empresa_nombre || ""}`, margin, 52);
+      }
+    },
+  });
+
+  let currentY = (doc as any).lastAutoTable.finalY;
   
   // Check if we need a new page for totals
   if (currentY + 60 > pageHeight - 40) {
     doc.addPage();
-    currentY = drawHeader(5);
-    currentY += 10;
+    drawHeader(5);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...COLORS.text);
+    doc.text(`Cotización N° ${data.numero_cotizacion} - ${data.empresa_nombre || ""}`, margin, 52);
+    currentY = 55;
   }
   
   drawTotals(currentY);
-  drawFooter();
+  
+  // Draw footer on every page
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    drawFooter();
+  }
 
   // Save the PDF
   const fileName = `Cotizacion_${data.numero_cotizacion}_${data.empresa_nombre || "SinNombre"}.pdf`;
