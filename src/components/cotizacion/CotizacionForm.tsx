@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { Plus, Trash2, Building2, Package, ClipboardList, ChevronDown, ChevronUp, FileDown, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -111,6 +112,7 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
   const [isNewEmpresa, setIsNewEmpresa] = useState(false);
   const [items, setItems] = useState<CotizacionItem[]>([]);
   const [observaciones, setObservaciones] = useState("");
+  const [afectoIva, setAfectoIva] = useState(true);
 
   // Add item state
   const [tipoItem, setTipoItem] = useState<"paquete" | "examen">("paquete");
@@ -188,6 +190,7 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
         telefono: cotizacion.empresa_telefono || "",
       });
       setObservaciones(cotizacion.observaciones || "");
+      setAfectoIva(cotizacion.afecto_iva !== false);
 
       // Load items
       const { data: itemsData, error: itemsError } = await supabase
@@ -247,10 +250,11 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
   const calculateItemValues = (
     valorUnitarioNeto: number,
     cantidad: number,
-    margenId: string | null
+    margenId: string | null,
+    aplicaIva: boolean = true
   ) => {
     const valorTotalNeto = valorUnitarioNeto * cantidad;
-    const valorIva = valorTotalNeto * 0.19;
+    const valorIva = aplicaIva ? valorTotalNeto * 0.19 : 0;
     const valorConIva = valorTotalNeto + valorIva;
 
     const margen = margenes.find((m) => m.id === margenId);
@@ -288,7 +292,7 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
       }));
 
       const valorUnitarioNeto = detalleExamenes.reduce((sum, e) => sum + e.costo_neto, 0);
-      const calculatedValues = calculateItemValues(valorUnitarioNeto, itemCantidad, itemMargenId);
+      const calculatedValues = calculateItemValues(valorUnitarioNeto, itemCantidad, itemMargenId, afectoIva);
 
       newItem = {
         id: crypto.randomUUID(),
@@ -309,7 +313,7 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
       if (!examen) return;
 
       const valorUnitarioNeto = examen.costo_neto || 0;
-      const calculatedValues = calculateItemValues(valorUnitarioNeto, itemCantidad, itemMargenId);
+      const calculatedValues = calculateItemValues(valorUnitarioNeto, itemCantidad, itemMargenId, afectoIva);
 
       newItem = {
         id: crypto.randomUUID(),
@@ -339,7 +343,7 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
 
         const newCantidad = field === "cantidad" ? (value as number) : item.cantidad;
         const newMargenId = field === "margen_id" ? (value as string) : item.margen_id;
-        const calculatedValues = calculateItemValues(item.valor_unitario_neto, newCantidad, newMargenId);
+        const calculatedValues = calculateItemValues(item.valor_unitario_neto, newCantidad, newMargenId, afectoIva);
 
         return {
           ...item,
@@ -366,6 +370,23 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
       )
     );
   };
+
+  // Recalculate all items when afectoIva changes
+  useEffect(() => {
+    if (items.length > 0) {
+      setItems((prev) =>
+        prev.map((item) => {
+          const calculatedValues = calculateItemValues(
+            item.valor_unitario_neto,
+            item.cantidad,
+            item.margen_id,
+            afectoIva
+          );
+          return { ...item, ...calculatedValues };
+        })
+      );
+    }
+  }, [afectoIva]);
 
   const totals = useMemo(() => {
     const subtotalNeto = items.reduce((sum, item) => sum + item.valor_total_neto, 0);
@@ -486,6 +507,7 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
         total_con_margen: totals.totalFinal,
         estado,
         observaciones: observaciones || null,
+        afecto_iva: afectoIva,
       };
 
       let savedCotizacionId: string;
@@ -564,6 +586,7 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
           total_iva: totals.totalIva,
           total_con_iva: totals.totalConIva,
           total_con_margen: totals.totalFinal,
+          afecto_iva: afectoIva,
         });
         toast.success("PDF generado exitosamente");
       }
@@ -895,7 +918,7 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
 
                   {/* Item Totals */}
                   <div className="px-4 py-3 border-t bg-muted/30">
-                    <div className="grid grid-cols-5 gap-4 text-sm">
+                    <div className={`grid gap-4 text-sm ${afectoIva ? 'grid-cols-5' : 'grid-cols-4'}`}>
                       <div>
                         <span className="text-muted-foreground">Valor Unitario:</span>
                         <div className="font-mono font-medium">{formatCurrency(item.valor_unitario_neto)}</div>
@@ -904,10 +927,12 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
                         <span className="text-muted-foreground">Subtotal Neto:</span>
                         <div className="font-mono font-medium">{formatCurrency(item.valor_total_neto)}</div>
                       </div>
-                      <div>
-                        <span className="text-muted-foreground">IVA (19%):</span>
-                        <div className="font-mono">{formatCurrency(item.valor_iva)}</div>
-                      </div>
+                      {afectoIva && (
+                        <div>
+                          <span className="text-muted-foreground">IVA (19%):</span>
+                          <div className="font-mono">{formatCurrency(item.valor_iva)}</div>
+                        </div>
+                      )}
                       <div>
                         <span className="text-muted-foreground">
                           {item.margen_nombre ? `${item.margen_nombre} (${item.margen_porcentaje}%):` : "Margen:"}
@@ -932,14 +957,22 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
                   <span className="text-muted-foreground">Subtotal Neto:</span>
                   <span className="font-mono">{formatCurrency(totals.subtotalNeto)}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">IVA (19%):</span>
-                  <span className="font-mono">{formatCurrency(totals.totalIva)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total con IVA:</span>
-                  <span className="font-mono">{formatCurrency(totals.totalConIva)}</span>
-                </div>
+                {afectoIva ? (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">IVA (19%):</span>
+                      <span className="font-mono">{formatCurrency(totals.totalIva)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Total con IVA:</span>
+                      <span className="font-mono">{formatCurrency(totals.totalConIva)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground italic">Documento Exento de IVA</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Márgenes aplicados:</span>
                   <span className="font-mono">{formatCurrency(totals.totalMargenes)}</span>
@@ -954,6 +987,26 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
           </CardContent>
         </Card>
       )}
+
+      {/* IVA Toggle */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-base font-medium">Documento Afecto a IVA</Label>
+              <p className="text-sm text-muted-foreground">
+                {afectoIva 
+                  ? "Se aplicará IVA (19%) a todos los ítems" 
+                  : "Documento exento de IVA - No se aplicará impuesto"}
+              </p>
+            </div>
+            <Switch
+              checked={afectoIva}
+              onCheckedChange={setAfectoIva}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Observaciones */}
       <Card>
