@@ -302,6 +302,7 @@ export type Database = {
       }
       cotizaciones: {
         Row: {
+          afecto_iva: boolean
           created_at: string | null
           created_by: string | null
           empresa_contacto: string | null
@@ -322,6 +323,7 @@ export type Database = {
           total_iva: number | null
         }
         Insert: {
+          afecto_iva?: boolean
           created_at?: string | null
           created_by?: string | null
           empresa_contacto?: string | null
@@ -342,6 +344,7 @@ export type Database = {
           total_iva?: number | null
         }
         Update: {
+          afecto_iva?: boolean
           created_at?: string | null
           created_by?: string | null
           empresa_contacto?: string | null

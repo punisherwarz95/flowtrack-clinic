@@ -23,6 +23,7 @@ interface CotizacionData {
   total_iva: number;
   total_con_iva: number;
   total_con_margen: number;
+  afecto_iva?: boolean;
 }
 
 const formatCurrency = (value: number) => {
@@ -140,30 +141,43 @@ export const generateCotizacionPDF = (data: CotizacionData) => {
   const drawTotals = (startY: number) => {
     const rightCol = pageWidth - margin - 55;
     const valueCol = pageWidth - margin - 8;
+    const isAfecto = data.afecto_iva !== false;
 
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...COLORS.text);
 
-    doc.text("Subtotal Neto:", rightCol, startY + 8);
-    doc.text(formatCurrency(data.subtotal_neto), valueCol, startY + 8, { align: "right" });
+    let currentY = startY + 8;
 
-    doc.text("IVA (19%):", rightCol, startY + 15);
-    doc.text(formatCurrency(data.total_iva), valueCol, startY + 15, { align: "right" });
+    doc.text("Subtotal Neto:", rightCol, currentY);
+    doc.text(formatCurrency(data.subtotal_neto), valueCol, currentY, { align: "right" });
+    currentY += 7;
 
-    doc.text("Total con IVA:", rightCol, startY + 22);
-    doc.text(formatCurrency(data.total_con_iva), valueCol, startY + 22, { align: "right" });
+    if (isAfecto) {
+      doc.text("IVA (19%):", rightCol, currentY);
+      doc.text(formatCurrency(data.total_iva), valueCol, currentY, { align: "right" });
+      currentY += 7;
+
+      doc.text("Total con IVA:", rightCol, currentY);
+      doc.text(formatCurrency(data.total_con_iva), valueCol, currentY, { align: "right" });
+      currentY += 7;
+    } else {
+      doc.setFont("helvetica", "italic");
+      doc.text("(Documento Exento de IVA)", rightCol, currentY);
+      doc.setFont("helvetica", "normal");
+      currentY += 7;
+    }
 
     // Recuadro del total - más compacto
     doc.setFillColor(...COLORS.primary);
-    doc.rect(rightCol - 4, startY + 26, 62, 10, "F");
+    doc.rect(rightCol - 4, currentY + 1, 62, 10, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
-    doc.text("TOTAL:", rightCol, startY + 33);
-    doc.text(formatCurrency(data.total_con_margen), valueCol, startY + 33, { align: "right" });
+    doc.text("TOTAL:", rightCol, currentY + 8);
+    doc.text(formatCurrency(data.total_con_margen), valueCol, currentY + 8, { align: "right" });
 
-    return startY + 42;
+    return currentY + 17;
   };
 
   const drawFooter = () => {
