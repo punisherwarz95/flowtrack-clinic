@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Plus, FileText, Trash2, Eye, Pencil, Search, Settings } from "lucide-react";
+import { Plus, FileText, Trash2, Eye, Pencil, Search, Settings, Calendar, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
@@ -27,10 +27,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { useAuth } from "@/hooks/useAuth";
 import CotizacionForm from "@/components/cotizacion/CotizacionForm";
 import MargenesConfig from "@/components/cotizacion/MargenesConfig";
-import { format } from "date-fns";
+import { format, startOfDay, endOfDay, isWithinInterval } from "date-fns";
 import { es } from "date-fns/locale";
 
 interface Cotizacion {
@@ -75,7 +88,13 @@ const Cotizaciones = () => {
   const [cotizacionToDelete, setCotizacionToDelete] = useState<string | null>(null);
   const [editingCotizacion, setEditingCotizacion] = useState<Cotizacion | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterEmpresa, setFilterEmpresa] = useState<string>("all");
+  const [dateFilterType, setDateFilterType] = useState<"none" | "single" | "range">("none");
+  const [singleDate, setSingleDate] = useState<Date | undefined>(undefined);
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined });
 
+  // Get unique empresas for filter
+  const empresasUnicas = Array.from(new Set(cotizaciones.map(c => c.empresa_nombre).filter(Boolean))) as string[];
   useEffect(() => {
     loadCotizaciones();
   }, []);
@@ -118,12 +137,37 @@ const Cotizaciones = () => {
     }
   };
 
-  const filteredCotizaciones = cotizaciones.filter(
-    (c) =>
+  const filteredCotizaciones = cotizaciones.filter((c) => {
+    // Text search filter
+    const matchesSearch =
       c.empresa_nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.empresa_rut?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.numero_cotizacion.toString().includes(searchTerm)
-  );
+      c.numero_cotizacion.toString().includes(searchTerm);
+
+    // Empresa filter
+    const matchesEmpresa = filterEmpresa === "all" || c.empresa_nombre === filterEmpresa;
+
+    // Date filter
+    let matchesDate = true;
+    if (dateFilterType === "single" && singleDate) {
+      const cotizacionDate = new Date(c.fecha_cotizacion);
+      matchesDate = format(cotizacionDate, "yyyy-MM-dd") === format(singleDate, "yyyy-MM-dd");
+    } else if (dateFilterType === "range" && dateRange.from && dateRange.to) {
+      const cotizacionDate = new Date(c.fecha_cotizacion);
+      matchesDate = isWithinInterval(cotizacionDate, {
+        start: startOfDay(dateRange.from),
+        end: endOfDay(dateRange.to),
+      });
+    }
+
+    return matchesSearch && matchesEmpresa && matchesDate;
+  });
+
+  const clearDateFilter = () => {
+    setDateFilterType("none");
+    setSingleDate(undefined);
+    setDateRange({ from: undefined, to: undefined });
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -190,19 +234,121 @@ const Cotizaciones = () => {
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
-                Listado de Cotizaciones
-              </CardTitle>
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por empresa o número..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary" />
+                  Listado de Cotizaciones
+                </CardTitle>
+              </div>
+              
+              {/* Filters Row */}
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Search */}
+                <div className="relative w-64">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por empresa o número..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+
+                {/* Empresa Filter */}
+                <Select value={filterEmpresa} onValueChange={setFilterEmpresa}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Filtrar por empresa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las empresas</SelectItem>
+                    {empresasUnicas.map((empresa) => (
+                      <SelectItem key={empresa} value={empresa}>
+                        {empresa}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Date Filter Type */}
+                <Select value={dateFilterType} onValueChange={(v) => setDateFilterType(v as "none" | "single" | "range")}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Filtro de fecha" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin filtro fecha</SelectItem>
+                    <SelectItem value="single">Fecha específica</SelectItem>
+                    <SelectItem value="range">Rango de fechas</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* Single Date Picker */}
+                {dateFilterType === "single" && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-40 justify-start text-left font-normal">
+                        <Calendar className="mr-2 h-4 w-4" />
+                        {singleDate ? format(singleDate, "dd/MM/yyyy") : "Seleccionar"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={singleDate}
+                        onSelect={setSingleDate}
+                        initialFocus
+                        locale={es}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                )}
+
+                {/* Date Range Pickers */}
+                {dateFilterType === "range" && (
+                  <>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-36 justify-start text-left font-normal">
+                          <Calendar className="mr-2 h-4 w-4" />
+                          {dateRange.from ? format(dateRange.from, "dd/MM/yyyy") : "Desde"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={dateRange.from}
+                          onSelect={(date) => setDateRange((prev) => ({ ...prev, from: date }))}
+                          initialFocus
+                          locale={es}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-36 justify-start text-left font-normal">
+                          <Calendar className="mr-2 h-4 w-4" />
+                          {dateRange.to ? format(dateRange.to, "dd/MM/yyyy") : "Hasta"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={dateRange.to}
+                          onSelect={(date) => setDateRange((prev) => ({ ...prev, to: date }))}
+                          initialFocus
+                          locale={es}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </>
+                )}
+
+                {/* Clear Date Filter */}
+                {dateFilterType !== "none" && (
+                  <Button variant="ghost" size="icon" onClick={clearDateFilter} title="Limpiar filtro de fecha">
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </div>
           </CardHeader>
