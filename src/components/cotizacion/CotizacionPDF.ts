@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import logoJenner from "@/assets/LogoCentro_Jenner-Vert.jpg";
 
 interface CotizacionItem {
   item_numero: number;
@@ -45,11 +46,11 @@ const formatDate = (dateStr: string) => {
   return date.toLocaleDateString("es-CL", options);
 };
 
-// Colors based on the reference image
+// Colors based on Jenner brand
 const COLORS = {
-  primary: [0, 120, 170] as [number, number, number], // Blue header
-  accent: [0, 180, 180] as [number, number, number], // Cyan accent
-  tableHeader: [0, 120, 170] as [number, number, number],
+  primary: [0, 56, 101] as [number, number, number], // Dark blue #003865
+  accent: [0, 188, 212] as [number, number, number], // Cyan/turquoise #00BCD4
+  tableHeader: [0, 56, 101] as [number, number, number],
   text: [50, 50, 50] as [number, number, number],
   lightGray: [240, 240, 240] as [number, number, number],
 };
@@ -61,38 +62,35 @@ export const generateCotizacionPDF = (data: CotizacionData) => {
   const margin = 15;
 
   const drawHeader = (startY: number) => {
-    // Top cyan line - más delgada
+    // Top accent line
     doc.setFillColor(...COLORS.accent);
-    doc.rect(0, 0, pageWidth, 2, "F");
+    doc.rect(0, 0, pageWidth, 3, "F");
 
-    // Logo placeholder - Centro Médico Jenner text
-    doc.setFontSize(20);
+    // Company name - Centro Médico Jenner text
+    doc.setFontSize(18);
     doc.setTextColor(...COLORS.primary);
     doc.setFont("helvetica", "bold");
-    doc.text("Centro Médico Jenner", 42, startY + 12);
+    doc.text("Centro Médico Jenner", margin, startY + 12);
 
     // Contact info
     doc.setFontSize(8);
     doc.setTextColor(...COLORS.text);
     doc.setFont("helvetica", "normal");
-    doc.text("Av. Salvador Allende 3432, Edif. Nuevo Prado, piso 2. Iquique - Chile.", 42, startY + 18);
-    doc.text("www.centrojenner.cl", 42, startY + 23);
-    doc.text("contacto@centrojenner.cl", 42, startY + 28);
-    doc.text("57 226 2775", 42, startY + 33);
+    doc.text("Av. Salvador Allende 3432, Edif. Nuevo Prado, piso 2. Iquique - Chile.", margin, startY + 18);
+    doc.text("www.centrojenner.cl", margin, startY + 23);
+    doc.text("contacto@centrojenner.cl", margin, startY + 28);
+    doc.text("57 226 2775", margin, startY + 33);
 
-    // Logo icon circle on the left - más pequeño
-    doc.setFillColor(...COLORS.primary);
-    doc.circle(22, startY + 18, 9, "F");
-    doc.setFillColor(...COLORS.accent);
-    doc.circle(22, startY + 18, 6, "F");
-    doc.setFillColor(255, 255, 255);
-    doc.circle(22, startY + 18, 3, "F");
-
-    // Right side decorative element - más compacto
-    doc.setFillColor(...COLORS.primary);
-    doc.rect(pageWidth - 30, startY + 5, 18, 28, "F");
-    doc.setFillColor(...COLORS.accent);
-    doc.rect(pageWidth - 30, startY + 5, 4, 28, "F");
+    // Logo on the right side
+    try {
+      const logoWidth = 28;
+      const logoHeight = 35;
+      doc.addImage(logoJenner, "JPEG", pageWidth - margin - logoWidth, startY + 2, logoWidth, logoHeight);
+    } catch (e) {
+      // Fallback if logo fails to load - draw simple placeholder
+      doc.setFillColor(...COLORS.accent);
+      doc.rect(pageWidth - margin - 28, startY + 5, 28, 30, "F");
+    }
 
     return startY + 38;
   };
