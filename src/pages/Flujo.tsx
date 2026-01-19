@@ -58,7 +58,7 @@ interface Examen {
 }
 
 const Flujo = () => {
-  useAuth(); // Protect route
+  const { user } = useAuth(); // Protect route and get current user
   const [atenciones, setAtenciones] = useState<Atencion[]>([]);
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [examenes, setExamenes] = useState<Examen[]>([]);
@@ -510,7 +510,11 @@ const Flujo = () => {
             const idsToComplete = examenesDelBox.map(ae => ae.id);
             const { error: updateExamsError } = await supabase
               .from("atencion_examenes")
-              .update({ estado: "completado", fecha_realizacion: new Date().toISOString() })
+              .update({ 
+                estado: "completado", 
+                fecha_realizacion: new Date().toISOString(),
+                realizado_por: user?.id || null
+              })
               .in("id", idsToComplete);
             if (updateExamsError) throw updateExamsError;
           }
@@ -518,12 +522,16 @@ const Flujo = () => {
           // Parcial: marcar solo los seleccionados como completados, el resto como incompleto
           for (const ae of examenesDelBox) {
             const nuevoEstado = seleccionados.has(ae.id) ? "completado" : "incompleto";
+            const updateData: any = { 
+              estado: nuevoEstado, 
+              fecha_realizacion: nuevoEstado === "completado" ? new Date().toISOString() : null 
+            };
+            if (nuevoEstado === "completado") {
+              updateData.realizado_por = user?.id || null;
+            }
             const { error } = await supabase
               .from("atencion_examenes")
-              .update({ 
-                estado: nuevoEstado, 
-                fecha_realizacion: nuevoEstado === "completado" ? new Date().toISOString() : null 
-              })
+              .update(updateData)
               .eq("id", ae.id);
             if (error) throw error;
           }

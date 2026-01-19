@@ -85,11 +85,15 @@ Deno.serve(async (req) => {
     const allMenus = [
       '/',
       '/flujo',
+      '/mi-box',
       '/pacientes',
       '/completados',
+      '/incompletos',
       '/empresas',
       '/boxes',
       '/examenes',
+      '/cotizaciones',
+      '/prestadores',
       '/usuarios',
     ]
 
