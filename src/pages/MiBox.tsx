@@ -55,7 +55,7 @@ interface Box {
 const STORAGE_KEY = "mediflow_selected_box";
 
 const MiBox = () => {
-  useAuth();
+  const { user } = useAuth();
   const { isAdmin } = usePermissions();
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [selectedBoxId, setSelectedBoxId] = useState<string | null>(null);
@@ -337,7 +337,8 @@ const MiBox = () => {
         .from("atencion_examenes")
         .update({ 
           estado: nuevoEstado,
-          fecha_realizacion: nuevoEstado === "completado" ? new Date().toISOString() : null
+          fecha_realizacion: nuevoEstado === "completado" ? new Date().toISOString() : null,
+          realizado_por: nuevoEstado === "completado" ? (user?.id || null) : null
         })
         .eq("id", atencionExamenId);
 
@@ -363,7 +364,11 @@ const MiBox = () => {
       if (estado === "completado" && boxExamIds.length > 0) {
         await supabase
           .from("atencion_examenes")
-          .update({ estado: "completado", fecha_realizacion: new Date().toISOString() })
+          .update({ 
+            estado: "completado", 
+            fecha_realizacion: new Date().toISOString(),
+            realizado_por: user?.id || null
+          })
           .eq("atencion_id", atencionId)
           .in("examen_id", boxExamIds)
           .in("estado", ["pendiente", "incompleto"]);

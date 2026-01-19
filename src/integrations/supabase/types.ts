@@ -23,6 +23,7 @@ export type Database = {
           fecha_realizacion: string | null
           id: string
           observaciones: string | null
+          realizado_por: string | null
         }
         Insert: {
           atencion_id: string
@@ -32,6 +33,7 @@ export type Database = {
           fecha_realizacion?: string | null
           id?: string
           observaciones?: string | null
+          realizado_por?: string | null
         }
         Update: {
           atencion_id?: string
@@ -41,6 +43,7 @@ export type Database = {
           fecha_realizacion?: string | null
           id?: string
           observaciones?: string | null
+          realizado_por?: string | null
         }
         Relationships: [
           {
@@ -630,6 +633,123 @@ export type Database = {
           descripcion?: string | null
           id?: string
           nombre?: string
+        }
+        Relationships: []
+      }
+      prestador_examenes: {
+        Row: {
+          created_at: string
+          examen_id: string
+          id: string
+          prestador_id: string
+          valor_prestacion: number
+        }
+        Insert: {
+          created_at?: string
+          examen_id: string
+          id?: string
+          prestador_id: string
+          valor_prestacion?: number
+        }
+        Update: {
+          created_at?: string
+          examen_id?: string
+          id?: string
+          prestador_id?: string
+          valor_prestacion?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prestador_examenes_examen_id_fkey"
+            columns: ["examen_id"]
+            isOneToOne: false
+            referencedRelation: "examenes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prestador_examenes_prestador_id_fkey"
+            columns: ["prestador_id"]
+            isOneToOne: false
+            referencedRelation: "prestadores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prestador_reemplazos: {
+        Row: {
+          created_at: string
+          fecha: string
+          id: string
+          motivo: string | null
+          prestador_original_id: string
+          prestador_reemplazo_id: string
+        }
+        Insert: {
+          created_at?: string
+          fecha: string
+          id?: string
+          motivo?: string | null
+          prestador_original_id: string
+          prestador_reemplazo_id: string
+        }
+        Update: {
+          created_at?: string
+          fecha?: string
+          id?: string
+          motivo?: string | null
+          prestador_original_id?: string
+          prestador_reemplazo_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prestador_reemplazos_prestador_original_id_fkey"
+            columns: ["prestador_original_id"]
+            isOneToOne: false
+            referencedRelation: "prestadores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prestador_reemplazos_prestador_reemplazo_id_fkey"
+            columns: ["prestador_reemplazo_id"]
+            isOneToOne: false
+            referencedRelation: "prestadores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prestadores: {
+        Row: {
+          activo: boolean
+          created_at: string
+          email: string | null
+          especialidad: string | null
+          id: string
+          nombre: string
+          rut: string | null
+          telefono: string | null
+          user_id: string | null
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          email?: string | null
+          especialidad?: string | null
+          id?: string
+          nombre: string
+          rut?: string | null
+          telefono?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          email?: string | null
+          especialidad?: string | null
+          id?: string
+          nombre?: string
+          rut?: string | null
+          telefono?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
