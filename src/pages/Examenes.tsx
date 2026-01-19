@@ -27,6 +27,8 @@ interface Examen {
   nombre: string;
   descripcion: string | null;
   duracion_estimada: number | null;
+  codigo: string | null;
+  costo_neto: number | null;
 }
 
 interface Box {
@@ -63,6 +65,8 @@ const Examenes = () => {
     nombre: "",
     descripcion: "",
     duracion_estimada: "",
+    codigo: "",
+    costo_neto: "",
   });
   const [paqueteFormData, setPaqueteFormData] = useState({
     nombre: "",
@@ -137,6 +141,8 @@ const Examenes = () => {
             nombre: formData.nombre,
             descripcion: formData.descripcion || null,
             duracion_estimada: formData.duracion_estimada ? parseInt(formData.duracion_estimada) : null,
+            codigo: formData.codigo || null,
+            costo_neto: formData.costo_neto ? parseFloat(formData.costo_neto) : 0,
           })
           .eq("id", editingExamen.id);
 
@@ -169,6 +175,8 @@ const Examenes = () => {
               nombre: formData.nombre,
               descripcion: formData.descripcion || null,
               duracion_estimada: formData.duracion_estimada ? parseInt(formData.duracion_estimada) : null,
+              codigo: formData.codigo || null,
+              costo_neto: formData.costo_neto ? parseFloat(formData.costo_neto) : 0,
             },
           ])
           .select()
@@ -193,7 +201,7 @@ const Examenes = () => {
       
       setOpenExamenDialog(false);
       setEditingExamen(null);
-      setFormData({ nombre: "", descripcion: "", duracion_estimada: "" });
+      setFormData({ nombre: "", descripcion: "", duracion_estimada: "", codigo: "", costo_neto: "" });
       setSelectedBoxes([]);
       loadExamenes();
     } catch (error: any) {
@@ -337,7 +345,7 @@ const Examenes = () => {
               setOpenExamenDialog(open);
               if (!open) {
                 setEditingExamen(null);
-                setFormData({ nombre: "", descripcion: "", duracion_estimada: "" });
+                setFormData({ nombre: "", descripcion: "", duracion_estimada: "", codigo: "", costo_neto: "" });
                 setSelectedBoxes([]);
               }
             }}>
@@ -380,6 +388,29 @@ const Examenes = () => {
                       onChange={(e) => setFormData({ ...formData, duracion_estimada: e.target.value })}
                       placeholder="30"
                     />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="codigo">Código</Label>
+                      <Input
+                        id="codigo"
+                        value={formData.codigo}
+                        onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
+                        placeholder="EX-001"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="costo_neto">Costo Neto ($)</Label>
+                      <Input
+                        id="costo_neto"
+                        type="number"
+                        min="0"
+                        step="100"
+                        value={formData.costo_neto}
+                        onChange={(e) => setFormData({ ...formData, costo_neto: e.target.value })}
+                        placeholder="5000"
+                      />
+                    </div>
                   </div>
                   <div>
                     <Label>Boxes donde se realiza *</Label>
@@ -505,6 +536,8 @@ const Examenes = () => {
                               nombre: examen.nombre,
                               descripcion: examen.descripcion || "",
                               duracion_estimada: examen.duracion_estimada?.toString() || "",
+                              codigo: examen.codigo || "",
+                              costo_neto: examen.costo_neto?.toString() || "",
                             });
                             
                             // Cargar boxes asociados al examen
