@@ -222,7 +222,6 @@ export const generateCotizacionPDF = (data: CotizacionData) => {
         content: item.nombre_prestacion.toUpperCase(),
         styles: { fontStyle: "bold" },
       },
-      { content: `$ ${item.valor_unitario_neto.toLocaleString("es-CL")}`, styles: { halign: "right" } },
       { content: item.cantidad.toString(), styles: { halign: "center" } },
       { content: formatCurrency(item.valor_final), styles: { halign: "right", fontStyle: "bold" } },
     ]);
@@ -244,7 +243,6 @@ export const generateCotizacionPDF = (data: CotizacionData) => {
           },
           { content: "", styles: { fillColor: [255, 255, 255] } },
           { content: "", styles: { fillColor: [255, 255, 255] } },
-          { content: "", styles: { fillColor: [255, 255, 255] } },
         ]);
         rowSpanMap.push(itemIndex); // Same item group
       });
@@ -256,7 +254,7 @@ export const generateCotizacionPDF = (data: CotizacionData) => {
 
   autoTable(doc, {
     startY: tableStartY,
-    head: [["Item", "Prestaciones", "Valor unit.", "Cantidad", "Valor Total"]],
+    head: [["Item", "Prestaciones", "Cantidad", "Valor Total"]],
     body: tableData,
     theme: "plain",
     headStyles: {
@@ -269,9 +267,8 @@ export const generateCotizacionPDF = (data: CotizacionData) => {
     columnStyles: {
       0: { cellWidth: 15, halign: "center" },
       1: { cellWidth: "auto" },
-      2: { cellWidth: 30, halign: "right" },
-      3: { cellWidth: 25, halign: "center" },
-      4: { cellWidth: 30, halign: "right" },
+      2: { cellWidth: 25, halign: "center" },
+      3: { cellWidth: 35, halign: "right" },
     },
     styles: {
       fontSize: 8,
