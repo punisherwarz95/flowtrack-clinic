@@ -404,8 +404,7 @@ const Examenes = () => {
                       <Input
                         id="costo_neto"
                         type="number"
-                        min="0"
-                        step="100"
+                        step="any"
                         value={formData.costo_neto}
                         onChange={(e) => setFormData({ ...formData, costo_neto: e.target.value })}
                         placeholder="5000"
