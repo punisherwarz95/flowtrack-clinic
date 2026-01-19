@@ -408,15 +408,6 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
     if (!empresaForm.rut?.trim()) {
       errores.push("RUT de la empresa");
     }
-    if (!empresaForm.contacto?.trim()) {
-      errores.push("Nombre de contacto");
-    }
-    if (!empresaForm.email?.trim()) {
-      errores.push("Email de contacto");
-    }
-    if (!empresaForm.telefono?.trim()) {
-      errores.push("Teléfono de contacto");
-    }
     if (items.length === 0) {
       errores.push("Al menos un ítem en la cotización");
     }
@@ -707,14 +698,14 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
                   />
                 </div>
                 <div>
-                  <Label>Contacto *</Label>
+                  <Label>Contacto</Label>
                   <Input
                     value={empresaForm.contacto}
                     onChange={(e) => setEmpresaForm({ ...empresaForm, contacto: e.target.value })}
                   />
                 </div>
                 <div>
-                  <Label>Email *</Label>
+                  <Label>Email</Label>
                   <Input
                     type="email"
                     value={empresaForm.email}
@@ -722,7 +713,7 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
                   />
                 </div>
                 <div>
-                  <Label>Teléfono *</Label>
+                  <Label>Teléfono</Label>
                   <Input
                     value={empresaForm.telefono}
                     onChange={(e) => setEmpresaForm({ ...empresaForm, telefono: e.target.value })}
