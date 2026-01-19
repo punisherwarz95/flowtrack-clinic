@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,10 +7,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Trash2, Building2, Package, ClipboardList, ChevronDown, ChevronUp, FileDown } from "lucide-react";
+import { Plus, Trash2, Building2, Package, ClipboardList, ChevronDown, ChevronUp, FileDown, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { generateCotizacionPDF } from "./CotizacionPDF";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Empresa {
   id: string;
@@ -107,6 +117,11 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
   const [selectedItemId, setSelectedItemId] = useState<string>("");
   const [itemCantidad, setItemCantidad] = useState<number>(1);
   const [itemMargenId, setItemMargenId] = useState<string>("");
+
+  // Duplicate confirmation dialog state
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [duplicateItems, setDuplicateItems] = useState<Array<{ nombre: string; count: number }>>([]);
+  const pendingSaveRef = useRef<{ estado: string; generatePdf: boolean } | null>(null);
 
   useEffect(() => {
     loadData();
@@ -422,20 +437,18 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
 
     const duplicados = Array.from(itemCounts.values()).filter(item => item.count > 1);
     if (duplicados.length > 0) {
-      toast.warning(
-        <div>
-          <strong>⚠️ Se detectaron ítems repetidos:</strong>
-          <ul className="mt-2 list-disc list-inside">
-            {duplicados.map((dup, i) => (
-              <li key={i}>{dup.nombre} (x{dup.count})</li>
-            ))}
-          </ul>
-          <p className="mt-2 text-sm">Revise si esto es intencional antes de continuar.</p>
-        </div>,
-        { duration: 6000 }
-      );
+      // Store pending save params and show confirmation dialog
+      pendingSaveRef.current = { estado, generatePdf };
+      setDuplicateItems(duplicados);
+      setShowDuplicateDialog(true);
+      return;
     }
 
+    // Proceed with save
+    await executeSave(estado, generatePdf);
+  };
+
+  const executeSave = async (estado: string, generatePdf: boolean) => {
     setSaving(true);
     try {
       let empresaId = selectedEmpresa?.id || null;
@@ -563,6 +576,19 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleConfirmDuplicateSave = async () => {
+    setShowDuplicateDialog(false);
+    if (pendingSaveRef.current) {
+      await executeSave(pendingSaveRef.current.estado, pendingSaveRef.current.generatePdf);
+      pendingSaveRef.current = null;
+    }
+  };
+
+  const handleCancelDuplicateSave = () => {
+    setShowDuplicateDialog(false);
+    pendingSaveRef.current = null;
   };
 
   if (loading) {
@@ -957,6 +983,39 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
           {saving ? "Guardando..." : "Guardar y Generar PDF"}
         </Button>
       </div>
+
+      {/* Duplicate Items Confirmation Dialog */}
+      <AlertDialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="h-5 w-5" />
+              Se detectaron ítems repetidos
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>Los siguientes ítems aparecen más de una vez en la cotización:</p>
+                <ul className="list-disc list-inside space-y-1 bg-amber-50 dark:bg-amber-950 p-3 rounded-md">
+                  {duplicateItems.map((dup, i) => (
+                    <li key={i} className="text-amber-800 dark:text-amber-200 font-medium">
+                      {dup.nombre} <span className="text-amber-600">(×{dup.count})</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-sm">¿Desea continuar con el guardado o prefiere corregir los ítems duplicados?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelDuplicateSave}>
+              Corregir
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDuplicateSave} className="bg-amber-600 hover:bg-amber-700">
+              Continuar y Guardar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
