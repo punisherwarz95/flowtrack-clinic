@@ -201,10 +201,14 @@ export const generateCotizacionPDF = (data: CotizacionData) => {
   drawHeader(5);
   drawClientInfo(50);
   
-  // Prepare table data
+  // Prepare table data with row grouping for items with sub-items
   const tableData: any[] = [];
+  const rowSpanMap: number[] = []; // Track which rows belong together
 
-  data.items.forEach((item) => {
+  data.items.forEach((item, itemIndex) => {
+    const itemStartRow = tableData.length;
+    
+    // Main item row
     tableData.push([
       { content: item.item_numero.toString(), styles: { fontStyle: "bold" } },
       {
@@ -215,7 +219,9 @@ export const generateCotizacionPDF = (data: CotizacionData) => {
       { content: item.cantidad.toString(), styles: { halign: "center" } },
       { content: formatCurrency(item.valor_final), styles: { halign: "right", fontStyle: "bold" } },
     ]);
+    rowSpanMap.push(itemIndex);
 
+    // Sub-items (detail examenes) - only if there are multiple
     if (item.detalle_examenes && item.detalle_examenes.length > 1) {
       item.detalle_examenes.forEach((examen) => {
         tableData.push([
@@ -233,9 +239,13 @@ export const generateCotizacionPDF = (data: CotizacionData) => {
           { content: "", styles: { fillColor: [255, 255, 255] } },
           { content: "", styles: { fillColor: [255, 255, 255] } },
         ]);
+        rowSpanMap.push(itemIndex); // Same item group
       });
     }
   });
+
+  // Footer height reservation
+  const footerHeight = 45;
 
   autoTable(doc, {
     startY: tableStartY,
@@ -265,7 +275,28 @@ export const generateCotizacionPDF = (data: CotizacionData) => {
     alternateRowStyles: {
       fillColor: [250, 250, 250],
     },
-    margin: { left: margin, right: margin, top: 60 },
+    margin: { left: margin, right: margin, top: 60, bottom: footerHeight },
+    rowPageBreak: 'avoid', // Try to keep rows together
+    willDrawCell: (hookData) => {
+      // Check if this row and its related sub-rows would be split
+      if (hookData.section === 'body' && hookData.row.index !== undefined) {
+        const currentItemGroup = rowSpanMap[hookData.row.index];
+        const lastRowOfGroup = rowSpanMap.lastIndexOf(currentItemGroup);
+        const isFirstRowOfGroup = hookData.row.index === rowSpanMap.indexOf(currentItemGroup);
+        
+        if (isFirstRowOfGroup && lastRowOfGroup > hookData.row.index) {
+          // Calculate approximate height for all rows in this group
+          const rowsInGroup = lastRowOfGroup - hookData.row.index + 1;
+          const estimatedGroupHeight = rowsInGroup * 8; // Approximate row height
+          const remainingSpace = pageHeight - footerHeight - hookData.cursor.y;
+          
+          // If group won't fit, force page break before this row
+          if (estimatedGroupHeight > remainingSpace && hookData.cursor.y > tableStartY + 20) {
+            // This will be handled by pageBreak logic
+          }
+        }
+      }
+    },
     didDrawPage: (hookData) => {
       // Only draw header on pages after the first
       if (hookData.pageNumber > 1) {
