@@ -113,21 +113,36 @@ export const useAtencionDocumentos = (atencionId: string | null) => {
 
 // Hook to generate documents from battery when assigning to patient
 export const useGenerateDocumentosFromBateria = () => {
-  const generateDocuments = async (atencionId: string, paqueteIds: string[]) => {
-    if (!atencionId || paqueteIds.length === 0) return;
+  const generateDocuments = async (atencionId: string, paqueteIds: string[]): Promise<{ success: boolean; count: number; error?: string }> => {
+    console.log("[GenerateDocuments] Iniciando - atencionId:", atencionId, "paqueteIds:", paqueteIds);
+    
+    if (!atencionId || paqueteIds.length === 0) {
+      console.log("[GenerateDocuments] No hay atencionId o paqueteIds vacíos, saliendo");
+      return { success: true, count: 0 };
+    }
 
     try {
       // Get all documents associated with the selected batteries
+      console.log("[GenerateDocuments] Buscando documentos en bateria_documentos para paquetes:", paqueteIds);
       const { data: bateriaDocumentos, error: bdError } = await supabase
         .from("bateria_documentos")
-        .select("documento_id")
+        .select("documento_id, paquete_id")
         .in("paquete_id", paqueteIds);
 
-      if (bdError) throw bdError;
+      if (bdError) {
+        console.error("[GenerateDocuments] Error consultando bateria_documentos:", bdError);
+        throw bdError;
+      }
 
-      if (!bateriaDocumentos || bateriaDocumentos.length === 0) return;
+      console.log("[GenerateDocuments] Documentos encontrados en baterías:", bateriaDocumentos);
+
+      if (!bateriaDocumentos || bateriaDocumentos.length === 0) {
+        console.log("[GenerateDocuments] No hay documentos asociados a estas baterías");
+        return { success: true, count: 0 };
+      }
 
       const uniqueDocumentoIds = [...new Set(bateriaDocumentos.map(bd => bd.documento_id))];
+      console.log("[GenerateDocuments] IDs únicos de documentos:", uniqueDocumentoIds);
 
       // Check which documents already exist for this atencion
       const { data: existingDocs, error: existingError } = await supabase
@@ -135,12 +150,20 @@ export const useGenerateDocumentosFromBateria = () => {
         .select("documento_id")
         .eq("atencion_id", atencionId);
 
-      if (existingError) throw existingError;
+      if (existingError) {
+        console.error("[GenerateDocuments] Error consultando documentos existentes:", existingError);
+        throw existingError;
+      }
 
       const existingDocIds = new Set((existingDocs || []).map(d => d.documento_id));
       const newDocIds = uniqueDocumentoIds.filter(id => !existingDocIds.has(id));
+      
+      console.log("[GenerateDocuments] Documentos existentes:", existingDocs?.length || 0, "Nuevos a crear:", newDocIds.length);
 
-      if (newDocIds.length === 0) return;
+      if (newDocIds.length === 0) {
+        console.log("[GenerateDocuments] Todos los documentos ya existen, no se crean nuevos");
+        return { success: true, count: 0 };
+      }
 
       // Create new atencion_documentos
       const newDocs = newDocIds.map(documento_id => ({
@@ -150,15 +173,22 @@ export const useGenerateDocumentosFromBateria = () => {
         estado: "pendiente",
       }));
 
-      const { error: insertError } = await supabase
+      console.log("[GenerateDocuments] Insertando documentos:", newDocs);
+      const { data: insertedData, error: insertError } = await supabase
         .from("atencion_documentos")
-        .insert(newDocs);
+        .insert(newDocs)
+        .select();
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error("[GenerateDocuments] Error insertando documentos:", insertError);
+        throw insertError;
+      }
 
-      console.log(`Generated ${newDocIds.length} documents for atencion ${atencionId}`);
-    } catch (error) {
-      console.error("Error generating documents from bateria:", error);
+      console.log(`[GenerateDocuments] ✓ Generados ${newDocIds.length} documentos para atencion ${atencionId}`, insertedData);
+      return { success: true, count: newDocIds.length };
+    } catch (error: any) {
+      console.error("[GenerateDocuments] Error generando documentos:", error);
+      return { success: false, count: 0, error: error.message || "Error desconocido" };
     }
   };
 
