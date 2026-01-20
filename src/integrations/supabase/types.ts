@@ -14,6 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
+      atencion_documentos: {
+        Row: {
+          atencion_id: string
+          completado_at: string | null
+          created_at: string
+          documento_id: string
+          estado: string
+          id: string
+          observaciones: string | null
+          respuestas: Json
+          revisado_at: string | null
+          revisado_por: string | null
+          updated_at: string
+        }
+        Insert: {
+          atencion_id: string
+          completado_at?: string | null
+          created_at?: string
+          documento_id: string
+          estado?: string
+          id?: string
+          observaciones?: string | null
+          respuestas?: Json
+          revisado_at?: string | null
+          revisado_por?: string | null
+          updated_at?: string
+        }
+        Update: {
+          atencion_id?: string
+          completado_at?: string | null
+          created_at?: string
+          documento_id?: string
+          estado?: string
+          id?: string
+          observaciones?: string | null
+          respuestas?: Json
+          revisado_at?: string | null
+          revisado_por?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atencion_documentos_atencion_id_fkey"
+            columns: ["atencion_id"]
+            isOneToOne: false
+            referencedRelation: "atenciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atencion_documentos_documento_id_fkey"
+            columns: ["documento_id"]
+            isOneToOne: false
+            referencedRelation: "documentos_formularios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       atencion_examenes: {
         Row: {
           atencion_id: string
@@ -115,6 +172,45 @@ export type Database = {
             columns: ["paciente_id"]
             isOneToOne: false
             referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bateria_documentos: {
+        Row: {
+          created_at: string
+          documento_id: string
+          id: string
+          orden: number
+          paquete_id: string
+        }
+        Insert: {
+          created_at?: string
+          documento_id: string
+          id?: string
+          orden?: number
+          paquete_id: string
+        }
+        Update: {
+          created_at?: string
+          documento_id?: string
+          id?: string
+          orden?: number
+          paquete_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bateria_documentos_documento_id_fkey"
+            columns: ["documento_id"]
+            isOneToOne: false
+            referencedRelation: "documentos_formularios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bateria_documentos_paquete_id_fkey"
+            columns: ["paquete_id"]
+            isOneToOne: false
+            referencedRelation: "paquetes_examenes"
             referencedColumns: ["id"]
           },
         ]
@@ -373,6 +469,122 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documento_campos: {
+        Row: {
+          created_at: string
+          documento_id: string
+          etiqueta: string
+          id: string
+          opciones: Json | null
+          orden: number
+          requerido: boolean
+          tipo_campo: string
+        }
+        Insert: {
+          created_at?: string
+          documento_id: string
+          etiqueta: string
+          id?: string
+          opciones?: Json | null
+          orden?: number
+          requerido?: boolean
+          tipo_campo?: string
+        }
+        Update: {
+          created_at?: string
+          documento_id?: string
+          etiqueta?: string
+          id?: string
+          opciones?: Json | null
+          orden?: number
+          requerido?: boolean
+          tipo_campo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documento_campos_documento_id_fkey"
+            columns: ["documento_id"]
+            isOneToOne: false
+            referencedRelation: "documentos_formularios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documentos_formularios: {
+        Row: {
+          activo: boolean
+          created_at: string
+          descripcion: string | null
+          id: string
+          nombre: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          nombre: string
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          nombre?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      empresa_baterias: {
+        Row: {
+          activo: boolean
+          created_at: string
+          empresa_id: string
+          id: string
+          paquete_id: string
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          empresa_id: string
+          id?: string
+          paquete_id: string
+          updated_at?: string
+          valor?: number
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          paquete_id?: string
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "empresa_baterias_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "empresa_baterias_paquete_id_fkey"
+            columns: ["paquete_id"]
+            isOneToOne: false
+            referencedRelation: "paquetes_examenes"
             referencedColumns: ["id"]
           },
         ]
