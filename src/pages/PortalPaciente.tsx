@@ -307,9 +307,14 @@ export default function PortalPaciente() {
       // Tomar el primer resultado (el más reciente si hay duplicados)
       const pacienteData = pacientesData && pacientesData.length > 0 ? pacientesData[0] : null;
 
+      // Usar zona horaria de Chile para el rango del día
       const today = new Date();
-      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).toISOString();
-      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).toISOString();
+      const startOfDayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
+      const endOfDayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+      const startOfDay = startOfDayDate.toISOString();
+      const endOfDay = endOfDayDate.toISOString();
+      
+      console.log("[Portal] Buscando atención - RUT:", rutFormateado, "Rango:", startOfDay, "a", endOfDay);
 
       if (pacienteData) {
         setPaciente(pacienteData);
@@ -387,6 +392,8 @@ export default function PortalPaciente() {
             description: `Su número de atención es #${existingAtencion.numero_ingreso}`,
           });
         } else {
+          console.log("[Portal] No se encontró atención existente, creando nueva para paciente:", pacienteData.id);
+          
           const { data: newAtencion, error: atencionError } = await supabase
             .from("atenciones")
             .insert({
@@ -397,7 +404,12 @@ export default function PortalPaciente() {
             .select("*, boxes(*)")
             .single();
 
-          if (atencionError) throw atencionError;
+          if (atencionError) {
+            console.error("[Portal] Error creando atención:", atencionError);
+            throw atencionError;
+          }
+          
+          console.log("[Portal] Atención creada:", newAtencion);
 
           setAtencion({
             ...newAtencion,
