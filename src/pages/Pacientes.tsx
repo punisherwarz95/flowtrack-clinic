@@ -431,52 +431,62 @@ const Pacientes = () => {
         if (atencionError) throw atencionError;
 
         if (atencionData) {
-          // Solo eliminar exámenes pendientes (conservar los completados)
-          await supabase
-            .from("atencion_examenes")
-            .delete()
-            .eq("atencion_id", atencionData.id)
-            .eq("estado", "pendiente");
+          // Solo modificar exámenes si se seleccionaron exámenes o paquetes
+          const hayNuevosExamenes = selectedExamenes.length > 0 || selectedPaquetes.length > 0;
+          
+          if (hayNuevosExamenes) {
+            // Solo eliminar exámenes pendientes (conservar los completados)
+            await supabase
+              .from("atencion_examenes")
+              .delete()
+              .eq("atencion_id", atencionData.id)
+              .eq("estado", "pendiente");
 
-          // Agregar nuevos exámenes como pendientes
-          const examenesData = selectedExamenes.map(examenId => ({
-            atencion_id: atencionData.id,
-            examen_id: examenId,
-            estado: 'pendiente' as 'pendiente' | 'completado' | 'incompleto'
-          }));
+            // Agregar nuevos exámenes como pendientes
+            if (selectedExamenes.length > 0) {
+              const examenesData = selectedExamenes.map(examenId => ({
+                atencion_id: atencionData.id,
+                examen_id: examenId,
+                estado: 'pendiente' as 'pendiente' | 'completado' | 'incompleto'
+              }));
 
-          const { error: examenesError } = await supabase
-            .from("atencion_examenes")
-            .insert(examenesData);
+              const { error: examenesError } = await supabase
+                .from("atencion_examenes")
+                .insert(examenesData);
 
-          if (examenesError) throw examenesError;
-
-          // FASE 6: Generate documents from selected batteries (also on edit)
-          if (selectedPaquetes.length > 0) {
-            console.log("[Pacientes] Generando documentos para paquetes:", selectedPaquetes);
-            const result = await generateDocuments(atencionData.id, selectedPaquetes);
-            if (result.success && result.count > 0) {
-              toast.success(`${result.count} documento(s) generado(s)`);
-            } else if (!result.success) {
-              toast.error(`Error generando documentos: ${result.error}`);
+              if (examenesError) throw examenesError;
             }
-          }
 
-          // Si la atención estaba completada o incompleta, devolverla a en_espera
-          if (atencionData.estado === "completado" || atencionData.estado === "incompleto") {
-            const { error: updateError } = await supabase
-              .from("atenciones")
-              .update({ 
-                estado: "en_espera", 
-                box_id: null,
-                fecha_fin_atencion: null 
-              })
-              .eq("id", atencionData.id);
+            // FASE 6: Generate documents from selected batteries (also on edit)
+            if (selectedPaquetes.length > 0) {
+              console.log("[Pacientes] Generando documentos para paquetes:", selectedPaquetes);
+              const result = await generateDocuments(atencionData.id, selectedPaquetes);
+              if (result.success && result.count > 0) {
+                toast.success(`${result.count} documento(s) generado(s)`);
+              } else if (!result.success) {
+                toast.error(`Error generando documentos: ${result.error}`);
+              }
+            }
 
-            if (updateError) throw updateError;
-            toast.success("Paciente devuelto a lista de espera con nuevos exámenes");
+            // Solo devolver a espera si se agregaron nuevos exámenes Y la atención estaba completada/incompleta
+            if (atencionData.estado === "completado" || atencionData.estado === "incompleto") {
+              const { error: updateError } = await supabase
+                .from("atenciones")
+                .update({ 
+                  estado: "en_espera", 
+                  box_id: null,
+                  fecha_fin_atencion: null 
+                })
+                .eq("id", atencionData.id);
+
+              if (updateError) throw updateError;
+              toast.success("Paciente devuelto a lista de espera con nuevos exámenes");
+            } else {
+              toast.success("Paciente actualizado con nuevos exámenes");
+            }
           } else {
-            toast.success("Paciente actualizado exitosamente");
+            // Solo se modificaron datos del paciente, no tocar exámenes ni estado
+            toast.success("Datos del paciente actualizados");
           }
         }
       } else {
