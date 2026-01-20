@@ -67,11 +67,12 @@ const VARIABLES_DISPONIBLES = [
   { value: "{{nombre}}", label: "Nombre del paciente", category: "Paciente" },
   { value: "{{rut}}", label: "RUT del paciente", category: "Paciente" },
   { value: "{{fecha_nacimiento}}", label: "Fecha de nacimiento", category: "Paciente" },
+  { value: "{{edad}}", label: "Edad del paciente", category: "Paciente" },
   { value: "{{email}}", label: "Email del paciente", category: "Paciente" },
   { value: "{{telefono}}", label: "Teléfono del paciente", category: "Paciente" },
   { value: "{{direccion}}", label: "Dirección del paciente", category: "Paciente" },
   { value: "{{empresa}}", label: "Nombre de la empresa", category: "Empresa" },
-  { value: "{{fecha_actual}}", label: "Fecha actual", category: "Sistema" },
+  { value: "{{fecha_actual}}", label: "Fecha de hoy", category: "Sistema" },
   { value: "{{numero_ingreso}}", label: "Número de ingreso", category: "Atención" },
 ];
 
@@ -370,6 +371,7 @@ const Documentos = () => {
       .replace(/\{\{nombre\}\}/g, "Juan Pérez González")
       .replace(/\{\{rut\}\}/g, "12.345.678-9")
       .replace(/\{\{fecha_nacimiento\}\}/g, "15/03/1985")
+      .replace(/\{\{edad\}\}/g, "39 años")
       .replace(/\{\{email\}\}/g, "juan.perez@email.com")
       .replace(/\{\{telefono\}\}/g, "+56 9 1234 5678")
       .replace(/\{\{direccion\}\}/g, "Av. Principal 123, Santiago")
