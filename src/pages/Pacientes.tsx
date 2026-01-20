@@ -453,7 +453,13 @@ const Pacientes = () => {
 
           // FASE 6: Generate documents from selected batteries (also on edit)
           if (selectedPaquetes.length > 0) {
-            await generateDocuments(atencionData.id, selectedPaquetes);
+            console.log("[Pacientes] Generando documentos para paquetes:", selectedPaquetes);
+            const result = await generateDocuments(atencionData.id, selectedPaquetes);
+            if (result.success && result.count > 0) {
+              toast.success(`${result.count} documento(s) generado(s)`);
+            } else if (!result.success) {
+              toast.error(`Error generando documentos: ${result.error}`);
+            }
           }
 
           // Si la atención estaba completada o incompleta, devolverla a en_espera
@@ -518,7 +524,13 @@ const Pacientes = () => {
 
         // FASE 6: Generate documents from selected batteries
         if (selectedPaquetes.length > 0) {
-          await generateDocuments(atencionData.id, selectedPaquetes);
+          console.log("[Pacientes] Generando documentos para nuevo paciente, paquetes:", selectedPaquetes);
+          const result = await generateDocuments(atencionData.id, selectedPaquetes);
+          if (result.success && result.count > 0) {
+            toast.success(`${result.count} documento(s) generado(s)`);
+          } else if (!result.success) {
+            toast.error(`Error generando documentos: ${result.error}`);
+          }
         }
 
         toast.success("Paciente agregado exitosamente");

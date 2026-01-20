@@ -74,8 +74,9 @@ const Flujo = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   // Estado local para marcar exámenes antes de guardar
   const [examenesSeleccionados, setExamenesSeleccionados] = useState<{[atencionId: string]: Set<string>}>({});
-  // FASE 7: Document pending counts per atencion
+  // FASE 7: Document counts per atencion (pendientes y totales)
   const [docsPendientes, setDocsPendientes] = useState<{[atencionId: string]: number}>({});
+  const [docsTotal, setDocsTotal] = useState<{[atencionId: string]: number}>({});
 
   // OPTIMIZACIÓN v0.0.2: Realtime inteligente - actualiza solo lo necesario
   const handleRealtimeAtencionChange = async (payload: any) => {
@@ -216,31 +217,38 @@ const Flujo = () => {
     }
   };
 
-  // FASE 7: Load pending document counts for all atenciones
+  // FASE 7: Load document counts (pending and total) for all atenciones
   const loadDocsPendientesCount = async (atencionesData: Atencion[]) => {
     if (atencionesData.length === 0) {
       setDocsPendientes({});
+      setDocsTotal({});
       return;
     }
 
     try {
       const atencionIds = atencionesData.map(a => a.id);
       
+      // Get ALL documents for these atenciones
       const { data: docs, error } = await supabase
         .from("atencion_documentos")
         .select("atencion_id, estado")
-        .in("atencion_id", atencionIds)
-        .eq("estado", "pendiente");
+        .in("atencion_id", atencionIds);
 
       if (error) throw error;
 
       // Group counts by atencion
-      const counts: {[atencionId: string]: number} = {};
+      const pendingCounts: {[atencionId: string]: number} = {};
+      const totalCounts: {[atencionId: string]: number} = {};
+      
       (docs || []).forEach(d => {
-        counts[d.atencion_id] = (counts[d.atencion_id] || 0) + 1;
+        totalCounts[d.atencion_id] = (totalCounts[d.atencion_id] || 0) + 1;
+        if (d.estado === "pendiente") {
+          pendingCounts[d.atencion_id] = (pendingCounts[d.atencion_id] || 0) + 1;
+        }
       });
 
-      setDocsPendientes(counts);
+      setDocsPendientes(pendingCounts);
+      setDocsTotal(totalCounts);
     } catch (error) {
       console.error("Error loading docs pendientes:", error);
     }
@@ -718,13 +726,20 @@ const Flujo = () => {
                           <Badge variant="outline" className="text-xs">
                             {atencion.pacientes.tipo_servicio === "workmed" ? "WM" : "J"}
                           </Badge>
-                          {/* FASE 7: Document pending indicator */}
-                          {docsPendientes[atencion.id] > 0 && (
-                            <Badge variant="outline" className="text-xs border-warning text-warning gap-1">
-                              <FileWarning className="h-3 w-3" />
-                              {docsPendientes[atencion.id]} docs
-                            </Badge>
-                          )}
+                          {/* FASE 7: Document status indicator */}
+                          {docsTotal[atencion.id] > 0 ? (
+                            docsPendientes[atencion.id] > 0 ? (
+                              <Badge variant="outline" className="text-xs border-warning text-warning gap-1">
+                                <FileWarning className="h-3 w-3" />
+                                {docsPendientes[atencion.id]} docs pend.
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs border-success text-success gap-1">
+                                <Check className="h-3 w-3" />
+                                Docs OK
+                              </Badge>
+                            )
+                          ) : null}
                           {atencion.boxes && (
                             <span className="text-xs text-muted-foreground">({atencion.boxes.nombre})</span>
                           )}
@@ -904,13 +919,20 @@ const Flujo = () => {
                           <Badge variant="outline" className="text-xs">
                             {atencion.pacientes.tipo_servicio === "workmed" ? "WM" : "J"}
                           </Badge>
-                          {/* FASE 7: Document pending indicator */}
-                          {docsPendientes[atencion.id] > 0 && (
-                            <Badge variant="outline" className="text-xs border-warning text-warning gap-1">
-                              <FileWarning className="h-3 w-3" />
-                              {docsPendientes[atencion.id]} docs
-                            </Badge>
-                          )}
+                          {/* FASE 7: Document status indicator */}
+                          {docsTotal[atencion.id] > 0 ? (
+                            docsPendientes[atencion.id] > 0 ? (
+                              <Badge variant="outline" className="text-xs border-warning text-warning gap-1">
+                                <FileWarning className="h-3 w-3" />
+                                {docsPendientes[atencion.id]} docs pend.
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs border-success text-success gap-1">
+                                <Check className="h-3 w-3" />
+                                Docs OK
+                              </Badge>
+                            )
+                          ) : null}
                         </div>
                         <div className="mt-2">
                           <div className="flex items-center gap-1 mb-1">
@@ -1084,6 +1106,20 @@ const Flujo = () => {
                         <Badge variant="outline" className="text-xs">
                           {atencion.pacientes.tipo_servicio === "workmed" ? "WM" : "J"}
                         </Badge>
+                        {/* FASE 7: Document status indicator in En Atención */}
+                        {docsTotal[atencion.id] > 0 ? (
+                          docsPendientes[atencion.id] > 0 ? (
+                            <Badge variant="outline" className="text-xs border-warning text-warning gap-1">
+                              <FileWarning className="h-3 w-3" />
+                              {docsPendientes[atencion.id]} docs pend.
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs border-success text-success gap-1">
+                              <Check className="h-3 w-3" />
+                              Docs OK
+                            </Badge>
+                          )
+                        ) : null}
                       </div>
                       <div className="mt-2">
                         <div className="flex items-center gap-1 mb-1">
