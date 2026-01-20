@@ -734,8 +734,8 @@ const Documentos = () => {
                   value={campoEtiqueta} 
                   onChange={(e) => setCampoEtiqueta(e.target.value)} 
                   placeholder="Yo, {{nombre}}, con RUT {{rut}}, declaro que..."
-                  rows={8}
-                  className="resize-y font-mono text-sm"
+                  rows={16}
+                  className="resize-y font-mono text-sm min-h-[300px]"
                 />
               ) : (
                 <Input 
