@@ -136,9 +136,10 @@ export const DocumentoFormViewer = ({
     atencionDocumento.respuestas || {}
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Use a map of refs for multiple signature fields
+  const canvasRefs = useRef<Map<string, HTMLCanvasElement>>(new Map());
   const [isDrawing, setIsDrawing] = useState(false);
-  const [signatureFieldId, setSignatureFieldId] = useState<string | null>(null);
+  const [activeSignatureField, setActiveSignatureField] = useState<string | null>(null);
 
   const isComplete = atencionDocumento.estado === "completado";
   const isReviewed = atencionDocumento.estado === "revisado";
@@ -199,11 +200,12 @@ export const DocumentoFormViewer = ({
     }
   };
 
-  // Signature canvas handling
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+  // Signature canvas handling - use field-specific canvas from refs map
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>, fieldId: string) => {
     if (readonly || isComplete || isReviewed) return;
     setIsDrawing(true);
-    const canvas = canvasRef.current;
+    setActiveSignatureField(fieldId);
+    const canvas = canvasRefs.current.get(fieldId);
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -221,9 +223,9 @@ export const DocumentoFormViewer = ({
     ctx.moveTo(x, y);
   };
 
-  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || readonly || isComplete || isReviewed) return;
-    const canvas = canvasRef.current;
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>, fieldId: string) => {
+    if (!isDrawing || activeSignatureField !== fieldId || readonly || isComplete || isReviewed) return;
+    const canvas = canvasRefs.current.get(fieldId);
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -241,17 +243,18 @@ export const DocumentoFormViewer = ({
     ctx.stroke();
   };
 
-  const stopDrawing = () => {
-    if (!isDrawing) return;
+  const stopDrawing = (fieldId: string) => {
+    if (!isDrawing || activeSignatureField !== fieldId) return;
     setIsDrawing(false);
-    const canvas = canvasRef.current;
-    if (!canvas || !signatureFieldId) return;
+    const canvas = canvasRefs.current.get(fieldId);
+    if (!canvas) return;
     const dataUrl = canvas.toDataURL("image/png");
-    handleChange(signatureFieldId, dataUrl);
+    handleChange(fieldId, dataUrl);
+    setActiveSignatureField(null);
   };
 
   const clearSignature = (fieldId: string) => {
-    const canvas = canvasRef.current;
+    const canvas = canvasRefs.current.get(fieldId);
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -369,15 +372,16 @@ export const DocumentoFormViewer = ({
             <div className="border-2 border-dashed rounded-md relative bg-white">
               <canvas
                 ref={(el) => {
-                  if (el && signatureFieldId !== campo.id) {
-                    setSignatureFieldId(campo.id);
+                  if (el) {
+                    canvasRefs.current.set(campo.id, el);
                     const ctx = el.getContext("2d");
                     if (ctx) {
                       ctx.strokeStyle = "#000";
                       ctx.lineWidth = 2;
                       ctx.lineCap = "round";
                       // Load existing signature if any
-                      if (signatureValue) {
+                      if (signatureValue && !el.dataset.loaded) {
+                        el.dataset.loaded = "true";
                         const img = new Image();
                         img.onload = () => {
                           ctx.drawImage(img, 0, 0);
@@ -390,13 +394,13 @@ export const DocumentoFormViewer = ({
                 width={300}
                 height={100}
                 className="w-full h-24 cursor-crosshair touch-none"
-                onMouseDown={startDrawing}
-                onMouseMove={draw}
-                onMouseUp={stopDrawing}
-                onMouseLeave={stopDrawing}
-                onTouchStart={startDrawing}
-                onTouchMove={draw}
-                onTouchEnd={stopDrawing}
+                onMouseDown={(e) => startDrawing(e, campo.id)}
+                onMouseMove={(e) => draw(e, campo.id)}
+                onMouseUp={() => stopDrawing(campo.id)}
+                onMouseLeave={() => stopDrawing(campo.id)}
+                onTouchStart={(e) => startDrawing(e, campo.id)}
+                onTouchMove={(e) => draw(e, campo.id)}
+                onTouchEnd={() => stopDrawing(campo.id)}
               />
             </div>
             {!isDisabled && (

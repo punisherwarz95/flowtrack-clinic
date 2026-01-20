@@ -384,8 +384,18 @@ export default function PortalPaciente() {
           prevEstadoRef.current = existingAtencion.estado;
           prevBoxIdRef.current = existingAtencion.box_id;
           
-          // Ya no cargamos empresa automáticamente - recepción la asigna manualmente
-          // porque el paciente puede venir por diferentes empresas
+          // Cargar empresa si el paciente tiene una asignada
+          if (pacienteData.empresa_id) {
+            const { data: empresaData } = await supabase
+              .from("empresas")
+              .select("id, nombre")
+              .eq("id", pacienteData.empresa_id)
+              .single();
+            
+            if (empresaData) {
+              setEmpresa(empresaData);
+            }
+          }
           
           toast({
             title: "Bienvenido",
