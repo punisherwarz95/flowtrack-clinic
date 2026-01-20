@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, ClipboardList, Package, Trash2, Pencil } from "lucide-react";
+import { Plus, ClipboardList, Package, Trash2, Pencil, FileText, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
@@ -48,11 +48,32 @@ interface Paquete {
   }>;
 }
 
+interface DocumentoFormulario {
+  id: string;
+  nombre: string;
+  tipo: string;
+}
+
+interface Empresa {
+  id: string;
+  nombre: string;
+}
+
+interface EmpresaBateria {
+  id: string;
+  empresa_id: string;
+  paquete_id: string;
+  valor: number;
+  empresa?: { nombre: string };
+}
+
 const Examenes = () => {
   useAuth(); // Protect route
   const [examenes, setExamenes] = useState<Examen[]>([]);
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [paquetes, setPaquetes] = useState<Paquete[]>([]);
+  const [documentos, setDocumentos] = useState<DocumentoFormulario[]>([]);
+  const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [openExamenDialog, setOpenExamenDialog] = useState(false);
   const [openPaqueteDialog, setOpenPaqueteDialog] = useState(false);
   const [examenToDelete, setExamenToDelete] = useState<string | null>(null);
@@ -61,6 +82,9 @@ const Examenes = () => {
   const [editingPaquete, setEditingPaquete] = useState<Paquete | null>(null);
   const [selectedBoxes, setSelectedBoxes] = useState<string[]>([]);
   const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
+  const [selectedDocumentos, setSelectedDocumentos] = useState<string[]>([]);
+  const [empresaPrecios, setEmpresaPrecios] = useState<Record<string, string>>({});
+  const [paqueteDialogTab, setPaqueteDialogTab] = useState("examenes");
   const [formData, setFormData] = useState({
     nombre: "",
     descripcion: "",
@@ -77,7 +101,69 @@ const Examenes = () => {
     loadExamenes();
     loadBoxes();
     loadPaquetes();
+    loadDocumentos();
+    loadEmpresas();
   }, []);
+
+  const loadDocumentos = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("documentos_formularios")
+        .select("id, nombre, tipo")
+        .order("nombre");
+
+      if (error) throw error;
+      setDocumentos(data || []);
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
+
+  const loadEmpresas = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("empresas")
+        .select("id, nombre")
+        .order("nombre");
+
+      if (error) throw error;
+      setEmpresas(data || []);
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
+
+  const loadPaqueteDocumentos = async (paqueteId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("bateria_documentos")
+        .select("documento_id")
+        .eq("paquete_id", paqueteId);
+
+      if (error) throw error;
+      setSelectedDocumentos(data?.map(d => d.documento_id) || []);
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
+
+  const loadPaquetePrecios = async (paqueteId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("empresa_baterias")
+        .select("empresa_id, valor")
+        .eq("paquete_id", paqueteId);
+
+      if (error) throw error;
+      const precios: Record<string, string> = {};
+      data?.forEach(eb => {
+        precios[eb.empresa_id] = eb.valor?.toString() || "";
+      });
+      setEmpresaPrecios(precios);
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
 
   const loadExamenes = async () => {
     try {
@@ -219,7 +305,11 @@ const Examenes = () => {
     }
 
     try {
+      let paqueteId: string;
+      
       if (editingPaquete) {
+        paqueteId = editingPaquete.id;
+        
         const { error: paqueteError } = await supabase
           .from("paquetes_examenes")
           .update({
@@ -230,25 +320,23 @@ const Examenes = () => {
 
         if (paqueteError) throw paqueteError;
 
-        // Eliminar asociaciones anteriores
+        // Eliminar asociaciones anteriores de exámenes
         await supabase
           .from("paquete_examen_items")
           .delete()
           .eq("paquete_id", editingPaquete.id);
 
-        // Crear nuevas asociaciones
-        const paqueteExamenesData = selectedExamenes.map(examenId => ({
-          paquete_id: editingPaquete.id,
-          examen_id: examenId,
-        }));
+        // Eliminar asociaciones anteriores de documentos
+        await supabase
+          .from("bateria_documentos")
+          .delete()
+          .eq("paquete_id", editingPaquete.id);
 
-        const { error: itemsError } = await supabase
-          .from("paquete_examen_items")
-          .insert(paqueteExamenesData);
-
-        if (itemsError) throw itemsError;
-        
-        toast.success("Paquete actualizado exitosamente");
+        // Eliminar precios anteriores
+        await supabase
+          .from("empresa_baterias")
+          .delete()
+          .eq("paquete_id", editingPaquete.id);
       } else {
         const { data: paqueteData, error: paqueteError } = await supabase
           .from("paquetes_examenes")
@@ -262,26 +350,62 @@ const Examenes = () => {
           .single();
 
         if (paqueteError) throw paqueteError;
+        paqueteId = paqueteData.id;
+      }
 
-        // Asociar exámenes al paquete
-        const paqueteExamenesData = selectedExamenes.map(examenId => ({
-          paquete_id: paqueteData.id,
-          examen_id: examenId,
+      // Asociar exámenes al paquete
+      const paqueteExamenesData = selectedExamenes.map(examenId => ({
+        paquete_id: paqueteId,
+        examen_id: examenId,
+      }));
+
+      const { error: itemsError } = await supabase
+        .from("paquete_examen_items")
+        .insert(paqueteExamenesData);
+
+      if (itemsError) throw itemsError;
+
+      // Asociar documentos al paquete
+      if (selectedDocumentos.length > 0) {
+        const bateriaDocumentosData = selectedDocumentos.map((docId, idx) => ({
+          paquete_id: paqueteId,
+          documento_id: docId,
+          orden: idx,
         }));
 
-        const { error: itemsError } = await supabase
-          .from("paquete_examen_items")
-          .insert(paqueteExamenesData);
+        const { error: docsError } = await supabase
+          .from("bateria_documentos")
+          .insert(bateriaDocumentosData);
 
-        if (itemsError) throw itemsError;
-        
-        toast.success("Paquete de exámenes creado exitosamente");
+        if (docsError) throw docsError;
       }
+
+      // Guardar precios por empresa
+      const preciosData = Object.entries(empresaPrecios)
+        .filter(([_, valor]) => valor && parseFloat(valor) > 0)
+        .map(([empresaId, valor]) => ({
+          paquete_id: paqueteId,
+          empresa_id: empresaId,
+          valor: parseFloat(valor),
+        }));
+
+      if (preciosData.length > 0) {
+        const { error: preciosError } = await supabase
+          .from("empresa_baterias")
+          .insert(preciosData);
+
+        if (preciosError) throw preciosError;
+      }
+      
+      toast.success(editingPaquete ? "Paquete actualizado exitosamente" : "Paquete de exámenes creado exitosamente");
       
       setOpenPaqueteDialog(false);
       setEditingPaquete(null);
       setPaqueteFormData({ nombre: "", descripcion: "" });
       setSelectedExamenes([]);
+      setSelectedDocumentos([]);
+      setEmpresaPrecios({});
+      setPaqueteDialogTab("examenes");
       loadPaquetes();
     } catch (error: any) {
       console.error("Error:", error);
@@ -446,6 +570,9 @@ const Examenes = () => {
                 setEditingPaquete(null);
                 setPaqueteFormData({ nombre: "", descripcion: "" });
                 setSelectedExamenes([]);
+                setSelectedDocumentos([]);
+                setEmpresaPrecios({});
+                setPaqueteDialogTab("examenes");
               }
             }}>
               <DialogTrigger asChild>
@@ -454,52 +581,147 @@ const Examenes = () => {
                   Nuevo Paquete
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>{editingPaquete ? "Editar Paquete" : "Crear Paquete de Exámenes"}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handlePaqueteSubmit} className="space-y-4">
-                  <div>
-                    <Label htmlFor="paquete-nombre">Nombre del Paquete *</Label>
-                    <Input
-                      id="paquete-nombre"
-                      required
-                      value={paqueteFormData.nombre}
-                      onChange={(e) => setPaqueteFormData({ ...paqueteFormData, nombre: e.target.value })}
-                      placeholder="Ej: Examen Pre-ocupacional Completo"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="paquete-descripcion">Descripción</Label>
-                    <Textarea
-                      id="paquete-descripcion"
-                      value={paqueteFormData.descripcion}
-                      onChange={(e) => setPaqueteFormData({ ...paqueteFormData, descripcion: e.target.value })}
-                      placeholder="Descripción del paquete"
-                    />
-                  </div>
-                  <div>
-                    <Label>Exámenes incluidos *</Label>
-                    <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2">
-                      {examenes.map((examen) => (
-                        <label key={examen.id} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedExamenes.includes(examen.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedExamenes([...selectedExamenes, examen.id]);
-                              } else {
-                                setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
-                              }
-                            }}
-                            className="w-4 h-4"
-                          />
-                          <span className="text-sm">{examen.nombre}</span>
-                        </label>
-                      ))}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="paquete-nombre">Nombre del Paquete *</Label>
+                      <Input
+                        id="paquete-nombre"
+                        required
+                        value={paqueteFormData.nombre}
+                        onChange={(e) => setPaqueteFormData({ ...paqueteFormData, nombre: e.target.value })}
+                        placeholder="Ej: Examen Pre-ocupacional Completo"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="paquete-descripcion">Descripción</Label>
+                      <Input
+                        id="paquete-descripcion"
+                        value={paqueteFormData.descripcion}
+                        onChange={(e) => setPaqueteFormData({ ...paqueteFormData, descripcion: e.target.value })}
+                        placeholder="Descripción del paquete"
+                      />
                     </div>
                   </div>
+                  
+                  <Tabs value={paqueteDialogTab} onValueChange={setPaqueteDialogTab} className="w-full">
+                    <TabsList className="grid w-full grid-cols-3">
+                      <TabsTrigger value="examenes" className="gap-2">
+                        <ClipboardList className="h-4 w-4" />
+                        Exámenes
+                      </TabsTrigger>
+                      <TabsTrigger value="documentos" className="gap-2">
+                        <FileText className="h-4 w-4" />
+                        Documentos
+                      </TabsTrigger>
+                      <TabsTrigger value="precios" className="gap-2">
+                        <DollarSign className="h-4 w-4" />
+                        Precios
+                      </TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="examenes" className="mt-4">
+                      <Label>Exámenes incluidos *</Label>
+                      <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2 mt-2">
+                        {examenes.map((examen) => (
+                          <label key={examen.id} className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedExamenes.includes(examen.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedExamenes([...selectedExamenes, examen.id]);
+                                } else {
+                                  setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
+                                }
+                              }}
+                              className="w-4 h-4"
+                            />
+                            <span className="text-sm">{examen.nombre}</span>
+                            {examen.costo_neto && examen.costo_neto > 0 && (
+                              <span className="text-xs text-muted-foreground ml-auto">
+                                ${examen.costo_neto.toLocaleString()}
+                              </span>
+                            )}
+                          </label>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {selectedExamenes.length} exámenes seleccionados
+                      </p>
+                    </TabsContent>
+                    
+                    <TabsContent value="documentos" className="mt-4">
+                      <Label>Documentos requeridos</Label>
+                      <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2 mt-2">
+                        {documentos.length === 0 ? (
+                          <p className="text-sm text-muted-foreground text-center py-4">
+                            No hay documentos creados. Crea documentos en el módulo Documentos.
+                          </p>
+                        ) : (
+                          documentos.map((doc) => (
+                            <label key={doc.id} className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={selectedDocumentos.includes(doc.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedDocumentos([...selectedDocumentos, doc.id]);
+                                  } else {
+                                    setSelectedDocumentos(selectedDocumentos.filter(id => id !== doc.id));
+                                  }
+                                }}
+                                className="w-4 h-4"
+                              />
+                              <span className="text-sm">{doc.nombre}</span>
+                              <span className="text-xs text-muted-foreground ml-auto capitalize">
+                                {doc.tipo}
+                              </span>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {selectedDocumentos.length} documentos seleccionados
+                      </p>
+                    </TabsContent>
+                    
+                    <TabsContent value="precios" className="mt-4">
+                      <Label>Precios por Empresa</Label>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Define precios específicos para cada empresa. Dejar vacío para usar precio estándar.
+                      </p>
+                      <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-3 mt-2">
+                        {empresas.map((empresa) => (
+                          <div key={empresa.id} className="flex items-center gap-3">
+                            <span className="text-sm flex-1 truncate">{empresa.nombre}</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm text-muted-foreground">$</span>
+                              <Input
+                                type="number"
+                                step="any"
+                                value={empresaPrecios[empresa.id] || ""}
+                                onChange={(e) => setEmpresaPrecios({
+                                  ...empresaPrecios,
+                                  [empresa.id]: e.target.value
+                                })}
+                                placeholder="0"
+                                className="w-28 h-8"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {Object.values(empresaPrecios).filter(v => v && parseFloat(v) > 0).length} empresas con precio específico
+                      </p>
+                    </TabsContent>
+                  </Tabs>
+                  
                   <Button type="submit" className="w-full">
                     {editingPaquete ? "Actualizar Paquete" : "Crear Paquete"}
                   </Button>
@@ -591,13 +813,17 @@ const Examenes = () => {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => {
+                          onClick={async () => {
                             setEditingPaquete(paquete);
                             setPaqueteFormData({
                               nombre: paquete.nombre,
                               descripcion: paquete.descripcion || "",
                             });
                             setSelectedExamenes(paquete.paquete_examen_items.map(item => item.examen_id));
+                            await Promise.all([
+                              loadPaqueteDocumentos(paquete.id),
+                              loadPaquetePrecios(paquete.id)
+                            ]);
                             setOpenPaqueteDialog(true);
                           }}
                         >
