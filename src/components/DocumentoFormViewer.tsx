@@ -392,8 +392,8 @@ export const DocumentoFormViewer = ({
                   }
                 }}
                 width={300}
-                height={100}
-                className="w-full h-24 cursor-crosshair touch-none"
+                height={130}
+                className="w-full h-32 cursor-crosshair touch-none"
                 onMouseDown={(e) => startDrawing(e, campo.id)}
                 onMouseMove={(e) => draw(e, campo.id)}
                 onMouseUp={() => stopDrawing(campo.id)}
