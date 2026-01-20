@@ -72,6 +72,23 @@ const getOpcionesArray = (opciones: unknown): string[] => {
   return [];
 };
 
+// Calculate age from birth date
+const calculateAge = (birthDateStr?: string): string => {
+  if (!birthDateStr) return "[Sin edad]";
+  try {
+    const birthDate = new Date(birthDateStr);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return `${age} años`;
+  } catch {
+    return "[Sin edad]";
+  }
+};
+
 // Replace variables in text with actual values
 const replaceVariables = (text: string, context?: DocumentoContextData): string => {
   if (!context) return text;
@@ -83,6 +100,7 @@ const replaceVariables = (text: string, context?: DocumentoContextData): string 
     result = result.replace(/\{\{nombre\}\}/g, context.paciente.nombre || "[Sin nombre]");
     result = result.replace(/\{\{rut\}\}/g, context.paciente.rut || "[Sin RUT]");
     result = result.replace(/\{\{fecha_nacimiento\}\}/g, context.paciente.fecha_nacimiento || "[Sin fecha]");
+    result = result.replace(/\{\{edad\}\}/g, calculateAge(context.paciente.fecha_nacimiento));
     result = result.replace(/\{\{email\}\}/g, context.paciente.email || "[Sin email]");
     result = result.replace(/\{\{telefono\}\}/g, context.paciente.telefono || "[Sin teléfono]");
     result = result.replace(/\{\{direccion\}\}/g, context.paciente.direccion || "[Sin dirección]");
