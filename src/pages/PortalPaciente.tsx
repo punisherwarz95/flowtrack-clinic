@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import portalBackground from "@/assets/portal-background.jpeg";
 
-// Portal Paciente v0.0.7 - RUT formato estándar 00.000.000-0
-// Cambios: Estandarización de formato RUT en BD, búsqueda simplificada
-const PORTAL_VERSION = "0.0.7";
+// Portal Paciente v0.0.8 - Integración de documentos requeridos
+// Cambios: Documentos de baterías visibles y completables por el paciente
+const PORTAL_VERSION = "0.0.8";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
-import { Loader2, ExternalLink, CheckCircle2, Clock, Building2, FileText, AlertCircle, X, RefreshCw, ChevronDown, CalendarIcon } from "lucide-react";
+import { Loader2, ExternalLink, CheckCircle2, Clock, Building2, FileText, AlertCircle, X, RefreshCw, ChevronDown, CalendarIcon, ClipboardList } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { format, parse, isValid } from "date-fns";
@@ -20,6 +20,8 @@ import { es } from "date-fns/locale";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn, formatRutStandard, normalizeRut as normalizeRutUtil } from "@/lib/utils";
+import { useAtencionDocumentos } from "@/hooks/useAtencionDocumentos";
+import { DocumentoFormViewer, DocumentoStatusCard } from "@/components/DocumentoFormViewer";
 
 interface Paciente {
   id: string;
@@ -92,6 +94,19 @@ export default function PortalPaciente() {
   const [testModalOpen, setTestModalOpen] = useState(false);
   const [currentTest, setCurrentTest] = useState<ExamenTest | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Documentos del paciente
+  const [selectedDocumentoIndex, setSelectedDocumentoIndex] = useState<number | null>(null);
+  const [documentoDialogOpen, setDocumentoDialogOpen] = useState(false);
+  
+  // Hook para documentos de la atención
+  const { 
+    documentos: atencionDocumentos, 
+    campos: documentoCampos, 
+    reload: reloadDocumentos,
+    pendingCount: documentosPendientes,
+    totalCount: documentosTotal
+  } = useAtencionDocumentos(atencion?.id || null);
   
   // Lista de ciudades de Chile para validación
   const ciudadesChile = [
@@ -1420,8 +1435,8 @@ export default function PortalPaciente() {
             
             {/* No company warning */}
             {!empresa && (
-              <div className="mt-3 p-2 rounded bg-amber-500/10 border border-amber-500/30">
-                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 text-sm">
+              <div className="mt-3 p-2 rounded bg-warning/10 border border-warning/30">
+                <div className="flex items-center gap-2 text-warning text-sm">
                   <AlertCircle className="h-4 w-4" />
                   <span>Esperando asignación de empresa por recepción</span>
                 </div>
@@ -1440,13 +1455,45 @@ export default function PortalPaciente() {
           </CardContent>
         </Card>
 
+        {/* Documentos requeridos */}
+        {atencionDocumentos.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <ClipboardList className="h-5 w-5" />
+                Documentos a Completar
+                {documentosPendientes > 0 && (
+                  <Badge variant="outline" className="ml-2">
+                    {documentosPendientes} pendiente{documentosPendientes > 1 ? "s" : ""}
+                  </Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                Complete los siguientes documentos requeridos para su atención
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {atencionDocumentos.map((doc, index) => (
+                <DocumentoStatusCard
+                  key={doc.id}
+                  atencionDocumento={doc}
+                  onClick={() => {
+                    setSelectedDocumentoIndex(index);
+                    setDocumentoDialogOpen(true);
+                  }}
+                />
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Tests / Forms */}
         {examenTests.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <ExternalLink className="h-5 w-5" />
-                Formularios a Completar
+                Formularios Externos
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -1459,7 +1506,7 @@ export default function PortalPaciente() {
                 >
                   <span>{test.nombre}</span>
                   {isTestCompleted(test.id) ? (
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
                   ) : (
                     <ExternalLink className="h-4 w-4" />
                   )}
@@ -1521,7 +1568,24 @@ export default function PortalPaciente() {
         </DialogContent>
       </Dialog>
 
-      {/* Indicador de versión - v0.0.5 */}
+      {/* Documento Modal */}
+      <Dialog open={documentoDialogOpen} onOpenChange={setDocumentoDialogOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          {selectedDocumentoIndex !== null && atencionDocumentos[selectedDocumentoIndex] && (
+            <DocumentoFormViewer
+              atencionDocumento={atencionDocumentos[selectedDocumentoIndex]}
+              campos={documentoCampos[atencionDocumentos[selectedDocumentoIndex].documento_id] || []}
+              onComplete={() => {
+                reloadDocumentos();
+                setDocumentoDialogOpen(false);
+                setSelectedDocumentoIndex(null);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Indicador de versión */}
       <div className="fixed bottom-2 left-2 text-xs text-muted-foreground/50 select-none pointer-events-none">
         v{PORTAL_VERSION}
       </div>
