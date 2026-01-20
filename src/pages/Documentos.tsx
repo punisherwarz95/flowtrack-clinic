@@ -43,6 +43,7 @@ const TIPOS_DOCUMENTO = [
 ];
 
 const TIPOS_CAMPO = [
+  { value: "texto_informativo", label: "📄 Texto informativo (solo lectura)" },
   { value: "texto", label: "Texto corto" },
   { value: "texto_largo", label: "Texto largo" },
   { value: "checkbox", label: "Casilla de verificación" },
@@ -348,6 +349,12 @@ const Documentos = () => {
 
   const renderPreviewCampo = (campo: DocumentoCampo) => {
     switch (campo.tipo_campo) {
+      case "texto_informativo":
+        return (
+          <div className="bg-muted/50 border rounded-md p-4 text-sm text-foreground whitespace-pre-wrap">
+            {campo.etiqueta}
+          </div>
+        );
       case "texto":
         return <Input placeholder={campo.etiqueta} disabled />;
       case "texto_largo":
@@ -618,15 +625,6 @@ const Documentos = () => {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="campoEtiqueta">Etiqueta del campo *</Label>
-              <Input 
-                id="campoEtiqueta" 
-                value={campoEtiqueta} 
-                onChange={(e) => setCampoEtiqueta(e.target.value)} 
-                placeholder="Ej: ¿Acepta los términos?"
-              />
-            </div>
-            <div>
               <Label htmlFor="campoTipo">Tipo de campo</Label>
               <Select value={campoTipo} onValueChange={setCampoTipo}>
                 <SelectTrigger>
@@ -638,6 +636,33 @@ const Documentos = () => {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <Label htmlFor="campoEtiqueta">
+                {campoTipo === "texto_informativo" ? "Texto a mostrar *" : "Etiqueta del campo *"}
+              </Label>
+              {campoTipo === "texto_informativo" ? (
+                <Textarea 
+                  id="campoEtiqueta" 
+                  value={campoEtiqueta} 
+                  onChange={(e) => setCampoEtiqueta(e.target.value)} 
+                  placeholder="Escriba aquí el texto informativo, instrucciones o consentimiento que el paciente debe leer antes de firmar..."
+                  rows={8}
+                  className="resize-y"
+                />
+              ) : (
+                <Input 
+                  id="campoEtiqueta" 
+                  value={campoEtiqueta} 
+                  onChange={(e) => setCampoEtiqueta(e.target.value)} 
+                  placeholder="Ej: ¿Acepta los términos?"
+                />
+              )}
+              {campoTipo === "texto_informativo" && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Este texto se mostrará al paciente como información de solo lectura.
+                </p>
+              )}
             </div>
             {(campoTipo === "select" || campoTipo === "radio") && (
               <div>
@@ -651,10 +676,12 @@ const Documentos = () => {
                 />
               </div>
             )}
-            <div className="flex items-center gap-2">
-              <Switch checked={campoRequerido} onCheckedChange={setCampoRequerido} id="campoRequerido" />
-              <Label htmlFor="campoRequerido">Campo requerido</Label>
-            </div>
+            {campoTipo !== "texto_informativo" && (
+              <div className="flex items-center gap-2">
+                <Switch checked={campoRequerido} onCheckedChange={setCampoRequerido} id="campoRequerido" />
+                <Label htmlFor="campoRequerido">Campo requerido</Label>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCampoDialogOpen(false)}>Cancelar</Button>
