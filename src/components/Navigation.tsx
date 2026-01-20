@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Activity, Users, Box, ClipboardList, LayoutDashboard, Building2, CheckCircle, AlertCircle, UserCog, LogOut, Moon, Sun, FileText, UserCheck } from "lucide-react";
+import { Activity, Users, Box, ClipboardList, LayoutDashboard, Building2, CheckCircle, AlertCircle, UserCog, LogOut, Moon, Sun, FileText, UserCheck, FileEdit } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
@@ -23,6 +23,7 @@ const Navigation = () => {
     { to: "/examenes", icon: ClipboardList, label: "Exámenes" },
     { to: "/cotizaciones", icon: FileText, label: "Cotizaciones" },
     { to: "/prestadores", icon: UserCheck, label: "Prestadores" },
+    { to: "/documentos", icon: FileEdit, label: "Documentos" },
     { to: "/usuarios", icon: UserCog, label: "Usuarios" },
   ];
 
