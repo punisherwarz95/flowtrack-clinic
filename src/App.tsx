@@ -17,6 +17,7 @@ import Boxes from "./pages/Boxes";
 import Examenes from "./pages/Examenes";
 import Cotizaciones from "./pages/Cotizaciones";
 import Prestadores from "./pages/Prestadores";
+import Documentos from "./pages/Documentos";
 import BoxView from "./pages/BoxView";
 import Usuarios from "./pages/Usuarios";
 import PortalPaciente from "./pages/PortalPaciente";
@@ -49,6 +50,7 @@ const App = () => (
             <Route path="/examenes" element={<ProtectedRoute path="/examenes"><Examenes /></ProtectedRoute>} />
             <Route path="/cotizaciones" element={<ProtectedRoute path="/cotizaciones"><Cotizaciones /></ProtectedRoute>} />
             <Route path="/prestadores" element={<ProtectedRoute path="/prestadores"><Prestadores /></ProtectedRoute>} />
+            <Route path="/documentos" element={<ProtectedRoute path="/documentos"><Documentos /></ProtectedRoute>} />
             <Route path="/usuarios" element={<ProtectedRoute path="/usuarios"><Usuarios /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
