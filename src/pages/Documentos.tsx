@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import Navigation from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
@@ -108,6 +108,9 @@ const Documentos = () => {
   
   // Expanded cards
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  
+  // Ref for textarea cursor position
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     loadDocumentos();
@@ -693,7 +696,23 @@ const Documentos = () => {
                                   variant="secondary"
                                   size="sm"
                                   className="h-6 text-xs"
-                                  onClick={() => setCampoEtiqueta(prev => prev + v.value)}
+                                  onClick={() => {
+                                    const textarea = textareaRef.current;
+                                    if (textarea) {
+                                      const start = textarea.selectionStart;
+                                      const end = textarea.selectionEnd;
+                                      const newValue = campoEtiqueta.substring(0, start) + v.value + campoEtiqueta.substring(end);
+                                      setCampoEtiqueta(newValue);
+                                      // Restore cursor position after insertion
+                                      setTimeout(() => {
+                                        textarea.focus();
+                                        const newCursorPos = start + v.value.length;
+                                        textarea.setSelectionRange(newCursorPos, newCursorPos);
+                                      }, 0);
+                                    } else {
+                                      setCampoEtiqueta(prev => prev + v.value);
+                                    }
+                                  }}
                                 >
                                   {v.label}
                                 </Button>
@@ -708,6 +727,7 @@ const Documentos = () => {
               </div>
               {campoTipo === "texto_informativo" ? (
                 <Textarea 
+                  ref={textareaRef}
                   id="campoEtiqueta" 
                   value={campoEtiqueta} 
                   onChange={(e) => setCampoEtiqueta(e.target.value)} 
