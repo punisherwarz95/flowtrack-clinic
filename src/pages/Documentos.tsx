@@ -649,7 +649,7 @@ const Documentos = () => {
 
       {/* Dialog crear/editar campo */}
       <Dialog open={campoDialogOpen} onOpenChange={setCampoDialogOpen}>
-        <DialogContent>
+        <DialogContent className={campoTipo === "texto_informativo" ? "max-w-[60vw] w-[60vw]" : ""}>
           <DialogHeader>
             <DialogTitle>{editingCampo ? "Editar Campo" : "Nuevo Campo"}</DialogTitle>
             <DialogDescription>
