@@ -451,6 +451,11 @@ const Pacientes = () => {
 
           if (examenesError) throw examenesError;
 
+          // FASE 6: Generate documents from selected batteries (also on edit)
+          if (selectedPaquetes.length > 0) {
+            await generateDocuments(atencionData.id, selectedPaquetes);
+          }
+
           // Si la atención estaba completada o incompleta, devolverla a en_espera
           if (atencionData.estado === "completado" || atencionData.estado === "incompleto") {
             const { error: updateError } = await supabase
