@@ -14,8 +14,9 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
-import { Plus, FileText, Edit, Trash2, GripVertical, Eye, Settings, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, FileText, Edit, Trash2, GripVertical, Eye, Settings, ChevronDown, ChevronUp, Variable } from "lucide-react";
 import { GlobalChat } from "@/components/GlobalChat";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface DocumentoFormulario {
   id: string;
@@ -60,6 +61,19 @@ const getOpcionesArray = (opciones: unknown): string[] => {
   }
   return [];
 };
+
+// Variables disponibles para insertar en textos informativos
+const VARIABLES_DISPONIBLES = [
+  { value: "{{nombre}}", label: "Nombre del paciente", category: "Paciente" },
+  { value: "{{rut}}", label: "RUT del paciente", category: "Paciente" },
+  { value: "{{fecha_nacimiento}}", label: "Fecha de nacimiento", category: "Paciente" },
+  { value: "{{email}}", label: "Email del paciente", category: "Paciente" },
+  { value: "{{telefono}}", label: "Teléfono del paciente", category: "Paciente" },
+  { value: "{{direccion}}", label: "Dirección del paciente", category: "Paciente" },
+  { value: "{{empresa}}", label: "Nombre de la empresa", category: "Empresa" },
+  { value: "{{fecha_actual}}", label: "Fecha actual", category: "Sistema" },
+  { value: "{{numero_ingreso}}", label: "Número de ingreso", category: "Atención" },
+];
 
 const Documentos = () => {
   const [documentos, setDocumentos] = useState<DocumentoFormulario[]>([]);
@@ -347,12 +361,26 @@ const Documentos = () => {
     return TIPOS_CAMPO.find(t => t.value === tipo)?.label || tipo;
   };
 
+  // Preview sample data for variable replacement
+  const previewSampleData = (text: string): string => {
+    return text
+      .replace(/\{\{nombre\}\}/g, "Juan Pérez González")
+      .replace(/\{\{rut\}\}/g, "12.345.678-9")
+      .replace(/\{\{fecha_nacimiento\}\}/g, "15/03/1985")
+      .replace(/\{\{email\}\}/g, "juan.perez@email.com")
+      .replace(/\{\{telefono\}\}/g, "+56 9 1234 5678")
+      .replace(/\{\{direccion\}\}/g, "Av. Principal 123, Santiago")
+      .replace(/\{\{empresa\}\}/g, "Empresa Ejemplo S.A.")
+      .replace(/\{\{numero_ingreso\}\}/g, "42")
+      .replace(/\{\{fecha_actual\}\}/g, new Date().toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' }));
+  };
+
   const renderPreviewCampo = (campo: DocumentoCampo) => {
     switch (campo.tipo_campo) {
       case "texto_informativo":
         return (
           <div className="bg-muted/50 border rounded-md p-4 text-sm text-foreground whitespace-pre-wrap">
-            {campo.etiqueta}
+            {previewSampleData(campo.etiqueta)}
           </div>
         );
       case "texto":
@@ -638,17 +666,54 @@ const Documentos = () => {
               </Select>
             </div>
             <div>
-              <Label htmlFor="campoEtiqueta">
-                {campoTipo === "texto_informativo" ? "Texto a mostrar *" : "Etiqueta del campo *"}
-              </Label>
+              <div className="flex items-center justify-between mb-1">
+                <Label htmlFor="campoEtiqueta">
+                  {campoTipo === "texto_informativo" ? "Texto a mostrar *" : "Etiqueta del campo *"}
+                </Label>
+                {campoTipo === "texto_informativo" && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-7 gap-1">
+                        <Variable className="h-3 w-3" />
+                        Insertar variable
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-72 p-2" align="end">
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground px-2">
+                          Click para insertar en el texto:
+                        </p>
+                        {["Paciente", "Empresa", "Atención", "Sistema"].map((category) => (
+                          <div key={category}>
+                            <p className="text-xs font-semibold text-foreground px-2 py-1">{category}</p>
+                            <div className="flex flex-wrap gap-1 px-1">
+                              {VARIABLES_DISPONIBLES.filter(v => v.category === category).map((v) => (
+                                <Button
+                                  key={v.value}
+                                  variant="secondary"
+                                  size="sm"
+                                  className="h-6 text-xs"
+                                  onClick={() => setCampoEtiqueta(prev => prev + v.value)}
+                                >
+                                  {v.label}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                )}
+              </div>
               {campoTipo === "texto_informativo" ? (
                 <Textarea 
                   id="campoEtiqueta" 
                   value={campoEtiqueta} 
                   onChange={(e) => setCampoEtiqueta(e.target.value)} 
-                  placeholder="Escriba aquí el texto informativo, instrucciones o consentimiento que el paciente debe leer antes de firmar..."
+                  placeholder="Yo, {{nombre}}, con RUT {{rut}}, declaro que..."
                   rows={8}
-                  className="resize-y"
+                  className="resize-y font-mono text-sm"
                 />
               ) : (
                 <Input 
@@ -660,7 +725,7 @@ const Documentos = () => {
               )}
               {campoTipo === "texto_informativo" && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Este texto se mostrará al paciente como información de solo lectura.
+                  Use variables como <code className="bg-muted px-1 rounded">{"{{nombre}}"}</code> para insertar datos del paciente automáticamente.
                 </p>
               )}
             </div>

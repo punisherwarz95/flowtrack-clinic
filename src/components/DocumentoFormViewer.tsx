@@ -41,12 +41,27 @@ interface AtencionDocumento {
   };
 }
 
+// Context data for variable replacement
+export interface DocumentoContextData {
+  paciente?: {
+    nombre?: string;
+    rut?: string;
+    fecha_nacimiento?: string;
+    email?: string;
+    telefono?: string;
+    direccion?: string;
+  };
+  empresa?: string;
+  numero_ingreso?: number;
+}
+
 interface DocumentoFormViewerProps {
   atencionDocumento: AtencionDocumento;
   campos: DocumentoCampo[];
   readonly?: boolean;
   onComplete?: () => void;
   showHeader?: boolean;
+  contextData?: DocumentoContextData;
 }
 
 // Helper to safely get opciones as string array
@@ -57,12 +72,47 @@ const getOpcionesArray = (opciones: unknown): string[] => {
   return [];
 };
 
+// Replace variables in text with actual values
+const replaceVariables = (text: string, context?: DocumentoContextData): string => {
+  if (!context) return text;
+  
+  let result = text;
+  
+  // Patient variables
+  if (context.paciente) {
+    result = result.replace(/\{\{nombre\}\}/g, context.paciente.nombre || "[Sin nombre]");
+    result = result.replace(/\{\{rut\}\}/g, context.paciente.rut || "[Sin RUT]");
+    result = result.replace(/\{\{fecha_nacimiento\}\}/g, context.paciente.fecha_nacimiento || "[Sin fecha]");
+    result = result.replace(/\{\{email\}\}/g, context.paciente.email || "[Sin email]");
+    result = result.replace(/\{\{telefono\}\}/g, context.paciente.telefono || "[Sin teléfono]");
+    result = result.replace(/\{\{direccion\}\}/g, context.paciente.direccion || "[Sin dirección]");
+  }
+  
+  // Company variable
+  result = result.replace(/\{\{empresa\}\}/g, context.empresa || "[Sin empresa]");
+  
+  // Attention variables
+  result = result.replace(/\{\{numero_ingreso\}\}/g, context.numero_ingreso?.toString() || "[Sin número]");
+  
+  // System variables
+  const today = new Date();
+  const formattedDate = today.toLocaleDateString('es-CL', { 
+    day: '2-digit', 
+    month: 'long', 
+    year: 'numeric' 
+  });
+  result = result.replace(/\{\{fecha_actual\}\}/g, formattedDate);
+  
+  return result;
+};
+
 export const DocumentoFormViewer = ({
   atencionDocumento,
   campos,
   readonly = false,
   onComplete,
   showHeader = true,
+  contextData,
 }: DocumentoFormViewerProps) => {
   const [respuestas, setRespuestas] = useState<Record<string, unknown>>(
     atencionDocumento.respuestas || {}
@@ -199,7 +249,7 @@ export const DocumentoFormViewer = ({
       case "texto_informativo":
         return (
           <div className="bg-muted/50 border rounded-md p-4 text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-            {campo.etiqueta}
+            {replaceVariables(campo.etiqueta, contextData)}
           </div>
         );
 

@@ -21,7 +21,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { cn, formatRutStandard, normalizeRut as normalizeRutUtil } from "@/lib/utils";
 import { useAtencionDocumentos } from "@/hooks/useAtencionDocumentos";
-import { DocumentoFormViewer, DocumentoStatusCard } from "@/components/DocumentoFormViewer";
+import { DocumentoFormViewer, DocumentoStatusCard, DocumentoContextData } from "@/components/DocumentoFormViewer";
 
 interface Paciente {
   id: string;
@@ -1579,6 +1579,18 @@ export default function PortalPaciente() {
                 reloadDocumentos();
                 setDocumentoDialogOpen(false);
                 setSelectedDocumentoIndex(null);
+              }}
+              contextData={{
+                paciente: paciente ? {
+                  nombre: paciente.nombre,
+                  rut: paciente.rut || undefined,
+                  fecha_nacimiento: paciente.fecha_nacimiento || undefined,
+                  email: paciente.email || undefined,
+                  telefono: paciente.telefono || undefined,
+                  direccion: paciente.direccion || undefined,
+                } : undefined,
+                empresa: empresa?.nombre,
+                numero_ingreso: atencion?.numero_ingreso || undefined,
               }}
             />
           )}
