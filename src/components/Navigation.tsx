@@ -50,7 +50,7 @@ const Navigation = () => {
             </Button>
           </div>
           
-          <div className="flex gap-1 flex-1">
+          <div className="flex flex-wrap gap-1 flex-1">
             {links.map((link) => {
               const Icon = link.icon;
               const isActive = location.pathname === link.to;
