@@ -16,7 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { GlobalChat } from "@/components/GlobalChat";
 import { useAtencionDocumentos } from "@/hooks/useAtencionDocumentos";
-import { DocumentoFormViewer } from "@/components/DocumentoFormViewer";
+import { DocumentoFormViewer, DocumentoContextData } from "@/components/DocumentoFormViewer";
 
 interface Atencion {
   id: string;
@@ -30,6 +30,14 @@ interface Atencion {
     nombre: string;
     rut: string;
     tipo_servicio: string;
+    fecha_nacimiento?: string | null;
+    email?: string | null;
+    telefono?: string | null;
+    direccion?: string | null;
+    empresa_id?: string | null;
+    empresas?: {
+      nombre: string;
+    } | null;
   };
 }
 
@@ -37,6 +45,9 @@ interface AtencionConExamenes extends Atencion {
   examenesRealizados?: string[];
   examenesPendientes?: string[];
 }
+
+// Constante para la query de paciente con todos los campos
+const PACIENTE_SELECT = "*, pacientes(id, nombre, rut, tipo_servicio, fecha_nacimiento, email, telefono, direccion, empresa_id, empresas(nombre))";
 
 interface AtencionExamen {
   id: string;
@@ -82,6 +93,7 @@ const MiBox = () => {
   // Estados para documentos
   const [documentosDialogOpen, setDocumentosDialogOpen] = useState(false);
   const [selectedAtencionForDocs, setSelectedAtencionForDocs] = useState<string | null>(null);
+  const [selectedPacienteContext, setSelectedPacienteContext] = useState<DocumentoContextData | undefined>(undefined);
   
   // Hook para documentos de la atención seleccionada
   const { 
@@ -156,7 +168,7 @@ const MiBox = () => {
       // 1. Pacientes actualmente en atención en este box
       const { data: enAtencionData, error: enAtencionError } = await supabase
         .from("atenciones")
-        .select("*, pacientes(id, nombre, rut, tipo_servicio)")
+        .select(PACIENTE_SELECT)
         .eq("estado", "en_atencion")
         .eq("box_id", selectedBoxId)
         .gte("fecha_ingreso", startOfDay.toISOString())
@@ -171,7 +183,7 @@ const MiBox = () => {
         // Obtener atenciones en_espera de hoy
         const { data: esperaData, error: esperaError } = await supabase
           .from("atenciones")
-          .select("*, pacientes(id, nombre, rut, tipo_servicio)")
+          .select(PACIENTE_SELECT)
           .eq("estado", "en_espera")
           .gte("fecha_ingreso", startOfDay.toISOString())
           .lte("fecha_ingreso", endOfDay.toISOString())
@@ -735,6 +747,18 @@ const MiBox = () => {
                       className="w-full"
                       onClick={() => {
                         setSelectedAtencionForDocs(paciente.id);
+                        setSelectedPacienteContext({
+                          paciente: {
+                            nombre: paciente.pacientes.nombre,
+                            rut: paciente.pacientes.rut || undefined,
+                            fecha_nacimiento: paciente.pacientes.fecha_nacimiento || undefined,
+                            email: paciente.pacientes.email || undefined,
+                            telefono: paciente.pacientes.telefono || undefined,
+                            direccion: paciente.pacientes.direccion || undefined,
+                          },
+                          empresa: paciente.pacientes.empresas?.nombre,
+                          numero_ingreso: paciente.numero_ingreso,
+                        });
                         setDocumentosDialogOpen(true);
                       }}
                     >
@@ -850,6 +874,7 @@ const MiBox = () => {
                     campos={documentoCampos[doc.documento_id] || []}
                     readonly
                     onComplete={reloadDocumentos}
+                    contextData={selectedPacienteContext}
                   />
                 ))
               )}
