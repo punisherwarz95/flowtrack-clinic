@@ -5,15 +5,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
-import { Clock, Play, CheckCircle, XCircle, RefreshCw, Box as BoxIcon, Settings } from "lucide-react";
+import { Clock, Play, CheckCircle, XCircle, RefreshCw, Box as BoxIcon, Settings, FileText, ClipboardList } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { GlobalChat } from "@/components/GlobalChat";
+import { useAtencionDocumentos } from "@/hooks/useAtencionDocumentos";
+import { DocumentoFormViewer } from "@/components/DocumentoFormViewer";
 
 interface Atencion {
   id: string;
@@ -75,6 +78,18 @@ const MiBox = () => {
   const [confirmCompletarDialog, setConfirmCompletarDialog] = useState<{open: boolean, atencionId: string | null}>({open: false, atencionId: null});
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showErrorOverlay, setShowErrorOverlay] = useState(false);
+  
+  // Estados para documentos
+  const [documentosDialogOpen, setDocumentosDialogOpen] = useState(false);
+  const [selectedAtencionForDocs, setSelectedAtencionForDocs] = useState<string | null>(null);
+  
+  // Hook para documentos de la atención seleccionada
+  const { 
+    documentos: atencionDocumentos, 
+    campos: documentoCampos, 
+    reload: reloadDocumentos,
+    pendingCount: documentosPendientes 
+  } = useAtencionDocumentos(selectedAtencionForDocs);
 
   // Cargar box guardado al inicio
   useEffect(() => {
@@ -713,6 +728,20 @@ const MiBox = () => {
                       )}
                     </div>
 
+                    {/* Botón para ver documentos */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => {
+                        setSelectedAtencionForDocs(paciente.id);
+                        setDocumentosDialogOpen(true);
+                      }}
+                    >
+                      <ClipboardList className="h-4 w-4 mr-2" />
+                      Ver Documentos
+                    </Button>
+
                     {/* Botones de acción */}
                     <div className="flex gap-2 pt-2 border-t">
                       <Button
@@ -791,6 +820,43 @@ const MiBox = () => {
       
       {/* Chat Global */}
       <GlobalChat />
+
+      {/* Dialog para ver documentos */}
+      <Dialog open={documentosDialogOpen} onOpenChange={setDocumentosDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5" />
+              Documentos del Paciente
+            </DialogTitle>
+            <DialogDescription>
+              {documentosPendientes > 0 
+                ? `${documentosPendientes} documento(s) pendiente(s) de completar`
+                : "Todos los documentos están completos"
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="flex-1 pr-4">
+            <div className="space-y-4">
+              {atencionDocumentos.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  No hay documentos asignados a esta atención
+                </p>
+              ) : (
+                atencionDocumentos.map((doc) => (
+                  <DocumentoFormViewer
+                    key={doc.id}
+                    atencionDocumento={doc}
+                    campos={documentoCampos[doc.documento_id] || []}
+                    readonly
+                    onComplete={reloadDocumentos}
+                  />
+                ))
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
