@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
-import { Play, CheckCircle, XCircle, Calendar as CalendarIcon, FileText, RefreshCw, ChevronDown, Check } from "lucide-react";
+import { Play, CheckCircle, XCircle, Calendar as CalendarIcon, FileText, RefreshCw, ChevronDown, Check, FileWarning } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -74,6 +74,8 @@ const Flujo = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   // Estado local para marcar exámenes antes de guardar
   const [examenesSeleccionados, setExamenesSeleccionados] = useState<{[atencionId: string]: Set<string>}>({});
+  // FASE 7: Document pending counts per atencion
+  const [docsPendientes, setDocsPendientes] = useState<{[atencionId: string]: number}>({});
 
   // OPTIMIZACIÓN v0.0.2: Realtime inteligente - actualiza solo lo necesario
   const handleRealtimeAtencionChange = async (payload: any) => {
@@ -205,11 +207,42 @@ const Flujo = () => {
       await Promise.all([
         loadPendingBoxesOptimized(atencionesRes.data || [], boxesRes.data || []),
         loadAtencionExamenesOptimized(atencionesRes.data || [], boxesRes.data || []),
-        loadExamenesPendientesOptimized(atencionesRes.data || [], examenesRes.data || [])
+        loadExamenesPendientesOptimized(atencionesRes.data || [], examenesRes.data || []),
+        loadDocsPendientesCount(atencionesRes.data || [])
       ]);
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al cargar datos");
+    }
+  };
+
+  // FASE 7: Load pending document counts for all atenciones
+  const loadDocsPendientesCount = async (atencionesData: Atencion[]) => {
+    if (atencionesData.length === 0) {
+      setDocsPendientes({});
+      return;
+    }
+
+    try {
+      const atencionIds = atencionesData.map(a => a.id);
+      
+      const { data: docs, error } = await supabase
+        .from("atencion_documentos")
+        .select("atencion_id, estado")
+        .in("atencion_id", atencionIds)
+        .eq("estado", "pendiente");
+
+      if (error) throw error;
+
+      // Group counts by atencion
+      const counts: {[atencionId: string]: number} = {};
+      (docs || []).forEach(d => {
+        counts[d.atencion_id] = (counts[d.atencion_id] || 0) + 1;
+      });
+
+      setDocsPendientes(counts);
+    } catch (error) {
+      console.error("Error loading docs pendientes:", error);
     }
   };
 
@@ -685,6 +718,13 @@ const Flujo = () => {
                           <Badge variant="outline" className="text-xs">
                             {atencion.pacientes.tipo_servicio === "workmed" ? "WM" : "J"}
                           </Badge>
+                          {/* FASE 7: Document pending indicator */}
+                          {docsPendientes[atencion.id] > 0 && (
+                            <Badge variant="outline" className="text-xs border-warning text-warning gap-1">
+                              <FileWarning className="h-3 w-3" />
+                              {docsPendientes[atencion.id]} docs
+                            </Badge>
+                          )}
                           {atencion.boxes && (
                             <span className="text-xs text-muted-foreground">({atencion.boxes.nombre})</span>
                           )}
@@ -864,6 +904,13 @@ const Flujo = () => {
                           <Badge variant="outline" className="text-xs">
                             {atencion.pacientes.tipo_servicio === "workmed" ? "WM" : "J"}
                           </Badge>
+                          {/* FASE 7: Document pending indicator */}
+                          {docsPendientes[atencion.id] > 0 && (
+                            <Badge variant="outline" className="text-xs border-warning text-warning gap-1">
+                              <FileWarning className="h-3 w-3" />
+                              {docsPendientes[atencion.id]} docs
+                            </Badge>
+                          )}
                         </div>
                         <div className="mt-2">
                           <div className="flex items-center gap-1 mb-1">

@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Trash2, Pencil, Calendar as CalendarIcon, ClipboardList } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Calendar as CalendarIcon, ClipboardList, FileText } from "lucide-react";
+import { useGenerateDocumentosFromBateria } from "@/hooks/useAtencionDocumentos";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
@@ -104,6 +105,9 @@ const Pacientes = () => {
   const [selectedPaquetes, setSelectedPaquetes] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [documentosPendientes, setDocumentosPendientes] = useState<{[patientId: string]: number}>({});
+  
+  const { generateDocuments } = useGenerateDocumentosFromBateria();
   
   // Estado para el diálogo de exámenes completados
   const [examenesCompletadosDialog, setExamenesCompletadosDialog] = useState<{
@@ -136,6 +140,52 @@ const Pacientes = () => {
 
     return () => clearInterval(interval);
   }, [selectedDate]);
+
+  // Load document counts for patients
+  const loadDocumentCounts = async (patientIds: string[]) => {
+    if (patientIds.length === 0) return;
+    
+    try {
+      const dateToUse = selectedDate || new Date();
+      const startOfDay = new Date(new Date(dateToUse).setHours(0, 0, 0, 0)).toISOString();
+      const endOfDay = new Date(new Date(dateToUse).setHours(23, 59, 59, 999)).toISOString();
+
+      // Get atenciones for these patients
+      const { data: atenciones, error: atencionesError } = await supabase
+        .from("atenciones")
+        .select("id, paciente_id")
+        .in("paciente_id", patientIds)
+        .gte("fecha_ingreso", startOfDay)
+        .lte("fecha_ingreso", endOfDay);
+
+      if (atencionesError) throw atencionesError;
+      if (!atenciones || atenciones.length === 0) return;
+
+      const atencionIds = atenciones.map(a => a.id);
+
+      // Get pending documents count
+      const { data: docs, error: docsError } = await supabase
+        .from("atencion_documentos")
+        .select("atencion_id, estado")
+        .in("atencion_id", atencionIds)
+        .eq("estado", "pendiente");
+
+      if (docsError) throw docsError;
+
+      // Map counts to patient IDs
+      const counts: {[patientId: string]: number} = {};
+      atenciones.forEach(a => {
+        const pendingCount = (docs || []).filter(d => d.atencion_id === a.id).length;
+        if (pendingCount > 0) {
+          counts[a.paciente_id] = pendingCount;
+        }
+      });
+
+      setDocumentosPendientes(counts);
+    } catch (error) {
+      console.error("Error loading document counts:", error);
+    }
+  };
 
   // Real-time updates for atenciones table
   useEffect(() => {
@@ -215,6 +265,11 @@ const Pacientes = () => {
       });
 
       setPatients(patientsWithAtenciones);
+      
+      // Load document counts after patients
+      if (pacienteIds.length > 0) {
+        loadDocumentCounts(pacienteIds);
+      }
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al cargar pacientes");
@@ -454,6 +509,11 @@ const Pacientes = () => {
             .insert(examenesData);
 
           if (examenesError) throw examenesError;
+        }
+
+        // FASE 6: Generate documents from selected batteries
+        if (selectedPaquetes.length > 0) {
+          await generateDocuments(atencionData.id, selectedPaquetes);
         }
 
         toast.success("Paciente agregado exitosamente");
@@ -965,6 +1025,13 @@ const Pacientes = () => {
                               {patient.tipo_servicio === 'workmed' ? 'Workmed' : 'Jenner'}
                             </div>
                           </div>
+                          {/* FASE 7: Document pending indicator */}
+                          {documentosPendientes[patient.id] > 0 && (
+                            <Badge variant="outline" className="border-warning text-warning gap-1">
+                              <FileText className="h-3 w-3" />
+                              {documentosPendientes[patient.id]} docs
+                            </Badge>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
