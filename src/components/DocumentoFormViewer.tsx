@@ -196,6 +196,13 @@ export const DocumentoFormViewer = ({
     const isDisabled = readonly || isComplete || isReviewed;
 
     switch (campo.tipo_campo) {
+      case "texto_informativo":
+        return (
+          <div className="bg-muted/50 border rounded-md p-4 text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+            {campo.etiqueta}
+          </div>
+        );
+
       case "texto":
         return (
           <Input
@@ -389,7 +396,7 @@ export const DocumentoFormViewer = ({
             .sort((a, b) => a.orden - b.orden)
             .map((campo) => (
               <div key={campo.id} className="space-y-2">
-                {campo.tipo_campo !== "checkbox" && (
+                {campo.tipo_campo !== "checkbox" && campo.tipo_campo !== "texto_informativo" && (
                   <Label className="flex items-center gap-1">
                     {campo.etiqueta}
                     {campo.requerido && <span className="text-destructive">*</span>}
