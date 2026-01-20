@@ -3,11 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Upload, Building2, Trash2, Pencil } from "lucide-react";
+import { Plus, Upload, Building2, Trash2, Pencil, Package, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,21 +24,45 @@ import { useAuth } from "@/hooks/useAuth";
 interface Empresa {
   id: string;
   nombre: string;
+  rut?: string;
+  razon_social?: string;
+  contacto?: string;
+  email?: string;
+  telefono?: string;
   created_at: string;
+}
+
+interface Paquete {
+  id: string;
+  nombre: string;
+}
+
+interface EmpresaBateria {
+  id: string;
+  empresa_id: string;
+  paquete_id: string;
+  valor: number;
+  paquete?: { nombre: string };
 }
 
 const Empresas = () => {
   useAuth(); // Protect route
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
+  const [paquetes, setPaquetes] = useState<Paquete[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
+  const [openBateriasDialog, setOpenBateriasDialog] = useState(false);
   const [empresaToDelete, setEmpresaToDelete] = useState<string | null>(null);
   const [editingEmpresa, setEditingEmpresa] = useState<Empresa | null>(null);
+  const [selectedEmpresa, setSelectedEmpresa] = useState<Empresa | null>(null);
+  const [empresaBaterias, setEmpresaBaterias] = useState<EmpresaBateria[]>([]);
+  const [bateriaPrecios, setBateriaPrecios] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
     nombre: "",
   });
 
   useEffect(() => {
     loadEmpresas();
+    loadPaquetes();
   }, []);
 
   const loadEmpresas = async () => {
@@ -52,6 +77,41 @@ const Empresas = () => {
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al cargar empresas");
+    }
+  };
+
+  const loadPaquetes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("paquetes_examenes")
+        .select("id, nombre")
+        .order("nombre");
+
+      if (error) throw error;
+      setPaquetes(data || []);
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
+
+  const loadEmpresaBaterias = async (empresaId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("empresa_baterias")
+        .select("*, paquete:paquetes_examenes(nombre)")
+        .eq("empresa_id", empresaId);
+
+      if (error) throw error;
+      setEmpresaBaterias(data || []);
+      
+      // Cargar precios en el estado
+      const precios: Record<string, string> = {};
+      data?.forEach(eb => {
+        precios[eb.paquete_id] = eb.valor?.toString() || "";
+      });
+      setBateriaPrecios(precios);
+    } catch (error) {
+      console.error("Error:", error);
     }
   };
 
@@ -86,6 +146,43 @@ const Empresas = () => {
     } catch (error: any) {
       console.error("Error:", error);
       toast.error(error.message || (editingEmpresa ? "Error al actualizar empresa" : "Error al agregar empresa"));
+    }
+  };
+
+  const handleSaveBaterias = async () => {
+    if (!selectedEmpresa) return;
+
+    try {
+      // Eliminar baterías existentes
+      await supabase
+        .from("empresa_baterias")
+        .delete()
+        .eq("empresa_id", selectedEmpresa.id);
+
+      // Insertar nuevos precios
+      const preciosData = Object.entries(bateriaPrecios)
+        .filter(([_, valor]) => valor && parseFloat(valor) > 0)
+        .map(([paqueteId, valor]) => ({
+          empresa_id: selectedEmpresa.id,
+          paquete_id: paqueteId,
+          valor: parseFloat(valor),
+        }));
+
+      if (preciosData.length > 0) {
+        const { error } = await supabase
+          .from("empresa_baterias")
+          .insert(preciosData);
+
+        if (error) throw error;
+      }
+
+      toast.success("Baterías contratadas actualizadas");
+      setOpenBateriasDialog(false);
+      setSelectedEmpresa(null);
+      setBateriaPrecios({});
+    } catch (error: any) {
+      console.error("Error:", error);
+      toast.error(error.message || "Error al guardar baterías");
     }
   };
 
@@ -136,6 +233,11 @@ const Empresas = () => {
     }
   };
 
+  const getBateriasCount = (empresaId: string) => {
+    // Esta función se puede optimizar si es necesario
+    return 0; // Por ahora no mostramos count en la card
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
@@ -144,7 +246,7 @@ const Empresas = () => {
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">Empresas</h1>
-            <p className="text-muted-foreground">Administra las empresas asociadas</p>
+            <p className="text-muted-foreground">Administra las empresas asociadas y sus baterías contratadas</p>
           </div>
           
           <div className="flex gap-3">
@@ -207,7 +309,19 @@ const Empresas = () => {
                     <Building2 className="h-5 w-5 text-primary" />
                     {empresa.nombre}
                   </CardTitle>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Baterías Contratadas"
+                      onClick={async () => {
+                        setSelectedEmpresa(empresa);
+                        await loadEmpresaBaterias(empresa.id);
+                        setOpenBateriasDialog(true);
+                      }}
+                    >
+                      <Package className="h-4 w-4 text-primary" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -233,10 +347,73 @@ const Empresas = () => {
                 <p className="text-sm text-muted-foreground">
                   Registrada: {new Date(empresa.created_at).toLocaleDateString()}
                 </p>
+                {empresa.rut && (
+                  <p className="text-sm text-muted-foreground">RUT: {empresa.rut}</p>
+                )}
               </CardContent>
             </Card>
           ))}
         </div>
+
+        {/* Dialog de Baterías Contratadas */}
+        <Dialog open={openBateriasDialog} onOpenChange={(open) => {
+          setOpenBateriasDialog(open);
+          if (!open) {
+            setSelectedEmpresa(null);
+            setBateriaPrecios({});
+          }
+        }}>
+          <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Baterías Contratadas - {selectedEmpresa?.nombre}
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Define los precios específicos para cada batería/paquete contratado por esta empresa.
+              </p>
+              
+              <div className="border rounded-md divide-y max-h-96 overflow-y-auto">
+                {paquetes.map((paquete) => (
+                  <div key={paquete.id} className="flex items-center justify-between p-3 gap-4">
+                    <span className="text-sm font-medium flex-1">{paquete.nombre}</span>
+                    <div className="flex items-center gap-1">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="number"
+                        step="any"
+                        value={bateriaPrecios[paquete.id] || ""}
+                        onChange={(e) => setBateriaPrecios({
+                          ...bateriaPrecios,
+                          [paquete.id]: e.target.value
+                        })}
+                        placeholder="Precio"
+                        className="w-28 h-8"
+                      />
+                    </div>
+                  </div>
+                ))}
+                {paquetes.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No hay paquetes disponibles. Crea paquetes en el módulo Exámenes.
+                  </p>
+                )}
+              </div>
+              
+              <div className="flex justify-between items-center pt-2">
+                <p className="text-xs text-muted-foreground">
+                  {Object.values(bateriaPrecios).filter(v => v && parseFloat(v) > 0).length} baterías con precio asignado
+                </p>
+                <Button onClick={handleSaveBaterias}>
+                  Guardar Cambios
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <AlertDialog open={!!empresaToDelete} onOpenChange={() => setEmpresaToDelete(null)}>
           <AlertDialogContent>
