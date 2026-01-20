@@ -783,15 +783,32 @@ const Flujo = () => {
                           </div>
                         </div>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="default"
-                        onClick={() => handleCompletarAtencion(atencion.id, "completado")}
-                        className="gap-2 bg-success hover:bg-success/90"
-                      >
-                        <CheckCircle className="h-4 w-4" />
-                        Finalizar
-                      </Button>
+                      {(docsPendientes[atencion.id] || 0) > 0 ? (
+                        <div className="flex flex-col items-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="default"
+                            disabled
+                            className="gap-2 bg-muted text-muted-foreground cursor-not-allowed"
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                            Finalizar
+                          </Button>
+                          <span className="text-xs text-warning">
+                            Faltan {docsPendientes[atencion.id]} doc(s) por firmar
+                          </span>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={() => handleCompletarAtencion(atencion.id, "completado")}
+                          className="gap-2 bg-success hover:bg-success/90"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                          Finalizar
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}
