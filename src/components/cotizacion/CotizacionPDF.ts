@@ -147,17 +147,10 @@ export const generateCotizacionPDF = (data: CotizacionData) => {
 
     let currentY = startY + 8;
 
-    doc.text("Subtotal Neto:", rightCol, currentY);
-    doc.text(formatCurrency(data.subtotal_neto), valueCol, currentY, { align: "right" });
-    currentY += 7;
-
+    // Solo mostrar IVA si es afecto
     if (isAfecto) {
       doc.text("IVA (19%):", rightCol, currentY);
       doc.text(formatCurrency(data.total_iva), valueCol, currentY, { align: "right" });
-      currentY += 7;
-
-      doc.text("Total con IVA:", rightCol, currentY);
-      doc.text(formatCurrency(data.total_con_iva), valueCol, currentY, { align: "right" });
       currentY += 7;
     } else {
       doc.setFont("helvetica", "italic");
@@ -166,7 +159,7 @@ export const generateCotizacionPDF = (data: CotizacionData) => {
       currentY += 7;
     }
 
-    // Recuadro del total - más compacto
+    // Recuadro del total final
     doc.setFillColor(...COLORS.primary);
     doc.rect(rightCol - 4, currentY + 1, 62, 10, "F");
     doc.setTextColor(255, 255, 255);
