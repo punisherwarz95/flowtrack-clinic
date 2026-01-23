@@ -64,6 +64,10 @@ const Dashboard = () => {
   const [filterCompletado, setFilterCompletado] = useState<boolean>(true);
   const [filterIncompleto, setFilterIncompleto] = useState<boolean>(true);
   
+  // Filtros por estado de atención
+  const [filterEstadoCompletado, setFilterEstadoCompletado] = useState<boolean>(true);
+  const [filterEstadoListo, setFilterEstadoListo] = useState<boolean>(true);
+  
   const [atencionesIngresadas, setAtencionesIngresadas] = useState<AtencionIngresada[]>([]);
   const [examenes, setExamenes] = useState<Examen[]>([]);
   
@@ -332,8 +336,18 @@ const Dashboard = () => {
     return { completados, pendientes, total: pacientesConExamen.length };
   })();
 
+  // Conteos por estado de atención
+  const conteosEstado = {
+    completados: atencionesIngresadas.filter(a => a.estado === "completado").length,
+    listos: atencionesIngresadas.filter(a => a.estado === "en_espera" || a.estado === "en_atencion").length
+  };
+
   // Filter patients by selected filters
   const filteredAtenciones = atencionesIngresadas.filter(a => {
+    // Filtro por estado de atención (checkboxes principales)
+    if (a.estado === "completado" && !filterEstadoCompletado) return false;
+    if ((a.estado === "en_espera" || a.estado === "en_atencion") && !filterEstadoListo) return false;
+    
     // Filter by empresa
     if (selectedEmpresaFilter !== "all") {
       if ((a.pacientes as any).empresas?.id !== selectedEmpresaFilter) return false;
@@ -714,8 +728,39 @@ const Dashboard = () => {
                       ))}
                     </SelectContent>
                   </Select>
-                  
-                  {selectedExamenFilter !== "all" && (
+                </div>
+                
+                {/* Checkboxes de filtro por estado de atención */}
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <div 
+                      onClick={() => setFilterEstadoCompletado(!filterEstadoCompletado)}
+                      className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
+                        filterEstadoCompletado 
+                          ? "bg-green-600 border-green-600 text-white" 
+                          : "border-muted-foreground"
+                      }`}
+                    >
+                      {filterEstadoCompletado && <Check className="h-3 w-3" />}
+                    </div>
+                    <span className="text-sm">Completados ({conteosEstado.completados})</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <div 
+                      onClick={() => setFilterEstadoListo(!filterEstadoListo)}
+                      className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
+                        filterEstadoListo 
+                          ? "bg-blue-600 border-blue-600 text-white" 
+                          : "border-muted-foreground"
+                      }`}
+                    >
+                      {filterEstadoListo && <Check className="h-3 w-3" />}
+                    </div>
+                    <span className="text-sm">Listos ({conteosEstado.listos})</span>
+                  </label>
+                </div>
+                
+                {selectedExamenFilter !== "all" && (
                     <div className="flex items-center gap-4">
                       <Badge variant="outline" className="text-sm">
                         Total: {conteosFiltro.total}
@@ -748,7 +793,6 @@ const Dashboard = () => {
                       </label>
                     </div>
                   )}
-                </div>
               </div>
             </CardHeader>
             <CardContent>
