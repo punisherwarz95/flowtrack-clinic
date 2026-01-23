@@ -81,8 +81,9 @@ interface TestTracking {
 }
 
 export default function PortalPaciente() {
-  const [step, setStep] = useState<"identificacion" | "registro" | "portal">("identificacion");
+  const [step, setStep] = useState<"codigo" | "identificacion" | "registro" | "portal">("codigo");
   const [rut, setRut] = useState("");
+  const [codigoIngresado, setCodigoIngresado] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [atencion, setAtencion] = useState<Atencion | null>(null);
@@ -277,6 +278,54 @@ export default function PortalPaciente() {
   const handleFormRutChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatRutForDisplay(e.target.value);
     setFormData(prev => ({ ...prev, rut: formatted }));
+  };
+
+  const validarCodigoDiario = async () => {
+    if (!codigoIngresado.trim()) {
+      toast({
+        title: "Error",
+        description: "Ingrese el código del día",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      const { data, error } = await supabase
+        .from("codigos_diarios")
+        .select("codigo")
+        .eq("fecha", today)
+        .eq("codigo", codigoIngresado.toUpperCase().trim())
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        toast({
+          title: "Código válido",
+          description: "Puede continuar con su identificación",
+        });
+        setStep("identificacion");
+      } else {
+        toast({
+          title: "Código inválido",
+          description: "El código ingresado no es correcto. Solicítelo al personal de recepción.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error validating código:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo validar el código. Intente nuevamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const buscarPaciente = async () => {
@@ -1084,6 +1133,48 @@ export default function PortalPaciente() {
   const isTestCompleted = (testId: string) => {
     return testTracking.some(t => t.examen_test_id === testId);
   };
+
+  if (step === "codigo") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundImage: `url(${portalBackground})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-bold">Portal del Paciente</CardTitle>
+            <CardDescription>Ingrese el código del día proporcionado en recepción</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="codigo">Código del Día</Label>
+              <Input
+                id="codigo"
+                placeholder="ABC12"
+                value={codigoIngresado}
+                onChange={(e) => setCodigoIngresado(e.target.value.toUpperCase())}
+                onKeyDown={(e) => e.key === "Enter" && validarCodigoDiario()}
+                className="text-lg text-center font-mono tracking-widest uppercase"
+                maxLength={5}
+              />
+            </div>
+            <Button 
+              onClick={validarCodigoDiario} 
+              className="w-full" 
+              size="lg"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Validando...
+                </>
+              ) : (
+                "Continuar"
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (step === "identificacion") {
     return (

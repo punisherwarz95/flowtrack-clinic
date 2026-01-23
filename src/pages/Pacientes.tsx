@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Trash2, Pencil, Calendar as CalendarIcon, ClipboardList, FileText } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Calendar as CalendarIcon, ClipboardList, FileText, RefreshCw, Copy, Key } from "lucide-react";
 import { useGenerateDocumentosFromBateria } from "@/hooks/useAtencionDocumentos";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -91,6 +91,20 @@ interface ExamenCompletado {
   };
 }
 
+// Función para generar código aleatorio (3 letras + 2 números)
+const generarCodigo = (): string => {
+  const letras = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // Sin I, O para evitar confusión
+  const numeros = '0123456789';
+  let codigo = '';
+  for (let i = 0; i < 3; i++) {
+    codigo += letras.charAt(Math.floor(Math.random() * letras.length));
+  }
+  for (let i = 0; i < 2; i++) {
+    codigo += numeros.charAt(Math.floor(Math.random() * numeros.length));
+  }
+  return codigo;
+};
+
 const Pacientes = () => {
   useAuth(); // Protect route
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -106,6 +120,11 @@ const Pacientes = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [documentosPendientes, setDocumentosPendientes] = useState<{[patientId: string]: number}>({});
+  
+  // Estado para el código del día
+  const [codigoDelDia, setCodigoDelDia] = useState<string | null>(null);
+  const [isLoadingCodigo, setIsLoadingCodigo] = useState(true);
+  const [isGeneratingCodigo, setIsGeneratingCodigo] = useState(false);
   
   const { generateDocuments } = useGenerateDocumentosFromBateria();
   
@@ -126,6 +145,73 @@ const Pacientes = () => {
     fecha_nacimiento: "",
     direccion: "",
   });
+
+  // Cargar código del día al iniciar
+  useEffect(() => {
+    loadCodigoDelDia();
+  }, []);
+
+  const loadCodigoDelDia = async () => {
+    setIsLoadingCodigo(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      const { data, error } = await supabase
+        .from("codigos_diarios")
+        .select("codigo")
+        .eq("fecha", today)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        setCodigoDelDia(data.codigo);
+      } else {
+        // No existe código para hoy, generar uno nuevo
+        await generarNuevoCodigo();
+      }
+    } catch (error) {
+      console.error("Error loading código del día:", error);
+      toast.error("Error al cargar código del día");
+    } finally {
+      setIsLoadingCodigo(false);
+    }
+  };
+
+  const generarNuevoCodigo = async () => {
+    setIsGeneratingCodigo(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const nuevoCodigo = generarCodigo();
+      
+      // Intentar insertar o actualizar (upsert)
+      const { error } = await supabase
+        .from("codigos_diarios")
+        .upsert({ 
+          fecha: today, 
+          codigo: nuevoCodigo 
+        }, { 
+          onConflict: 'fecha' 
+        });
+
+      if (error) throw error;
+
+      setCodigoDelDia(nuevoCodigo);
+      toast.success("Nuevo código generado: " + nuevoCodigo);
+    } catch (error) {
+      console.error("Error generating código:", error);
+      toast.error("Error al generar código");
+    } finally {
+      setIsGeneratingCodigo(false);
+    }
+  };
+
+  const copiarCodigo = () => {
+    if (codigoDelDia) {
+      navigator.clipboard.writeText(codigoDelDia);
+      toast.success("Código copiado al portapapeles");
+    }
+  };
 
   useEffect(() => {
     loadPatients();
@@ -721,7 +807,7 @@ const Pacientes = () => {
       <Navigation />
 
       <main className="container mx-auto px-4 py-8">
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">Pacientes</h1>
             <p className="text-muted-foreground">Gestiona la base de datos de pacientes</p>
@@ -973,6 +1059,49 @@ const Pacientes = () => {
             </Dialog>
           </div>
         </div>
+
+        {/* Card del Código del Día */}
+        <Card className="mb-4 border-primary/30 bg-primary/5">
+          <CardContent className="py-3 px-4">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <Key className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Código del Día</p>
+                  {isLoadingCodigo ? (
+                    <span className="text-lg font-mono text-muted-foreground">Cargando...</span>
+                  ) : (
+                    <span className="text-2xl font-bold font-mono tracking-wider text-primary">
+                      {codigoDelDia}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={copiarCodigo}
+                  disabled={!codigoDelDia || isLoadingCodigo}
+                  className="gap-1"
+                >
+                  <Copy className="h-4 w-4" />
+                  Copiar
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={generarNuevoCodigo}
+                  disabled={isGeneratingCodigo || isLoadingCodigo}
+                  className="gap-1"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isGeneratingCodigo ? 'animate-spin' : ''}`} />
+                  Regenerar
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

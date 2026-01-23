@@ -301,6 +301,30 @@ export type Database = {
           },
         ]
       }
+      codigos_diarios: {
+        Row: {
+          codigo: string
+          created_at: string | null
+          created_by: string | null
+          fecha: string
+          id: string
+        }
+        Insert: {
+          codigo: string
+          created_at?: string | null
+          created_by?: string | null
+          fecha?: string
+          id?: string
+        }
+        Update: {
+          codigo?: string
+          created_at?: string | null
+          created_by?: string | null
+          fecha?: string
+          id?: string
+        }
+        Relationships: []
+      }
       cotizacion_items: {
         Row: {
           cantidad: number
