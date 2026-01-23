@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, ClipboardCheck, Calendar as CalendarIcon, Users, Check, Building2 } from "lucide-react";
+import { Activity, ClipboardCheck, Calendar as CalendarIcon, Users, Check, Building2, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import Navigation from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,7 @@ const Dashboard = () => {
   const [selectedTipoFilter, setSelectedTipoFilter] = useState<string>("all");
   const [filterCompletado, setFilterCompletado] = useState<boolean>(true);
   const [filterIncompleto, setFilterIncompleto] = useState<boolean>(true);
+  const [filterNombre, setFilterNombre] = useState<string>("");
   
   // Filtros por estado de atención
   const [filterEstadoCompletado, setFilterEstadoCompletado] = useState<boolean>(true);
@@ -344,6 +346,12 @@ const Dashboard = () => {
 
   // Filter patients by selected filters
   const filteredAtenciones = atencionesIngresadas.filter(a => {
+    // Filtro por nombre
+    if (filterNombre.trim() !== "") {
+      const nombrePaciente = a.pacientes.nombre.toLowerCase();
+      if (!nombrePaciente.includes(filterNombre.toLowerCase().trim())) return false;
+    }
+    
     // Filtro por estado de atención (checkboxes principales)
     if (a.estado === "completado" && !filterEstadoCompletado) return false;
     if ((a.estado === "en_espera" || a.estado === "en_atencion") && !filterEstadoListo) return false;
@@ -693,6 +701,16 @@ const Dashboard = () => {
                 
                 {/* Filtros */}
                 <div className="flex flex-wrap items-center gap-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar por nombre..."
+                      value={filterNombre}
+                      onChange={(e) => setFilterNombre(e.target.value)}
+                      className="pl-9 w-[200px]"
+                    />
+                  </div>
+
                   <Select value={selectedEmpresaFilter} onValueChange={setSelectedEmpresaFilter}>
                     <SelectTrigger className="w-[180px]">
                       <Building2 className="h-4 w-4 mr-2" />
