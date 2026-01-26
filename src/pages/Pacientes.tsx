@@ -71,6 +71,7 @@ interface Examen {
   id: string;
   nombre: string;
   descripcion: string | null;
+  codigo: string | null;
 }
 
 interface Paquete {
@@ -117,6 +118,7 @@ const Pacientes = () => {
   const [pacienteToDelete, setPacienteToDelete] = useState<string | null>(null);
   const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
   const [selectedPaquetes, setSelectedPaquetes] = useState<string[]>([]);
+  const [examenFilter, setExamenFilter] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [documentosPendientes, setDocumentosPendientes] = useState<{[patientId: string]: number}>({});
@@ -426,7 +428,7 @@ const Pacientes = () => {
     try {
       const { data, error } = await supabase
         .from("examenes")
-        .select("*")
+        .select("id, nombre, descripcion, codigo")
         .order("nombre");
 
       if (error) throw error;
@@ -884,6 +886,7 @@ const Pacientes = () => {
                 setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: "", rut: "", email: "", telefono: "", fecha_nacimiento: "", direccion: "" });
                 setSelectedExamenes([]);
                 setSelectedPaquetes([]);
+                setExamenFilter("");
               }
             }}>
               <DialogTrigger asChild>
@@ -1065,8 +1068,25 @@ const Pacientes = () => {
                     {/* Columna derecha - Exámenes */}
                     <div className="space-y-4">
                       <h3 className="font-semibold text-sm text-muted-foreground border-b pb-2">Exámenes a Realizar</h3>
-                      <div className="border rounded-md p-3 max-h-[500px] overflow-y-auto space-y-2 bg-muted/30">
-                        {examenes.map((examen) => (
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Buscar por código o nombre..."
+                          value={examenFilter}
+                          onChange={(e) => setExamenFilter(e.target.value)}
+                          className="pl-9"
+                        />
+                      </div>
+                      <div className="border rounded-md p-3 max-h-[450px] overflow-y-auto space-y-2 bg-muted/30">
+                        {examenes
+                          .filter((examen) => {
+                            if (!examenFilter.trim()) return true;
+                            const searchLower = examenFilter.toLowerCase().trim();
+                            const codigoMatch = examen.codigo?.toLowerCase().includes(searchLower) || false;
+                            const nombreMatch = examen.nombre.toLowerCase().includes(searchLower);
+                            return codigoMatch || nombreMatch;
+                          })
+                          .map((examen) => (
                           <label key={examen.id} className="flex items-center gap-2 cursor-pointer">
                             <input
                               type="checkbox"
@@ -1089,7 +1109,10 @@ const Pacientes = () => {
                               }}
                               className="w-4 h-4"
                             />
-                            <span className="text-sm">{examen.nombre}</span>
+                            <span className="text-sm">
+                              {examen.codigo && <span className="font-mono text-xs text-muted-foreground mr-1">[{examen.codigo}]</span>}
+                              {examen.nombre}
+                            </span>
                           </label>
                         ))}
                       </div>
