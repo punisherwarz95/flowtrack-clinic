@@ -6,6 +6,7 @@ export interface ImportResult {
   examenesActualizados: number;
   prestadoresCreados: number;
   relacionesCreadas: number;
+  boxRelacionesCreadas: number;
   errores: string[];
 }
 
@@ -14,6 +15,7 @@ export interface ExcelRowData {
   nombre: string;
   costo: number | null;
   prestador: string | null;
+  box: string | null;
 }
 
 export const parseExcelFile = async (file: File): Promise<ExcelRowData[]> => {
@@ -43,6 +45,7 @@ export const parseExcelFile = async (file: File): Promise<ExcelRowData[]> => {
       nombre,
       costo: row[2] !== undefined && row[2] !== "" ? Number(row[2]) : null,
       prestador: row[3] ? String(row[3]).trim() : null,
+      box: row[4] ? String(row[4]).trim() : null,
     });
   }
 
@@ -58,6 +61,7 @@ export const importExamenesYPrestadoresFromExcel = async (
     examenesActualizados: 0,
     prestadoresCreados: 0,
     relacionesCreadas: 0,
+    boxRelacionesCreadas: 0,
     errores: [],
   };
 
@@ -83,7 +87,18 @@ export const importExamenesYPrestadoresFromExcel = async (
     }
   });
 
-  // Cache para relaciones existentes
+  // Cache para boxes existentes
+  const { data: boxesExistentes } = await supabase
+    .from("boxes")
+    .select("id, nombre")
+    .eq("activo", true);
+  
+  const boxesMap = new Map<string, string>();
+  boxesExistentes?.forEach((b) => {
+    boxesMap.set(b.nombre.toLowerCase().trim(), b.id);
+  });
+
+  // Cache para relaciones prestador-examen existentes
   const { data: relacionesExistentes } = await supabase
     .from("prestador_examenes")
     .select("prestador_id, examen_id");
@@ -91,6 +106,16 @@ export const importExamenesYPrestadoresFromExcel = async (
   const relacionesSet = new Set<string>();
   relacionesExistentes?.forEach((r) => {
     relacionesSet.add(`${r.prestador_id}-${r.examen_id}`);
+  });
+
+  // Cache para relaciones box-examen existentes
+  const { data: boxRelacionesExistentes } = await supabase
+    .from("box_examenes")
+    .select("box_id, examen_id");
+  
+  const boxRelacionesSet = new Set<string>();
+  boxRelacionesExistentes?.forEach((r) => {
+    boxRelacionesSet.add(`${r.box_id}-${r.examen_id}`);
   });
 
   for (let i = 0; i < rows.length; i++) {
@@ -157,7 +182,7 @@ export const importExamenesYPrestadoresFromExcel = async (
           result.prestadoresCreados++;
         }
 
-        // 3. Crear relación si no existe
+        // 3. Crear relación prestador-examen si no existe
         const relacionKey = `${prestadorId}-${examenId}`;
         if (!relacionesSet.has(relacionKey)) {
           const { error } = await supabase
@@ -171,6 +196,31 @@ export const importExamenesYPrestadoresFromExcel = async (
           if (error) throw error;
           relacionesSet.add(relacionKey);
           result.relacionesCreadas++;
+        }
+      }
+
+      // 4. Si hay box, buscar y crear relación
+      if (row.box) {
+        const boxLower = row.box.toLowerCase().trim();
+        
+        if (boxesMap.has(boxLower)) {
+          const boxId = boxesMap.get(boxLower)!;
+          const boxRelacionKey = `${boxId}-${examenId}`;
+          
+          if (!boxRelacionesSet.has(boxRelacionKey)) {
+            const { error } = await supabase
+              .from("box_examenes")
+              .insert({
+                box_id: boxId,
+                examen_id: examenId,
+              });
+
+            if (error) throw error;
+            boxRelacionesSet.add(boxRelacionKey);
+            result.boxRelacionesCreadas++;
+          }
+        } else {
+          result.errores.push(`Fila ${i + 2}: Box "${row.box}" no encontrado`);
         }
       }
     } catch (error: any) {

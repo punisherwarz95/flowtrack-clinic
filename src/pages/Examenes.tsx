@@ -528,6 +528,7 @@ const Examenes = () => {
   const getImportPreview = () => {
     const codigosExistentes = new Set(examenes.map(e => e.codigo?.toLowerCase().trim()).filter(Boolean));
     const prestadoresUnicos = new Set<string>();
+    const boxesUnicos = new Set<string>();
     
     let nuevos = 0;
     let actualizar = 0;
@@ -541,9 +542,12 @@ const Examenes = () => {
       if (row.prestador) {
         prestadoresUnicos.add(row.prestador.toLowerCase().trim());
       }
+      if (row.box) {
+        boxesUnicos.add(row.box.toLowerCase().trim());
+      }
     });
 
-    return { nuevos, actualizar, prestadores: prestadoresUnicos.size };
+    return { nuevos, actualizar, prestadores: prestadoresUnicos.size, boxes: boxesUnicos.size };
   };
 
   return (
@@ -589,6 +593,7 @@ const Examenes = () => {
                       <li>Columna B: Nombre del examen (obligatorio)</li>
                       <li>Columna C: Costo neto (opcional)</li>
                       <li>Columna D: Nombre del prestador (opcional)</li>
+                      <li>Columna E: Nombre del box (opcional)</li>
                     </ul>
                   </div>
 
@@ -628,6 +633,7 @@ const Examenes = () => {
                             <li>• {preview.nuevos} exámenes nuevos</li>
                             <li>• {preview.actualizar} exámenes a actualizar</li>
                             <li>• {preview.prestadores} prestadores únicos</li>
+                            <li>• {preview.boxes} boxes únicos</li>
                           </ul>
                         );
                       })()}
@@ -656,7 +662,8 @@ const Examenes = () => {
                           <li>• {importResult.examenesCreados} exámenes creados</li>
                           <li>• {importResult.examenesActualizados} exámenes actualizados</li>
                           <li>• {importResult.prestadoresCreados} prestadores creados</li>
-                          <li>• {importResult.relacionesCreadas} relaciones creadas</li>
+                          <li>• {importResult.relacionesCreadas} relaciones prestador-examen</li>
+                          <li>• {importResult.boxRelacionesCreadas} relaciones box-examen</li>
                         </ul>
                       </div>
 
