@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Navigation from "@/components/Navigation";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, UserCheck, CalendarIcon, RefreshCw, Link2 } from "lucide-react";
+import { Plus, Pencil, Trash2, UserCheck, CalendarIcon, RefreshCw, Link2, Search } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { GlobalChat } from "@/components/GlobalChat";
@@ -86,6 +87,7 @@ const Prestadores = () => {
 
   // Tarifas form
   const [selectedExamenes, setSelectedExamenes] = useState<{ [key: string]: number }>({});
+  const [tarifaSearchFilter, setTarifaSearchFilter] = useState("");
 
   // Reemplazo form
   const [reemplazoOriginalId, setReemplazoOriginalId] = useState("");
@@ -265,9 +267,38 @@ const Prestadores = () => {
 
   const handleOpenTarifas = async (prestador: Prestador) => {
     setSelectedPrestadorTarifas(prestador);
+    setTarifaSearchFilter("");
     await loadPrestadorExamenes(prestador.id);
     setTarifasDialogOpen(true);
   };
+
+  // Filtered exams for tarifas dialog
+  const filteredExamenesForTarifas = useMemo(() => {
+    const searchLower = tarifaSearchFilter.toLowerCase().trim();
+    if (!searchLower) return examenes;
+    
+    return examenes.filter((examen) => {
+      const codigoMatch = examen.codigo?.toLowerCase().includes(searchLower) || false;
+      const nombreMatch = examen.nombre.toLowerCase().includes(searchLower);
+      return codigoMatch || nombreMatch;
+    });
+  }, [examenes, tarifaSearchFilter]);
+
+  // Get activated tarifas for current prestador
+  const tarifasActivadas = useMemo(() => {
+    return examenes.filter((examen) => examen.id in selectedExamenes);
+  }, [examenes, selectedExamenes]);
+
+  const filteredTarifasActivadas = useMemo(() => {
+    const searchLower = tarifaSearchFilter.toLowerCase().trim();
+    if (!searchLower) return tarifasActivadas;
+    
+    return tarifasActivadas.filter((examen) => {
+      const codigoMatch = examen.codigo?.toLowerCase().includes(searchLower) || false;
+      const nombreMatch = examen.nombre.toLowerCase().includes(searchLower);
+      return codigoMatch || nombreMatch;
+    });
+  }, [tarifasActivadas, tarifaSearchFilter]);
 
   const handleToggleExamen = (examenId: string, checked: boolean) => {
     if (checked) {
@@ -704,43 +735,106 @@ const Prestadores = () => {
 
       {/* Tarifas Dialog */}
       <Dialog open={tarifasDialogOpen} onOpenChange={setTarifasDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>
               Tarifas de {selectedPrestadorTarifas?.nombre}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
-            {examenes.map((examen) => (
-              <div key={examen.id} className="flex items-center gap-4 p-2 border rounded-lg">
-                <Checkbox
-                  checked={examen.id in selectedExamenes}
-                  onCheckedChange={(checked) => handleToggleExamen(examen.id, !!checked)}
-                />
-                <div className="flex-1">
-                  <p className="font-medium">{examen.nombre}</p>
-                  {examen.codigo && (
-                    <p className="text-xs text-muted-foreground">{examen.codigo}</p>
+          
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por código o nombre..."
+              value={tarifaSearchFilter}
+              onChange={(e) => setTarifaSearchFilter(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
+          {/* Tarifas Activadas Table */}
+          {tarifasActivadas.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="font-medium text-sm text-muted-foreground">
+                Tarifas activadas ({filteredTarifasActivadas.length} de {tarifasActivadas.length})
+              </h3>
+              <div className="rounded-md border max-h-[200px] overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[100px]">Código</TableHead>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead className="w-[120px] text-right">Valor</TableHead>
+                      <TableHead className="w-[60px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredTarifasActivadas.map((examen) => (
+                      <TableRow key={examen.id}>
+                        <TableCell className="font-mono text-sm">
+                          {examen.codigo || "-"}
+                        </TableCell>
+                        <TableCell>{examen.nombre}</TableCell>
+                        <TableCell className="text-right">
+                          ${selectedExamenes[examen.id]?.toLocaleString() || 0}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => handleToggleExamen(examen.id, false)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+
+          {/* All Exams List */}
+          <div className="space-y-2 flex-1 overflow-hidden flex flex-col">
+            <h3 className="font-medium text-sm text-muted-foreground">
+              Todos los exámenes ({filteredExamenesForTarifas.length} de {examenes.length})
+            </h3>
+            <div className="space-y-2 overflow-y-auto flex-1 pr-2">
+              {filteredExamenesForTarifas.map((examen) => (
+                <div key={examen.id} className="flex items-center gap-4 p-2 border rounded-lg">
+                  <Checkbox
+                    checked={examen.id in selectedExamenes}
+                    onCheckedChange={(checked) => handleToggleExamen(examen.id, !!checked)}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{examen.nombre}</p>
+                    {examen.codigo && (
+                      <p className="text-xs text-muted-foreground">{examen.codigo}</p>
+                    )}
+                  </div>
+                  {examen.id in selectedExamenes && (
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm">$</Label>
+                      <Input
+                        type="number"
+                        className="w-28"
+                        value={selectedExamenes[examen.id] || ""}
+                        onChange={(e) =>
+                          handleValorChange(examen.id, parseFloat(e.target.value) || 0)
+                        }
+                        placeholder="0"
+                      />
+                    </div>
                   )}
                 </div>
-                {examen.id in selectedExamenes && (
-                  <div className="flex items-center gap-2">
-                    <Label className="text-sm">$</Label>
-                    <Input
-                      type="number"
-                      className="w-28"
-                      value={selectedExamenes[examen.id] || ""}
-                      onChange={(e) =>
-                        handleValorChange(examen.id, parseFloat(e.target.value) || 0)
-                      }
-                      placeholder="0"
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-          <DialogFooter>
+
+          <DialogFooter className="pt-4 border-t">
             <Button variant="outline" onClick={() => setTarifasDialogOpen(false)}>
               Cancelar
             </Button>
