@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Trash2, Pencil, Calendar as CalendarIcon, ClipboardList, FileText, RefreshCw, Copy, Key } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Calendar as CalendarIcon, ClipboardList, FileText, RefreshCw, Copy, Key, Settings, Clock } from "lucide-react";
 import { useGenerateDocumentosFromBateria } from "@/hooks/useAtencionDocumentos";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -126,6 +126,11 @@ const Pacientes = () => {
   const [isLoadingCodigo, setIsLoadingCodigo] = useState(true);
   const [isGeneratingCodigo, setIsGeneratingCodigo] = useState(false);
   
+  // Estado para configuración de hora de reset
+  const [configDialogOpen, setConfigDialogOpen] = useState(false);
+  const [horaReset, setHoraReset] = useState<string>("00:00");
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
+  
   const { generateDocuments } = useGenerateDocumentosFromBateria();
   
   // Estado para el diálogo de exámenes completados
@@ -146,10 +151,50 @@ const Pacientes = () => {
     direccion: "",
   });
 
-  // Cargar código del día al iniciar
+  // Cargar código del día y configuración al iniciar
   useEffect(() => {
     loadCodigoDelDia();
+    loadConfiguracion();
   }, []);
+
+  const loadConfiguracion = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("codigo_diario_config")
+        .select("hora_reset")
+        .limit(1);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        // El formato viene como "HH:MM:SS", convertir a "HH:MM"
+        const horaCompleta = data[0].hora_reset;
+        setHoraReset(horaCompleta.substring(0, 5));
+      }
+    } catch (error) {
+      console.error("Error loading config:", error);
+    }
+  };
+
+  const handleSaveConfig = async () => {
+    setIsSavingConfig(true);
+    try {
+      const { error } = await supabase
+        .from("codigo_diario_config")
+        .update({ hora_reset: horaReset + ":00" })
+        .neq("id", "00000000-0000-0000-0000-000000000000"); // Actualiza todos los registros
+
+      if (error) throw error;
+
+      toast.success(`Hora de reset configurada: ${horaReset}`);
+      setConfigDialogOpen(false);
+    } catch (error) {
+      console.error("Error saving config:", error);
+      toast.error("Error al guardar configuración");
+    } finally {
+      setIsSavingConfig(false);
+    }
+  };
 
   const loadCodigoDelDia = async () => {
     setIsLoadingCodigo(true);
@@ -1098,6 +1143,55 @@ const Pacientes = () => {
                   <RefreshCw className={`h-4 w-4 ${isGeneratingCodigo ? 'animate-spin' : ''}`} />
                   Regenerar
                 </Button>
+                <Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1"
+                      title="Configurar hora de reset"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <Clock className="h-5 w-5" />
+                        Configuración del Código
+                      </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="hora-reset">Hora de restablecimiento del código</Label>
+                        <p className="text-sm text-muted-foreground">
+                          El código se regenerará automáticamente a esta hora cada día.
+                        </p>
+                        <Input
+                          id="hora-reset"
+                          type="time"
+                          value={horaReset}
+                          onChange={(e) => setHoraReset(e.target.value)}
+                          className="w-full"
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => setConfigDialogOpen(false)}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          onClick={handleSaveConfig}
+                          disabled={isSavingConfig}
+                        >
+                          {isSavingConfig ? "Guardando..." : "Guardar"}
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
           </CardContent>
