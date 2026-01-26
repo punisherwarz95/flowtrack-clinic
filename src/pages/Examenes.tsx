@@ -88,6 +88,7 @@ const Examenes = () => {
   const [selectedDocumentos, setSelectedDocumentos] = useState<string[]>([]);
   const [empresaPrecios, setEmpresaPrecios] = useState<Record<string, string>>({});
   const [paqueteDialogTab, setPaqueteDialogTab] = useState("examenes");
+  const [paqueteExamenFilter, setPaqueteExamenFilter] = useState("");
   const [formData, setFormData] = useState({
     nombre: "",
     descripcion: "",
@@ -831,6 +832,7 @@ const Examenes = () => {
                 setSelectedDocumentos([]);
                 setEmpresaPrecios({});
                 setPaqueteDialogTab("examenes");
+                setPaqueteExamenFilter("");
               }
             }}>
               <DialogTrigger asChild>
@@ -882,35 +884,115 @@ const Examenes = () => {
                       </TabsTrigger>
                     </TabsList>
                     
-                    <TabsContent value="examenes" className="mt-4">
-                      <Label>Exámenes incluidos *</Label>
-                      <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2 mt-2">
-                        {examenes.map((examen) => (
-                          <label key={examen.id} className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={selectedExamenes.includes(examen.id)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedExamenes([...selectedExamenes, examen.id]);
-                                } else {
-                                  setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
-                                }
-                              }}
-                              className="w-4 h-4"
-                            />
-                            <span className="text-sm">{examen.nombre}</span>
-                            {examen.costo_neto && examen.costo_neto > 0 && (
-                              <span className="text-xs text-muted-foreground ml-auto">
-                                ${examen.costo_neto.toLocaleString()}
-                              </span>
-                            )}
-                          </label>
-                        ))}
+                    <TabsContent value="examenes" className="mt-4 space-y-4">
+                      {/* Exámenes Seleccionados */}
+                      {selectedExamenes.length > 0 && (
+                        <div>
+                          <Label className="mb-2 block">Exámenes en el paquete ({selectedExamenes.length})</Label>
+                          <div className="border rounded-md max-h-40 overflow-y-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="w-24">Código</TableHead>
+                                  <TableHead>Nombre</TableHead>
+                                  <TableHead className="w-24 text-right">Costo</TableHead>
+                                  <TableHead className="w-12"></TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {examenes
+                                  .filter(e => selectedExamenes.includes(e.id))
+                                  .filter(e => {
+                                    if (!paqueteExamenFilter.trim()) return true;
+                                    const searchLower = paqueteExamenFilter.toLowerCase().trim();
+                                    const codigoMatch = e.codigo?.toLowerCase().includes(searchLower) || false;
+                                    const nombreMatch = e.nombre.toLowerCase().includes(searchLower);
+                                    return codigoMatch || nombreMatch;
+                                  })
+                                  .map((examen) => (
+                                    <TableRow key={examen.id}>
+                                      <TableCell className="font-mono text-xs">{examen.codigo || "-"}</TableCell>
+                                      <TableCell className="text-sm">{examen.nombre}</TableCell>
+                                      <TableCell className="text-right text-xs text-muted-foreground">
+                                        {examen.costo_neto && examen.costo_neto > 0 
+                                          ? `$${examen.costo_neto.toLocaleString()}` 
+                                          : "-"}
+                                      </TableCell>
+                                      <TableCell>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-6 w-6"
+                                          onClick={() => setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id))}
+                                        >
+                                          <Trash2 className="h-3 w-3 text-destructive" />
+                                        </Button>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Buscador y lista de todos los exámenes */}
+                      <div>
+                        <Label className="mb-2 block">Agregar exámenes</Label>
+                        <div className="relative mb-2">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Buscar por código o nombre..."
+                            value={paqueteExamenFilter}
+                            onChange={(e) => setPaqueteExamenFilter(e.target.value)}
+                            className="pl-10"
+                          />
+                        </div>
+                        <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2">
+                          {examenes
+                            .filter(e => !selectedExamenes.includes(e.id))
+                            .filter(e => {
+                              if (!paqueteExamenFilter.trim()) return true;
+                              const searchLower = paqueteExamenFilter.toLowerCase().trim();
+                              const codigoMatch = e.codigo?.toLowerCase().includes(searchLower) || false;
+                              const nombreMatch = e.nombre.toLowerCase().includes(searchLower);
+                              return codigoMatch || nombreMatch;
+                            })
+                            .map((examen) => (
+                              <label key={examen.id} className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-1 rounded">
+                                <input
+                                  type="checkbox"
+                                  checked={false}
+                                  onChange={() => setSelectedExamenes([...selectedExamenes, examen.id])}
+                                  className="w-4 h-4"
+                                />
+                                <span className="text-xs font-mono text-muted-foreground w-16 truncate">
+                                  {examen.codigo || "-"}
+                                </span>
+                                <span className="text-sm flex-1">{examen.nombre}</span>
+                                {examen.costo_neto && examen.costo_neto > 0 && (
+                                  <span className="text-xs text-muted-foreground">
+                                    ${examen.costo_neto.toLocaleString()}
+                                  </span>
+                                )}
+                              </label>
+                            ))}
+                          {examenes.filter(e => !selectedExamenes.includes(e.id)).filter(e => {
+                            if (!paqueteExamenFilter.trim()) return true;
+                            const searchLower = paqueteExamenFilter.toLowerCase().trim();
+                            const codigoMatch = e.codigo?.toLowerCase().includes(searchLower) || false;
+                            const nombreMatch = e.nombre.toLowerCase().includes(searchLower);
+                            return codigoMatch || nombreMatch;
+                          }).length === 0 && (
+                            <p className="text-sm text-muted-foreground text-center py-4">
+                              {paqueteExamenFilter.trim() 
+                                ? "No se encontraron exámenes con ese criterio" 
+                                : "Todos los exámenes ya están seleccionados"}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {selectedExamenes.length} exámenes seleccionados
-                      </p>
                     </TabsContent>
                     
                     <TabsContent value="documentos" className="mt-4">
