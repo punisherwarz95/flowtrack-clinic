@@ -1,14 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, ClipboardList, Package, Trash2, Pencil, FileText, DollarSign } from "lucide-react";
+import { Plus, ClipboardList, Package, Trash2, Pencil, FileText, DollarSign, Upload, FileSpreadsheet, CheckCircle2, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
@@ -21,6 +21,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/useAuth";
+import { Progress } from "@/components/ui/progress";
+import { parseExcelFile, importExamenesYPrestadoresFromExcel, ExcelRowData, ImportResult } from "@/lib/supabase";
 
 interface Examen {
   id: string;
@@ -96,6 +98,15 @@ const Examenes = () => {
     nombre: "",
     descripcion: "",
   });
+
+  // Estados para importación Excel
+  const [openImportDialog, setOpenImportDialog] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importData, setImportData] = useState<ExcelRowData[]>([]);
+  const [importProgress, setImportProgress] = useState(0);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadExamenes();
@@ -453,6 +464,88 @@ const Examenes = () => {
     }
   };
 
+  // Handlers para importación Excel
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setImportFile(file);
+      const data = await parseExcelFile(file);
+      
+      if (data.length === 0) {
+        toast.error("El archivo no contiene datos válidos");
+        setImportFile(null);
+        return;
+      }
+
+      setImportData(data);
+      setImportResult(null);
+      setImportProgress(0);
+    } catch (error: any) {
+      console.error("Error al leer archivo:", error);
+      toast.error("Error al leer el archivo Excel");
+      setImportFile(null);
+    }
+  };
+
+  const handleImport = async () => {
+    if (importData.length === 0) return;
+
+    setIsImporting(true);
+    setImportProgress(0);
+
+    try {
+      const result = await importExamenesYPrestadoresFromExcel(importData, setImportProgress);
+      setImportResult(result);
+      
+      if (result.errores.length === 0) {
+        toast.success("Importación completada exitosamente");
+      } else {
+        toast.warning(`Importación completada con ${result.errores.length} errores`);
+      }
+      
+      loadExamenes();
+    } catch (error: any) {
+      console.error("Error:", error);
+      toast.error("Error durante la importación");
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const resetImportDialog = () => {
+    setImportFile(null);
+    setImportData([]);
+    setImportProgress(0);
+    setImportResult(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  // Calcular preview de la importación
+  const getImportPreview = () => {
+    const codigosExistentes = new Set(examenes.map(e => e.codigo?.toLowerCase().trim()).filter(Boolean));
+    const prestadoresUnicos = new Set<string>();
+    
+    let nuevos = 0;
+    let actualizar = 0;
+
+    importData.forEach(row => {
+      if (codigosExistentes.has(row.codigo.toLowerCase().trim())) {
+        actualizar++;
+      } else {
+        nuevos++;
+      }
+      if (row.prestador) {
+        prestadoresUnicos.add(row.prestador.toLowerCase().trim());
+      }
+    });
+
+    return { nuevos, actualizar, prestadores: prestadoresUnicos.size };
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
@@ -465,6 +558,148 @@ const Examenes = () => {
           </div>
           
           <div className="flex gap-3">
+            {/* Botón Importar Excel */}
+            <Dialog open={openImportDialog} onOpenChange={(open) => {
+              setOpenImportDialog(open);
+              if (!open) resetImportDialog();
+            }}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Upload className="h-4 w-4" />
+                  Importar Excel
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <FileSpreadsheet className="h-5 w-5" />
+                    Importar Exámenes desde Excel
+                  </DialogTitle>
+                  <DialogDescription>
+                    Carga un archivo Excel con exámenes y prestadores
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                  {/* Instrucciones */}
+                  <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1">
+                    <p className="font-medium">Formato esperado del archivo:</p>
+                    <ul className="list-disc list-inside text-muted-foreground space-y-0.5">
+                      <li>Columna A: Código del examen (obligatorio)</li>
+                      <li>Columna B: Nombre del examen (obligatorio)</li>
+                      <li>Columna C: Costo neto (opcional)</li>
+                      <li>Columna D: Nombre del prestador (opcional)</li>
+                    </ul>
+                  </div>
+
+                  {/* Input de archivo */}
+                  <div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".xlsx,.xls,.csv"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      id="excel-file-input"
+                    />
+                    <Label
+                      htmlFor="excel-file-input"
+                      className="flex items-center justify-center gap-2 border-2 border-dashed rounded-lg p-6 cursor-pointer hover:border-primary/50 transition-colors"
+                    >
+                      {importFile ? (
+                        <span className="text-sm">{importFile.name}</span>
+                      ) : (
+                        <>
+                          <Upload className="h-5 w-5 text-muted-foreground" />
+                          <span className="text-muted-foreground">Seleccionar archivo...</span>
+                        </>
+                      )}
+                    </Label>
+                  </div>
+
+                  {/* Preview de datos */}
+                  {importData.length > 0 && !importResult && (
+                    <div className="bg-muted/30 rounded-lg p-4 space-y-2">
+                      <p className="font-medium">Se encontraron {importData.length} registros</p>
+                      {(() => {
+                        const preview = getImportPreview();
+                        return (
+                          <ul className="text-sm text-muted-foreground space-y-1">
+                            <li>• {preview.nuevos} exámenes nuevos</li>
+                            <li>• {preview.actualizar} exámenes a actualizar</li>
+                            <li>• {preview.prestadores} prestadores únicos</li>
+                          </ul>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {/* Progreso de importación */}
+                  {isImporting && (
+                    <div className="space-y-2">
+                      <Progress value={importProgress} />
+                      <p className="text-sm text-center text-muted-foreground">
+                        Importando... {importProgress}%
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Resultado de importación */}
+                  {importResult && (
+                    <div className="space-y-3">
+                      <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-4 space-y-2">
+                        <p className="font-medium flex items-center gap-2 text-green-700 dark:text-green-400">
+                          <CheckCircle2 className="h-4 w-4" />
+                          Importación completada
+                        </p>
+                        <ul className="text-sm space-y-1">
+                          <li>• {importResult.examenesCreados} exámenes creados</li>
+                          <li>• {importResult.examenesActualizados} exámenes actualizados</li>
+                          <li>• {importResult.prestadoresCreados} prestadores creados</li>
+                          <li>• {importResult.relacionesCreadas} relaciones creadas</li>
+                        </ul>
+                      </div>
+
+                      {importResult.errores.length > 0 && (
+                        <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-4 space-y-2">
+                          <p className="font-medium flex items-center gap-2 text-red-700 dark:text-red-400">
+                            <AlertCircle className="h-4 w-4" />
+                            Errores ({importResult.errores.length})
+                          </p>
+                          <ul className="text-sm text-red-600 dark:text-red-400 max-h-24 overflow-y-auto space-y-1">
+                            {importResult.errores.slice(0, 5).map((error, idx) => (
+                              <li key={idx}>• {error}</li>
+                            ))}
+                            {importResult.errores.length > 5 && (
+                              <li>... y {importResult.errores.length - 5} más</li>
+                            )}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Botones */}
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => setOpenImportDialog(false)}
+                  >
+                    {importResult ? "Cerrar" : "Cancelar"}
+                  </Button>
+                  {!importResult && (
+                    <Button
+                      onClick={handleImport}
+                      disabled={importData.length === 0 || isImporting}
+                    >
+                      Importar
+                    </Button>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+
             <Dialog open={openExamenDialog} onOpenChange={(open) => {
               setOpenExamenDialog(open);
               if (!open) {
