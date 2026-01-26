@@ -1,103 +1,179 @@
 
 
-# Plan: Usar Costo del Excel como Valor de Prestación por Prestador
+# Plan: Mejorar Vista de Exámenes con Lista y Filtro
 
 ## Objetivo
-Modificar el importador para que el costo de cada fila se guarde como el **valor que cobra cada prestador por ese examen** (`valor_prestacion` en `prestador_examenes`), en lugar de sobrescribir el costo base del examen.
+Cambiar la visualización de exámenes de tarjetas (cards) a una lista/tabla que muestre el código y nombre de cada examen, y agregar un campo de búsqueda que filtre tanto por código como por nombre.
 
-## Nuevo comportamiento propuesto
+## Cambios visuales propuestos
 
+### Vista actual (Cards)
 ```text
-Excel de entrada:
-┌──────────┬─────────────────┬─────────┬──────────────┐
-│ CODIGO   │ NOMBRE          │ COSTO   │ PRESTADOR    │
-├──────────┼─────────────────┼─────────┼──────────────┤
-│ 01       │ Audiometría     │ 500     │ Prestador AB │
-│ 01       │ Audiometría     │ 400     │ Prestador AC │
-│ 02       │ Espirometría    │ 600     │ Prestador AB │
-└──────────┴─────────────────┴─────────┴──────────────┘
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│ 📋 Audiometría  │  │ 📋 Espirometría │  │ 📋 Rx Tórax     │
+│                 │  │                 │  │                 │
+│ Duración: 30min │  │ Duración: 15min │  │ Duración: 10min │
+└─────────────────┘  └─────────────────┘  └─────────────────┘
+```
 
-Resultado en base de datos:
+### Nueva vista (Tabla con filtro)
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│ 🔍 [Buscar por código o nombre...                    ]              │
+├─────────────────────────────────────────────────────────────────────┤
+│ CÓDIGO     │ NOMBRE              │ COSTO      │ ACCIONES            │
+├────────────┼─────────────────────┼────────────┼─────────────────────┤
+│ AUD-001    │ Audiometría         │ $5,000     │ [✏️] [🗑️]           │
+│ ESP-002    │ Espirometría        │ $8,000     │ [✏️] [🗑️]           │
+│ RX-003     │ Radiografía Tórax   │ $12,000    │ [✏️] [🗑️]           │
+│ ...        │ ...                 │ ...        │ ...                 │
+└────────────┴─────────────────────┴────────────┴─────────────────────┘
 
-Tabla examenes:
-┌──────────┬─────────────────┬───────────┐
-│ codigo   │ nombre          │ costo_neto│
-├──────────┼─────────────────┼───────────┤
-│ 01       │ Audiometría     │ 500       │  ← Se usa el costo de la PRIMERA fila
-│ 02       │ Espirometría    │ 600       │
-└──────────┴─────────────────┴───────────┘
-
-Tabla prestador_examenes:
-┌────────────────┬────────────────┬──────────────────┐
-│ prestador      │ examen         │ valor_prestacion │
-├────────────────┼────────────────┼──────────────────┤
-│ Prestador AB   │ Audiometría    │ 500              │  ← Cada prestador
-│ Prestador AC   │ Audiometría    │ 400              │  ← tiene su tarifa
-│ Prestador AB   │ Espirometría   │ 600              │
-└────────────────┴────────────────┴──────────────────┘
+Mostrando 45 de 150 exámenes
 ```
 
 ## Cambios a implementar
 
-### Modificar `src/lib/supabase.ts`
+### Modificar `src/pages/Examenes.tsx`
 
-1. **Al crear/actualizar exámenes**: Solo actualizar `costo_neto` en la **primera aparición** del código (no sobrescribir en filas posteriores)
+1. **Agregar estado para el filtro de búsqueda**
+   ```typescript
+   const [searchFilter, setSearchFilter] = useState("");
+   ```
 
-2. **Al crear relación prestador-examen**: Usar el costo de esa fila como `valor_prestacion` en lugar de 0
+2. **Crear función para filtrar exámenes**
+   ```typescript
+   const filteredExamenes = examenes.filter((examen) => {
+     const searchLower = searchFilter.toLowerCase().trim();
+     if (!searchLower) return true;
+     
+     const codigoMatch = examen.codigo?.toLowerCase().includes(searchLower);
+     const nombreMatch = examen.nombre.toLowerCase().includes(searchLower);
+     
+     return codigoMatch || nombreMatch;
+   });
+   ```
 
-3. **Si la relación ya existe**: Actualizar el `valor_prestacion` con el nuevo valor del Excel
+3. **Reemplazar grid de Cards por componente Table**
+   - Agregar Input de búsqueda arriba de la tabla
+   - Usar los componentes Table, TableHeader, TableBody, TableRow, TableHead, TableCell
+   - Columnas: Código, Nombre, Costo, Acciones (editar/eliminar)
+   - Mostrar contador de resultados filtrados
 
----
+### Estructura del nuevo código
+
+```text
+<TabsContent value="examenes">
+  ┌──────────────────────────────────────────────────┐
+  │ Input de búsqueda con ícono Search               │
+  │ placeholder="Buscar por código o nombre..."      │
+  └──────────────────────────────────────────────────┘
+  
+  ┌──────────────────────────────────────────────────┐
+  │ <Table>                                          │
+  │   <TableHeader>                                  │
+  │     - Código                                     │
+  │     - Nombre                                     │
+  │     - Costo                                      │
+  │     - Acciones                                   │
+  │   </TableHeader>                                 │
+  │   <TableBody>                                    │
+  │     {filteredExamenes.map(...)}                  │
+  │   </TableBody>                                   │
+  │ </Table>                                         │
+  └──────────────────────────────────────────────────┘
+  
+  <p>Mostrando X de Y exámenes</p>
+</TabsContent>
+```
 
 ## Detalles tecnicos
 
-### Cambio en la lógica de exámenes
-
+### Imports adicionales necesarios
 ```typescript
-// Antes (sobrescribe siempre):
-if (examenesMap.has(codigoLower)) {
-  await supabase.from("examenes")
-    .update({ nombre: row.nombre, costo_neto: row.costo ?? 0 })
-    .eq("id", examenId);
-}
-
-// Después (solo usa el existente, no sobrescribe):
-if (examenesMap.has(codigoLower)) {
-  examenId = examenesMap.get(codigoLower)!;
-  // No actualiza - mantiene el costo original
-}
+import { Search } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 ```
 
-### Cambio en la lógica de relaciones
-
+### Estado nuevo
 ```typescript
-// Antes:
-await supabase.from("prestador_examenes").insert({
-  prestador_id: prestadorId,
-  examen_id: examenId,
-  valor_prestacion: 0,  // Siempre 0
-});
+const [searchFilter, setSearchFilter] = useState("");
+```
 
-// Después:
-if (!relacionesSet.has(relacionKey)) {
-  // Crear nueva relación con el valor del Excel
-  await supabase.from("prestador_examenes").insert({
-    prestador_id: prestadorId,
-    examen_id: examenId,
-    valor_prestacion: row.costo ?? 0,  // Usar costo del Excel
+### Lógica de filtrado
+```typescript
+const filteredExamenes = useMemo(() => {
+  const searchLower = searchFilter.toLowerCase().trim();
+  if (!searchLower) return examenes;
+  
+  return examenes.filter((examen) => {
+    const codigoMatch = examen.codigo?.toLowerCase().includes(searchLower) || false;
+    const nombreMatch = examen.nombre.toLowerCase().includes(searchLower);
+    return codigoMatch || nombreMatch;
   });
-} else {
-  // Actualizar valor si la relación ya existe
-  await supabase.from("prestador_examenes")
-    .update({ valor_prestacion: row.costo ?? 0 })
-    .eq("prestador_id", prestadorId)
-    .eq("examen_id", examenId);
-}
+}, [examenes, searchFilter]);
 ```
 
-### Archivo a modificar
-- `src/lib/supabase.ts` - Función `importExamenesYPrestadoresFromExcel`
+### Componente de búsqueda
+```tsx
+<div className="relative mb-4">
+  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+  <Input
+    placeholder="Buscar por código o nombre..."
+    value={searchFilter}
+    onChange={(e) => setSearchFilter(e.target.value)}
+    className="pl-10"
+  />
+</div>
+```
 
-### Resultado esperado
-Con este cambio, podrás tener un archivo Excel donde el mismo examen aparece múltiples veces con diferentes prestadores y costos, y cada prestador tendrá su tarifa correcta guardada.
+### Tabla de exámenes
+```tsx
+<div className="rounded-md border">
+  <Table>
+    <TableHeader>
+      <TableRow>
+        <TableHead className="w-[120px]">Código</TableHead>
+        <TableHead>Nombre</TableHead>
+        <TableHead className="w-[120px] text-right">Costo</TableHead>
+        <TableHead className="w-[100px] text-center">Acciones</TableHead>
+      </TableRow>
+    </TableHeader>
+    <TableBody>
+      {filteredExamenes.map((examen) => (
+        <TableRow key={examen.id}>
+          <TableCell className="font-mono text-sm">
+            {examen.codigo || "-"}
+          </TableCell>
+          <TableCell>{examen.nombre}</TableCell>
+          <TableCell className="text-right">
+            {examen.costo_neto ? `$${examen.costo_neto.toLocaleString()}` : "-"}
+          </TableCell>
+          <TableCell className="text-center">
+            <div className="flex justify-center gap-1">
+              <Button variant="ghost" size="icon" onClick={...}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={...}>
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            </div>
+          </TableCell>
+        </TableRow>
+      ))}
+    </TableBody>
+  </Table>
+</div>
+
+<p className="text-sm text-muted-foreground mt-2">
+  Mostrando {filteredExamenes.length} de {examenes.length} exámenes
+</p>
+```
+
+### Archivos a modificar
+- `src/pages/Examenes.tsx`
+
+### Dependencias
+- Componentes Table ya existen en `src/components/ui/table.tsx`
+- Ícono Search de lucide-react ya está disponible
 
