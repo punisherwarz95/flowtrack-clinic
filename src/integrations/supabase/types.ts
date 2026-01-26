@@ -301,6 +301,27 @@ export type Database = {
           },
         ]
       }
+      codigo_diario_config: {
+        Row: {
+          created_at: string
+          hora_reset: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          hora_reset?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          hora_reset?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       codigos_diarios: {
         Row: {
           codigo: string
