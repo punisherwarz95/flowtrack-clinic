@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, ClipboardList, Package, Trash2, Pencil, FileText, DollarSign, Upload, FileSpreadsheet, CheckCircle2, AlertCircle } from "lucide-react";
+import { Plus, ClipboardList, Package, Trash2, Pencil, FileText, DollarSign, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Search } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
@@ -98,6 +99,9 @@ const Examenes = () => {
     nombre: "",
     descripcion: "",
   });
+
+  // Estado para filtro de búsqueda de exámenes
+  const [searchFilter, setSearchFilter] = useState("");
 
   // Estados para importación Excel
   const [openImportDialog, setOpenImportDialog] = useState(false);
@@ -523,6 +527,18 @@ const Examenes = () => {
       fileInputRef.current.value = "";
     }
   };
+
+  // Filtrar exámenes por código o nombre
+  const filteredExamenes = useMemo(() => {
+    const searchLower = searchFilter.toLowerCase().trim();
+    if (!searchLower) return examenes;
+    
+    return examenes.filter((examen) => {
+      const codigoMatch = examen.codigo?.toLowerCase().includes(searchLower) || false;
+      const nombreMatch = examen.nombre.toLowerCase().includes(searchLower);
+      return codigoMatch || nombreMatch;
+    });
+  }, [examenes, searchFilter]);
 
   // Calcular preview de la importación
   const getImportPreview = () => {
@@ -980,65 +996,92 @@ const Examenes = () => {
           </TabsList>
           
           <TabsContent value="examenes" className="mt-6">
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {examenes.map((examen) => (
-                <Card key={examen.id}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2">
-                        <ClipboardList className="h-5 w-5 text-primary" />
-                        {examen.nombre}
-                      </CardTitle>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={async () => {
-                            setEditingExamen(examen);
-                            setFormData({
-                              nombre: examen.nombre,
-                              descripcion: examen.descripcion || "",
-                              duracion_estimada: examen.duracion_estimada?.toString() || "",
-                              codigo: examen.codigo || "",
-                              costo_neto: examen.costo_neto?.toString() || "",
-                            });
-                            
-                            // Cargar boxes asociados al examen
-                            const { data: boxExamenes } = await supabase
-                              .from("box_examenes")
-                              .select("box_id")
-                              .eq("examen_id", examen.id);
-                            
-                            setSelectedBoxes(boxExamenes?.map(be => be.box_id) || []);
-                            setOpenExamenDialog(true);
-                          }}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setExamenToDelete(examen.id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {examen.descripcion && (
-                      <p className="text-sm text-muted-foreground mb-3">{examen.descripcion}</p>
-                    )}
-                    {examen.duracion_estimada && (
-                      <div className="text-sm">
-                        <span className="font-medium text-foreground">Duración:</span>{" "}
-                        <span className="text-muted-foreground">{examen.duracion_estimada} min</span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+            {/* Filtro de búsqueda */}
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por código o nombre..."
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                className="pl-10 max-w-md"
+              />
             </div>
+
+            {/* Tabla de exámenes */}
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[120px]">Código</TableHead>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead className="w-[120px] text-right">Costo</TableHead>
+                    <TableHead className="w-[100px] text-center">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredExamenes.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                        {searchFilter ? "No se encontraron exámenes" : "No hay exámenes registrados"}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredExamenes.map((examen) => (
+                      <TableRow key={examen.id}>
+                        <TableCell className="font-mono text-sm">
+                          {examen.codigo || "-"}
+                        </TableCell>
+                        <TableCell>{examen.nombre}</TableCell>
+                        <TableCell className="text-right">
+                          {examen.costo_neto ? `$${examen.costo_neto.toLocaleString()}` : "-"}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={async () => {
+                                setEditingExamen(examen);
+                                setFormData({
+                                  nombre: examen.nombre,
+                                  descripcion: examen.descripcion || "",
+                                  duracion_estimada: examen.duracion_estimada?.toString() || "",
+                                  codigo: examen.codigo || "",
+                                  costo_neto: examen.costo_neto?.toString() || "",
+                                });
+                                
+                                // Cargar boxes asociados al examen
+                                const { data: boxExamenes } = await supabase
+                                  .from("box_examenes")
+                                  .select("box_id")
+                                  .eq("examen_id", examen.id);
+                                
+                                setSelectedBoxes(boxExamenes?.map(be => be.box_id) || []);
+                                setOpenExamenDialog(true);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setExamenToDelete(examen.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Contador de resultados */}
+            <p className="text-sm text-muted-foreground mt-2">
+              Mostrando {filteredExamenes.length} de {examenes.length} exámenes
+            </p>
           </TabsContent>
 
           <TabsContent value="paquetes" className="mt-6">
