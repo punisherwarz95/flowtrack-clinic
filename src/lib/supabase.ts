@@ -1,4 +1,190 @@
 import { supabase } from "@/integrations/supabase/client";
+import * as XLSX from "xlsx";
+
+export interface ImportResult {
+  examenesCreados: number;
+  examenesActualizados: number;
+  prestadoresCreados: number;
+  relacionesCreadas: number;
+  errores: string[];
+}
+
+export interface ExcelRowData {
+  codigo: string;
+  nombre: string;
+  costo: number | null;
+  prestador: string | null;
+}
+
+export const parseExcelFile = async (file: File): Promise<ExcelRowData[]> => {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: "array" });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  
+  // Use defval to handle empty cells
+  const rawRows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { 
+    header: 1,
+    defval: ""
+  });
+
+  // Skip header row and process data
+  const rows: ExcelRowData[] = [];
+  for (let i = 1; i < rawRows.length; i++) {
+    const row = rawRows[i];
+    if (!row || !Array.isArray(row) || row.length < 2) continue;
+
+    const codigo = String(row[0] || "").trim();
+    const nombre = String(row[1] || "").trim();
+
+    if (!codigo || !nombre) continue;
+
+    rows.push({
+      codigo,
+      nombre,
+      costo: row[2] !== undefined && row[2] !== "" ? Number(row[2]) : null,
+      prestador: row[3] ? String(row[3]).trim() : null,
+    });
+  }
+
+  return rows;
+};
+
+export const importExamenesYPrestadoresFromExcel = async (
+  rows: ExcelRowData[],
+  onProgress?: (progress: number) => void
+): Promise<ImportResult> => {
+  const result: ImportResult = {
+    examenesCreados: 0,
+    examenesActualizados: 0,
+    prestadoresCreados: 0,
+    relacionesCreadas: 0,
+    errores: [],
+  };
+
+  // Cache para prestadores existentes
+  const { data: prestadoresExistentes } = await supabase
+    .from("prestadores")
+    .select("id, nombre");
+  
+  const prestadoresMap = new Map<string, string>();
+  prestadoresExistentes?.forEach((p) => {
+    prestadoresMap.set(p.nombre.toLowerCase().trim(), p.id);
+  });
+
+  // Cache para exámenes existentes
+  const { data: examenesExistentes } = await supabase
+    .from("examenes")
+    .select("id, codigo");
+  
+  const examenesMap = new Map<string, string>();
+  examenesExistentes?.forEach((e) => {
+    if (e.codigo) {
+      examenesMap.set(e.codigo.toLowerCase().trim(), e.id);
+    }
+  });
+
+  // Cache para relaciones existentes
+  const { data: relacionesExistentes } = await supabase
+    .from("prestador_examenes")
+    .select("prestador_id, examen_id");
+  
+  const relacionesSet = new Set<string>();
+  relacionesExistentes?.forEach((r) => {
+    relacionesSet.add(`${r.prestador_id}-${r.examen_id}`);
+  });
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    
+    try {
+      let examenId: string;
+      const codigoLower = row.codigo.toLowerCase().trim();
+
+      // 1. Buscar o crear examen
+      if (examenesMap.has(codigoLower)) {
+        examenId = examenesMap.get(codigoLower)!;
+        
+        // Actualizar examen existente
+        const { error } = await supabase
+          .from("examenes")
+          .update({
+            nombre: row.nombre,
+            costo_neto: row.costo ?? 0,
+          })
+          .eq("id", examenId);
+
+        if (error) throw error;
+        result.examenesActualizados++;
+      } else {
+        // Crear nuevo examen
+        const { data, error } = await supabase
+          .from("examenes")
+          .insert({
+            codigo: row.codigo,
+            nombre: row.nombre,
+            costo_neto: row.costo ?? 0,
+          })
+          .select("id")
+          .single();
+
+        if (error) throw error;
+        examenId = data.id;
+        examenesMap.set(codigoLower, examenId);
+        result.examenesCreados++;
+      }
+
+      // 2. Si hay prestador, buscar o crear
+      if (row.prestador) {
+        const prestadorLower = row.prestador.toLowerCase().trim();
+        let prestadorId: string;
+
+        if (prestadoresMap.has(prestadorLower)) {
+          prestadorId = prestadoresMap.get(prestadorLower)!;
+        } else {
+          // Crear nuevo prestador
+          const { data, error } = await supabase
+            .from("prestadores")
+            .insert({
+              nombre: row.prestador,
+              activo: true,
+            })
+            .select("id")
+            .single();
+
+          if (error) throw error;
+          prestadorId = data.id;
+          prestadoresMap.set(prestadorLower, prestadorId);
+          result.prestadoresCreados++;
+        }
+
+        // 3. Crear relación si no existe
+        const relacionKey = `${prestadorId}-${examenId}`;
+        if (!relacionesSet.has(relacionKey)) {
+          const { error } = await supabase
+            .from("prestador_examenes")
+            .insert({
+              prestador_id: prestadorId,
+              examen_id: examenId,
+              valor_prestacion: 0,
+            });
+
+          if (error) throw error;
+          relacionesSet.add(relacionKey);
+          result.relacionesCreadas++;
+        }
+      }
+    } catch (error: any) {
+      result.errores.push(`Fila ${i + 2}: ${error.message || "Error desconocido"}`);
+    }
+
+    // Reportar progreso
+    if (onProgress) {
+      onProgress(Math.round(((i + 1) / rows.length) * 100));
+    }
+  }
+
+  return result;
+};
 
 export const importPatientsFromExcel = async (file: File) => {
   // Leer archivo Excel usando FileReader
