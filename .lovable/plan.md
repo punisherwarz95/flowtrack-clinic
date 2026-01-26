@@ -1,154 +1,103 @@
 
-# Plan: Carga Masiva de Exámenes y Prestadores desde Excel
+
+# Plan: Usar Costo del Excel como Valor de Prestación por Prestador
 
 ## Objetivo
-Implementar una funcionalidad para cargar un archivo Excel que contenga información de exámenes (codigo, nombre, costo) y sus prestadores asociados, permitiendo:
-1. Crear/actualizar exámenes en la tabla `examenes`
-2. Asignar automáticamente los prestadores a cada examen en `prestador_examenes`
+Modificar el importador para que el costo de cada fila se guarde como el **valor que cobra cada prestador por ese examen** (`valor_prestacion` en `prestador_examenes`), en lugar de sobrescribir el costo base del examen.
 
-## Flujo propuesto
+## Nuevo comportamiento propuesto
 
 ```text
-┌─────────────────────────────────────────────────────────────────────┐
-│                    CARGA MASIVA DESDE EXCEL                         │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  Archivo Excel esperado:                                            │
-│  ┌──────────┬────────────────────┬─────────┬───────────────────┐   │
-│  │ CODIGO   │ NOMBRE             │ COSTO   │ PRESTADOR         │   │
-│  ├──────────┼────────────────────┼─────────┼───────────────────┤   │
-│  │ EX-001   │ Audiometría        │ 5000    │ Dr. García        │   │
-│  │ EX-002   │ Espirometría       │ 8000    │ Dr. García        │   │
-│  │ EX-003   │ Radiografía Tórax  │ 12000   │ Dr. López         │   │
-│  └──────────┴────────────────────┴─────────┴───────────────────┘   │
-│                                                                     │
-│  Proceso:                                                           │
-│  1. Usuario sube archivo .xlsx/.csv                                 │
-│  2. Sistema parsea las filas                                        │
-│  3. Por cada fila:                                                  │
-│     a) Busca examen por código → si no existe, lo crea            │
-│     b) Busca prestador por nombre → si no existe, lo crea         │
-│     c) Crea relación en prestador_examenes                        │
-│  4. Muestra resumen de la operación                                │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
-```
+Excel de entrada:
+┌──────────┬─────────────────┬─────────┬──────────────┐
+│ CODIGO   │ NOMBRE          │ COSTO   │ PRESTADOR    │
+├──────────┼─────────────────┼─────────┼──────────────┤
+│ 01       │ Audiometría     │ 500     │ Prestador AB │
+│ 01       │ Audiometría     │ 400     │ Prestador AC │
+│ 02       │ Espirometría    │ 600     │ Prestador AB │
+└──────────┴─────────────────┴─────────┴──────────────┘
 
-## Ubicación del componente
+Resultado en base de datos:
 
-Se agregará un botón de "Importar Excel" en la página de **Exámenes** (junto a los botones existentes), ya que es el módulo principal donde se gestionan los exámenes:
+Tabla examenes:
+┌──────────┬─────────────────┬───────────┐
+│ codigo   │ nombre          │ costo_neto│
+├──────────┼─────────────────┼───────────┤
+│ 01       │ Audiometría     │ 500       │  ← Se usa el costo de la PRIMERA fila
+│ 02       │ Espirometría    │ 600       │
+└──────────┴─────────────────┴───────────┘
 
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│ Exámenes y Paquetes                                             │
-│ Administra exámenes individuales y paquetes                     │
-├─────────────────────────────────────────────────────────────────┤
-│ [📥 Importar Excel] [+ Nuevo Examen] [📦 Nuevo Paquete]         │
-└─────────────────────────────────────────────────────────────────┘
+Tabla prestador_examenes:
+┌────────────────┬────────────────┬──────────────────┐
+│ prestador      │ examen         │ valor_prestacion │
+├────────────────┼────────────────┼──────────────────┤
+│ Prestador AB   │ Audiometría    │ 500              │  ← Cada prestador
+│ Prestador AC   │ Audiometría    │ 400              │  ← tiene su tarifa
+│ Prestador AB   │ Espirometría   │ 600              │
+└────────────────┴────────────────┴──────────────────┘
 ```
 
 ## Cambios a implementar
 
-### 1. Nueva función de importación en `src/lib/supabase.ts`
-Agregar función `importExamenesYPrestadoresFromExcel` que:
-- Lee archivo Excel real usando la librería `xlsx` (ya instalada)
-- Procesa cada fila con: codigo, nombre, costo, prestador
-- Implementa lógica de upsert para exámenes (buscar por código, crear si no existe)
-- Implementa lógica de upsert para prestadores (buscar por nombre, crear si no existe)
-- Crea las relaciones en `prestador_examenes`
+### Modificar `src/lib/supabase.ts`
 
-### 2. Modificar `src/pages/Examenes.tsx`
-- Agregar botón "Importar Excel" con ícono de Upload
-- Agregar Dialog para el proceso de importación con:
-  - Input file para seleccionar archivo
-  - Preview de los datos a importar (opcional)
-  - Barra de progreso durante la importación
-  - Resumen de resultados (exámenes creados, prestadores creados, relaciones creadas)
+1. **Al crear/actualizar exámenes**: Solo actualizar `costo_neto` en la **primera aparición** del código (no sobrescribir en filas posteriores)
+
+2. **Al crear relación prestador-examen**: Usar el costo de esa fila como `valor_prestacion` en lugar de 0
+
+3. **Si la relación ya existe**: Actualizar el `valor_prestacion` con el nuevo valor del Excel
 
 ---
 
 ## Detalles tecnicos
 
-### Estructura esperada del Excel
-| Columna | Campo | Obligatorio | Descripción |
-|---------|-------|-------------|-------------|
-| A | codigo | Sí | Código único del examen (ej: EX-001) |
-| B | nombre | Sí | Nombre del examen |
-| C | costo | No | Costo neto del examen (número) |
-| D | prestador | No | Nombre del prestador que realiza el examen |
+### Cambio en la lógica de exámenes
 
-### Lógica de procesamiento
 ```typescript
-async function importExamenesYPrestadoresFromExcel(file: File) {
-  // 1. Leer Excel con xlsx
-  const workbook = XLSX.read(await file.arrayBuffer());
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(sheet);
-  
-  // 2. Procesar cada fila
-  for (const row of rows) {
-    // 2a. Buscar o crear examen
-    let examen = await buscarExamenPorCodigo(row.codigo);
-    if (!examen) {
-      examen = await crearExamen({ codigo, nombre, costo });
-    } else {
-      await actualizarExamen(examen.id, { nombre, costo });
-    }
-    
-    // 2b. Si hay prestador, buscar o crear
-    if (row.prestador) {
-      let prestador = await buscarPrestadorPorNombre(row.prestador);
-      if (!prestador) {
-        prestador = await crearPrestador({ nombre: row.prestador });
-      }
-      
-      // 2c. Crear relación prestador-examen (si no existe)
-      await crearRelacionPrestadorExamen(prestador.id, examen.id);
-    }
-  }
+// Antes (sobrescribe siempre):
+if (examenesMap.has(codigoLower)) {
+  await supabase.from("examenes")
+    .update({ nombre: row.nombre, costo_neto: row.costo ?? 0 })
+    .eq("id", examenId);
+}
+
+// Después (solo usa el existente, no sobrescribe):
+if (examenesMap.has(codigoLower)) {
+  examenId = examenesMap.get(codigoLower)!;
+  // No actualiza - mantiene el costo original
 }
 ```
 
-### Manejo de duplicados
-- **Exámenes**: Se busca por `codigo`. Si existe, se actualiza nombre y costo. Si no existe, se crea.
-- **Prestadores**: Se busca por `nombre` (case-insensitive). Si existe, se usa el existente. Si no, se crea con datos mínimos.
-- **Relaciones**: Se verifica si ya existe la relación prestador-examen antes de crear.
+### Cambio en la lógica de relaciones
 
-### UI del Dialog de importación
-```text
-┌─────────────────────────────────────────────────────────┐
-│ Importar Exámenes desde Excel                           │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│ Formato esperado del archivo:                           │
-│ - Columna A: Código del examen                         │
-│ - Columna B: Nombre del examen                         │
-│ - Columna C: Costo neto (opcional)                     │
-│ - Columna D: Nombre del prestador (opcional)           │
-│                                                         │
-│ [📎 Seleccionar archivo...           ]                  │
-│                                                         │
-│ (Después de cargar)                                     │
-│ ┌─────────────────────────────────────────────────────┐│
-│ │ Se encontraron 45 registros                         ││
-│ │ • 30 exámenes nuevos                                ││
-│ │ • 15 exámenes a actualizar                          ││
-│ │ • 3 prestadores nuevos                              ││
-│ └─────────────────────────────────────────────────────┘│
-│                                                         │
-│            [Cancelar]  [Importar]                       │
-└─────────────────────────────────────────────────────────┘
+```typescript
+// Antes:
+await supabase.from("prestador_examenes").insert({
+  prestador_id: prestadorId,
+  examen_id: examenId,
+  valor_prestacion: 0,  // Siempre 0
+});
+
+// Después:
+if (!relacionesSet.has(relacionKey)) {
+  // Crear nueva relación con el valor del Excel
+  await supabase.from("prestador_examenes").insert({
+    prestador_id: prestadorId,
+    examen_id: examenId,
+    valor_prestacion: row.costo ?? 0,  // Usar costo del Excel
+  });
+} else {
+  // Actualizar valor si la relación ya existe
+  await supabase.from("prestador_examenes")
+    .update({ valor_prestacion: row.costo ?? 0 })
+    .eq("prestador_id", prestadorId)
+    .eq("examen_id", examenId);
+}
 ```
 
-### Archivos a modificar
-1. `src/lib/supabase.ts` - Agregar función de importación
-2. `src/pages/Examenes.tsx` - Agregar botón y dialog de importación
+### Archivo a modificar
+- `src/lib/supabase.ts` - Función `importExamenesYPrestadoresFromExcel`
 
-### Dependencias
-- Se usará la librería `xlsx` que ya está instalada en el proyecto
+### Resultado esperado
+Con este cambio, podrás tener un archivo Excel donde el mismo examen aparece múltiples veces con diferentes prestadores y costos, y cada prestador tendrá su tarifa correcta guardada.
 
-### Manejo de errores
-- Validación de columnas obligatorias (codigo, nombre)
-- Mensaje de error si el archivo no tiene el formato esperado
-- Log de filas que fallan individualmente sin detener toda la importación
-- Resumen final con cantidad de éxitos y errores
