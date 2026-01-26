@@ -126,20 +126,10 @@ export const importExamenesYPrestadoresFromExcel = async (
       const codigoLower = row.codigo.toLowerCase().trim();
 
       // 1. Buscar o crear examen
+      // Si ya existe, solo usamos el ID existente (no actualizamos costo_neto)
       if (examenesMap.has(codigoLower)) {
         examenId = examenesMap.get(codigoLower)!;
-        
-        // Actualizar examen existente
-        const { error } = await supabase
-          .from("examenes")
-          .update({
-            nombre: row.nombre,
-            costo_neto: row.costo ?? 0,
-          })
-          .eq("id", examenId);
-
-        if (error) throw error;
-        result.examenesActualizados++;
+        // No actualizamos - el costo base se mantiene del primer registro
       } else {
         // Crear nuevo examen
         const { data, error } = await supabase
@@ -182,20 +172,30 @@ export const importExamenesYPrestadoresFromExcel = async (
           result.prestadoresCreados++;
         }
 
-        // 3. Crear relación prestador-examen si no existe
+        // 3. Crear o actualizar relación prestador-examen
         const relacionKey = `${prestadorId}-${examenId}`;
         if (!relacionesSet.has(relacionKey)) {
+          // Crear nueva relación con el valor del Excel
           const { error } = await supabase
             .from("prestador_examenes")
             .insert({
               prestador_id: prestadorId,
               examen_id: examenId,
-              valor_prestacion: 0,
+              valor_prestacion: row.costo ?? 0,
             });
 
           if (error) throw error;
           relacionesSet.add(relacionKey);
           result.relacionesCreadas++;
+        } else {
+          // Actualizar valor_prestacion si la relación ya existe
+          const { error } = await supabase
+            .from("prestador_examenes")
+            .update({ valor_prestacion: row.costo ?? 0 })
+            .eq("prestador_id", prestadorId)
+            .eq("examen_id", examenId);
+
+          if (error) throw error;
         }
       }
 
