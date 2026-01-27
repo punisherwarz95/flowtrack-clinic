@@ -14,6 +14,84 @@ export type Database = {
   }
   public: {
     Tables: {
+      agenda_bloques: {
+        Row: {
+          activo: boolean | null
+          created_at: string | null
+          cupo_maximo: number
+          hora_fin: string
+          hora_inicio: string
+          id: string
+          nombre: string
+          orden: number | null
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string | null
+          cupo_maximo?: number
+          hora_fin: string
+          hora_inicio: string
+          id?: string
+          nombre: string
+          orden?: number | null
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string | null
+          cupo_maximo?: number
+          hora_fin?: string
+          hora_inicio?: string
+          id?: string
+          nombre?: string
+          orden?: number | null
+        }
+        Relationships: []
+      }
+      agenda_cupos: {
+        Row: {
+          bloque_id: string
+          created_at: string | null
+          cupos_reservados: number
+          empresa_id: string
+          fecha: string
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          bloque_id: string
+          created_at?: string | null
+          cupos_reservados?: number
+          empresa_id: string
+          fecha: string
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          bloque_id?: string
+          created_at?: string | null
+          cupos_reservados?: number
+          empresa_id?: string
+          fecha?: string
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agenda_cupos_bloque_id_fkey"
+            columns: ["bloque_id"]
+            isOneToOne: false
+            referencedRelation: "agenda_bloques"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_cupos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       atencion_documentos: {
         Row: {
           atencion_id: string
@@ -132,6 +210,7 @@ export type Database = {
           numero_ingreso: number | null
           observaciones: string | null
           paciente_id: string
+          prereserva_id: string | null
         }
         Insert: {
           box_id?: string | null
@@ -145,6 +224,7 @@ export type Database = {
           numero_ingreso?: number | null
           observaciones?: string | null
           paciente_id: string
+          prereserva_id?: string | null
         }
         Update: {
           box_id?: string | null
@@ -158,6 +238,7 @@ export type Database = {
           numero_ingreso?: number | null
           observaciones?: string | null
           paciente_id?: string
+          prereserva_id?: string | null
         }
         Relationships: [
           {
@@ -172,6 +253,13 @@ export type Database = {
             columns: ["paciente_id"]
             isOneToOne: false
             referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atenciones_prereserva_id_fkey"
+            columns: ["prereserva_id"]
+            isOneToOne: false
+            referencedRelation: "prereservas"
             referencedColumns: ["id"]
           },
         ]
@@ -208,6 +296,45 @@ export type Database = {
           },
           {
             foreignKeyName: "bateria_documentos_paquete_id_fkey"
+            columns: ["paquete_id"]
+            isOneToOne: false
+            referencedRelation: "paquetes_examenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bateria_faenas: {
+        Row: {
+          activo: boolean | null
+          created_at: string | null
+          faena_id: string
+          id: string
+          paquete_id: string
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string | null
+          faena_id: string
+          id?: string
+          paquete_id: string
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string | null
+          faena_id?: string
+          id?: string
+          paquete_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bateria_faenas_faena_id_fkey"
+            columns: ["faena_id"]
+            isOneToOne: false
+            referencedRelation: "faenas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bateria_faenas_paquete_id_fkey"
             columns: ["paquete_id"]
             isOneToOne: false
             referencedRelation: "paquetes_examenes"
@@ -444,6 +571,135 @@ export type Database = {
           },
         ]
       }
+      cotizacion_solicitud_items: {
+        Row: {
+          cantidad_estimada: number | null
+          created_at: string | null
+          descripcion: string | null
+          examen_id: string | null
+          id: string
+          paquete_id: string | null
+          solicitud_id: string
+        }
+        Insert: {
+          cantidad_estimada?: number | null
+          created_at?: string | null
+          descripcion?: string | null
+          examen_id?: string | null
+          id?: string
+          paquete_id?: string | null
+          solicitud_id: string
+        }
+        Update: {
+          cantidad_estimada?: number | null
+          created_at?: string | null
+          descripcion?: string | null
+          examen_id?: string | null
+          id?: string
+          paquete_id?: string | null
+          solicitud_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotizacion_solicitud_items_examen_id_fkey"
+            columns: ["examen_id"]
+            isOneToOne: false
+            referencedRelation: "examenes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotizacion_solicitud_items_paquete_id_fkey"
+            columns: ["paquete_id"]
+            isOneToOne: false
+            referencedRelation: "paquetes_examenes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotizacion_solicitud_items_solicitud_id_fkey"
+            columns: ["solicitud_id"]
+            isOneToOne: false
+            referencedRelation: "cotizacion_solicitudes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cotizacion_solicitudes: {
+        Row: {
+          aceptado_at: string | null
+          cotizacion_id: string | null
+          created_at: string | null
+          descripcion: string | null
+          empresa_id: string
+          empresa_usuario_id: string | null
+          estado: string | null
+          faena_id: string | null
+          id: string
+          respondido_at: string | null
+          respondido_por: string | null
+          titulo: string
+          updated_at: string | null
+        }
+        Insert: {
+          aceptado_at?: string | null
+          cotizacion_id?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          empresa_id: string
+          empresa_usuario_id?: string | null
+          estado?: string | null
+          faena_id?: string | null
+          id?: string
+          respondido_at?: string | null
+          respondido_por?: string | null
+          titulo: string
+          updated_at?: string | null
+        }
+        Update: {
+          aceptado_at?: string | null
+          cotizacion_id?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string
+          empresa_usuario_id?: string | null
+          estado?: string | null
+          faena_id?: string | null
+          id?: string
+          respondido_at?: string | null
+          respondido_por?: string | null
+          titulo?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotizacion_solicitudes_cotizacion_id_fkey"
+            columns: ["cotizacion_id"]
+            isOneToOne: false
+            referencedRelation: "cotizaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotizacion_solicitudes_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotizacion_solicitudes_empresa_usuario_id_fkey"
+            columns: ["empresa_usuario_id"]
+            isOneToOne: false
+            referencedRelation: "empresa_usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotizacion_solicitudes_faena_id_fkey"
+            columns: ["faena_id"]
+            isOneToOne: false
+            referencedRelation: "faenas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cotizaciones: {
         Row: {
           afecto_iva: boolean
@@ -461,6 +717,7 @@ export type Database = {
           id: string
           numero_cotizacion: number
           observaciones: string | null
+          solicitud_id: string | null
           subtotal_neto: number | null
           total_con_iva: number | null
           total_con_margen: number | null
@@ -482,6 +739,7 @@ export type Database = {
           id?: string
           numero_cotizacion?: number
           observaciones?: string | null
+          solicitud_id?: string | null
           subtotal_neto?: number | null
           total_con_iva?: number | null
           total_con_margen?: number | null
@@ -503,6 +761,7 @@ export type Database = {
           id?: string
           numero_cotizacion?: number
           observaciones?: string | null
+          solicitud_id?: string | null
           subtotal_neto?: number | null
           total_con_iva?: number | null
           total_con_margen?: number | null
@@ -514,6 +773,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotizaciones_solicitud_id_fkey"
+            columns: ["solicitud_id"]
+            isOneToOne: false
+            referencedRelation: "cotizacion_solicitudes"
             referencedColumns: ["id"]
           },
         ]
@@ -634,6 +900,79 @@ export type Database = {
           },
         ]
       }
+      empresa_user_roles: {
+        Row: {
+          created_at: string | null
+          empresa_usuario_id: string
+          id: string
+          role: string
+        }
+        Insert: {
+          created_at?: string | null
+          empresa_usuario_id: string
+          id?: string
+          role?: string
+        }
+        Update: {
+          created_at?: string | null
+          empresa_usuario_id?: string
+          id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "empresa_user_roles_empresa_usuario_id_fkey"
+            columns: ["empresa_usuario_id"]
+            isOneToOne: false
+            referencedRelation: "empresa_usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      empresa_usuarios: {
+        Row: {
+          activo: boolean | null
+          auth_user_id: string | null
+          cargo: string | null
+          created_at: string | null
+          email: string
+          empresa_id: string
+          id: string
+          nombre: string
+          updated_at: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          auth_user_id?: string | null
+          cargo?: string | null
+          created_at?: string | null
+          email: string
+          empresa_id: string
+          id?: string
+          nombre: string
+          updated_at?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          auth_user_id?: string | null
+          cargo?: string | null
+          created_at?: string | null
+          email?: string
+          empresa_id?: string
+          id?: string
+          nombre?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "empresa_usuarios_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       empresas: {
         Row: {
           activo: boolean | null
@@ -673,6 +1012,185 @@ export type Database = {
         }
         Relationships: []
       }
+      estado_pago_items: {
+        Row: {
+          atencion_id: string
+          baterias: Json | null
+          cargo: string | null
+          created_at: string | null
+          estado_pago_id: string
+          faena: string | null
+          fecha_atencion: string
+          id: string
+          paciente_nombre: string
+          paciente_rut: string | null
+          subtotal: number | null
+        }
+        Insert: {
+          atencion_id: string
+          baterias?: Json | null
+          cargo?: string | null
+          created_at?: string | null
+          estado_pago_id: string
+          faena?: string | null
+          fecha_atencion: string
+          id?: string
+          paciente_nombre: string
+          paciente_rut?: string | null
+          subtotal?: number | null
+        }
+        Update: {
+          atencion_id?: string
+          baterias?: Json | null
+          cargo?: string | null
+          created_at?: string | null
+          estado_pago_id?: string
+          faena?: string | null
+          fecha_atencion?: string
+          id?: string
+          paciente_nombre?: string
+          paciente_rut?: string | null
+          subtotal?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estado_pago_items_atencion_id_fkey"
+            columns: ["atencion_id"]
+            isOneToOne: false
+            referencedRelation: "atenciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estado_pago_items_estado_pago_id_fkey"
+            columns: ["estado_pago_id"]
+            isOneToOne: false
+            referencedRelation: "estados_pago"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      estados_pago: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          empresa_id: string
+          estado: string | null
+          fecha_desde: string
+          fecha_hasta: string
+          id: string
+          numero: number
+          observaciones: string | null
+          total: number | null
+          total_iva: number | null
+          total_neto: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          empresa_id: string
+          estado?: string | null
+          fecha_desde: string
+          fecha_hasta: string
+          id?: string
+          numero: number
+          observaciones?: string | null
+          total?: number | null
+          total_iva?: number | null
+          total_neto?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          empresa_id?: string
+          estado?: string | null
+          fecha_desde?: string
+          fecha_hasta?: string
+          id?: string
+          numero?: number
+          observaciones?: string | null
+          total?: number | null
+          total_iva?: number | null
+          total_neto?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estados_pago_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      evaluaciones_clinicas: {
+        Row: {
+          atencion_id: string
+          created_at: string | null
+          datos_clinicos: Json | null
+          evaluado_at: string | null
+          evaluado_por: string | null
+          id: string
+          numero_informe: number | null
+          observaciones: string | null
+          paquete_id: string
+          restricciones: string | null
+          resultado: string | null
+          revisado_at: string | null
+          revisado_por: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          atencion_id: string
+          created_at?: string | null
+          datos_clinicos?: Json | null
+          evaluado_at?: string | null
+          evaluado_por?: string | null
+          id?: string
+          numero_informe?: number | null
+          observaciones?: string | null
+          paquete_id: string
+          restricciones?: string | null
+          resultado?: string | null
+          revisado_at?: string | null
+          revisado_por?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          atencion_id?: string
+          created_at?: string | null
+          datos_clinicos?: Json | null
+          evaluado_at?: string | null
+          evaluado_por?: string | null
+          id?: string
+          numero_informe?: number | null
+          observaciones?: string | null
+          paquete_id?: string
+          restricciones?: string | null
+          resultado?: string | null
+          revisado_at?: string | null
+          revisado_por?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaluaciones_clinicas_atencion_id_fkey"
+            columns: ["atencion_id"]
+            isOneToOne: false
+            referencedRelation: "atenciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evaluaciones_clinicas_paquete_id_fkey"
+            columns: ["paquete_id"]
+            isOneToOne: false
+            referencedRelation: "paquetes_examenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       examenes: {
         Row: {
           codigo: string | null
@@ -702,6 +1220,41 @@ export type Database = {
           nombre?: string
         }
         Relationships: []
+      }
+      faenas: {
+        Row: {
+          activo: boolean | null
+          created_at: string | null
+          direccion: string | null
+          empresa_id: string
+          id: string
+          nombre: string
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string | null
+          direccion?: string | null
+          empresa_id: string
+          id?: string
+          nombre: string
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string | null
+          direccion?: string | null
+          empresa_id?: string
+          id?: string
+          nombre?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "faenas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       margenes_cotizacion: {
         Row: {
@@ -791,10 +1344,12 @@ export type Database = {
       }
       pacientes: {
         Row: {
+          cargo: string | null
           created_at: string | null
           direccion: string | null
           email: string | null
           empresa_id: string | null
+          faena_id: string | null
           fecha_nacimiento: string | null
           id: string
           nombre: string
@@ -803,10 +1358,12 @@ export type Database = {
           tipo_servicio: Database["public"]["Enums"]["tipo_servicio"] | null
         }
         Insert: {
+          cargo?: string | null
           created_at?: string | null
           direccion?: string | null
           email?: string | null
           empresa_id?: string | null
+          faena_id?: string | null
           fecha_nacimiento?: string | null
           id?: string
           nombre: string
@@ -815,10 +1372,12 @@ export type Database = {
           tipo_servicio?: Database["public"]["Enums"]["tipo_servicio"] | null
         }
         Update: {
+          cargo?: string | null
           created_at?: string | null
           direccion?: string | null
           email?: string | null
           empresa_id?: string | null
+          faena_id?: string | null
           fecha_nacimiento?: string | null
           id?: string
           nombre?: string
@@ -832,6 +1391,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pacientes_faena_id_fkey"
+            columns: ["faena_id"]
+            isOneToOne: false
+            referencedRelation: "faenas"
             referencedColumns: ["id"]
           },
         ]
@@ -892,6 +1458,138 @@ export type Database = {
           nombre?: string
         }
         Relationships: []
+      }
+      prereserva_baterias: {
+        Row: {
+          created_at: string | null
+          id: string
+          paquete_id: string
+          prereserva_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          paquete_id: string
+          prereserva_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          paquete_id?: string
+          prereserva_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prereserva_baterias_paquete_id_fkey"
+            columns: ["paquete_id"]
+            isOneToOne: false
+            referencedRelation: "paquetes_examenes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prereserva_baterias_prereserva_id_fkey"
+            columns: ["prereserva_id"]
+            isOneToOne: false
+            referencedRelation: "prereservas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prereservas: {
+        Row: {
+          atencion_id: string | null
+          bloque_id: string
+          cargo: string
+          confirmado_at: string | null
+          confirmado_por: string | null
+          created_at: string | null
+          created_by: string | null
+          email: string | null
+          empresa_id: string
+          estado: string | null
+          faena_id: string
+          fecha: string
+          id: string
+          nombre: string
+          rut: string
+          telefono: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          atencion_id?: string | null
+          bloque_id: string
+          cargo: string
+          confirmado_at?: string | null
+          confirmado_por?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          email?: string | null
+          empresa_id: string
+          estado?: string | null
+          faena_id: string
+          fecha: string
+          id?: string
+          nombre: string
+          rut: string
+          telefono?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          atencion_id?: string | null
+          bloque_id?: string
+          cargo?: string
+          confirmado_at?: string | null
+          confirmado_por?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          email?: string | null
+          empresa_id?: string
+          estado?: string | null
+          faena_id?: string
+          fecha?: string
+          id?: string
+          nombre?: string
+          rut?: string
+          telefono?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prereservas_atencion_id_fkey"
+            columns: ["atencion_id"]
+            isOneToOne: false
+            referencedRelation: "atenciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prereservas_bloque_id_fkey"
+            columns: ["bloque_id"]
+            isOneToOne: false
+            referencedRelation: "agenda_bloques"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prereservas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "empresa_usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prereservas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prereservas_faena_id_fkey"
+            columns: ["faena_id"]
+            isOneToOne: false
+            referencedRelation: "faenas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       prestador_examenes: {
         Row: {
@@ -1060,6 +1758,12 @@ export type Database = {
     }
     Functions: {
       get_next_cotizacion_number: { Args: never; Returns: number }
+      get_next_estado_pago_number: {
+        Args: { p_empresa_id: string }
+        Returns: number
+      }
+      get_next_informe_number: { Args: never; Returns: number }
+      get_user_empresa_id: { Args: { p_user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1067,6 +1771,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_empresa_user: { Args: { p_user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "user"

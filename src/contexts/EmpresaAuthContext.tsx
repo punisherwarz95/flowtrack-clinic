@@ -1,0 +1,203 @@
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Session, User } from "@supabase/supabase-js";
+
+interface EmpresaUsuario {
+  id: string;
+  empresa_id: string;
+  auth_user_id: string;
+  email: string;
+  nombre: string;
+  cargo: string | null;
+  activo: boolean;
+  empresas?: {
+    id: string;
+    nombre: string;
+    rut: string | null;
+    razon_social: string | null;
+  };
+}
+
+interface EmpresaAuthContextType {
+  session: Session | null;
+  user: User | null;
+  empresaUsuario: EmpresaUsuario | null;
+  loading: boolean;
+  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (data: SignUpData) => Promise<{ error: string | null; success: boolean }>;
+  signOut: () => Promise<void>;
+  checkEmpresa: (rut: string) => Promise<{ exists: boolean; empresa?: { id: string; nombre: string; rut: string } }>;
+}
+
+interface SignUpData {
+  email: string;
+  password: string;
+  nombre: string;
+  cargo?: string;
+  empresa_rut: string;
+}
+
+const EmpresaAuthContext = createContext<EmpresaAuthContextType | undefined>(undefined);
+
+export const EmpresaAuthProvider = ({ children }: { children: ReactNode }) => {
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [empresaUsuario, setEmpresaUsuario] = useState<EmpresaUsuario | null>(null);
+  const [loading, setLoading] = useState(true);
+  const initializedRef = useRef(false);
+
+  useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, currentSession) => {
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+
+        if (currentSession?.user) {
+          // Cargar datos del usuario de empresa de forma asíncrona
+          setTimeout(() => {
+            loadEmpresaUsuario(currentSession.user.id);
+          }, 0);
+        } else {
+          setEmpresaUsuario(null);
+          setLoading(false);
+        }
+      }
+    );
+
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
+
+      if (currentSession?.user) {
+        loadEmpresaUsuario(currentSession.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const loadEmpresaUsuario = async (authUserId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("empresa_usuarios")
+        .select("*, empresas(*)")
+        .eq("auth_user_id", authUserId)
+        .eq("activo", true)
+        .limit(1);
+
+      if (error) {
+        console.error("Error cargando empresa_usuario:", error);
+        setEmpresaUsuario(null);
+      } else if (data && data.length > 0) {
+        setEmpresaUsuario(data[0] as unknown as EmpresaUsuario);
+      } else {
+        setEmpresaUsuario(null);
+      }
+    } catch (err) {
+      console.error("Error en loadEmpresaUsuario:", err);
+      setEmpresaUsuario(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signIn = async (email: string, password: string): Promise<{ error: string | null }> => {
+    try {
+      const response = await supabase.functions.invoke("empresa-auth/login", {
+        body: { email, password },
+      });
+
+      if (response.error) {
+        return { error: response.error.message };
+      }
+
+      if (response.data?.error) {
+        return { error: response.data.error };
+      }
+
+      if (response.data?.session) {
+        await supabase.auth.setSession(response.data.session);
+        setEmpresaUsuario(response.data.empresa_usuario);
+      }
+
+      return { error: null };
+    } catch (err: any) {
+      console.error("Error en signIn:", err);
+      return { error: "Error al iniciar sesión" };
+    }
+  };
+
+  const signUp = async (data: SignUpData): Promise<{ error: string | null; success: boolean }> => {
+    try {
+      const response = await supabase.functions.invoke("empresa-auth/signup", {
+        body: data,
+      });
+
+      if (response.error) {
+        return { error: response.error.message, success: false };
+      }
+
+      if (response.data?.error) {
+        return { error: response.data.error, success: false };
+      }
+
+      return { error: null, success: true };
+    } catch (err: any) {
+      console.error("Error en signUp:", err);
+      return { error: "Error al registrar usuario", success: false };
+    }
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setEmpresaUsuario(null);
+  };
+
+  const checkEmpresa = async (rut: string): Promise<{ exists: boolean; empresa?: { id: string; nombre: string; rut: string } }> => {
+    try {
+      const response = await supabase.functions.invoke("empresa-auth/check-empresa", {
+        body: { rut },
+      });
+
+      if (response.error) {
+        return { exists: false };
+      }
+
+      return response.data;
+    } catch (err) {
+      console.error("Error en checkEmpresa:", err);
+      return { exists: false };
+    }
+  };
+
+  return (
+    <EmpresaAuthContext.Provider
+      value={{
+        session,
+        user,
+        empresaUsuario,
+        loading,
+        signIn,
+        signUp,
+        signOut,
+        checkEmpresa,
+      }}
+    >
+      {children}
+    </EmpresaAuthContext.Provider>
+  );
+};
+
+export const useEmpresaAuth = () => {
+  const context = useContext(EmpresaAuthContext);
+  if (context === undefined) {
+    throw new Error("useEmpresaAuth must be used within an EmpresaAuthProvider");
+  }
+  return context;
+};
