@@ -153,13 +153,16 @@ const EmpresaBaterias = () => {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Faena</label>
-                <Select value={selectedFaenaId} onValueChange={setSelectedFaenaId}>
+                <Select
+                  value={selectedFaenaId}
+                  onValueChange={(v) => setSelectedFaenaId(v === "__all__" ? "" : v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Todas las faenas" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todas las faenas</SelectItem>
-                    {faenas.map((faena) => (
+                    <SelectItem value="__all__">Todas las faenas</SelectItem>
+                    {faenas.filter((f) => f.id).map((faena) => (
                       <SelectItem key={faena.id} value={faena.id}>
                         {faena.nombre}
                       </SelectItem>
