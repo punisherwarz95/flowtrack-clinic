@@ -8,20 +8,48 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Activity } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthContext } from "@/contexts/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
+
+const STAFF_ROUTE_CANDIDATES = [
+  "/",
+  "/flujo",
+  "/mi-box",
+  "/pacientes",
+  "/completados",
+  "/incompletos",
+  "/empresas",
+  "/boxes",
+  "/examenes",
+  "/cotizaciones",
+  "/prestadores",
+  "/documentos",
+  "/usuarios",
+];
 
 const Login = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuthContext();
+  const { user, loading: authLoading, signOut } = useAuthContext();
+  const { hasPermission, loading: permLoading } = usePermissions(user);
 
   // Redirect if already logged in - use useEffect to avoid render-time navigation
   useEffect(() => {
-    if (!authLoading && user) {
-      navigate("/", { replace: true });
+    if (authLoading || permLoading) return;
+
+    if (user) {
+      const nextPath = STAFF_ROUTE_CANDIDATES.find((p) => hasPermission(p)) ?? null;
+
+      if (nextPath) {
+        navigate(nextPath, { replace: true });
+      } else {
+        // Evita loop infinito /login -> / -> /login cuando el usuario no tiene permisos
+        toast.error("Tu usuario no tiene permisos asignados. Contacta a un administrador.");
+        void signOut();
+      }
     }
-  }, [authLoading, user, navigate]);
+  }, [authLoading, permLoading, user, hasPermission, navigate, signOut]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,7 +81,7 @@ const Login = () => {
     }
   };
 
-  if (authLoading) {
+  if (authLoading || permLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
