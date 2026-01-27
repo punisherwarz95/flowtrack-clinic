@@ -34,18 +34,29 @@ const Login = () => {
   const { user, loading: authLoading, signOut } = useAuthContext();
   const { hasPermission, loading: permLoading } = usePermissions(user);
 
+  const isEmpresaUser = (u: typeof user) => {
+    const tipo = (u?.user_metadata as any)?.tipo;
+    return tipo === "empresa";
+  };
+
   // Redirect if already logged in - use useEffect to avoid render-time navigation
   useEffect(() => {
     if (authLoading || permLoading) return;
 
     if (user) {
+      // Si el usuario pertenece al Portal Empresas, enviarlo a su portal.
+      if (isEmpresaUser(user)) {
+        navigate("/empresa", { replace: true });
+        return;
+      }
+
       const nextPath = STAFF_ROUTE_CANDIDATES.find((p) => hasPermission(p)) ?? null;
 
       if (nextPath) {
         navigate(nextPath, { replace: true });
       } else {
         // Evita loop infinito /login -> / -> /login cuando el usuario no tiene permisos
-        toast.error("Tu usuario no tiene permisos asignados. Contacta a un administrador.");
+        toast("Tu usuario no tiene permisos asignados. Contacta a un administrador.");
         void signOut();
       }
     }
@@ -65,7 +76,7 @@ const Login = () => {
       });
 
       if (error) {
-        toast.error("Error al iniciar sesión: " + error.message);
+        toast("Error al iniciar sesión: " + error.message);
         return;
       }
 
@@ -75,7 +86,7 @@ const Login = () => {
         // y el useEffect de arriba haga la redirección.
       }
     } catch (error) {
-      toast.error("Error inesperado al iniciar sesión");
+      toast("Error inesperado al iniciar sesión");
     } finally {
       setLoading(false);
     }
