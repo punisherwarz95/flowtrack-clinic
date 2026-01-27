@@ -103,7 +103,7 @@ const EmpresaCotizaciones = () => {
         .select(`
           *,
           faena:faenas(nombre),
-          cotizacion:cotizaciones(id, numero_cotizacion, total_con_iva),
+          cotizacion:cotizaciones!cotizacion_solicitudes_cotizacion_id_fkey(id, numero_cotizacion, total_con_iva),
           items:cotizacion_solicitud_items(
             paquete:paquetes_examenes(nombre),
             examen:examenes(nombre),
