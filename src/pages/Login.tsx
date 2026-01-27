@@ -8,61 +8,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Activity } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthContext } from "@/contexts/AuthContext";
-import { usePermissions } from "@/hooks/usePermissions";
-
-const STAFF_ROUTE_CANDIDATES = [
-  "/",
-  "/flujo",
-  "/mi-box",
-  "/pacientes",
-  "/completados",
-  "/incompletos",
-  "/empresas",
-  "/boxes",
-  "/examenes",
-  "/cotizaciones",
-  "/prestadores",
-  "/documentos",
-  "/usuarios",
-];
 
 const Login = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { user, loading: authLoading, signOut } = useAuthContext();
-  const { hasPermission, loading: permLoading } = usePermissions(user);
+  const { user, loading: authLoading } = useAuthContext();
 
-  const isEmpresaUser = (u: typeof user) => {
-    const tipo = (u?.user_metadata as any)?.tipo;
-    return tipo === "empresa";
-  };
-
-  // Redirect if already logged in - use useEffect to avoid render-time navigation
+  // Redirigir si ya está autenticado
   useEffect(() => {
-    if (authLoading || permLoading) return;
+    if (authLoading) return;
 
     if (user) {
-      // Si el usuario pertenece al Portal Empresas, cerrar su sesión para que pueda
-      // iniciar sesión como staff (evita conflicto de sesiones)
-      if (isEmpresaUser(user)) {
-        // Cerrar sesión silenciosamente para permitir login de staff
-        void signOut();
-        return;
-      }
-
-      const nextPath = STAFF_ROUTE_CANDIDATES.find((p) => hasPermission(p)) ?? null;
-
-      if (nextPath) {
-        navigate(nextPath, { replace: true });
+      // Si es usuario de empresa, enviarlo a su portal
+      const tipo = (user.user_metadata as any)?.tipo;
+      if (tipo === "empresa") {
+        navigate("/empresa", { replace: true });
       } else {
-        // Evita loop infinito /login -> / -> /login cuando el usuario no tiene permisos
-        toast("Tu usuario no tiene permisos asignados. Contacta a un administrador.");
-        void signOut();
+        // Usuario de staff: ir al dashboard
+        navigate("/", { replace: true });
       }
     }
-  }, [authLoading, permLoading, user, hasPermission, navigate, signOut]);
+  }, [authLoading, user, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,8 +52,7 @@ const Login = () => {
 
       if (data.session) {
         toast.success("Inicio de sesión exitoso");
-        // No navegamos aquí: esperamos a que el AuthContext reciba la sesión
-        // y el useEffect de arriba haga la redirección.
+        // Redirección manejada por el useEffect cuando AuthContext actualice
       }
     } catch (error) {
       toast("Error inesperado al iniciar sesión");
@@ -94,7 +61,7 @@ const Login = () => {
     }
   };
 
-  if (authLoading || permLoading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
