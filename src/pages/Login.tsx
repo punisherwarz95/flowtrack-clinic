@@ -43,7 +43,8 @@ const Login = () => {
 
       if (data.session) {
         toast.success("Inicio de sesión exitoso");
-        navigate("/", { replace: true });
+        // No navegamos aquí: esperamos a que el AuthContext reciba la sesión
+        // y el useEffect de arriba haga la redirección.
       }
     } catch (error) {
       toast.error("Error inesperado al iniciar sesión");
