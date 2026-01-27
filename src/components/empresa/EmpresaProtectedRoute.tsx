@@ -23,7 +23,7 @@ const EmpresaProtectedRoute = ({ children }: EmpresaProtectedRouteProps) => {
 
   // Usuario autenticado pero no es usuario de empresa
   if (!empresaUsuario) {
-    return <Navigate to="/empresa/login" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   return <>{children}</>;

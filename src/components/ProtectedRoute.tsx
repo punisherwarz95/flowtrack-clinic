@@ -11,6 +11,8 @@ const ProtectedRoute = ({ children, path }: ProtectedRouteProps) => {
   const { user, loading: authLoading } = useAuthContext();
   const { hasPermission, loading: permLoading } = usePermissions(user);
 
+  const userTipo = (user?.user_metadata as any)?.tipo;
+
   if (authLoading || permLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -22,6 +24,11 @@ const ProtectedRoute = ({ children, path }: ProtectedRouteProps) => {
   // No user logged in, redirect to login
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Usuario autenticado pero pertenece al Portal Empresas
+  if (userTipo === "empresa") {
+    return <Navigate to="/empresa" replace />;
   }
 
   // User logged in but no permission for this path
