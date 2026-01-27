@@ -377,28 +377,33 @@ const Empresas = () => {
               </p>
               
               <div className="border rounded-md divide-y max-h-96 overflow-y-auto">
-                {paquetes.map((paquete) => (
-                  <div key={paquete.id} className="flex items-center justify-between p-3 gap-4">
-                    <span className="text-sm font-medium flex-1">{paquete.nombre}</span>
-                    <div className="flex items-center gap-1">
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      <Input
-                        type="number"
-                        step="any"
-                        value={bateriaPrecios[paquete.id] || ""}
-                        onChange={(e) => setBateriaPrecios({
-                          ...bateriaPrecios,
-                          [paquete.id]: e.target.value
-                        })}
-                        placeholder="Precio"
-                        className="w-28 h-8"
-                      />
+                {paquetes
+                  .filter((paquete) => {
+                    const precio = bateriaPrecios[paquete.id];
+                    return precio && parseFloat(precio) > 0;
+                  })
+                  .map((paquete) => (
+                    <div key={paquete.id} className="flex items-center justify-between p-3 gap-4">
+                      <span className="text-sm font-medium flex-1">{paquete.nombre}</span>
+                      <div className="flex items-center gap-1">
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        <Input
+                          type="number"
+                          step="any"
+                          value={bateriaPrecios[paquete.id] || ""}
+                          onChange={(e) => setBateriaPrecios({
+                            ...bateriaPrecios,
+                            [paquete.id]: e.target.value
+                          })}
+                          placeholder="Precio"
+                          className="w-28 h-8"
+                        />
+                      </div>
                     </div>
-                  </div>
-                ))}
-                {paquetes.length === 0 && (
+                  ))}
+                {Object.values(bateriaPrecios).filter(v => v && parseFloat(v) > 0).length === 0 && (
                   <p className="text-sm text-muted-foreground text-center py-8">
-                    No hay paquetes disponibles. Crea paquetes en el módulo Exámenes.
+                    Esta empresa no tiene baterías con precio asignado.
                   </p>
                 )}
               </div>
