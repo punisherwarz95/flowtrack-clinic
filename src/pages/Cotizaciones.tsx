@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Plus, FileText, Trash2, Eye, Pencil, Search, Settings, Calendar, X } from "lucide-react";
+import { Plus, FileText, Trash2, Eye, Pencil, Search, Settings, Calendar, X, Clock, MessageSquare, Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
@@ -60,6 +60,28 @@ interface Cotizacion {
   created_at: string;
 }
 
+interface SolicitudCotizacion {
+  id: string;
+  titulo: string;
+  descripcion: string | null;
+  estado: string;
+  created_at: string;
+  empresa: {
+    id: string;
+    nombre: string;
+  } | null;
+  faena: {
+    id: string;
+    nombre: string;
+  } | null;
+  items: {
+    id: string;
+    cantidad_estimada: number | null;
+    paquete: { id: string; nombre: string } | null;
+    examen: { id: string; nombre: string } | null;
+  }[];
+}
+
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat("es-CL", {
     style: "currency",
@@ -82,11 +104,14 @@ const getEstadoBadge = (estado: string) => {
 const Cotizaciones = () => {
   useAuth();
   const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([]);
+  const [solicitudes, setSolicitudes] = useState<SolicitudCotizacion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingSolicitudes, setLoadingSolicitudes] = useState(true);
   const [openFormDialog, setOpenFormDialog] = useState(false);
   const [openMargenesDialog, setOpenMargenesDialog] = useState(false);
   const [cotizacionToDelete, setCotizacionToDelete] = useState<string | null>(null);
   const [editingCotizacion, setEditingCotizacion] = useState<Cotizacion | null>(null);
+  const [respondingSolicitud, setRespondingSolicitud] = useState<SolicitudCotizacion | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterEmpresa, setFilterEmpresa] = useState<string>("all");
   const [dateFilterType, setDateFilterType] = useState<"none" | "single" | "range">("none");
@@ -97,7 +122,41 @@ const Cotizaciones = () => {
   const empresasUnicas = Array.from(new Set(cotizaciones.map(c => c.empresa_nombre).filter(Boolean))) as string[];
   useEffect(() => {
     loadCotizaciones();
+    loadSolicitudes();
   }, []);
+
+  const loadSolicitudes = async () => {
+    try {
+      setLoadingSolicitudes(true);
+      const { data, error } = await supabase
+        .from("cotizacion_solicitudes")
+        .select(`
+          id,
+          titulo,
+          descripcion,
+          estado,
+          created_at,
+          empresa:empresas(id, nombre),
+          faena:faenas(id, nombre),
+          items:cotizacion_solicitud_items(
+            id,
+            cantidad_estimada,
+            paquete:paquetes_examenes(id, nombre),
+            examen:examenes(id, nombre)
+          )
+        `)
+        .eq("estado", "pendiente")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setSolicitudes(data || []);
+    } catch (error) {
+      console.error("Error loading solicitudes:", error);
+      toast.error("Error al cargar solicitudes pendientes");
+    } finally {
+      setLoadingSolicitudes(false);
+    }
+  };
 
   const loadCotizaciones = async () => {
     try {
@@ -200,7 +259,10 @@ const Cotizaciones = () => {
               open={openFormDialog} 
               onOpenChange={(open) => {
                 setOpenFormDialog(open);
-                if (!open) setEditingCotizacion(null);
+                if (!open) {
+                  setEditingCotizacion(null);
+                  setRespondingSolicitud(null);
+                }
               }}
             >
               <DialogTrigger asChild>
@@ -212,25 +274,110 @@ const Cotizaciones = () => {
               <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>
-                    {editingCotizacion ? `Editar Cotización #${editingCotizacion.numero_cotizacion}` : "Nueva Cotización"}
+                    {editingCotizacion 
+                      ? `Editar Cotización #${editingCotizacion.numero_cotizacion}` 
+                      : respondingSolicitud
+                        ? `Responder Solicitud: ${respondingSolicitud.titulo}`
+                        : "Nueva Cotización"}
                   </DialogTitle>
                 </DialogHeader>
                 <CotizacionForm 
                   cotizacionId={editingCotizacion?.id}
+                  solicitudId={respondingSolicitud?.id}
                   onSuccess={() => {
                     setOpenFormDialog(false);
                     setEditingCotizacion(null);
+                    setRespondingSolicitud(null);
                     loadCotizaciones();
+                    loadSolicitudes();
                   }}
                   onCancel={() => {
                     setOpenFormDialog(false);
                     setEditingCotizacion(null);
+                    setRespondingSolicitud(null);
                   }}
                 />
               </DialogContent>
             </Dialog>
           </div>
         </div>
+
+        {/* Solicitudes Pendientes Section */}
+        {solicitudes.length > 0 && (
+          <Card className="mb-6 border-accent/50 bg-accent/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-accent-foreground">
+                <Clock className="h-5 w-5 text-accent" />
+                Solicitudes de Cotización Pendientes ({solicitudes.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingSolicitudes ? (
+                <div className="text-center py-4 text-muted-foreground">Cargando...</div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {solicitudes.map((solicitud) => (
+                    <Card key={solicitud.id} className="border bg-card">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Building2 className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium">{solicitud.empresa?.nombre || "Sin empresa"}</span>
+                          </div>
+                          <Badge variant="secondary">
+                            Pendiente
+                          </Badge>
+                        </div>
+                        <h4 className="font-semibold mb-1">{solicitud.titulo}</h4>
+                        {solicitud.faena && (
+                          <p className="text-sm text-muted-foreground mb-2">
+                            Faena: {solicitud.faena.nombre}
+                          </p>
+                        )}
+                        {solicitud.descripcion && (
+                          <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
+                            {solicitud.descripcion}
+                          </p>
+                        )}
+                        <div className="text-xs text-muted-foreground mb-3">
+                          <strong>Items solicitados:</strong>
+                          <ul className="list-disc list-inside mt-1">
+                            {solicitud.items.slice(0, 3).map((item) => (
+                              <li key={item.id}>
+                                {item.paquete?.nombre || item.examen?.nombre || "Item"}
+                                {item.cantidad_estimada ? ` (x${item.cantidad_estimada})` : ""}
+                              </li>
+                            ))}
+                            {solicitud.items.length > 3 && (
+                              <li className="text-muted-foreground">
+                                +{solicitud.items.length - 3} más...
+                              </li>
+                            )}
+                          </ul>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(solicitud.created_at), "dd/MM/yyyy HH:mm", { locale: es })}
+                          </span>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setRespondingSolicitud(solicitud);
+                              setOpenFormDialog(true);
+                            }}
+                          >
+                            <MessageSquare className="h-4 w-4 mr-1" />
+                            Responder
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
