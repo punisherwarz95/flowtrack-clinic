@@ -394,7 +394,7 @@ const EmpresaAgendamiento = () => {
                         <SelectValue placeholder="Seleccionar bloque" />
                       </SelectTrigger>
                       <SelectContent>
-                        {bloques.map((bloque) => {
+                        {bloques.filter((b) => b.id).map((bloque) => {
                           const cupoDisp = cuposDisponibles[bloque.id] || 0;
                           return (
                             <SelectItem
@@ -419,7 +419,7 @@ const EmpresaAgendamiento = () => {
                       <SelectValue placeholder="Seleccionar faena" />
                     </SelectTrigger>
                     <SelectContent>
-                      {faenas.map((faena) => (
+                      {faenas.filter((f) => f.id).map((faena) => (
                         <SelectItem key={faena.id} value={faena.id}>
                           {faena.nombre}
                         </SelectItem>
