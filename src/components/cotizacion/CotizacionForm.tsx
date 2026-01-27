@@ -78,6 +78,7 @@ interface CotizacionItem {
 
 interface CotizacionFormProps {
   cotizacionId?: string;
+  solicitudId?: string;
   onSuccess: () => void;
   onCancel: () => void;
 }
@@ -90,7 +91,7 @@ const formatCurrency = (value: number) => {
   }).format(value);
 };
 
-const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormProps) => {
+const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: CotizacionFormProps) => {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [examenes, setExamenes] = useState<Examen[]>([]);
   const [paquetes, setPaquetes] = useState<Paquete[]>([]);
@@ -133,7 +134,13 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
     if (cotizacionId) {
       loadCotizacion(cotizacionId);
     }
-  }, [cotizacionId]);
+  }, [cotizacionId, empresas]);
+
+  useEffect(() => {
+    if (solicitudId && !cotizacionId && empresas.length > 0 && paquetes.length > 0 && examenes.length > 0 && margenes.length > 0) {
+      loadSolicitud(solicitudId);
+    }
+  }, [solicitudId, cotizacionId, empresas, paquetes, examenes, margenes]);
 
   const loadData = async () => {
     try {
@@ -211,6 +218,147 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al cargar cotización");
+    }
+  };
+
+  const loadSolicitud = async (id: string) => {
+    try {
+      const { data: solicitud, error } = await supabase
+        .from("cotizacion_solicitudes")
+        .select(`
+          id,
+          titulo,
+          descripcion,
+          empresa_id,
+          faena_id,
+          empresa:empresas(id, nombre, rut, razon_social, contacto, email, telefono),
+          items:cotizacion_solicitud_items(
+            id,
+            cantidad_estimada,
+            paquete_id,
+            examen_id,
+            paquete:paquetes_examenes(id, nombre),
+            examen:examenes(id, nombre, costo_neto)
+          )
+        `)
+        .eq("id", id)
+        .single();
+
+      if (error) throw error;
+      if (!solicitud) return;
+
+      // Set empresa data
+      if (solicitud.empresa) {
+        const empresaData = solicitud.empresa as any;
+        const empresa = empresas.find((e) => e.id === empresaData.id);
+        if (empresa) {
+          setSelectedEmpresa(empresa);
+          setEmpresaForm({
+            nombre: empresa.nombre || "",
+            rut: empresa.rut || "",
+            razon_social: empresa.razon_social || "",
+            contacto: empresa.contacto || "",
+            email: empresa.email || "",
+            telefono: empresa.telefono || "",
+          });
+          setIsNewEmpresa(false);
+        }
+      }
+
+      // Add items from solicitud
+      const defaultMargen = margenes.length > 0 ? margenes[0] : null;
+      let itemNumero = 1;
+      const newItems: CotizacionItem[] = [];
+
+      for (const item of (solicitud.items as any[]) || []) {
+        const cantidad = item.cantidad_estimada || 1;
+
+        if (item.paquete_id && item.paquete) {
+          // It's a paquete
+          const paquete = paquetes.find((p) => p.id === item.paquete_id);
+          if (paquete) {
+            const detalleExamenes = paquete.paquete_examen_items?.map((pei) => ({
+              examen_id: pei.examenes.id,
+              nombre: pei.examenes.nombre,
+              costo_neto: pei.examenes.costo_neto || 0,
+            })) || [];
+            
+            const costoTotal = detalleExamenes.reduce((sum, e) => sum + e.costo_neto, 0);
+            const valorTotalNeto = costoTotal * cantidad;
+            const valorIva = afectoIva ? valorTotalNeto * 0.19 : 0;
+            const valorConIva = valorTotalNeto + valorIva;
+            const margenPorcentaje = defaultMargen?.porcentaje || 0;
+            const valorMargen = valorConIva * (margenPorcentaje / 100);
+            const valorFinal = valorConIva + valorMargen;
+
+            newItems.push({
+              id: crypto.randomUUID(),
+              item_numero: itemNumero++,
+              tipo_item: "paquete",
+              paquete_id: paquete.id,
+              examen_id: null,
+              nombre_prestacion: paquete.nombre,
+              detalle_examenes: detalleExamenes,
+              valor_unitario_neto: costoTotal,
+              cantidad,
+              valor_total_neto: valorTotalNeto,
+              valor_iva: valorIva,
+              valor_con_iva: valorConIva,
+              margen_id: defaultMargen?.id || null,
+              margen_nombre: defaultMargen?.nombre || null,
+              margen_porcentaje: margenPorcentaje,
+              valor_margen: valorMargen,
+              valor_final: valorFinal,
+              expanded: false,
+            });
+          }
+        } else if (item.examen_id && item.examen) {
+          // It's an examen
+          const examen = examenes.find((e) => e.id === item.examen_id);
+          if (examen) {
+            const valorTotalNeto = (examen.costo_neto || 0) * cantidad;
+            const valorIva = afectoIva ? valorTotalNeto * 0.19 : 0;
+            const valorConIva = valorTotalNeto + valorIva;
+            const margenPorcentaje = defaultMargen?.porcentaje || 0;
+            const valorMargen = valorConIva * (margenPorcentaje / 100);
+            const valorFinal = valorConIva + valorMargen;
+
+            newItems.push({
+              id: crypto.randomUUID(),
+              item_numero: itemNumero++,
+              tipo_item: "examen",
+              paquete_id: null,
+              examen_id: examen.id,
+              nombre_prestacion: examen.nombre,
+              detalle_examenes: [],
+              valor_unitario_neto: examen.costo_neto || 0,
+              cantidad,
+              valor_total_neto: valorTotalNeto,
+              valor_iva: valorIva,
+              valor_con_iva: valorConIva,
+              margen_id: defaultMargen?.id || null,
+              margen_nombre: defaultMargen?.nombre || null,
+              margen_porcentaje: margenPorcentaje,
+              valor_margen: valorMargen,
+              valor_final: valorFinal,
+              expanded: false,
+            });
+          }
+        }
+      }
+
+      if (newItems.length > 0) {
+        setItems(newItems);
+      }
+
+      // Set observaciones from description
+      if (solicitud.descripcion) {
+        setObservaciones(solicitud.descripcion);
+      }
+
+    } catch (error) {
+      console.error("Error loading solicitud:", error);
+      toast.error("Error al cargar solicitud");
     }
   };
 
@@ -519,15 +667,35 @@ const CotizacionForm = ({ cotizacionId, onSuccess, onCancel }: CotizacionFormPro
         // Delete existing items
         await supabase.from("cotizacion_items").delete().eq("cotizacion_id", cotizacionId);
       } else {
+        const insertData = solicitudId 
+          ? { ...cotizacionData, solicitud_id: solicitudId }
+          : cotizacionData;
+
         const { data: newCotizacion, error } = await supabase
           .from("cotizaciones")
-          .insert(cotizacionData)
+          .insert(insertData)
           .select("id, numero_cotizacion, fecha_cotizacion")
           .single();
 
         if (error) throw error;
         savedCotizacionId = newCotizacion.id;
         numeroCotizacion = newCotizacion.numero_cotizacion;
+
+        // Update solicitud status if responding to one
+        if (solicitudId) {
+          const { error: solicitudError } = await supabase
+            .from("cotizacion_solicitudes")
+            .update({
+              estado: "respondida",
+              cotizacion_id: savedCotizacionId,
+              respondido_at: new Date().toISOString(),
+            })
+            .eq("id", solicitudId);
+
+          if (solicitudError) {
+            console.error("Error updating solicitud:", solicitudError);
+          }
+        }
       }
 
       // Insert items - convert empty strings to null for UUID fields
