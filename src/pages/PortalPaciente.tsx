@@ -467,13 +467,34 @@ export default function PortalPaciente() {
           prevEstadoRef.current = "en_espera";
           prevBoxIdRef.current = null;
           
-          // Ya no cargamos empresa automáticamente - recepción la asigna manualmente
-          // porque el paciente puede venir por diferentes empresas
+          // Paciente existente sin atención hoy: permitir verificar/actualizar datos
+          // Pre-llenar el formulario con datos existentes
+          const nombreParts = pacienteData.nombre?.split(" ") || [];
+          const direccionParts = pacienteData.direccion?.split(", ") || [];
+          
+          setFormData({
+            primerNombre: nombreParts[0] || "",
+            apellidoPaterno: nombreParts[1] || "",
+            apellidoMaterno: nombreParts.slice(2).join(" ") || "",
+            rut: pacienteData.rut || rut,
+            fecha_nacimiento: pacienteData.fecha_nacimiento || "",
+            fecha_nacimiento_display: pacienteData.fecha_nacimiento 
+              ? format(new Date(pacienteData.fecha_nacimiento + "T12:00:00"), "dd/MM/yyyy")
+              : "",
+            email: pacienteData.email || "",
+            telefono: pacienteData.telefono || "",
+            calle: direccionParts[0] || "",
+            numeracion: direccionParts[1] || "",
+            ciudad: direccionParts[2] || direccionParts[0] || ""
+          });
           
           toast({
-            title: "Registro de hoy",
-            description: `Su número de atención es #${newAtencion.numero_ingreso}. Espere a que el recepcionista complete su registro.`,
+            title: `Su número de atención es #${newAtencion.numero_ingreso}`,
+            description: "Verifique sus datos. Si son correctos, confirme para continuar.",
           });
+          
+          setStep("registro");
+          return;
         }
         
         setStep("portal");
