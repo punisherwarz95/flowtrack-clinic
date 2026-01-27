@@ -376,13 +376,16 @@ const EmpresaCotizaciones = () => {
 
                 <div className="space-y-2">
                   <Label>Faena (opcional)</Label>
-                  <Select value={formFaenaId} onValueChange={setFormFaenaId}>
+                  <Select
+                    value={formFaenaId}
+                    onValueChange={(v) => setFormFaenaId(v === "__none__" ? "" : v)}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar faena" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Sin faena específica</SelectItem>
-                      {faenas.map((faena) => (
+                      <SelectItem value="__none__">Sin faena específica</SelectItem>
+                      {faenas.filter((f) => f.id).map((faena) => (
                         <SelectItem key={faena.id} value={faena.id}>
                           {faena.nombre}
                         </SelectItem>
