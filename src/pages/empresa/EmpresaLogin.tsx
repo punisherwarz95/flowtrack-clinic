@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useEmpresaAuth } from "@/contexts/EmpresaAuthContext";
 import { Button } from "@/components/ui/button";
@@ -12,8 +12,16 @@ import { useToast } from "@/hooks/use-toast";
 
 const EmpresaLogin = () => {
   const navigate = useNavigate();
-  const { signIn, signUp, checkEmpresa, loading: authLoading } = useEmpresaAuth();
+  const { signIn, signUp, checkEmpresa, loading: authLoading, user, empresaUsuario } = useEmpresaAuth();
   const { toast } = useToast();
+
+  // Redirigir solo cuando ya exista el perfil de empresa (evita bounce por estado aún no actualizado)
+  useEffect(() => {
+    if (authLoading) return;
+    if (user && empresaUsuario) {
+      navigate("/empresa", { replace: true });
+    }
+  }, [authLoading, user, empresaUsuario, navigate]);
 
   // Login state
   const [loginEmail, setLoginEmail] = useState("");
@@ -42,7 +50,10 @@ const EmpresaLogin = () => {
     if (error) {
       setLoginError(error);
     } else {
-      navigate("/empresa");
+      toast({
+        title: "Inicio de sesión exitoso",
+        description: "Redirigiendo al portal...",
+      });
     }
 
     setLoginLoading(false);
@@ -220,14 +231,14 @@ const EmpresaLogin = () => {
                   </div>
                 </div>
 
-                {empresaVerificada && (
-                  <Alert className="bg-green-50 border-green-200">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    <AlertDescription className="text-green-700">
-                      Empresa verificada: <strong>{empresaVerificada.nombre}</strong>
-                    </AlertDescription>
-                  </Alert>
-                )}
+                 {empresaVerificada && (
+                   <Alert className="bg-accent/20 border-accent">
+                     <CheckCircle className="h-4 w-4 text-accent" />
+                     <AlertDescription className="text-foreground">
+                       Empresa verificada: <strong>{empresaVerificada.nombre}</strong>
+                     </AlertDescription>
+                   </Alert>
+                 )}
 
                 {/* Paso 2: Datos del usuario (solo si empresa verificada) */}
                 {empresaVerificada && (
