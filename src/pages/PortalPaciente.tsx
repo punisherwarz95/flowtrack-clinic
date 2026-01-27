@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import portalBackground from "@/assets/portal-background.jpeg";
 
-// Portal Paciente v0.0.8 - Integración de documentos requeridos
-// Cambios: Documentos de baterías visibles y completables por el paciente
-const PORTAL_VERSION = "0.0.8";
+// Portal Paciente v0.0.9 - Pacientes existentes pueden verificar/actualizar datos
+// Cambios: Cuando un paciente conocido ingresa sin atención del día, ahora ve el formulario
+//          con sus datos pre-llenados para verificar/actualizar antes de continuar
+const PORTAL_VERSION = "0.0.9";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
