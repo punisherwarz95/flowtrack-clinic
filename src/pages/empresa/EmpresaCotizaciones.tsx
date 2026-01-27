@@ -40,6 +40,12 @@ import {
   Send,
 } from "lucide-react";
 
+interface CotizacionItem {
+  nombre_prestacion: string;
+  valor_final: number | null;
+  paquete_id: string | null;
+}
+
 interface Solicitud {
   id: string;
   titulo: string;
@@ -51,6 +57,7 @@ interface Solicitud {
     id: string;
     numero_cotizacion: number;
     total_con_iva: number | null;
+    items: CotizacionItem[];
   } | null;
   items: {
     paquete: { nombre: string } | null;
@@ -103,7 +110,12 @@ const EmpresaCotizaciones = () => {
         .select(`
           *,
           faena:faenas(nombre),
-          cotizacion:cotizaciones!cotizacion_solicitudes_cotizacion_id_fkey(id, numero_cotizacion, total_con_iva),
+          cotizacion:cotizaciones!cotizacion_solicitudes_cotizacion_id_fkey(
+            id, 
+            numero_cotizacion, 
+            total_con_iva,
+            items:cotizacion_items(nombre_prestacion, valor_final, paquete_id)
+          ),
           items:cotizacion_solicitud_items(
             paquete:paquetes_examenes(nombre),
             examen:examenes(nombre),
@@ -375,14 +387,37 @@ const EmpresaCotizaciones = () => {
         </div>
 
         {solicitud.cotizacion && (
-          <div className="p-3 rounded-lg bg-muted">
+          <div className="p-3 rounded-lg bg-muted space-y-2">
             <p className="text-sm font-medium">
               Cotización N° {solicitud.cotizacion.numero_cotizacion}
             </p>
+            
+            {/* Detalle de baterías con valores */}
+            {solicitud.cotizacion.items && solicitud.cotizacion.items.length > 0 && (
+              <div className="space-y-1">
+                {solicitud.cotizacion.items
+                  .filter(item => item.paquete_id) // Solo baterías
+                  .map((item, idx) => (
+                    <div key={idx} className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">{item.nombre_prestacion}</span>
+                      <span className="font-medium">
+                        ${Math.ceil(item.valor_final || 0).toLocaleString("es-CL")}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            )}
+            
+            {/* Total redondeado hacia arriba */}
             {solicitud.cotizacion.total_con_iva && (
-              <p className="text-lg font-bold">
-                ${solicitud.cotizacion.total_con_iva.toLocaleString("es-CL")}
-              </p>
+              <div className="border-t pt-2 mt-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">TOTAL</span>
+                  <span className="text-lg font-bold">
+                    ${Math.ceil(solicitud.cotizacion.total_con_iva).toLocaleString("es-CL")}
+                  </span>
+                </div>
+              </div>
             )}
           </div>
         )}
