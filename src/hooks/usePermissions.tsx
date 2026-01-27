@@ -18,6 +18,13 @@ export const usePermissions = (user: User | null = null) => {
   }, [user?.id]);
 
   const loadPermissions = async (userId: string) => {
+    let finished = false;
+    const failsafe = window.setTimeout(() => {
+      if (finished) return;
+      console.warn("[Permissions] Failsafe: permissions loading timeout, forcing loading=false");
+      setLoading(false);
+    }, 5000);
+
     try {
       setLoading(true);
       
@@ -56,6 +63,8 @@ export const usePermissions = (user: User | null = null) => {
     } catch (error) {
       console.error("Error loading permissions:", error);
     } finally {
+      finished = true;
+      window.clearTimeout(failsafe);
       setLoading(false);
     }
   };
