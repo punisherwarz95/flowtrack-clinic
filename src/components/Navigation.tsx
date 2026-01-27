@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 
 const Navigation = () => {
   const location = useLocation();
-  const { hasPermission } = usePermissions();
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
+  const { hasPermission } = usePermissions(user);
   const { theme, toggleTheme } = useTheme();
 
   const allLinks = [
