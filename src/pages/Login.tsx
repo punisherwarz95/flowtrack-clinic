@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -16,11 +16,12 @@ const Login = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuthContext();
 
-  // Redirect if already logged in
-  if (!authLoading && user) {
-    navigate("/", { replace: true });
-    return null;
-  }
+  // Redirect if already logged in - use useEffect to avoid render-time navigation
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate("/", { replace: true });
+    }
+  }, [authLoading, user, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
