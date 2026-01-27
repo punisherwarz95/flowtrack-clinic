@@ -3,6 +3,23 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 
+const normalizeEmpresaAuthError = (message: string) => {
+  const msg = (message || "").toLowerCase();
+
+  // Errores típicos del SDK al invocar funciones
+  if (msg.includes("failed to send a request")) {
+    return "No se pudo conectar con el servidor. Revisa tu conexión e inténtalo nuevamente.";
+  }
+
+  if (msg.includes("non-2xx")) {
+    // La función suele devolver un error más específico en response.data.error;
+    // si no, damos un mensaje genérico.
+    return "No fue posible iniciar sesión. Verifica tus credenciales o que tu usuario esté habilitado.";
+  }
+
+  return message || "Error al iniciar sesión";
+};
+
 interface EmpresaUsuario {
   id: string;
   empresa_id: string;
@@ -114,11 +131,13 @@ export const EmpresaAuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (response.error) {
-        return { error: response.error.message };
+        // A veces viene un body con error más descriptivo
+        const maybeDataError = (response.data as any)?.error;
+        return { error: normalizeEmpresaAuthError(maybeDataError || response.error.message) };
       }
 
       if (response.data?.error) {
-        return { error: response.data.error };
+        return { error: normalizeEmpresaAuthError(response.data.error) };
       }
 
       if (response.data?.session) {
@@ -129,7 +148,7 @@ export const EmpresaAuthProvider = ({ children }: { children: ReactNode }) => {
       return { error: null };
     } catch (err: any) {
       console.error("Error en signIn:", err);
-      return { error: "Error al iniciar sesión" };
+      return { error: normalizeEmpresaAuthError(err?.message ?? "") };
     }
   };
 
