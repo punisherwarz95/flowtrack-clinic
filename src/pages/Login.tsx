@@ -44,9 +44,11 @@ const Login = () => {
     if (authLoading || permLoading) return;
 
     if (user) {
-      // Si el usuario pertenece al Portal Empresas, enviarlo a su portal.
+      // Si el usuario pertenece al Portal Empresas, cerrar su sesión para que pueda
+      // iniciar sesión como staff (evita conflicto de sesiones)
       if (isEmpresaUser(user)) {
-        navigate("/empresa", { replace: true });
+        // Cerrar sesión silenciosamente para permitir login de staff
+        void signOut();
         return;
       }
 
