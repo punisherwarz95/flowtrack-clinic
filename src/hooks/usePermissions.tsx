@@ -1,28 +1,31 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { User } from "@supabase/supabase-js";
 
-export const usePermissions = () => {
+export const usePermissions = (user: User | null = null) => {
   const [permissions, setPermissions] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadPermissions();
-  }, []);
+    if (user) {
+      loadPermissions(user.id);
+    } else {
+      setPermissions([]);
+      setIsAdmin(false);
+      setLoading(false);
+    }
+  }, [user?.id]);
 
-  const loadPermissions = async () => {
+  const loadPermissions = async (userId: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
+      setLoading(true);
+      
       // Check if user is admin
       const { data: roles, error: rolesError } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", user.id);
+        .eq("user_id", userId);
 
       if (rolesError) throw rolesError;
 
@@ -45,7 +48,7 @@ export const usePermissions = () => {
       const { data: perms, error: permsError } = await supabase
         .from("menu_permissions")
         .select("menu_path")
-        .eq("user_id", user.id);
+        .eq("user_id", userId);
 
       if (permsError) throw permsError;
 

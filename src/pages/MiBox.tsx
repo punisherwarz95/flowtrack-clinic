@@ -70,7 +70,7 @@ const STORAGE_KEY = "mediflow_selected_box";
 
 const MiBox = () => {
   const { user } = useAuth();
-  const { isAdmin } = usePermissions();
+  const { isAdmin } = usePermissions(user);
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [selectedBoxId, setSelectedBoxId] = useState<string | null>(null);
   const [showBoxSelector, setShowBoxSelector] = useState(false);

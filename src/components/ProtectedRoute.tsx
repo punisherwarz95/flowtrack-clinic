@@ -9,7 +9,7 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute = ({ children, path }: ProtectedRouteProps) => {
   const { user, loading: authLoading } = useAuth();
-  const { hasPermission, loading: permLoading } = usePermissions();
+  const { hasPermission, loading: permLoading } = usePermissions(user);
 
   if (authLoading || permLoading) {
     return (
