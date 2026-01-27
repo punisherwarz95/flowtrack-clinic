@@ -23,9 +23,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (initializedRef.current) return;
     initializedRef.current = true;
 
+    let isMounted = true;
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
+        if (!isMounted) return;
         // Only update state synchronously, no async calls here
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
@@ -35,12 +38,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // THEN check for existing session once
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      if (!isMounted) return;
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       setLoading(false);
+    }).catch(() => {
+      if (isMounted) {
+        setLoading(false);
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {
