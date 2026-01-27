@@ -895,7 +895,7 @@ const Pacientes = () => {
                   Nuevo Paciente
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="w-[70vw] h-[70vh] max-w-none overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>{editingPatient ? "Editar Paciente" : "Agregar Nuevo Paciente"}</DialogTitle>
                 </DialogHeader>
@@ -1068,6 +1068,47 @@ const Pacientes = () => {
                     {/* Columna derecha - Exámenes */}
                     <div className="space-y-4">
                       <h3 className="font-semibold text-sm text-muted-foreground border-b pb-2">Exámenes a Realizar</h3>
+                      
+                      {/* Cuadro de exámenes agregados */}
+                      {selectedExamenes.length > 0 && (
+                        <div className="border-2 border-primary/30 rounded-md p-3 bg-primary/5">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-semibold text-primary">
+                              Exámenes Agregados ({selectedExamenes.length})
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                            {selectedExamenes.map((examenId) => {
+                              const examen = examenes.find(e => e.id === examenId);
+                              if (!examen) return null;
+                              return (
+                                <Badge 
+                                  key={examenId} 
+                                  variant="secondary"
+                                  className="flex items-center gap-1 cursor-pointer hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                                  onClick={() => {
+                                    setSelectedExamenes(selectedExamenes.filter(id => id !== examenId));
+                                    const paquetesConExamen = paquetes.filter(p => 
+                                      p.paquete_examen_items.some(item => item.examen_id === examenId)
+                                    );
+                                    const paquetesARemover = paquetesConExamen.filter(p => selectedPaquetes.includes(p.id));
+                                    if (paquetesARemover.length > 0) {
+                                      setSelectedPaquetes(selectedPaquetes.filter(id => 
+                                        !paquetesARemover.map(p => p.id).includes(id)
+                                      ));
+                                    }
+                                  }}
+                                >
+                                  {examen.codigo && <span className="font-mono text-xs">[{examen.codigo}]</span>}
+                                  <span className="text-xs">{examen.nombre}</span>
+                                  <Trash2 className="h-3 w-3 ml-1" />
+                                </Badge>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -1077,7 +1118,7 @@ const Pacientes = () => {
                           className="pl-9"
                         />
                       </div>
-                      <div className="border rounded-md p-3 max-h-[450px] overflow-y-auto space-y-2 bg-muted/30">
+                      <div className="border rounded-md p-3 max-h-[250px] overflow-y-auto space-y-2 bg-muted/30">
                         {examenes
                           .filter((examen) => {
                             if (!examenFilter.trim()) return true;
