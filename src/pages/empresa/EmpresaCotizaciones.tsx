@@ -203,6 +203,27 @@ const EmpresaCotizaciones = () => {
     }
 
     try {
+      // 1. Obtener la solicitud con su cotización asociada
+      const { data: solicitud, error: solicitudError } = await supabase
+        .from("cotizacion_solicitudes")
+        .select("cotizacion_id, empresa_id")
+        .eq("id", solicitudId)
+        .maybeSingle();
+
+      if (solicitudError || !solicitud?.cotizacion_id) {
+        throw new Error("No se encontró la cotización asociada");
+      }
+
+      // 2. Obtener los items de la cotización (baterías con precios)
+      const { data: items, error: itemsError } = await supabase
+        .from("cotizacion_items")
+        .select("paquete_id, valor_final")
+        .eq("cotizacion_id", solicitud.cotizacion_id)
+        .not("paquete_id", "is", null);
+
+      if (itemsError) throw itemsError;
+
+      // 3. Actualizar estado de la solicitud
       await supabase
         .from("cotizacion_solicitudes")
         .update({
@@ -211,7 +232,50 @@ const EmpresaCotizaciones = () => {
         })
         .eq("id", solicitudId);
 
-      toast({ title: "Cotización aceptada" });
+      // 4. Actualizar estado de la cotización
+      await supabase
+        .from("cotizaciones")
+        .update({ estado: "aceptada" })
+        .eq("id", solicitud.cotizacion_id);
+
+      // 5. Insertar/actualizar baterías en empresa_baterias
+      if (items && items.length > 0) {
+        for (const item of items) {
+          if (!item.paquete_id) continue;
+
+          // Verificar si ya existe
+          const { data: existing } = await supabase
+            .from("empresa_baterias")
+            .select("id")
+            .eq("empresa_id", solicitud.empresa_id)
+            .eq("paquete_id", item.paquete_id)
+            .maybeSingle();
+
+          if (existing) {
+            // Actualizar precio existente
+            await supabase
+              .from("empresa_baterias")
+              .update({ 
+                valor: item.valor_final || 0,
+                activo: true,
+                updated_at: new Date().toISOString()
+              })
+              .eq("id", existing.id);
+          } else {
+            // Insertar nueva batería
+            await supabase
+              .from("empresa_baterias")
+              .insert({
+                empresa_id: solicitud.empresa_id,
+                paquete_id: item.paquete_id,
+                valor: item.valor_final || 0,
+                activo: true,
+              });
+          }
+        }
+      }
+
+      toast({ title: "Cotización aceptada y precios actualizados" });
       loadData();
     } catch (error) {
       console.error("Error aceptando cotización:", error);
@@ -225,10 +289,26 @@ const EmpresaCotizaciones = () => {
     }
 
     try {
+      // 1. Obtener la solicitud con su cotización asociada
+      const { data: solicitud } = await supabase
+        .from("cotizacion_solicitudes")
+        .select("cotizacion_id")
+        .eq("id", solicitudId)
+        .maybeSingle();
+
+      // 2. Actualizar estado de la solicitud
       await supabase
         .from("cotizacion_solicitudes")
         .update({ estado: "rechazada" })
         .eq("id", solicitudId);
+
+      // 3. Actualizar estado de la cotización si existe
+      if (solicitud?.cotizacion_id) {
+        await supabase
+          .from("cotizaciones")
+          .update({ estado: "rechazada" })
+          .eq("id", solicitud.cotizacion_id);
+      }
 
       toast({ title: "Cotización rechazada" });
       loadData();
