@@ -25,6 +25,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     let isMounted = true;
 
+    // Failsafe: nunca quedarnos pegados en loading por un getSession colgado
+    const loadingFailsafe = window.setTimeout(() => {
+      if (!isMounted) return;
+      console.warn("[Auth] Failsafe: auth loading timeout, forcing loading=false");
+      setLoading(false);
+    }, 5000);
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
@@ -37,19 +44,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     );
 
     // THEN check for existing session once
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      if (!isMounted) return;
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      setLoading(false);
-    }).catch(() => {
-      if (isMounted) {
-        setLoading(false);
+    const getSessionWithTimeout = async () => {
+      try {
+        const timeoutMs = 4000;
+        const timeoutPromise = new Promise<null>((resolve) => {
+          window.setTimeout(() => resolve(null), timeoutMs);
+        });
+
+        const sessionPromise = supabase.auth
+          .getSession()
+          .then(({ data: { session: currentSession } }) => currentSession);
+
+        const currentSession = (await Promise.race([
+          sessionPromise,
+          timeoutPromise,
+        ])) as Session | null;
+
+        if (!isMounted) return;
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+      } catch {
+        // ignore
+      } finally {
+        if (isMounted) setLoading(false);
       }
-    });
+    };
+
+    void getSessionWithTimeout();
 
     return () => {
       isMounted = false;
+      window.clearTimeout(loadingFailsafe);
       subscription.unsubscribe();
     };
   }, []);
