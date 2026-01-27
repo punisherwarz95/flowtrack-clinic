@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.create-user]
 verify_jwt = true
+
+[functions.empresa-auth]
+verify_jwt = false
