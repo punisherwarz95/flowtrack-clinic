@@ -85,12 +85,13 @@ export const EmpresaAuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(currentSession?.user ?? null);
 
         if (currentSession?.user) {
-          // Cargar datos del usuario de empresa de forma asíncrona
+          // Solo cargar si no tenemos ya un empresaUsuario (evita sobrescribir admin virtual)
           setTimeout(() => {
-            loadEmpresaUsuario(currentSession.user.id);
+            loadEmpresaUsuario(currentSession.user.id, false);
           }, 0);
         } else {
           setEmpresaUsuario(null);
+          setIsStaffAdmin(false);
           setLoading(false);
         }
       }
@@ -101,7 +102,7 @@ export const EmpresaAuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(currentSession?.user ?? null);
 
       if (currentSession?.user) {
-        loadEmpresaUsuario(currentSession.user.id);
+        loadEmpresaUsuario(currentSession.user.id, true);
       } else {
         setLoading(false);
       }
@@ -110,7 +111,14 @@ export const EmpresaAuthProvider = ({ children }: { children: ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const loadEmpresaUsuario = async (authUserId: string) => {
+  // skipIfAlreadySet: evita sobrescribir cuando ya se estableció desde signIn (admin virtual)
+  const loadEmpresaUsuario = async (authUserId: string, isInitialLoad: boolean) => {
+    // Si ya tenemos empresaUsuario establecido (ej: admin virtual desde signIn), no sobrescribir
+    if (!isInitialLoad && empresaUsuario !== null) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from("empresa_usuarios")
@@ -121,15 +129,23 @@ export const EmpresaAuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) {
         console.error("Error cargando empresa_usuario:", error);
-        setEmpresaUsuario(null);
+        // No sobrescribir si ya tenemos un usuario (admin virtual)
+        if (!empresaUsuario) {
+          setEmpresaUsuario(null);
+        }
       } else if (data && data.length > 0) {
         setEmpresaUsuario(data[0] as unknown as EmpresaUsuario);
       } else {
-        setEmpresaUsuario(null);
+        // No sobrescribir si ya tenemos un usuario (admin virtual)
+        if (!empresaUsuario) {
+          setEmpresaUsuario(null);
+        }
       }
     } catch (err) {
       console.error("Error en loadEmpresaUsuario:", err);
-      setEmpresaUsuario(null);
+      if (!empresaUsuario) {
+        setEmpresaUsuario(null);
+      }
     } finally {
       setLoading(false);
     }

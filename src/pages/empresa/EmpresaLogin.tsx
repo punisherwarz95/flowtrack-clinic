@@ -12,16 +12,16 @@ import { useToast } from "@/hooks/use-toast";
 
 const EmpresaLogin = () => {
   const navigate = useNavigate();
-  const { signIn, signUp, checkEmpresa, loading: authLoading, user, empresaUsuario } = useEmpresaAuth();
+  const { signIn, signUp, checkEmpresa, loading: authLoading, user, empresaUsuario, isStaffAdmin } = useEmpresaAuth();
   const { toast } = useToast();
 
-  // Redirigir solo cuando ya exista el perfil de empresa (evita bounce por estado aún no actualizado)
+  // Redirigir cuando ya exista el perfil de empresa O cuando es admin de staff
   useEffect(() => {
     if (authLoading) return;
-    if (user && empresaUsuario) {
+    if (user && (empresaUsuario || isStaffAdmin)) {
       navigate("/empresa", { replace: true });
     }
-  }, [authLoading, user, empresaUsuario, navigate]);
+  }, [authLoading, user, empresaUsuario, isStaffAdmin, navigate]);
 
   // Login state
   const [loginEmail, setLoginEmail] = useState("");
