@@ -33,7 +33,7 @@ interface Bateria {
 }
 
 const EmpresaBaterias = () => {
-  const { empresaUsuario } = useEmpresaAuth();
+  const { currentEmpresaId, isStaffAdmin } = useEmpresaAuth();
 
   const [faenas, setFaenas] = useState<Faena[]>([]);
   const [baterias, setBaterias] = useState<Bateria[]>([]);
@@ -42,26 +42,28 @@ const EmpresaBaterias = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (empresaUsuario?.empresa_id) {
+    if (currentEmpresaId) {
       loadFaenas();
+    } else {
+      setLoading(false);
     }
-  }, [empresaUsuario?.empresa_id]);
+  }, [currentEmpresaId]);
 
   useEffect(() => {
     if (selectedFaenaId) {
       loadBateriasForFaena(selectedFaenaId);
-    } else {
+    } else if (currentEmpresaId) {
       loadAllBaterias();
     }
-  }, [selectedFaenaId, empresaUsuario?.empresa_id]);
+  }, [selectedFaenaId, currentEmpresaId]);
 
   const loadFaenas = async () => {
-    if (!empresaUsuario?.empresa_id) return;
+    if (!currentEmpresaId) return;
 
     const { data } = await supabase
       .from("faenas")
       .select("*")
-      .eq("empresa_id", empresaUsuario.empresa_id)
+      .eq("empresa_id", currentEmpresaId)
       .eq("activo", true)
       .order("nombre");
 
@@ -69,7 +71,7 @@ const EmpresaBaterias = () => {
   };
 
   const loadAllBaterias = async () => {
-    if (!empresaUsuario?.empresa_id) return;
+    if (!currentEmpresaId) return;
 
     setLoading(true);
     try {
@@ -84,7 +86,7 @@ const EmpresaBaterias = () => {
             examenes:paquete_examen_items(examen:examenes(id, nombre, codigo))
           )
         `)
-        .eq("empresa_id", empresaUsuario.empresa_id)
+        .eq("empresa_id", currentEmpresaId)
         .eq("activo", true);
 
       const bats = empresaBaterias?.map((eb: any) => eb.paquete).filter(Boolean) || [];

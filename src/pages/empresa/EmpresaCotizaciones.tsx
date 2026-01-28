@@ -77,7 +77,7 @@ interface Bateria {
 }
 
 const EmpresaCotizaciones = () => {
-  const { empresaUsuario } = useEmpresaAuth();
+  const { currentEmpresaId, empresaUsuario, isStaffAdmin } = useEmpresaAuth();
   const { toast } = useToast();
 
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
@@ -94,13 +94,15 @@ const EmpresaCotizaciones = () => {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (empresaUsuario?.empresa_id) {
+    if (currentEmpresaId) {
       loadData();
+    } else {
+      setLoading(false);
     }
-  }, [empresaUsuario?.empresa_id]);
+  }, [currentEmpresaId]);
 
   const loadData = async () => {
-    if (!empresaUsuario?.empresa_id) return;
+    if (!currentEmpresaId) return;
 
     setLoading(true);
     try {
@@ -122,7 +124,7 @@ const EmpresaCotizaciones = () => {
             cantidad_estimada
           )
         `)
-        .eq("empresa_id", empresaUsuario.empresa_id)
+        .eq("empresa_id", currentEmpresaId)
         .order("created_at", { ascending: false });
 
       setSolicitudes((solicitudesData as unknown as Solicitud[]) || []);
@@ -131,7 +133,7 @@ const EmpresaCotizaciones = () => {
       const { data: faenasData } = await supabase
         .from("faenas")
         .select("*")
-        .eq("empresa_id", empresaUsuario.empresa_id)
+        .eq("empresa_id", currentEmpresaId)
         .eq("activo", true);
 
       setFaenas(faenasData || []);
@@ -170,8 +172,8 @@ const EmpresaCotizaciones = () => {
       const { data: solicitud, error } = await supabase
         .from("cotizacion_solicitudes")
         .insert({
-          empresa_id: empresaUsuario?.empresa_id,
-          empresa_usuario_id: empresaUsuario?.id,
+          empresa_id: currentEmpresaId,
+          empresa_usuario_id: empresaUsuario?.id?.startsWith("admin-virtual") ? null : empresaUsuario?.id,
           titulo: formTitulo,
           descripcion: formDescripcion || null,
           faena_id: formFaenaId || null,

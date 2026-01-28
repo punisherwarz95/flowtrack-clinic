@@ -23,7 +23,7 @@ interface DashboardStats {
 }
 
 const EmpresaDashboard = () => {
-  const { empresaUsuario } = useEmpresaAuth();
+  const { empresaUsuario, currentEmpresaId, isStaffAdmin, empresaOverride } = useEmpresaAuth();
   const [stats, setStats] = useState<DashboardStats>({
     prereservasHoy: 0,
     prereservasPendientes: 0,
@@ -34,14 +34,20 @@ const EmpresaDashboard = () => {
   });
   const [loading, setLoading] = useState(true);
 
+  // Nombre de empresa actual (override o original)
+  const currentEmpresaNombre = empresaOverride?.nombre ?? empresaUsuario?.empresas?.nombre ?? "Empresa";
+
   useEffect(() => {
-    if (empresaUsuario?.empresa_id) {
+    if (currentEmpresaId) {
       loadStats();
+    } else if (isStaffAdmin) {
+      // Admin sin empresa seleccionada - mostrar stats vacíos
+      setLoading(false);
     }
-  }, [empresaUsuario?.empresa_id]);
+  }, [currentEmpresaId]);
 
   const loadStats = async () => {
-    if (!empresaUsuario?.empresa_id) return;
+    if (!currentEmpresaId) return;
 
     try {
       const today = new Date().toISOString().split("T")[0];
@@ -53,7 +59,7 @@ const EmpresaDashboard = () => {
       const { count: prereservasHoy } = await supabase
         .from("prereservas")
         .select("*", { count: "exact", head: true })
-        .eq("empresa_id", empresaUsuario.empresa_id)
+        .eq("empresa_id", currentEmpresaId)
         .eq("fecha", today)
         .eq("estado", "pendiente");
 
@@ -61,7 +67,7 @@ const EmpresaDashboard = () => {
       const { count: prereservasPendientes } = await supabase
         .from("prereservas")
         .select("*", { count: "exact", head: true })
-        .eq("empresa_id", empresaUsuario.empresa_id)
+        .eq("empresa_id", currentEmpresaId)
         .eq("estado", "pendiente")
         .gte("fecha", today);
 
@@ -69,7 +75,7 @@ const EmpresaDashboard = () => {
       const { count: pacientesAtendidosMes } = await supabase
         .from("prereservas")
         .select("*", { count: "exact", head: true })
-        .eq("empresa_id", empresaUsuario.empresa_id)
+        .eq("empresa_id", currentEmpresaId)
         .eq("estado", "atendido")
         .gte("fecha", startOfMonth.toISOString().split("T")[0]);
 
@@ -77,14 +83,14 @@ const EmpresaDashboard = () => {
       const { count: cotizacionesPendientes } = await supabase
         .from("cotizacion_solicitudes")
         .select("*", { count: "exact", head: true })
-        .eq("empresa_id", empresaUsuario.empresa_id)
+        .eq("empresa_id", currentEmpresaId)
         .in("estado", ["pendiente", "en_revision"]);
 
       // Estados de pago pendientes
       const { count: estadosPagoPendientes } = await supabase
         .from("estados_pago")
         .select("*", { count: "exact", head: true })
-        .eq("empresa_id", empresaUsuario.empresa_id)
+        .eq("empresa_id", currentEmpresaId)
         .eq("estado", "pendiente");
 
       setStats({
@@ -156,9 +162,18 @@ const EmpresaDashboard = () => {
             Bienvenido, {empresaUsuario?.nombre}
           </h1>
           <p className="text-muted-foreground">
-            Panel de gestión de {empresaUsuario?.empresas?.nombre}
+            Panel de gestión de {currentEmpresaNombre}
           </p>
         </div>
+
+        {/* Mensaje para admin sin empresa seleccionada */}
+        {isStaffAdmin && !currentEmpresaId && (
+          <div className="p-4 rounded-lg bg-amber-50 border border-amber-200">
+            <p className="text-amber-800 font-medium">
+              Seleccione una empresa desde el menú superior para ver sus datos.
+            </p>
+          </div>
+        )}
 
         {/* Stats Grid */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -234,12 +249,12 @@ const EmpresaDashboard = () => {
             <CardContent className="space-y-3">
               <div className="p-3 rounded-lg bg-muted">
                 <div className="text-sm font-medium">Empresa</div>
-                <div className="text-lg">{empresaUsuario?.empresas?.nombre}</div>
+                <div className="text-lg">{currentEmpresaNombre}</div>
               </div>
-              {empresaUsuario?.empresas?.rut && (
+              {(empresaOverride?.rut || empresaUsuario?.empresas?.rut) && (
                 <div className="p-3 rounded-lg bg-muted">
                   <div className="text-sm font-medium">RUT</div>
-                  <div className="text-lg">{empresaUsuario.empresas.rut}</div>
+                  <div className="text-lg">{empresaOverride?.rut || empresaUsuario?.empresas?.rut}</div>
                 </div>
               )}
               <div className="p-3 rounded-lg bg-muted">

@@ -49,7 +49,7 @@ interface EstadoPagoItem {
 }
 
 const EmpresaEstadosPago = () => {
-  const { empresaUsuario } = useEmpresaAuth();
+  const { currentEmpresaId, isStaffAdmin } = useEmpresaAuth();
   const { toast } = useToast();
 
   const [estadosPago, setEstadosPago] = useState<EstadoPago[]>([]);
@@ -64,13 +64,15 @@ const EmpresaEstadosPago = () => {
   const [generando, setGenerando] = useState(false);
 
   useEffect(() => {
-    if (empresaUsuario?.empresa_id) {
+    if (currentEmpresaId) {
       loadEstadosPago();
+    } else {
+      setLoading(false);
     }
-  }, [empresaUsuario?.empresa_id]);
+  }, [currentEmpresaId]);
 
   const loadEstadosPago = async () => {
-    if (!empresaUsuario?.empresa_id) return;
+    if (!currentEmpresaId) return;
 
     setLoading(true);
     try {
@@ -80,7 +82,7 @@ const EmpresaEstadosPago = () => {
           *,
           items:estado_pago_items(*)
         `)
-        .eq("empresa_id", empresaUsuario.empresa_id)
+        .eq("empresa_id", currentEmpresaId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -93,7 +95,7 @@ const EmpresaEstadosPago = () => {
   };
 
   const handleGenerarEstado = async () => {
-    if (!empresaUsuario?.empresa_id) return;
+    if (!currentEmpresaId) return;
 
     setGenerando(true);
     try {
@@ -106,7 +108,7 @@ const EmpresaEstadosPago = () => {
           baterias:prereserva_baterias(paquete:paquetes_examenes(nombre)),
           atencion:atenciones(id, fecha_fin_atencion)
         `)
-        .eq("empresa_id", empresaUsuario.empresa_id)
+        .eq("empresa_id", currentEmpresaId)
         .eq("estado", "atendido")
         .gte("fecha", fechaDesde)
         .lte("fecha", fechaHasta);
@@ -123,7 +125,7 @@ const EmpresaEstadosPago = () => {
       const { data: empresaBaterias } = await supabase
         .from("empresa_baterias")
         .select("paquete_id, valor")
-        .eq("empresa_id", empresaUsuario.empresa_id);
+        .eq("empresa_id", currentEmpresaId);
 
       const bateriaValores: Record<string, number> = {};
       empresaBaterias?.forEach((eb: any) => {
@@ -164,7 +166,7 @@ const EmpresaEstadosPago = () => {
       const { data: estadoPago, error: estadoError } = await supabase
         .from("estados_pago")
         .insert({
-          empresa_id: empresaUsuario.empresa_id,
+          empresa_id: currentEmpresaId,
           numero: await getNextNumero(),
           fecha_desde: fechaDesde,
           fecha_hasta: fechaHasta,
@@ -172,7 +174,6 @@ const EmpresaEstadosPago = () => {
           total_iva: totalIva,
           total: total,
           estado: "pendiente",
-          created_by: empresaUsuario.auth_user_id,
         })
         .select()
         .single();
@@ -202,7 +203,7 @@ const EmpresaEstadosPago = () => {
     const { data } = await supabase
       .from("estados_pago")
       .select("numero")
-      .eq("empresa_id", empresaUsuario?.empresa_id)
+      .eq("empresa_id", currentEmpresaId)
       .order("numero", { ascending: false })
       .limit(1);
 
