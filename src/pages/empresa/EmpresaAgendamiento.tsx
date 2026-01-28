@@ -222,6 +222,8 @@ const EmpresaAgendamiento = () => {
       toast({ title: "Seleccione una empresa primero", variant: "destructive" });
       return;
     }
+
+    if (!formNombre || !formRut || !formCargo || !formBloqueId || !formFaenaId) {
       toast({ title: "Complete todos los campos obligatorios", variant: "destructive" });
       return;
     }
