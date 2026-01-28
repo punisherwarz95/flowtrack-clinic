@@ -1,172 +1,71 @@
 
+# Plan: Selector de Empresa para Administrador en Portal Empresa
 
-# Plan: Restaurar Login Simple de Staff y Separar Autenticación de Portales
+## Descripcion General
+Implementar un selector de empresas en el header del Portal de Empresas que permita a usuarios administradores (staff con rol "admin") cambiar entre diferentes empresas para visualizar sus datos. Esto facilitara la solucion de problemas sin necesidad de conocer las credenciales de cada empresa.
 
-## Diagnóstico del Problema
+## Como Funcionara
 
-El login de staff dejó de funcionar porque se agregó lógica compleja que:
-1. Usa `usePermissions` en el Login, causando dependencias de carga
-2. Cierra sesiones de empresa silenciosamente, lo cual puede interferir con el flujo normal
-3. Verifica permisos ANTES de redirigir, pero si hay algún delay o error en `usePermissions`, ejecuta `signOut()`
+1. **Deteccion de Administrador**: Cuando un usuario inicia sesion en el portal de empresa, el sistema verificara si ese usuario tambien tiene rol de administrador en el sistema de staff (tabla `user_roles`).
 
-El usuario `operaciones@mediflow.local` es admin con todos los permisos - el problema NO es de datos sino de lógica de redirección.
+2. **Selector en el Header**: Si el usuario es administrador, junto al nombre de la empresa actual aparecera un dropdown que permite seleccionar cualquier otra empresa del sistema.
 
-## Solución: Simplificar Login de Staff
+3. **Cambio de Contexto**: Al seleccionar otra empresa, el contexto de `empresaUsuario.empresa_id` cambiara temporalmente (sin afectar la base de datos), permitiendo ver todos los datos de esa empresa.
 
-Restaurar la lógica original simple donde:
-1. El Login de staff NO verifica permisos durante el login
-2. La verificación de permisos ocurre SOLO en `ProtectedRoute`
-3. Si hay sesión activa al cargar Login, redirigir inmediatamente sin verificaciones complejas
+4. **Indicador Visual**: Cuando se este visualizando una empresa diferente a la original, se mostrara un badge o indicador para recordar que se esta en "modo administrador".
 
-## Cambios Requeridos
-
-### 1. Simplificar `src/pages/Login.tsx`
+## Flujo de Usuario
 
 ```text
-- ELIMINAR: uso de usePermissions hook
-- ELIMINAR: lógica de signOut silencioso para usuarios empresa
-- ELIMINAR: verificación de permisos en useEffect
-- MANTENER: detección simple de usuario autenticado y redirección a "/"
-- AGREGAR: si el usuario es de empresa (tipo="empresa"), redirigir a /empresa en vez de cerrar sesión
+1. Operaciones inicia sesion en /empresa/login
+   |
+2. Sistema detecta que es admin (user_roles.role = 'admin')
+   |
+3. En el header, junto a "Portal Empresa / [Nombre Empresa]"
+   aparece un icono de dropdown
+   |
+4. Al hacer clic, se despliega lista de todas las empresas
+   |
+5. Al seleccionar una empresa, el dashboard y modulos
+   muestran los datos de esa empresa
+   |
+6. Un badge indica: "Viendo como: [Empresa X]"
 ```
 
-El Login quedará simple:
-- Si ya hay usuario autenticado:
-  - Si es usuario de empresa: redirigir a `/empresa`
-  - Si es usuario de staff: redirigir a `/`
-- Si no hay usuario: mostrar formulario de login
-- Después de login exitoso: esperar a que AuthContext actualice y redireccione
+## Cambios Tecnicos
 
-### 2. Mantener separación en `ProtectedRoute`
+### 1. Modificar Edge Function `empresa-auth/login`
+- Agregar logica para verificar si el auth_user_id tiene rol "admin" en tabla `user_roles`
+- Si es admin, incluir flag `isStaffAdmin: true` en la respuesta
 
-El componente ya maneja correctamente:
-- Usuarios no autenticados: redirigir a /login
-- Usuarios de empresa: redirigir a /empresa
-- Usuarios sin permisos: redirigir a /login
+### 2. Actualizar `EmpresaAuthContext.tsx`
+- Agregar estado `isStaffAdmin: boolean`
+- Agregar estado `empresaOverride: Empresa | null` para cuando admin ve otra empresa
+- Agregar funcion `setEmpresaOverride(empresa)` para cambiar contexto
+- Modificar `empresaUsuario` para usar `empresaOverride` cuando exista
 
-No requiere cambios.
+### 3. Modificar `EmpresaNavigation.tsx`
+- Agregar componente `Select` o `DropdownMenu` junto al nombre de empresa
+- Solo visible cuando `isStaffAdmin === true`
+- Al cambiar, llamar a `setEmpresaOverride`
+- Mostrar badge "Modo Admin" cuando `empresaOverride` este activo
 
-### 3. Verificar `AuthContext` y `usePermissions` 
+### 4. Cargar lista de empresas
+- Consultar todas las empresas activas desde Supabase
+- Mostrarlas ordenadas por nombre en el selector
 
-Ya tienen failsafes de 5 segundos - mantener estos timeouts.
+## Consideraciones de Seguridad
+- La verificacion de rol admin se hace del lado del servidor (Edge Function)
+- El selector solo modifica la vista del frontend, no altera datos reales
+- Las operaciones de escritura seguiran usando el `empresa_id` real del usuario (o se pueden bloquear en modo override)
 
-## Código Resultante para Login.tsx
+## Archivos a Modificar
 
-```tsx
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity } from "lucide-react";
-import { toast } from "sonner";
-import { useAuthContext } from "@/contexts/AuthContext";
+| Archivo | Cambios |
+|---------|---------|
+| `supabase/functions/empresa-auth/index.ts` | Agregar verificacion de rol admin |
+| `src/contexts/EmpresaAuthContext.tsx` | Estados y funcion para override de empresa |
+| `src/components/empresa/EmpresaNavigation.tsx` | Selector visual de empresas |
 
-const Login = () => {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuthContext();
-
-  // Redirigir si ya está autenticado
-  useEffect(() => {
-    if (authLoading) return;
-
-    if (user) {
-      // Si es usuario de empresa, enviarlo a su portal
-      const tipo = (user.user_metadata as any)?.tipo;
-      if (tipo === "empresa") {
-        navigate("/empresa", { replace: true });
-      } else {
-        // Usuario de staff: ir al dashboard
-        navigate("/", { replace: true });
-      }
-    }
-  }, [authLoading, user, navigate]);
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const emailToUse = username.includes('@') ? username : `${username}@mediflow.local`;
-      
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: emailToUse,
-        password: password,
-      });
-
-      if (error) {
-        toast("Error al iniciar sesión: " + error.message);
-        return;
-      }
-
-      if (data.session) {
-        toast.success("Inicio de sesión exitoso");
-        // Redirección manejada por el useEffect cuando AuthContext actualice
-      }
-    } catch (error) {
-      toast("Error inesperado al iniciar sesión");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  return (
-    // ... formulario sin cambios
-  );
-};
-```
-
-## Flujo Resultante
-
-```text
-Usuario accede a /login
-    |
-    v
-¿authLoading? --> Sí --> Mostrar spinner (máx 5s por failsafe)
-    |
-    No
-    v
-¿Hay usuario? --> Sí --> ¿tipo=empresa? --> Sí --> Redirigir /empresa
-    |                         |
-    No                        No
-    |                         v
-    v                    Redirigir /
-Mostrar formulario
-    |
-    v
-Usuario ingresa credenciales
-    |
-    v
-Login exitoso --> AuthContext actualiza --> useEffect detecta --> Redirige /
-    |
-    v
-ProtectedRoute en / valida permisos
-    |
-    v
-¿Tiene permiso? --> Sí --> Mostrar Dashboard
-         |
-         No
-         v
-    Redirigir /login
-```
-
-## Por Qué Esto Funciona
-
-1. **Sin dependencia de usePermissions en Login**: La verificación de permisos solo ocurre en ProtectedRoute, evitando race conditions
-2. **Separación clara**: Usuarios de empresa van a /empresa, usuarios de staff van a /
-3. **Failsafe mantiene flujo**: Si algo falla, el spinner termina en 5 segundos
-4. **Simple y predecible**: Mismo comportamiento que la versión publicada que funciona
-
+## Resultado Esperado
+Un administrador podra iniciar sesion en el portal de empresa y, desde el header, seleccionar cualquier empresa para ver su dashboard, cotizaciones, estados de pago, y demas datos, facilitando el soporte y solucion de problemas.
