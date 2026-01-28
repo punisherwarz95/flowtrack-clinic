@@ -20,6 +20,13 @@ const normalizeEmpresaAuthError = (message: string) => {
   return message || "Error al iniciar sesión";
 };
 
+interface Empresa {
+  id: string;
+  nombre: string;
+  rut: string | null;
+  razon_social: string | null;
+}
+
 interface EmpresaUsuario {
   id: string;
   empresa_id: string;
@@ -28,12 +35,7 @@ interface EmpresaUsuario {
   nombre: string;
   cargo: string | null;
   activo: boolean;
-  empresas?: {
-    id: string;
-    nombre: string;
-    rut: string | null;
-    razon_social: string | null;
-  };
+  empresas?: Empresa;
 }
 
 interface EmpresaAuthContextType {
@@ -41,6 +43,10 @@ interface EmpresaAuthContextType {
   user: User | null;
   empresaUsuario: EmpresaUsuario | null;
   loading: boolean;
+  isStaffAdmin: boolean;
+  empresaOverride: Empresa | null;
+  setEmpresaOverride: (empresa: Empresa | null) => void;
+  currentEmpresaId: string | null;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (data: SignUpData) => Promise<{ error: string | null; success: boolean }>;
   signOut: () => Promise<void>;
@@ -62,7 +68,12 @@ export const EmpresaAuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [empresaUsuario, setEmpresaUsuario] = useState<EmpresaUsuario | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isStaffAdmin, setIsStaffAdmin] = useState(false);
+  const [empresaOverride, setEmpresaOverride] = useState<Empresa | null>(null);
   const initializedRef = useRef(false);
+
+  // Computed: empresa_id actual (override si está activo, o el original)
+  const currentEmpresaId = empresaOverride?.id ?? empresaUsuario?.empresa_id ?? null;
 
   useEffect(() => {
     if (initializedRef.current) return;
@@ -143,6 +154,7 @@ export const EmpresaAuthProvider = ({ children }: { children: ReactNode }) => {
       if (response.data?.session) {
         await supabase.auth.setSession(response.data.session);
         setEmpresaUsuario(response.data.empresa_usuario);
+        setIsStaffAdmin(response.data.isStaffAdmin === true);
       }
 
       return { error: null };
@@ -176,6 +188,8 @@ export const EmpresaAuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     await supabase.auth.signOut();
     setEmpresaUsuario(null);
+    setIsStaffAdmin(false);
+    setEmpresaOverride(null);
   };
 
   const checkEmpresa = async (rut: string): Promise<{ exists: boolean; empresa?: { id: string; nombre: string; rut: string } }> => {
@@ -202,6 +216,10 @@ export const EmpresaAuthProvider = ({ children }: { children: ReactNode }) => {
         user,
         empresaUsuario,
         loading,
+        isStaffAdmin,
+        empresaOverride,
+        setEmpresaOverride,
+        currentEmpresaId,
         signIn,
         signUp,
         signOut,

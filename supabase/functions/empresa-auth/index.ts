@@ -83,7 +83,20 @@ Deno.serve(async (req) => {
           .eq("id", empresaUsuario[0].id);
       }
 
-      console.log("Login exitoso para usuario de empresa:", email);
+      // Verificar si el usuario es admin del staff (tabla user_roles)
+      let isStaffAdmin = false;
+      if (authData.user) {
+        const { data: adminRole } = await supabaseAdmin
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", authData.user.id)
+          .eq("role", "admin")
+          .limit(1);
+        
+        isStaffAdmin = !!(adminRole && adminRole.length > 0);
+      }
+
+      console.log("Login exitoso para usuario de empresa:", email, "isStaffAdmin:", isStaffAdmin);
 
       return new Response(
         JSON.stringify({
@@ -91,6 +104,7 @@ Deno.serve(async (req) => {
           session: authData.session,
           user: authData.user,
           empresa_usuario: empresaUsuario[0],
+          isStaffAdmin,
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
