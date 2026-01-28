@@ -45,23 +45,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Verificar que el email corresponde a un usuario de empresa
-      const { data: empresaUsuario, error: empresaError } = await supabaseAdmin
-        .from("empresa_usuarios")
-        .select("*, empresas(*)")
-        .eq("email", email.toLowerCase())
-        .eq("activo", true)
-        .limit(1);
-
-      if (empresaError || !empresaUsuario || empresaUsuario.length === 0) {
-        console.log("Usuario de empresa no encontrado:", email);
-        return new Response(
-          JSON.stringify({ error: "Credenciales inválidas o usuario no autorizado" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      // Intentar login con Supabase Auth
+      // Primero intentar autenticar con Supabase Auth
       const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
         email,
         password,
@@ -75,15 +59,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Actualizar auth_user_id si no está configurado
-      if (!empresaUsuario[0].auth_user_id && authData.user) {
-        await supabaseAdmin
-          .from("empresa_usuarios")
-          .update({ auth_user_id: authData.user.id })
-          .eq("id", empresaUsuario[0].id);
-      }
-
-      // Verificar si el usuario es admin del staff (tabla user_roles)
+      // Verificar si es un admin de staff (tabla user_roles)
       let isStaffAdmin = false;
       if (authData.user) {
         const { data: adminRole } = await supabaseAdmin
@@ -94,6 +70,60 @@ Deno.serve(async (req) => {
           .limit(1);
         
         isStaffAdmin = !!(adminRole && adminRole.length > 0);
+      }
+
+      // Verificar si el email corresponde a un usuario de empresa
+      const { data: empresaUsuario, error: empresaError } = await supabaseAdmin
+        .from("empresa_usuarios")
+        .select("*, empresas(*)")
+        .eq("email", email.toLowerCase())
+        .eq("activo", true)
+        .limit(1);
+
+      // Si no es usuario de empresa
+      if (empresaError || !empresaUsuario || empresaUsuario.length === 0) {
+        // Pero SI es admin de staff, permitir acceso sin empresa vinculada
+        if (isStaffAdmin) {
+          console.log("Admin de staff accediendo al portal de empresa:", email);
+          
+          // Crear un objeto "empresa_usuario virtual" para admins
+          const virtualEmpresaUsuario = {
+            id: "admin-virtual-" + authData.user.id,
+            empresa_id: null, // Sin empresa vinculada inicialmente
+            auth_user_id: authData.user.id,
+            email: email.toLowerCase(),
+            nombre: authData.user.user_metadata?.username || email.split("@")[0],
+            cargo: "Administrador del Sistema",
+            activo: true,
+            empresas: null, // Deberá seleccionar una empresa desde el selector
+          };
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              session: authData.session,
+              user: authData.user,
+              empresa_usuario: virtualEmpresaUsuario,
+              isStaffAdmin: true,
+            }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        console.log("Usuario de empresa no encontrado:", email);
+        return new Response(
+          JSON.stringify({ error: "Credenciales inválidas o usuario no autorizado" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Usuario de empresa encontrado
+      // Actualizar auth_user_id si no está configurado
+      if (!empresaUsuario[0].auth_user_id && authData.user) {
+        await supabaseAdmin
+          .from("empresa_usuarios")
+          .update({ auth_user_id: authData.user.id })
+          .eq("id", empresaUsuario[0].id);
       }
 
       console.log("Login exitoso para usuario de empresa:", email, "isStaffAdmin:", isStaffAdmin);
