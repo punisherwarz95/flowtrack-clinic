@@ -10,9 +10,9 @@ import {
   Package,
   ClipboardCheck,
   LogOut,
-  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import EmpresaSelector from "./EmpresaSelector";
 
 const menuItems = [
   { path: "/empresa", label: "Dashboard", icon: LayoutDashboard },
@@ -26,27 +26,35 @@ const menuItems = [
 
 const EmpresaNavigation = () => {
   const location = useLocation();
-  const { empresaUsuario, signOut } = useEmpresaAuth();
+  const { empresaUsuario, signOut, isStaffAdmin, empresaOverride } = useEmpresaAuth();
 
   const handleSignOut = async () => {
     await signOut();
   };
 
+  // Nombre de empresa a mostrar (override si está activo)
+  const currentEmpresaNombre = empresaOverride?.nombre ?? empresaUsuario?.empresas?.nombre;
+
   return (
     <header className="bg-card border-b sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          {/* Logo y nombre de empresa */}
+          {/* Logo y selector de empresa (para admins) o nombre de empresa */}
           <div className="flex items-center gap-3">
-            <Building2 className="h-6 w-6 text-primary" />
-            <div>
-              <h1 className="font-semibold text-lg leading-tight">Portal Empresa</h1>
-              {empresaUsuario?.empresas && (
-                <p className="text-xs text-muted-foreground">
-                  {empresaUsuario.empresas.nombre}
-                </p>
-              )}
-            </div>
+            {isStaffAdmin ? (
+              <EmpresaSelector />
+            ) : (
+              <>
+                <div>
+                  <h1 className="font-semibold text-lg leading-tight">Portal Empresa</h1>
+                  {currentEmpresaNombre && (
+                    <p className="text-xs text-muted-foreground">
+                      {currentEmpresaNombre}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Navegación */}
