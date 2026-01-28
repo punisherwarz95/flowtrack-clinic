@@ -112,13 +112,20 @@ const Login = () => {
               {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
             </Button>
           </form>
-          <div className="mt-4 pt-4 border-t">
+          <div className="mt-4 pt-4 border-t space-y-2">
             <Button 
               variant="outline" 
               className="w-full" 
               onClick={() => navigate("/portal-paciente")}
             >
               Portal Paciente
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full" 
+              onClick={() => navigate("/empresa/login")}
+            >
+              Portal Empresa
             </Button>
           </div>
         </CardContent>
