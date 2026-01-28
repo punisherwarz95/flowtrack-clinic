@@ -6,7 +6,7 @@ interface EmpresaProtectedRouteProps {
 }
 
 const EmpresaProtectedRoute = ({ children }: EmpresaProtectedRouteProps) => {
-  const { user, empresaUsuario, loading } = useEmpresaAuth();
+  const { user, empresaUsuario, loading, isStaffAdmin } = useEmpresaAuth();
 
   if (loading) {
     return (
@@ -21,8 +21,8 @@ const EmpresaProtectedRoute = ({ children }: EmpresaProtectedRouteProps) => {
     return <Navigate to="/empresa/login" replace />;
   }
 
-  // Usuario autenticado pero no es usuario de empresa
-  if (!empresaUsuario) {
+  // Usuario autenticado pero no es usuario de empresa NI admin de staff
+  if (!empresaUsuario && !isStaffAdmin) {
     return <Navigate to="/login" replace />;
   }
 

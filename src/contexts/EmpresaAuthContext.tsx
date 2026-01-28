@@ -29,13 +29,13 @@ interface Empresa {
 
 interface EmpresaUsuario {
   id: string;
-  empresa_id: string;
+  empresa_id: string | null;
   auth_user_id: string;
   email: string;
   nombre: string;
   cargo: string | null;
   activo: boolean;
-  empresas?: Empresa;
+  empresas?: Empresa | null;
 }
 
 interface EmpresaAuthContextType {
