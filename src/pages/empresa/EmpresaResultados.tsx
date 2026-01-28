@@ -55,7 +55,7 @@ interface PacienteResultado {
 }
 
 const EmpresaResultados = () => {
-  const { empresaUsuario } = useEmpresaAuth();
+  const { currentEmpresaId, isStaffAdmin } = useEmpresaAuth();
 
   const [pacientes, setPacientes] = useState<PacienteResultado[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,13 +68,15 @@ const EmpresaResultados = () => {
   const [selectedPaciente, setSelectedPaciente] = useState<PacienteResultado | null>(null);
 
   useEffect(() => {
-    if (empresaUsuario?.empresa_id) {
+    if (currentEmpresaId) {
       loadResultados();
+    } else {
+      setLoading(false);
     }
-  }, [empresaUsuario?.empresa_id, fechaDesde, fechaHasta]);
+  }, [currentEmpresaId, fechaDesde, fechaHasta]);
 
   const loadResultados = async () => {
-    if (!empresaUsuario?.empresa_id) return;
+    if (!currentEmpresaId) return;
 
     setLoading(true);
     try {
@@ -100,7 +102,7 @@ const EmpresaResultados = () => {
             )
           )
         `)
-        .eq("empresa_id", empresaUsuario.empresa_id)
+        .eq("empresa_id", currentEmpresaId)
         .eq("estado", "atendido")
         .gte("fecha", fechaDesde)
         .lte("fecha", fechaHasta)

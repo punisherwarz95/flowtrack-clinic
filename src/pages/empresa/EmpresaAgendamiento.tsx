@@ -79,7 +79,7 @@ interface CupoDisponible {
 }
 
 const EmpresaAgendamiento = () => {
-  const { empresaUsuario } = useEmpresaAuth();
+  const { currentEmpresaId, empresaUsuario, isStaffAdmin } = useEmpresaAuth();
   const { toast } = useToast();
 
   const [bloques, setBloques] = useState<Bloque[]>([]);
@@ -106,15 +106,19 @@ const EmpresaAgendamiento = () => {
   const [searchFilter, setSearchFilter] = useState("");
 
   useEffect(() => {
-    loadInitialData();
-  }, [empresaUsuario?.empresa_id]);
+    if (currentEmpresaId) {
+      loadInitialData();
+    } else {
+      setLoading(false);
+    }
+  }, [currentEmpresaId]);
 
   useEffect(() => {
-    if (selectedDate && empresaUsuario?.empresa_id) {
+    if (selectedDate && currentEmpresaId) {
       loadPrereservas();
       loadCuposDisponibles();
     }
-  }, [selectedDate, empresaUsuario?.empresa_id]);
+  }, [selectedDate, currentEmpresaId]);
 
   useEffect(() => {
     if (formFaenaId) {
@@ -123,7 +127,7 @@ const EmpresaAgendamiento = () => {
   }, [formFaenaId]);
 
   const loadInitialData = async () => {
-    if (!empresaUsuario?.empresa_id) return;
+    if (!currentEmpresaId) return;
 
     try {
       // Cargar bloques
@@ -139,7 +143,7 @@ const EmpresaAgendamiento = () => {
       const { data: faenasData } = await supabase
         .from("faenas")
         .select("*")
-        .eq("empresa_id", empresaUsuario.empresa_id)
+        .eq("empresa_id", currentEmpresaId)
         .eq("activo", true)
         .order("nombre");
 
@@ -152,7 +156,7 @@ const EmpresaAgendamiento = () => {
   };
 
   const loadPrereservas = async () => {
-    if (!empresaUsuario?.empresa_id) return;
+    if (!currentEmpresaId) return;
 
     const { data } = await supabase
       .from("prereservas")
@@ -162,7 +166,7 @@ const EmpresaAgendamiento = () => {
         faena:faenas(*),
         baterias:prereserva_baterias(paquete:paquetes_examenes(*))
       `)
-      .eq("empresa_id", empresaUsuario.empresa_id)
+      .eq("empresa_id", currentEmpresaId)
       .eq("fecha", selectedDate)
       .order("created_at", { ascending: false });
 
@@ -170,7 +174,7 @@ const EmpresaAgendamiento = () => {
   };
 
   const loadCuposDisponibles = async () => {
-    if (!empresaUsuario?.empresa_id) return;
+    if (!currentEmpresaId) return;
 
     // Obtener cupos reservados para la fecha
     const { data: cuposData } = await supabase
@@ -198,11 +202,11 @@ const EmpresaAgendamiento = () => {
     const bateriasFromFaena = data?.map((d: any) => d.paquete).filter(Boolean) || [];
     
     // Si no hay baterías específicas de faena, cargar todas las baterías de la empresa
-    if (bateriasFromFaena.length === 0 && empresaUsuario?.empresa_id) {
+    if (bateriasFromFaena.length === 0 && currentEmpresaId) {
       const { data: empresaBaterias } = await supabase
         .from("empresa_baterias")
         .select("paquete:paquetes_examenes(*)")
-        .eq("empresa_id", empresaUsuario.empresa_id)
+        .eq("empresa_id", currentEmpresaId)
         .eq("activo", true);
 
       setBaterias(empresaBaterias?.map((d: any) => d.paquete).filter(Boolean) || []);
@@ -214,7 +218,10 @@ const EmpresaAgendamiento = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formNombre || !formRut || !formCargo || !formBloqueId || !formFaenaId) {
+    if (!currentEmpresaId) {
+      toast({ title: "Seleccione una empresa primero", variant: "destructive" });
+      return;
+    }
       toast({ title: "Complete todos los campos obligatorios", variant: "destructive" });
       return;
     }

@@ -32,7 +32,7 @@ interface PacienteAtendido {
 }
 
 const EmpresaPacientes = () => {
-  const { empresaUsuario } = useEmpresaAuth();
+  const { currentEmpresaId, isStaffAdmin } = useEmpresaAuth();
   const [pacientes, setPacientes] = useState<PacienteAtendido[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchFilter, setSearchFilter] = useState("");
@@ -42,13 +42,15 @@ const EmpresaPacientes = () => {
   const [fechaHasta, setFechaHasta] = useState(format(new Date(), "yyyy-MM-dd"));
 
   useEffect(() => {
-    if (empresaUsuario?.empresa_id) {
+    if (currentEmpresaId) {
       loadPacientes();
+    } else {
+      setLoading(false);
     }
-  }, [empresaUsuario?.empresa_id, fechaDesde, fechaHasta]);
+  }, [currentEmpresaId, fechaDesde, fechaHasta]);
 
   const loadPacientes = async () => {
-    if (!empresaUsuario?.empresa_id) return;
+    if (!currentEmpresaId) return;
 
     setLoading(true);
     try {
@@ -60,7 +62,7 @@ const EmpresaPacientes = () => {
           baterias:prereserva_baterias(paquete:paquetes_examenes(nombre)),
           atencion:atenciones(estado, fecha_fin_atencion)
         `)
-        .eq("empresa_id", empresaUsuario.empresa_id)
+        .eq("empresa_id", currentEmpresaId)
         .in("estado", ["confirmado", "atendido"])
         .gte("fecha", fechaDesde)
         .lte("fecha", fechaHasta)
