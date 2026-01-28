@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Upload, Building2, Trash2, Pencil, Package, DollarSign } from "lucide-react";
+import { Plus, Upload, Building2, Trash2, Pencil, Package, DollarSign, MapPin, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/useAuth";
+import EmpresaFaenas from "@/components/empresas/EmpresaFaenas";
 
 interface Empresa {
   id: string;
@@ -51,6 +52,7 @@ const Empresas = () => {
   const [paquetes, setPaquetes] = useState<Paquete[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [openBateriasDialog, setOpenBateriasDialog] = useState(false);
+  const [openFaenasDialog, setOpenFaenasDialog] = useState(false);
   const [empresaToDelete, setEmpresaToDelete] = useState<string | null>(null);
   const [editingEmpresa, setEditingEmpresa] = useState<Empresa | null>(null);
   const [selectedEmpresa, setSelectedEmpresa] = useState<Empresa | null>(null);
@@ -313,6 +315,17 @@ const Empresas = () => {
                     <Button
                       variant="ghost"
                       size="icon"
+                      title="Faenas / Centros de Trabajo"
+                      onClick={() => {
+                        setSelectedEmpresa(empresa);
+                        setOpenFaenasDialog(true);
+                      }}
+                    >
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       title="Baterías Contratadas"
                       onClick={async () => {
                         setSelectedEmpresa(empresa);
@@ -417,6 +430,23 @@ const Empresas = () => {
                 </Button>
               </div>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de Faenas */}
+        <Dialog open={openFaenasDialog} onOpenChange={(open) => {
+          setOpenFaenasDialog(open);
+          if (!open) {
+            setSelectedEmpresa(null);
+          }
+        }}>
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+            {selectedEmpresa && (
+              <EmpresaFaenas 
+                empresaId={selectedEmpresa.id} 
+                empresaNombre={selectedEmpresa.nombre} 
+              />
+            )}
           </DialogContent>
         </Dialog>
 
