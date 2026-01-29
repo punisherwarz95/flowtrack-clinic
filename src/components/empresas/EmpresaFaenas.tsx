@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, MapPin, Pencil, Trash2 } from "lucide-react";
+import { Plus, MapPin, Pencil, Trash2, Package, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -31,6 +31,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface Faena {
   id: string;
@@ -41,6 +48,19 @@ interface Faena {
   created_at: string;
 }
 
+interface Paquete {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+}
+
+interface BateriaFaena {
+  id: string;
+  paquete_id: string;
+  faena_id: string;
+  activo: boolean;
+}
+
 interface EmpresaFaenasProps {
   empresaId: string;
   empresaNombre: string;
@@ -48,33 +68,50 @@ interface EmpresaFaenasProps {
 
 const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
   const [faenas, setFaenas] = useState<Faena[]>([]);
+  const [paquetes, setPaquetes] = useState<Paquete[]>([]);
+  const [bateriasFaenas, setBateriasFaenas] = useState<BateriaFaena[]>([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingFaena, setEditingFaena] = useState<Faena | null>(null);
   const [faenaToDelete, setFaenaToDelete] = useState<string | null>(null);
+  const [expandedFaenas, setExpandedFaenas] = useState<Set<string>>(new Set());
   const [formData, setFormData] = useState({
     nombre: "",
     direccion: "",
   });
 
   useEffect(() => {
-    loadFaenas();
+    loadData();
   }, [empresaId]);
 
-  const loadFaenas = async () => {
+  const loadData = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("faenas")
-        .select("*")
-        .eq("empresa_id", empresaId)
-        .order("nombre");
+      const [faenasRes, paquetesRes, bateriasRes] = await Promise.all([
+        supabase
+          .from("faenas")
+          .select("*")
+          .eq("empresa_id", empresaId)
+          .order("nombre"),
+        supabase
+          .from("paquetes_examenes")
+          .select("id, nombre, descripcion")
+          .order("nombre"),
+        supabase
+          .from("bateria_faenas")
+          .select("*"),
+      ]);
 
-      if (error) throw error;
-      setFaenas(data || []);
+      if (faenasRes.error) throw faenasRes.error;
+      if (paquetesRes.error) throw paquetesRes.error;
+      if (bateriasRes.error) throw bateriasRes.error;
+
+      setFaenas(faenasRes.data || []);
+      setPaquetes(paquetesRes.data || []);
+      setBateriasFaenas(bateriasRes.data || []);
     } catch (error) {
-      console.error("Error loading faenas:", error);
-      toast.error("Error al cargar faenas");
+      console.error("Error loading data:", error);
+      toast.error("Error al cargar datos");
     } finally {
       setLoading(false);
     }
@@ -110,7 +147,7 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
       setOpenDialog(false);
       setEditingFaena(null);
       setFormData({ nombre: "", direccion: "" });
-      loadFaenas();
+      loadData();
     } catch (error: any) {
       console.error("Error:", error);
       toast.error(error.message || "Error al guardar faena");
@@ -126,7 +163,7 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
 
       if (error) throw error;
       toast.success(faena.activo ? "Faena desactivada" : "Faena activada");
-      loadFaenas();
+      loadData();
     } catch (error: any) {
       console.error("Error:", error);
       toast.error("Error al cambiar estado");
@@ -145,11 +182,62 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
       if (error) throw error;
       toast.success("Faena eliminada");
       setFaenaToDelete(null);
-      loadFaenas();
+      loadData();
     } catch (error: any) {
       console.error("Error:", error);
       toast.error(error.message || "Error al eliminar faena");
     }
+  };
+
+  const toggleExpanded = (faenaId: string) => {
+    const newExpanded = new Set(expandedFaenas);
+    if (newExpanded.has(faenaId)) {
+      newExpanded.delete(faenaId);
+    } else {
+      newExpanded.add(faenaId);
+    }
+    setExpandedFaenas(newExpanded);
+  };
+
+  const isBateriaAsignada = (faenaId: string, paqueteId: string) => {
+    return bateriasFaenas.some(
+      (bf) => bf.faena_id === faenaId && bf.paquete_id === paqueteId && bf.activo
+    );
+  };
+
+  const handleToggleBateria = async (faenaId: string, paqueteId: string) => {
+    try {
+      const existing = bateriasFaenas.find(
+        (bf) => bf.faena_id === faenaId && bf.paquete_id === paqueteId
+      );
+
+      if (existing) {
+        // Toggle activo status
+        const { error } = await supabase
+          .from("bateria_faenas")
+          .update({ activo: !existing.activo })
+          .eq("id", existing.id);
+
+        if (error) throw error;
+      } else {
+        // Create new relationship
+        const { error } = await supabase
+          .from("bateria_faenas")
+          .insert([{ faena_id: faenaId, paquete_id: paqueteId, activo: true }]);
+
+        if (error) throw error;
+      }
+
+      toast.success("Batería actualizada");
+      loadData();
+    } catch (error: any) {
+      console.error("Error:", error);
+      toast.error("Error al actualizar batería");
+    }
+  };
+
+  const getBateriasCount = (faenaId: string) => {
+    return bateriasFaenas.filter((bf) => bf.faena_id === faenaId && bf.activo).length;
   };
 
   return (
@@ -161,7 +249,7 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
             Faenas / Centros de Trabajo
           </h3>
           <p className="text-sm text-muted-foreground">
-            Gestiona las faenas de {empresaNombre}
+            Gestiona las faenas y sus baterías para {empresaNombre}
           </p>
         </div>
         <Dialog
@@ -196,7 +284,7 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
                   onChange={(e) =>
                     setFormData({ ...formData, nombre: e.target.value })
                   }
-                  placeholder="Ej: Faena Norte"
+                  placeholder="Ej: Homologación, Zaldivar, etc."
                 />
               </div>
               <div>
@@ -229,58 +317,110 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
           <p className="text-sm">Crea la primera faena para esta empresa</p>
         </div>
       ) : (
-        <div className="border rounded-md">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Dirección</TableHead>
-                <TableHead className="text-center">Activo</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {faenas.map((faena) => (
-                <TableRow key={faena.id}>
-                  <TableCell className="font-medium">{faena.nombre}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {faena.direccion || "-"}
-                  </TableCell>
-                  <TableCell className="text-center">
+        <div className="space-y-2">
+          {faenas.map((faena) => (
+            <Collapsible
+              key={faena.id}
+              open={expandedFaenas.has(faena.id)}
+              onOpenChange={() => toggleExpanded(faena.id)}
+            >
+              <div className="border rounded-lg">
+                <div className="flex items-center justify-between p-3 bg-muted/30">
+                  <CollapsibleTrigger asChild>
+                    <button className="flex items-center gap-3 flex-1 text-left hover:bg-muted/50 rounded p-1 -m-1">
+                      {expandedFaenas.has(faena.id) ? (
+                        <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <div>
+                        <div className="font-medium flex items-center gap-2">
+                          {faena.nombre}
+                          <Badge variant="secondary" className="text-xs">
+                            <Package className="h-3 w-3 mr-1" />
+                            {getBateriasCount(faena.id)} baterías
+                          </Badge>
+                        </div>
+                        {faena.direccion && (
+                          <div className="text-sm text-muted-foreground">
+                            {faena.direccion}
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  </CollapsibleTrigger>
+                  <div className="flex items-center gap-2">
                     <Switch
                       checked={faena.activo}
                       onCheckedChange={() => handleToggleActivo(faena)}
                     />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setEditingFaena(faena);
-                          setFormData({
-                            nombre: faena.nombre,
-                            direccion: faena.direccion || "",
-                          });
-                          setOpenDialog(true);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setFaenaToDelete(faena.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setEditingFaena(faena);
+                        setFormData({
+                          nombre: faena.nombre,
+                          direccion: faena.direccion || "",
+                        });
+                        setOpenDialog(true);
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setFaenaToDelete(faena.id)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+                <CollapsibleContent>
+                  <div className="p-4 border-t bg-background">
+                    <div className="mb-3">
+                      <h4 className="text-sm font-medium flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        Baterías asignadas a esta faena
+                      </h4>
+                      <p className="text-xs text-muted-foreground">
+                        Selecciona las baterías que corresponden a esta faena
+                      </p>
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                    <div className="grid gap-2 max-h-64 overflow-y-auto">
+                      {paquetes.map((paquete) => (
+                        <label
+                          key={paquete.id}
+                          className="flex items-center gap-3 p-2 rounded-lg border hover:bg-muted/50 cursor-pointer"
+                        >
+                          <Checkbox
+                            checked={isBateriaAsignada(faena.id, paquete.id)}
+                            onCheckedChange={() =>
+                              handleToggleBateria(faena.id, paquete.id)
+                            }
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium text-sm">{paquete.nombre}</div>
+                            {paquete.descripcion && (
+                              <div className="text-xs text-muted-foreground">
+                                {paquete.descripcion}
+                              </div>
+                            )}
+                          </div>
+                        </label>
+                      ))}
+                      {paquetes.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          No hay baterías disponibles
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
+          ))}
         </div>
       )}
 
@@ -292,8 +432,8 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar faena?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Si hay prereservas asociadas a
-              esta faena, no podrá ser eliminada.
+              Esta acción no se puede deshacer. Si hay prereservas o baterías
+              asociadas a esta faena, no podrá ser eliminada.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
