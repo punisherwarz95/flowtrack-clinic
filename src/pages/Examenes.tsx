@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, ClipboardList, Package, Trash2, Pencil, FileText, DollarSign, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Search } from "lucide-react";
+import { Plus, ClipboardList, Package, Trash2, Pencil, FileText, DollarSign, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Search, MapPin } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -70,6 +70,12 @@ interface EmpresaBateria {
   empresa?: { nombre: string };
 }
 
+interface Faena {
+  id: string;
+  nombre: string;
+  empresa_id: string | null;
+}
+
 const Examenes = () => {
   useAuth(); // Protect route
   const [examenes, setExamenes] = useState<Examen[]>([]);
@@ -77,6 +83,8 @@ const Examenes = () => {
   const [paquetes, setPaquetes] = useState<Paquete[]>([]);
   const [documentos, setDocumentos] = useState<DocumentoFormulario[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
+  const [faenas, setFaenas] = useState<Faena[]>([]);
+  const [selectedFaenas, setSelectedFaenas] = useState<string[]>([]);
   const [openExamenDialog, setOpenExamenDialog] = useState(false);
   const [openPaqueteDialog, setOpenPaqueteDialog] = useState(false);
   const [examenToDelete, setExamenToDelete] = useState<string | null>(null);
@@ -119,6 +127,7 @@ const Examenes = () => {
     loadPaquetes();
     loadDocumentos();
     loadEmpresas();
+    loadFaenas();
   }, []);
 
   const loadDocumentos = async () => {
@@ -144,6 +153,36 @@ const Examenes = () => {
 
       if (error) throw error;
       setEmpresas(data || []);
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
+
+  const loadFaenas = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("faenas")
+        .select("id, nombre, empresa_id")
+        .eq("activo", true)
+        .order("nombre");
+
+      if (error) throw error;
+      setFaenas(data || []);
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
+
+  const loadPaqueteFaenas = async (paqueteId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("bateria_faenas")
+        .select("faena_id")
+        .eq("paquete_id", paqueteId)
+        .eq("activo", true);
+
+      if (error) throw error;
+      setSelectedFaenas(data?.map(d => d.faena_id) || []);
     } catch (error) {
       console.error("Error:", error);
     }
@@ -353,6 +392,12 @@ const Examenes = () => {
           .from("empresa_baterias")
           .delete()
           .eq("paquete_id", editingPaquete.id);
+
+        // Eliminar faenas anteriores
+        await supabase
+          .from("bateria_faenas")
+          .delete()
+          .eq("paquete_id", editingPaquete.id);
       } else {
         const { data: paqueteData, error: paqueteError } = await supabase
           .from("paquetes_examenes")
@@ -412,6 +457,21 @@ const Examenes = () => {
 
         if (preciosError) throw preciosError;
       }
+
+      // Guardar faenas asignadas
+      if (selectedFaenas.length > 0) {
+        const faenasData = selectedFaenas.map(faenaId => ({
+          paquete_id: paqueteId,
+          faena_id: faenaId,
+          activo: true,
+        }));
+
+        const { error: faenasError } = await supabase
+          .from("bateria_faenas")
+          .insert(faenasData);
+
+        if (faenasError) throw faenasError;
+      }
       
       toast.success(editingPaquete ? "Paquete actualizado exitosamente" : "Paquete de exámenes creado exitosamente");
       
@@ -420,6 +480,7 @@ const Examenes = () => {
       setPaqueteFormData({ nombre: "", descripcion: "" });
       setSelectedExamenes([]);
       setSelectedDocumentos([]);
+      setSelectedFaenas([]);
       setEmpresaPrecios({});
       setPaqueteDialogTab("examenes");
       loadPaquetes();
@@ -830,6 +891,7 @@ const Examenes = () => {
                 setPaqueteFormData({ nombre: "", descripcion: "" });
                 setSelectedExamenes([]);
                 setSelectedDocumentos([]);
+                setSelectedFaenas([]);
                 setEmpresaPrecios({});
                 setPaqueteDialogTab("examenes");
                 setPaqueteExamenFilter("");
@@ -869,7 +931,7 @@ const Examenes = () => {
                   </div>
                   
                   <Tabs value={paqueteDialogTab} onValueChange={setPaqueteDialogTab} className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
+                    <TabsList className="grid w-full grid-cols-4">
                       <TabsTrigger value="examenes" className="gap-2">
                         <ClipboardList className="h-4 w-4" />
                         Exámenes
@@ -877,6 +939,10 @@ const Examenes = () => {
                       <TabsTrigger value="documentos" className="gap-2">
                         <FileText className="h-4 w-4" />
                         Documentos
+                      </TabsTrigger>
+                      <TabsTrigger value="faenas" className="gap-2">
+                        <MapPin className="h-4 w-4" />
+                        Faenas
                       </TabsTrigger>
                       <TabsTrigger value="precios" className="gap-2">
                         <DollarSign className="h-4 w-4" />
@@ -1027,6 +1093,42 @@ const Examenes = () => {
                       </div>
                       <p className="text-xs text-muted-foreground mt-2">
                         {selectedDocumentos.length} documentos seleccionados
+                      </p>
+                    </TabsContent>
+
+                    <TabsContent value="faenas" className="mt-4">
+                      <Label>Faenas donde aplica este paquete</Label>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Selecciona las faenas donde este paquete estará disponible.
+                      </p>
+                      <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2 mt-2">
+                        {faenas.length === 0 ? (
+                          <p className="text-sm text-muted-foreground text-center py-4">
+                            No hay faenas creadas. Crea faenas en el módulo Empresas.
+                          </p>
+                        ) : (
+                          faenas.map((faena) => (
+                            <label key={faena.id} className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-1 rounded">
+                              <input
+                                type="checkbox"
+                                checked={selectedFaenas.includes(faena.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedFaenas([...selectedFaenas, faena.id]);
+                                  } else {
+                                    setSelectedFaenas(selectedFaenas.filter(id => id !== faena.id));
+                                  }
+                                }}
+                                className="w-4 h-4"
+                              />
+                              <MapPin className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm">{faena.nombre}</span>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {selectedFaenas.length} faenas seleccionadas
                       </p>
                     </TabsContent>
                     
@@ -1189,7 +1291,8 @@ const Examenes = () => {
                             setSelectedExamenes(paquete.paquete_examen_items.map(item => item.examen_id));
                             await Promise.all([
                               loadPaqueteDocumentos(paquete.id),
-                              loadPaquetePrecios(paquete.id)
+                              loadPaquetePrecios(paquete.id),
+                              loadPaqueteFaenas(paquete.id)
                             ]);
                             setOpenPaqueteDialog(true);
                           }}
