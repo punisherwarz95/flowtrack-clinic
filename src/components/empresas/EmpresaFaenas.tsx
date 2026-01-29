@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, MapPin, Pencil, Trash2, Package, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, MapPin, Pencil, Trash2, Package, ChevronDown, ChevronUp, Link2, Unlink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -22,14 +22,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -38,13 +30,14 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Faena {
   id: string;
   nombre: string;
   direccion: string | null;
   activo: boolean;
-  empresa_id: string;
+  empresa_id: string | null;
   created_at: string;
 }
 
@@ -61,15 +54,23 @@ interface BateriaFaena {
   activo: boolean;
 }
 
+interface EmpresaFaena {
+  id: string;
+  empresa_id: string;
+  faena_id: string;
+  activo: boolean;
+}
+
 interface EmpresaFaenasProps {
   empresaId: string;
   empresaNombre: string;
 }
 
 const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
-  const [faenas, setFaenas] = useState<Faena[]>([]);
+  const [allFaenas, setAllFaenas] = useState<Faena[]>([]);
   const [paquetes, setPaquetes] = useState<Paquete[]>([]);
   const [bateriasFaenas, setBateriasFaenas] = useState<BateriaFaena[]>([]);
+  const [empresaFaenas, setEmpresaFaenas] = useState<EmpresaFaena[]>([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingFaena, setEditingFaena] = useState<Faena | null>(null);
@@ -87,11 +88,10 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [faenasRes, paquetesRes, bateriasRes] = await Promise.all([
+      const [faenasRes, paquetesRes, bateriasRes, empresaFaenasRes] = await Promise.all([
         supabase
           .from("faenas")
           .select("*")
-          .eq("empresa_id", empresaId)
           .order("nombre"),
         supabase
           .from("paquetes_examenes")
@@ -100,15 +100,21 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
         supabase
           .from("bateria_faenas")
           .select("*"),
+        supabase
+          .from("empresa_faenas")
+          .select("*")
+          .eq("empresa_id", empresaId),
       ]);
 
       if (faenasRes.error) throw faenasRes.error;
       if (paquetesRes.error) throw paquetesRes.error;
       if (bateriasRes.error) throw bateriasRes.error;
+      if (empresaFaenasRes.error) throw empresaFaenasRes.error;
 
-      setFaenas(faenasRes.data || []);
+      setAllFaenas(faenasRes.data || []);
       setPaquetes(paquetesRes.data || []);
       setBateriasFaenas(bateriasRes.data || []);
+      setEmpresaFaenas(empresaFaenasRes.data || []);
     } catch (error) {
       console.error("Error loading data:", error);
       toast.error("Error al cargar datos");
@@ -116,6 +122,14 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
       setLoading(false);
     }
   };
+
+  // Faenas asignadas a esta empresa
+  const assignedFaenaIds = new Set(
+    empresaFaenas.filter(ef => ef.activo).map(ef => ef.faena_id)
+  );
+  
+  const assignedFaenas = allFaenas.filter(f => assignedFaenaIds.has(f.id));
+  const availableFaenas = allFaenas.filter(f => !assignedFaenaIds.has(f.id) && f.activo);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,16 +146,32 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
         if (error) throw error;
         toast.success("Faena actualizada");
       } else {
-        const { error } = await supabase.from("faenas").insert([
-          {
+        // Crear faena global (sin empresa_id)
+        const { data: newFaena, error } = await supabase
+          .from("faenas")
+          .insert([{
             nombre: formData.nombre,
             direccion: formData.direccion || null,
-            empresa_id: empresaId,
-          },
-        ]);
+          }])
+          .select()
+          .single();
 
         if (error) throw error;
-        toast.success("Faena creada");
+
+        // Asignar automáticamente a esta empresa
+        if (newFaena) {
+          const { error: linkError } = await supabase
+            .from("empresa_faenas")
+            .insert([{
+              empresa_id: empresaId,
+              faena_id: newFaena.id,
+              activo: true,
+            }]);
+          
+          if (linkError) throw linkError;
+        }
+
+        toast.success("Faena creada y asignada");
       }
 
       setOpenDialog(false);
@@ -167,6 +197,56 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
     } catch (error: any) {
       console.error("Error:", error);
       toast.error("Error al cambiar estado");
+    }
+  };
+
+  const handleAssignFaena = async (faenaId: string) => {
+    try {
+      const existing = empresaFaenas.find(ef => ef.faena_id === faenaId);
+      
+      if (existing) {
+        // Reactivar
+        const { error } = await supabase
+          .from("empresa_faenas")
+          .update({ activo: true })
+          .eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        // Crear nueva asignación
+        const { error } = await supabase
+          .from("empresa_faenas")
+          .insert([{
+            empresa_id: empresaId,
+            faena_id: faenaId,
+            activo: true,
+          }]);
+        if (error) throw error;
+      }
+
+      toast.success("Faena asignada a la empresa");
+      loadData();
+    } catch (error: any) {
+      console.error("Error:", error);
+      toast.error("Error al asignar faena");
+    }
+  };
+
+  const handleUnassignFaena = async (faenaId: string) => {
+    try {
+      const existing = empresaFaenas.find(ef => ef.faena_id === faenaId);
+      if (existing) {
+        const { error } = await supabase
+          .from("empresa_faenas")
+          .update({ activo: false })
+          .eq("id", existing.id);
+        if (error) throw error;
+      }
+
+      toast.success("Faena desvinculada de la empresa");
+      loadData();
+    } catch (error: any) {
+      console.error("Error:", error);
+      toast.error("Error al desvincular faena");
     }
   };
 
@@ -212,7 +292,6 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
       );
 
       if (existing) {
-        // Toggle activo status
         const { error } = await supabase
           .from("bateria_faenas")
           .update({ activo: !existing.activo })
@@ -220,7 +299,6 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
 
         if (error) throw error;
       } else {
-        // Create new relationship
         const { error } = await supabase
           .from("bateria_faenas")
           .insert([{ faena_id: faenaId, paquete_id: paqueteId, activo: true }]);
@@ -240,6 +318,136 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
     return bateriasFaenas.filter((bf) => bf.faena_id === faenaId && bf.activo).length;
   };
 
+  const renderFaenaCard = (faena: Faena, isAssigned: boolean) => (
+    <Collapsible
+      key={faena.id}
+      open={expandedFaenas.has(faena.id)}
+      onOpenChange={() => toggleExpanded(faena.id)}
+    >
+      <div className="border rounded-lg">
+        <div className="flex items-center justify-between p-3 bg-muted/30">
+          <CollapsibleTrigger asChild>
+            <button className="flex items-center gap-3 flex-1 text-left hover:bg-muted/50 rounded p-1 -m-1">
+              {expandedFaenas.has(faena.id) ? (
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              )}
+              <div>
+                <div className="font-medium flex items-center gap-2">
+                  {faena.nombre}
+                  <Badge variant="secondary" className="text-xs">
+                    <Package className="h-3 w-3 mr-1" />
+                    {getBateriasCount(faena.id)} baterías
+                  </Badge>
+                  {!faena.activo && (
+                    <Badge variant="outline" className="text-xs text-muted-foreground">
+                      Inactiva
+                    </Badge>
+                  )}
+                </div>
+                {faena.direccion && (
+                  <div className="text-sm text-muted-foreground">
+                    {faena.direccion}
+                  </div>
+                )}
+              </div>
+            </button>
+          </CollapsibleTrigger>
+          <div className="flex items-center gap-2">
+            {isAssigned ? (
+              <>
+                <Switch
+                  checked={faena.activo}
+                  onCheckedChange={() => handleToggleActivo(faena)}
+                />
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Desvincular de esta empresa"
+                onClick={() => handleUnassignFaena(faena.id)}
+              >
+                <Unlink className="h-4 w-4 text-destructive" />
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Asignar a esta empresa"
+              onClick={() => handleAssignFaena(faena.id)}
+            >
+              <Link2 className="h-4 w-4 text-primary" />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setEditingFaena(faena);
+                setFormData({
+                  nombre: faena.nombre,
+                  direccion: faena.direccion || "",
+                });
+                setOpenDialog(true);
+              }}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setFaenaToDelete(faena.id)}
+            >
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+          </div>
+        </div>
+        <CollapsibleContent>
+          <div className="p-4 border-t bg-background">
+            <div className="mb-3">
+              <h4 className="text-sm font-medium flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                Baterías asignadas a esta faena
+              </h4>
+              <p className="text-xs text-muted-foreground">
+                Estas baterías estarán disponibles para cotizaciones y agendamientos en esta faena
+              </p>
+            </div>
+            <div className="grid gap-2 max-h-64 overflow-y-auto">
+              {paquetes.map((paquete) => (
+                <label
+                  key={paquete.id}
+                  className="flex items-center gap-3 p-2 rounded-lg border hover:bg-muted/50 cursor-pointer"
+                >
+                  <Checkbox
+                    checked={isBateriaAsignada(faena.id, paquete.id)}
+                    onCheckedChange={() =>
+                      handleToggleBateria(faena.id, paquete.id)
+                    }
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium text-sm">{paquete.nombre}</div>
+                    {paquete.descripcion && (
+                      <div className="text-xs text-muted-foreground">
+                        {paquete.descripcion}
+                      </div>
+                    )}
+                  </div>
+                </label>
+              ))}
+              {paquetes.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No hay baterías disponibles
+                </p>
+              )}
+            </div>
+          </div>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -249,7 +457,7 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
             Faenas / Centros de Trabajo
           </h3>
           <p className="text-sm text-muted-foreground">
-            Gestiona las faenas y sus baterías para {empresaNombre}
+            Gestiona faenas globales y asígnalas a {empresaNombre}
           </p>
         </div>
         <Dialog
@@ -271,7 +479,7 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
-                {editingFaena ? "Editar Faena" : "Nueva Faena"}
+                {editingFaena ? "Editar Faena" : "Nueva Faena Global"}
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -298,6 +506,12 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
                   placeholder="Ej: Av. Principal 123"
                 />
               </div>
+              <p className="text-xs text-muted-foreground">
+                {editingFaena 
+                  ? "Los cambios se aplicarán a todas las empresas que usen esta faena"
+                  : "La faena se creará como global y se asignará automáticamente a esta empresa"
+                }
+              </p>
               <Button type="submit" className="w-full">
                 {editingFaena ? "Actualizar" : "Crear Faena"}
               </Button>
@@ -310,118 +524,46 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
         <div className="flex items-center justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
-      ) : faenas.length === 0 ? (
-        <div className="text-center py-8 text-muted-foreground">
-          <MapPin className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <p>No hay faenas registradas</p>
-          <p className="text-sm">Crea la primera faena para esta empresa</p>
-        </div>
       ) : (
-        <div className="space-y-2">
-          {faenas.map((faena) => (
-            <Collapsible
-              key={faena.id}
-              open={expandedFaenas.has(faena.id)}
-              onOpenChange={() => toggleExpanded(faena.id)}
-            >
-              <div className="border rounded-lg">
-                <div className="flex items-center justify-between p-3 bg-muted/30">
-                  <CollapsibleTrigger asChild>
-                    <button className="flex items-center gap-3 flex-1 text-left hover:bg-muted/50 rounded p-1 -m-1">
-                      {expandedFaenas.has(faena.id) ? (
-                        <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                      )}
-                      <div>
-                        <div className="font-medium flex items-center gap-2">
-                          {faena.nombre}
-                          <Badge variant="secondary" className="text-xs">
-                            <Package className="h-3 w-3 mr-1" />
-                            {getBateriasCount(faena.id)} baterías
-                          </Badge>
-                        </div>
-                        {faena.direccion && (
-                          <div className="text-sm text-muted-foreground">
-                            {faena.direccion}
-                          </div>
-                        )}
-                      </div>
-                    </button>
-                  </CollapsibleTrigger>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={faena.activo}
-                      onCheckedChange={() => handleToggleActivo(faena)}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setEditingFaena(faena);
-                        setFormData({
-                          nombre: faena.nombre,
-                          direccion: faena.direccion || "",
-                        });
-                        setOpenDialog(true);
-                      }}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setFaenaToDelete(faena.id)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-                <CollapsibleContent>
-                  <div className="p-4 border-t bg-background">
-                    <div className="mb-3">
-                      <h4 className="text-sm font-medium flex items-center gap-2">
-                        <Package className="h-4 w-4" />
-                        Baterías asignadas a esta faena
-                      </h4>
-                      <p className="text-xs text-muted-foreground">
-                        Selecciona las baterías que corresponden a esta faena
-                      </p>
-                    </div>
-                    <div className="grid gap-2 max-h-64 overflow-y-auto">
-                      {paquetes.map((paquete) => (
-                        <label
-                          key={paquete.id}
-                          className="flex items-center gap-3 p-2 rounded-lg border hover:bg-muted/50 cursor-pointer"
-                        >
-                          <Checkbox
-                            checked={isBateriaAsignada(faena.id, paquete.id)}
-                            onCheckedChange={() =>
-                              handleToggleBateria(faena.id, paquete.id)
-                            }
-                          />
-                          <div className="flex-1">
-                            <div className="font-medium text-sm">{paquete.nombre}</div>
-                            {paquete.descripcion && (
-                              <div className="text-xs text-muted-foreground">
-                                {paquete.descripcion}
-                              </div>
-                            )}
-                          </div>
-                        </label>
-                      ))}
-                      {paquetes.length === 0 && (
-                        <p className="text-sm text-muted-foreground text-center py-4">
-                          No hay baterías disponibles
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </CollapsibleContent>
+        <Tabs defaultValue="assigned" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="assigned">
+              Asignadas ({assignedFaenas.length})
+            </TabsTrigger>
+            <TabsTrigger value="available">
+              Disponibles ({availableFaenas.length})
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="assigned" className="space-y-2 mt-4">
+            {assignedFaenas.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <MapPin className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No hay faenas asignadas a esta empresa</p>
+                <p className="text-sm">Ve a "Disponibles" para asignar faenas existentes o crea una nueva</p>
               </div>
-            </Collapsible>
-          ))}
-        </div>
+            ) : (
+              assignedFaenas.map((faena) => renderFaenaCard(faena, true))
+            )}
+          </TabsContent>
+          
+          <TabsContent value="available" className="space-y-2 mt-4">
+            {availableFaenas.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Link2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Todas las faenas están asignadas a esta empresa</p>
+                <p className="text-sm">Crea una nueva faena si necesitas más</p>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Haz clic en <Link2 className="h-3 w-3 inline text-primary" /> para asignar una faena a {empresaNombre}
+                </p>
+                {availableFaenas.map((faena) => renderFaenaCard(faena, false))}
+              </>
+            )}
+          </TabsContent>
+        </Tabs>
       )}
 
       <AlertDialog
@@ -432,8 +574,9 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar faena?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Si hay prereservas o baterías
-              asociadas a esta faena, no podrá ser eliminada.
+              Esta acción eliminará la faena de forma global. Si hay prereservas o 
+              baterías asociadas, no podrá ser eliminada. Otras empresas que usen 
+              esta faena también la perderán.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

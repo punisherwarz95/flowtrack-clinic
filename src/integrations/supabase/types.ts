@@ -900,6 +900,45 @@ export type Database = {
           },
         ]
       }
+      empresa_faenas: {
+        Row: {
+          activo: boolean | null
+          created_at: string | null
+          empresa_id: string
+          faena_id: string
+          id: string
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string | null
+          empresa_id: string
+          faena_id: string
+          id?: string
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string | null
+          empresa_id?: string
+          faena_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "empresa_faenas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "empresa_faenas_faena_id_fkey"
+            columns: ["faena_id"]
+            isOneToOne: false
+            referencedRelation: "faenas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       empresa_user_roles: {
         Row: {
           created_at: string | null
@@ -1226,7 +1265,7 @@ export type Database = {
           activo: boolean | null
           created_at: string | null
           direccion: string | null
-          empresa_id: string
+          empresa_id: string | null
           id: string
           nombre: string
         }
@@ -1234,7 +1273,7 @@ export type Database = {
           activo?: boolean | null
           created_at?: string | null
           direccion?: string | null
-          empresa_id: string
+          empresa_id?: string | null
           id?: string
           nombre: string
         }
@@ -1242,7 +1281,7 @@ export type Database = {
           activo?: boolean | null
           created_at?: string | null
           direccion?: string | null
-          empresa_id?: string
+          empresa_id?: string | null
           id?: string
           nombre?: string
         }
