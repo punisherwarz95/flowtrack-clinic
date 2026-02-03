@@ -1041,13 +1041,20 @@ const Pacientes = () => {
                                 name="tipo_servicio"
                                 value="workmed"
                                 checked={formData.tipo_servicio === "workmed"}
-                                onChange={(e) => {
+                                onChange={async (e) => {
                                   const workmedEmpresa = empresas.find(emp => emp.nombre.toUpperCase() === "WORKMED");
+                                  const empresaId = workmedEmpresa?.id || "";
                                   setFormData(prev => ({ 
                                     ...prev, 
                                     tipo_servicio: e.target.value as "workmed" | "jenner",
-                                    empresa_id: workmedEmpresa?.id || ""
+                                    empresa_id: empresaId,
+                                    faena_id: ""
                                   }));
+                                  setSelectedPaquetes([]);
+                                  setBateriasDisponibles([]);
+                                  if (empresaId) {
+                                    await loadFaenasDeEmpresa(empresaId);
+                                  }
                                 }}
                                 className="w-4 h-4"
                               />
