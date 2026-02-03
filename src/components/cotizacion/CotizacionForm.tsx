@@ -122,13 +122,14 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
   const [selectedItemId, setSelectedItemId] = useState<string>("");
   const [itemCantidad, setItemCantidad] = useState<number>(1);
   const [itemMargenId, setItemMargenId] = useState<string>("");
+  const [filtroFaenaId, setFiltroFaenaId] = useState<string>("__all__");
 
   // Duplicate confirmation dialog state
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
   const [duplicateItems, setDuplicateItems] = useState<Array<{ nombre: string; count: number }>>([]);
   const pendingSaveRef = useRef<{ estado: string; generatePdf: boolean } | null>(null);
 
-  // Agrupar paquetes por faena
+  // Agrupar paquetes por faena (aplicando filtro)
   const paquetesAgrupados = useMemo(() => {
     const grupos: { faenaId: string; faenaNombre: string; paquetes: typeof paquetes }[] = [];
     const sinFaena: typeof paquetes = [];
@@ -160,8 +161,13 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
       grupos.push({ faenaId: "__none__", faenaNombre: "Sin faena asignada", paquetes: sinFaena });
     }
 
+    // Aplicar filtro de faena
+    if (filtroFaenaId !== "__all__") {
+      return grupos.filter(g => g.faenaId === filtroFaenaId);
+    }
+
     return grupos;
-  }, [paquetes, paqueteFaenasMap, faenas]);
+  }, [paquetes, paqueteFaenasMap, faenas, filtroFaenaId]);
 
   useEffect(() => {
     loadData();
@@ -970,6 +976,25 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
                 </SelectContent>
               </Select>
             </div>
+            {tipoItem === "paquete" && (
+              <div className="w-48">
+                <Label>Filtrar por Faena</Label>
+                <Select value={filtroFaenaId} onValueChange={(v) => { setFiltroFaenaId(v); setSelectedItemId(""); }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas las faenas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">Todas las faenas</SelectItem>
+                    {faenas.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>
+                        {f.nombre}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="__none__">Sin faena asignada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="flex-1 min-w-[200px]">
               <Label>Prestación</Label>
               <Select value={selectedItemId} onValueChange={setSelectedItemId}>
