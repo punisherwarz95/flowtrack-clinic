@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Plus, Trash2, Building2, Package, ClipboardList, ChevronDown, ChevronUp, FileDown, AlertTriangle } from "lucide-react";
@@ -979,16 +979,16 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
                 <SelectContent className="max-h-80">
                   {tipoItem === "paquete"
                     ? paquetesAgrupados.map((grupo) => (
-                        <div key={grupo.faenaId}>
-                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50 sticky top-0">
-                            📍 {grupo.faenaNombre}
-                          </div>
+                        <SelectGroup key={grupo.faenaId}>
+                          <SelectLabel className="text-xs font-semibold text-muted-foreground bg-muted/40 py-1.5">
+                            {grupo.faenaNombre}
+                          </SelectLabel>
                           {grupo.paquetes.map((p) => (
-                            <SelectItem key={p.id} value={p.id} className="pl-4">
+                            <SelectItem key={p.id} value={p.id}>
                               {p.nombre}
                             </SelectItem>
                           ))}
-                        </div>
+                        </SelectGroup>
                       ))
                     : examenes.map((e) => (
                         <SelectItem key={e.id} value={e.id}>
