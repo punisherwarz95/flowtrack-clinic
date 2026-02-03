@@ -43,6 +43,7 @@ interface Patient {
   direccion: string | null;
   tipo_servicio: 'workmed' | 'jenner' | null;
   empresa_id: string | null;
+  faena_id: string | null;
   empresas?: {
     id: string;
     nombre: string;
@@ -65,6 +66,21 @@ const isPacienteIncompleto = (patient: Patient): boolean => {
 interface Empresa {
   id: string;
   nombre: string;
+}
+
+interface Faena {
+  id: string;
+  nombre: string;
+  direccion: string | null;
+}
+
+interface EmpresaFaena {
+  faena_id: string;
+  faenas: Faena;
+}
+
+interface BateriaFaena {
+  paquete_id: string;
 }
 
 interface Examen {
@@ -123,6 +139,11 @@ const Pacientes = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [documentosPendientes, setDocumentosPendientes] = useState<{[patientId: string]: number}>({});
   
+  // Estados para faenas
+  const [faenasEmpresa, setFaenasEmpresa] = useState<Faena[]>([]);
+  const [bateriasDisponibles, setBateriasDisponibles] = useState<string[]>([]);
+  const [loadingFaenas, setLoadingFaenas] = useState(false);
+  
   // Estado para el código del día
   const [codigoDelDia, setCodigoDelDia] = useState<string | null>(null);
   const [isLoadingCodigo, setIsLoadingCodigo] = useState(true);
@@ -142,6 +163,7 @@ const Pacientes = () => {
     nombre: "",
     tipo_servicio: "" as "workmed" | "jenner" | "",
     empresa_id: "",
+    faena_id: "",
     rut: "",
     email: "",
     telefono: "",
@@ -410,18 +432,96 @@ const Pacientes = () => {
     }
   };
 
+  // Cargar faenas disponibles para una empresa
+  const loadFaenasDeEmpresa = async (empresaId: string) => {
+    if (!empresaId) {
+      setFaenasEmpresa([]);
+      return;
+    }
+    
+    setLoadingFaenas(true);
+    try {
+      const { data, error } = await supabase
+        .from("empresa_faenas")
+        .select("faena_id, faenas:faena_id(id, nombre, direccion)")
+        .eq("empresa_id", empresaId)
+        .eq("activo", true);
+
+      if (error) throw error;
+      
+      const faenas = (data || [])
+        .map((ef: any) => ef.faenas)
+        .filter((f: any) => f !== null) as Faena[];
+      
+      setFaenasEmpresa(faenas);
+    } catch (error) {
+      console.error("Error loading faenas:", error);
+      setFaenasEmpresa([]);
+    } finally {
+      setLoadingFaenas(false);
+    }
+  };
+
+  // Cargar baterías disponibles para una faena
+  const loadBateriasDisponibles = async (faenaId: string) => {
+    if (!faenaId) {
+      setBateriasDisponibles([]);
+      return;
+    }
+    
+    try {
+      const { data, error } = await supabase
+        .from("bateria_faenas")
+        .select("paquete_id")
+        .eq("faena_id", faenaId)
+        .eq("activo", true);
+
+      if (error) throw error;
+      
+      const paqueteIds = (data || []).map((bf: any) => bf.paquete_id);
+      setBateriasDisponibles(paqueteIds);
+    } catch (error) {
+      console.error("Error loading baterias:", error);
+      setBateriasDisponibles([]);
+    }
+  };
+
+  // Manejar cambio de empresa
+  const handleEmpresaChange = async (empresaId: string) => {
+    setFormData(prev => ({ ...prev, empresa_id: empresaId, faena_id: "" }));
+    setSelectedPaquetes([]);
+    setBateriasDisponibles([]);
+    await loadFaenasDeEmpresa(empresaId);
+  };
+
+  // Manejar cambio de faena
+  const handleFaenaChange = async (faenaId: string) => {
+    setFormData(prev => ({ ...prev, faena_id: faenaId }));
+    setSelectedPaquetes([]);
+    await loadBateriasDisponibles(faenaId);
+  };
+
   const handleEdit = async (patient: Patient) => {
     setEditingPatient(patient.id);
     setFormData({
       nombre: patient.nombre,
       tipo_servicio: patient.tipo_servicio || "",
       empresa_id: patient.empresa_id || "",
+      faena_id: (patient as any).faena_id || "",
       rut: patient.rut || "",
       email: patient.email || "",
       telefono: patient.telefono || "",
       fecha_nacimiento: patient.fecha_nacimiento || "",
       direccion: patient.direccion || "",
     });
+    
+    // Cargar faenas de la empresa si existe
+    if (patient.empresa_id) {
+      await loadFaenasDeEmpresa(patient.empresa_id);
+      if ((patient as any).faena_id) {
+        await loadBateriasDisponibles((patient as any).faena_id);
+      }
+    }
 
     // Cargar exámenes de la última atención (cualquier estado)
     try {
@@ -637,7 +737,9 @@ const Pacientes = () => {
 
       setOpenDialog(false);
       setEditingPatient(null);
-      setFormData({ nombre: "", tipo_servicio: "", empresa_id: "", rut: "", email: "", telefono: "", fecha_nacimiento: "", direccion: "" });
+      setFormData({ nombre: "", tipo_servicio: "", empresa_id: "", faena_id: "", rut: "", email: "", telefono: "", fecha_nacimiento: "", direccion: "" });
+      setFaenasEmpresa([]);
+      setBateriasDisponibles([]);
       setSelectedExamenes([]);
       setSelectedPaquetes([]);
       loadPatients();
@@ -839,7 +941,9 @@ const Pacientes = () => {
               setOpenDialog(open);
               if (!open) {
                 setEditingPatient(null);
-                setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: "", rut: "", email: "", telefono: "", fecha_nacimiento: "", direccion: "" });
+                setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: "", faena_id: "", rut: "", email: "", telefono: "", fecha_nacimiento: "", direccion: "" });
+                setFaenasEmpresa([]);
+                setBateriasDisponibles([]);
                 setSelectedExamenes([]);
                 setSelectedPaquetes([]);
                 setExamenFilter("");
@@ -977,7 +1081,7 @@ const Pacientes = () => {
                           id="empresa"
                           required={formData.tipo_servicio === "jenner"}
                           value={formData.empresa_id}
-                          onChange={(e) => setFormData({ ...formData, empresa_id: e.target.value })}
+                          onChange={(e) => handleEmpresaChange(e.target.value)}
                           className="w-full h-10 px-3 rounded-md border border-input bg-background mt-1"
                         >
                           <option value="">Seleccione una empresa</option>
@@ -989,35 +1093,92 @@ const Pacientes = () => {
                         </select>
                       </div>
 
-                      <div>
-                        <Label className="text-sm font-medium">Paquetes de Exámenes</Label>
-                        <div className="border rounded-md p-3 max-h-64 overflow-y-auto space-y-2 bg-muted/30 mt-1">
-                          {paquetes.map((paquete) => (
-                            <label key={paquete.id} className="flex items-start gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={selectedPaquetes.includes(paquete.id)}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedPaquetes([...selectedPaquetes, paquete.id]);
-                                    const examenesIds = paquete.paquete_examen_items.map(item => item.examen_id);
-                                    const nuevosExamenes = examenesIds.filter(id => !selectedExamenes.includes(id));
-                                    setSelectedExamenes([...selectedExamenes, ...nuevosExamenes]);
-                                  } else {
-                                    setSelectedPaquetes(selectedPaquetes.filter(id => id !== paquete.id));
-                                  }
-                                }}
-                                className="w-4 h-4 mt-0.5"
-                              />
-                              <div className="flex-1">
-                                <span className="text-sm font-medium">{paquete.nombre}</span>
-                                {paquete.descripcion && (
-                                  <p className="text-xs text-muted-foreground">{paquete.descripcion}</p>
-                                )}
-                              </div>
-                            </label>
-                          ))}
+                      {/* Selector de Faena - solo visible si hay empresa seleccionada */}
+                      {formData.empresa_id && (
+                        <div>
+                          <Label htmlFor="faena" className="text-sm font-medium">
+                            Faena / Centro de Trabajo
+                          </Label>
+                          {loadingFaenas ? (
+                            <div className="h-10 flex items-center text-sm text-muted-foreground">
+                              Cargando faenas...
+                            </div>
+                          ) : faenasEmpresa.length === 0 ? (
+                            <div className="h-10 flex items-center text-sm text-amber-600">
+                              Esta empresa no tiene faenas asignadas
+                            </div>
+                          ) : (
+                            <select
+                              id="faena"
+                              value={formData.faena_id}
+                              onChange={(e) => handleFaenaChange(e.target.value)}
+                              className="w-full h-10 px-3 rounded-md border border-input bg-background mt-1"
+                            >
+                              <option value="">Seleccione una faena</option>
+                              {faenasEmpresa.map((faena) => (
+                                <option key={faena.id} value={faena.id}>
+                                  {faena.nombre}
+                                </option>
+                              ))}
+                            </select>
+                          )}
                         </div>
+                      )}
+
+                      <div>
+                        <Label className="text-sm font-medium">
+                          Baterías de Exámenes
+                          {formData.faena_id && bateriasDisponibles.length > 0 && (
+                            <span className="text-xs text-muted-foreground ml-2">
+                              ({bateriasDisponibles.length} disponibles para esta faena)
+                            </span>
+                          )}
+                        </Label>
+                        {formData.empresa_id && !formData.faena_id && faenasEmpresa.length > 0 ? (
+                          <div className="border rounded-md p-3 bg-muted/30 mt-1 text-sm text-muted-foreground">
+                            Seleccione una faena para ver las baterías disponibles
+                          </div>
+                        ) : (
+                          <div className="border rounded-md p-3 max-h-64 overflow-y-auto space-y-2 bg-muted/30 mt-1">
+                            {paquetes
+                              .filter((paquete) => {
+                                // Si no hay faena seleccionada o no hay baterías cargadas, mostrar todas
+                                if (!formData.faena_id || bateriasDisponibles.length === 0) return true;
+                                // Filtrar solo las baterías disponibles para la faena
+                                return bateriasDisponibles.includes(paquete.id);
+                              })
+                              .map((paquete) => (
+                              <label key={paquete.id} className="flex items-start gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedPaquetes.includes(paquete.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedPaquetes([...selectedPaquetes, paquete.id]);
+                                      const examenesIds = paquete.paquete_examen_items.map(item => item.examen_id);
+                                      const nuevosExamenes = examenesIds.filter(id => !selectedExamenes.includes(id));
+                                      setSelectedExamenes([...selectedExamenes, ...nuevosExamenes]);
+                                    } else {
+                                      setSelectedPaquetes(selectedPaquetes.filter(id => id !== paquete.id));
+                                    }
+                                  }}
+                                  className="w-4 h-4 mt-0.5"
+                                />
+                                <div className="flex-1">
+                                  <span className="text-sm font-medium">{paquete.nombre}</span>
+                                  {paquete.descripcion && (
+                                    <p className="text-xs text-muted-foreground">{paquete.descripcion}</p>
+                                  )}
+                                </div>
+                              </label>
+                            ))}
+                            {formData.faena_id && bateriasDisponibles.length === 0 && (
+                              <div className="text-sm text-muted-foreground text-center py-2">
+                                No hay baterías asignadas a esta faena
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 
