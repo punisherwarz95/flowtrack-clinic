@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Upload, Building2, Trash2, Pencil, Package, DollarSign, MapPin, Eye } from "lucide-react";
+import { Plus, Upload, Building2, Trash2, Pencil, Package, DollarSign, MapPin, Eye, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
@@ -58,9 +58,15 @@ const Empresas = () => {
   const [selectedEmpresa, setSelectedEmpresa] = useState<Empresa | null>(null);
   const [empresaBaterias, setEmpresaBaterias] = useState<EmpresaBateria[]>([]);
   const [bateriaPrecios, setBateriaPrecios] = useState<Record<string, string>>({});
+  const [searchTerm, setSearchTerm] = useState("");
   const [formData, setFormData] = useState({
     nombre: "",
   });
+
+  // Filtrar empresas por nombre
+  const filteredEmpresas = empresas.filter((empresa) =>
+    empresa.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   useEffect(() => {
     loadEmpresas();
@@ -302,8 +308,26 @@ const Empresas = () => {
           </div>
         </div>
 
+        {/* Buscador */}
+        <div className="mb-6">
+          <div className="relative w-full max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar empresa por nombre..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          {searchTerm && (
+            <p className="text-sm text-muted-foreground mt-2">
+              {filteredEmpresas.length} empresa(s) encontrada(s)
+            </p>
+          )}
+        </div>
+
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {empresas.map((empresa) => (
+          {filteredEmpresas.map((empresa) => (
             <Card key={empresa.id}>
               <CardHeader>
                 <div className="flex items-center justify-between">

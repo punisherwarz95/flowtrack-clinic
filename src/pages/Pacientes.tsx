@@ -135,6 +135,7 @@ const Pacientes = () => {
   const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
   const [selectedPaquetes, setSelectedPaquetes] = useState<string[]>([]);
   const [examenFilter, setExamenFilter] = useState("");
+  const [empresaSearchFilter, setEmpresaSearchFilter] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [documentosPendientes, setDocumentosPendientes] = useState<{[patientId: string]: number}>({});
@@ -1084,19 +1085,33 @@ const Pacientes = () => {
                         <Label htmlFor="empresa" className="text-sm font-medium">
                           Empresa {formData.tipo_servicio === "jenner" && "*"}
                         </Label>
+                        <div className="relative mt-1">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+                          <Input
+                            placeholder="Buscar empresa..."
+                            value={empresaSearchFilter}
+                            onChange={(e) => setEmpresaSearchFilter(e.target.value)}
+                            className="pl-10 mb-1"
+                          />
+                        </div>
                         <select
                           id="empresa"
                           required={formData.tipo_servicio === "jenner"}
                           value={formData.empresa_id}
                           onChange={(e) => handleEmpresaChange(e.target.value)}
-                          className="w-full h-10 px-3 rounded-md border border-input bg-background mt-1"
+                          className="w-full h-10 px-3 rounded-md border border-input bg-background"
                         >
                           <option value="">Seleccione una empresa</option>
-                          {empresas.map((empresa) => (
-                            <option key={empresa.id} value={empresa.id}>
-                              {empresa.nombre}
-                            </option>
-                          ))}
+                          {empresas
+                            .filter((empresa) => 
+                              !empresaSearchFilter || 
+                              empresa.nombre.toLowerCase().includes(empresaSearchFilter.toLowerCase())
+                            )
+                            .map((empresa) => (
+                              <option key={empresa.id} value={empresa.id}>
+                                {empresa.nombre}
+                              </option>
+                            ))}
                         </select>
                       </div>
 
