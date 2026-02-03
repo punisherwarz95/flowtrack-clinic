@@ -76,6 +76,139 @@ interface Faena {
   empresa_id: string | null;
 }
 
+// Componente para mostrar paquetes con filtro
+interface PaquetesGridProps {
+  paquetes: Paquete[];
+  faenas: Faena[];
+  searchFilter: string;
+  faenaFilter: string;
+  onEdit: (paquete: Paquete) => void;
+  onDelete: (paqueteId: string) => void;
+}
+
+const PaquetesGrid = ({ paquetes, faenas, searchFilter, faenaFilter, onEdit, onDelete }: PaquetesGridProps) => {
+  const [paqueteFaenasMap, setPaqueteFaenasMap] = useState<Record<string, string[]>>({});
+  
+  useEffect(() => {
+    const loadPaqueteFaenas = async () => {
+      const { data } = await supabase
+        .from("bateria_faenas")
+        .select("paquete_id, faena_id")
+        .eq("activo", true);
+      
+      const map: Record<string, string[]> = {};
+      (data || []).forEach(bf => {
+        if (!map[bf.paquete_id]) map[bf.paquete_id] = [];
+        map[bf.paquete_id].push(bf.faena_id);
+      });
+      setPaqueteFaenasMap(map);
+    };
+    loadPaqueteFaenas();
+  }, [paquetes]);
+
+  const filteredPaquetes = useMemo(() => {
+    return paquetes.filter(paquete => {
+      // Filtro por nombre
+      if (searchFilter && !paquete.nombre.toLowerCase().includes(searchFilter.toLowerCase())) {
+        return false;
+      }
+      // Filtro por faena
+      if (faenaFilter) {
+        const paqueteFaenas = paqueteFaenasMap[paquete.id] || [];
+        if (!paqueteFaenas.includes(faenaFilter)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [paquetes, searchFilter, faenaFilter, paqueteFaenasMap]);
+
+  const getFaenaNombre = (faenaId: string) => {
+    return faenas.find(f => f.id === faenaId)?.nombre || "";
+  };
+
+  if (filteredPaquetes.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        {searchFilter || faenaFilter ? "No se encontraron paquetes con los filtros aplicados" : "No hay paquetes registrados"}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredPaquetes.map((paquete) => {
+          const faenasDelPaquete = paqueteFaenasMap[paquete.id] || [];
+          return (
+            <Card key={paquete.id}>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="h-5 w-5 text-primary" />
+                    {paquete.nombre}
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onEdit(paquete)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onDelete(paquete.id)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {paquete.descripcion && (
+                  <p className="text-sm text-muted-foreground mb-3">{paquete.descripcion}</p>
+                )}
+                {faenasDelPaquete.length > 0 && (
+                  <div className="mb-3">
+                    <p className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                      <MapPin className="h-3 w-3" /> Faenas:
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {faenasDelPaquete.slice(0, 3).map((faenaId) => (
+                        <span key={faenaId} className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded">
+                          {getFaenaNombre(faenaId)}
+                        </span>
+                      ))}
+                      {faenasDelPaquete.length > 3 && (
+                        <span className="text-xs text-muted-foreground">+{faenasDelPaquete.length - 3} más</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+                <div className="mt-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Incluye:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {paquete.paquete_examen_items.map((item, idx) => (
+                      <span key={idx} className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                        {item.examenes.nombre}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+      <p className="text-sm text-muted-foreground mt-4">
+        Mostrando {filteredPaquetes.length} de {paquetes.length} paquetes
+      </p>
+    </>
+  );
+};
+
 const Examenes = () => {
   useAuth(); // Protect route
   const [examenes, setExamenes] = useState<Examen[]>([]);
@@ -97,6 +230,9 @@ const Examenes = () => {
   const [empresaPrecios, setEmpresaPrecios] = useState<Record<string, string>>({});
   const [paqueteDialogTab, setPaqueteDialogTab] = useState("examenes");
   const [paqueteExamenFilter, setPaqueteExamenFilter] = useState("");
+  // Estado para filtro de búsqueda de paquetes en la lista principal
+  const [paqueteSearchFilter, setPaqueteSearchFilter] = useState("");
+  const [paqueteFaenaFilter, setPaqueteFaenaFilter] = useState<string>("");
   const [formData, setFormData] = useState({
     nombre: "",
     descripcion: "",
@@ -1269,64 +1405,54 @@ const Examenes = () => {
           </TabsContent>
 
           <TabsContent value="paquetes" className="mt-6">
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {paquetes.map((paquete) => (
-                <Card key={paquete.id}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2">
-                        <Package className="h-5 w-5 text-primary" />
-                        {paquete.nombre}
-                      </CardTitle>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={async () => {
-                            setEditingPaquete(paquete);
-                            setPaqueteFormData({
-                              nombre: paquete.nombre,
-                              descripcion: paquete.descripcion || "",
-                            });
-                            setSelectedExamenes(paquete.paquete_examen_items.map(item => item.examen_id));
-                            await Promise.all([
-                              loadPaqueteDocumentos(paquete.id),
-                              loadPaquetePrecios(paquete.id),
-                              loadPaqueteFaenas(paquete.id)
-                            ]);
-                            setOpenPaqueteDialog(true);
-                          }}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setPaqueteToDelete(paquete.id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {paquete.descripcion && (
-                      <p className="text-sm text-muted-foreground mb-3">{paquete.descripcion}</p>
-                    )}
-                    <div className="mt-3">
-                      <p className="text-xs font-medium text-muted-foreground mb-2">Incluye:</p>
-                      <div className="flex flex-wrap gap-1">
-                        {paquete.paquete_examen_items.map((item, idx) => (
-                          <span key={idx} className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-                            {item.examenes.nombre}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+            {/* Filtros de búsqueda */}
+            <div className="flex flex-wrap gap-4 mb-6">
+              <div className="relative flex-1 min-w-[200px] max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar batería por nombre..."
+                  value={paqueteSearchFilter}
+                  onChange={(e) => setPaqueteSearchFilter(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <div className="w-64">
+                <select
+                  value={paqueteFaenaFilter}
+                  onChange={(e) => setPaqueteFaenaFilter(e.target.value)}
+                  className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                >
+                  <option value="">Todas las faenas</option>
+                  {faenas.map((faena) => (
+                    <option key={faena.id} value={faena.id}>
+                      {faena.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
+
+            <PaquetesGrid 
+              paquetes={paquetes}
+              faenas={faenas}
+              searchFilter={paqueteSearchFilter}
+              faenaFilter={paqueteFaenaFilter}
+              onEdit={async (paquete) => {
+                setEditingPaquete(paquete);
+                setPaqueteFormData({
+                  nombre: paquete.nombre,
+                  descripcion: paquete.descripcion || "",
+                });
+                setSelectedExamenes(paquete.paquete_examen_items.map(item => item.examen_id));
+                await Promise.all([
+                  loadPaqueteDocumentos(paquete.id),
+                  loadPaquetePrecios(paquete.id),
+                  loadPaqueteFaenas(paquete.id)
+                ]);
+                setOpenPaqueteDialog(true);
+              }}
+              onDelete={(paqueteId) => setPaqueteToDelete(paqueteId)}
+            />
           </TabsContent>
         </Tabs>
 

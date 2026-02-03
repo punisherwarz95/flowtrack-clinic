@@ -96,6 +96,8 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
   const [examenes, setExamenes] = useState<Examen[]>([]);
   const [paquetes, setPaquetes] = useState<Paquete[]>([]);
   const [margenes, setMargenes] = useState<Margen[]>([]);
+  const [faenas, setFaenas] = useState<{ id: string; nombre: string }[]>([]);
+  const [paqueteFaenasMap, setPaqueteFaenasMap] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -126,6 +128,41 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
   const [duplicateItems, setDuplicateItems] = useState<Array<{ nombre: string; count: number }>>([]);
   const pendingSaveRef = useRef<{ estado: string; generatePdf: boolean } | null>(null);
 
+  // Agrupar paquetes por faena
+  const paquetesAgrupados = useMemo(() => {
+    const grupos: { faenaId: string; faenaNombre: string; paquetes: typeof paquetes }[] = [];
+    const sinFaena: typeof paquetes = [];
+
+    paquetes.forEach(paquete => {
+      const faenasDelPaquete = paqueteFaenasMap[paquete.id] || [];
+      if (faenasDelPaquete.length === 0) {
+        sinFaena.push(paquete);
+      } else {
+        faenasDelPaquete.forEach(faenaId => {
+          let grupo = grupos.find(g => g.faenaId === faenaId);
+          if (!grupo) {
+            const faena = faenas.find(f => f.id === faenaId);
+            grupo = { faenaId, faenaNombre: faena?.nombre || "Sin nombre", paquetes: [] };
+            grupos.push(grupo);
+          }
+          if (!grupo.paquetes.find(p => p.id === paquete.id)) {
+            grupo.paquetes.push(paquete);
+          }
+        });
+      }
+    });
+
+    // Ordenar grupos por nombre de faena
+    grupos.sort((a, b) => a.faenaNombre.localeCompare(b.faenaNombre));
+
+    // Agregar "Sin faena asignada" al final si hay paquetes sin faena
+    if (sinFaena.length > 0) {
+      grupos.push({ faenaId: "__none__", faenaNombre: "Sin faena asignada", paquetes: sinFaena });
+    }
+
+    return grupos;
+  }, [paquetes, paqueteFaenasMap, faenas]);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -144,11 +181,13 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
 
   const loadData = async () => {
     try {
-      const [empresasRes, examenesRes, paquetesRes, margenesRes] = await Promise.all([
+      const [empresasRes, examenesRes, paquetesRes, margenesRes, faenasRes, bateriaFaenasRes] = await Promise.all([
         supabase.from("empresas").select("*").eq("activo", true).order("nombre"),
         supabase.from("examenes").select("id, nombre, codigo, costo_neto").order("nombre"),
         supabase.from("paquetes_examenes").select("id, nombre, paquete_examen_items(examen_id, examenes(id, nombre, codigo, costo_neto))").order("nombre"),
         supabase.from("margenes_cotizacion").select("*").eq("activo", true).order("orden"),
+        supabase.from("faenas").select("id, nombre").eq("activo", true).order("nombre"),
+        supabase.from("bateria_faenas").select("paquete_id, faena_id").eq("activo", true),
       ]);
 
       if (empresasRes.error) throw empresasRes.error;
@@ -160,6 +199,15 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
       setExamenes(examenesRes.data || []);
       setPaquetes(paquetesRes.data || []);
       setMargenes(margenesRes.data || []);
+      setFaenas(faenasRes.data || []);
+
+      // Construir mapa de paquete -> faenas
+      const map: Record<string, string[]> = {};
+      (bateriaFaenasRes.data || []).forEach(bf => {
+        if (!map[bf.paquete_id]) map[bf.paquete_id] = [];
+        map[bf.paquete_id].push(bf.faena_id);
+      });
+      setPaqueteFaenasMap(map);
 
       // Set default margen
       if (margenesRes.data && margenesRes.data.length > 0) {
@@ -928,12 +976,19 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar..." />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-80">
                   {tipoItem === "paquete"
-                    ? paquetes.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.nombre}
-                        </SelectItem>
+                    ? paquetesAgrupados.map((grupo) => (
+                        <div key={grupo.faenaId}>
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50 sticky top-0">
+                            📍 {grupo.faenaNombre}
+                          </div>
+                          {grupo.paquetes.map((p) => (
+                            <SelectItem key={p.id} value={p.id} className="pl-4">
+                              {p.nombre}
+                            </SelectItem>
+                          ))}
+                        </div>
                       ))
                     : examenes.map((e) => (
                         <SelectItem key={e.id} value={e.id}>
