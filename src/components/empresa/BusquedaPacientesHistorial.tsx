@@ -98,7 +98,7 @@ const BusquedaPacientesHistorial = ({
           faena_id,
           faenas ( nombre )
         ),
-        prereservas (
+         prereservas!atenciones_prereserva_id_fkey (
           prereserva_baterias (
             paquetes_examenes ( nombre )
           )
