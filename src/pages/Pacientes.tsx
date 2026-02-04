@@ -718,11 +718,12 @@ const Pacientes = () => {
           }
         }
       } else {
-        // Insertar paciente - convertir empresa_id vacío a null y formatear RUT
+        // Insertar paciente - convertir empresa_id y faena_id vacíos a null y formatear RUT
         const insertData = {
           ...formData,
           tipo_servicio: formData.tipo_servicio as "workmed" | "jenner",
           empresa_id: formData.empresa_id || null,
+          faena_id: formData.faena_id || null,
           rut: formData.rut.trim() ? formatRutStandard(formData.rut) : null,
         };
         const { data: pacienteData, error: pacienteError } = await supabase
