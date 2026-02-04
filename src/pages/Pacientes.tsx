@@ -685,6 +685,29 @@ const Pacientes = () => {
               if (examenesError) throw examenesError;
             }
 
+            // Registrar baterías asignadas a la atención para trazabilidad (edición)
+            if (selectedPaquetes.length > 0) {
+              // Primero eliminar baterías anteriores de esta atención
+              await supabase
+                .from("atencion_baterias")
+                .delete()
+                .eq("atencion_id", atencionData.id);
+
+              // Insertar las nuevas baterías
+              const bateriasData = selectedPaquetes.map(paqueteId => ({
+                atencion_id: atencionData.id,
+                paquete_id: paqueteId
+              }));
+
+              const { error: bateriasError } = await supabase
+                .from("atencion_baterias")
+                .insert(bateriasData);
+
+              if (bateriasError) {
+                console.error("Error registrando baterías:", bateriasError);
+              }
+            }
+
             // FASE 6: Generate documents from selected batteries (also on edit)
             if (selectedPaquetes.length > 0) {
               console.log("[Pacientes] Generando documentos para paquetes:", selectedPaquetes);
@@ -759,6 +782,23 @@ const Pacientes = () => {
             .insert(examenesData);
 
           if (examenesError) throw examenesError;
+        }
+
+        // Registrar baterías asignadas a la atención para trazabilidad
+        if (selectedPaquetes.length > 0) {
+          const bateriasData = selectedPaquetes.map(paqueteId => ({
+            atencion_id: atencionData.id,
+            paquete_id: paqueteId
+          }));
+
+          const { error: bateriasError } = await supabase
+            .from("atencion_baterias")
+            .insert(bateriasData);
+
+          if (bateriasError) {
+            console.error("Error registrando baterías:", bateriasError);
+            // No interrumpir el flujo, solo log
+          }
         }
 
         // FASE 6: Generate documents from selected batteries

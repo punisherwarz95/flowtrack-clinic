@@ -81,11 +81,34 @@ const EmpresaPacientes = () => {
       const { data: atencionesData, error: atencionesError } = await atQuery.limit(1000);
       if (atencionesError) throw atencionesError;
 
+      // Obtener baterías de atencion_baterias para todas las atenciones
+      const atencionIds = (atencionesData ?? []).map((a: any) => a.id);
+      let bateriasPorAtencion: Record<string, { nombre: string }[]> = {};
+
+      if (atencionIds.length > 0) {
+        const { data: atencionBaterias } = await supabase
+          .from("atencion_baterias")
+          .select("atencion_id, paquete:paquetes_examenes(nombre)")
+          .in("atencion_id", atencionIds);
+
+        (atencionBaterias || []).forEach((ab: any) => {
+          if (!bateriasPorAtencion[ab.atencion_id]) {
+            bateriasPorAtencion[ab.atencion_id] = [];
+          }
+          bateriasPorAtencion[ab.atencion_id].push({
+            nombre: ab.paquete?.nombre || "Batería"
+          });
+        });
+      }
+
       const pacienteById = new Map<string, any>((pacientesData ?? []).map((p: any) => [p.id, p]));
       const rows: PacienteAtendido[] = (atencionesData ?? []).map((a: any) => {
         const p = pacienteById.get(a.paciente_id);
         const fecha = a.fecha_ingreso ? String(a.fecha_ingreso).slice(0, 10) : "";
         const estado = a.estado ?? "";
+
+        // Obtener baterías de esta atención
+        const bateriasDeAtencion = bateriasPorAtencion[a.id] || [];
 
         return {
           id: a.id,
@@ -95,7 +118,7 @@ const EmpresaPacientes = () => {
           cargo: p?.cargo ?? "-",
           estado,
           faena: p?.faena ?? null,
-          baterias: [],
+          baterias: bateriasDeAtencion.map(b => ({ paquete: { nombre: b.nombre } })),
           atencion: {
             estado: a.estado ?? null,
             fecha_fin_atencion: a.fecha_fin_atencion ?? null,

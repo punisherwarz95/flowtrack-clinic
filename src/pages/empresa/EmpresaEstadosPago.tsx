@@ -124,11 +124,7 @@ const EmpresaEstadosPago = () => {
           paciente_id,
           fecha_ingreso,
           estado,
-          fecha_fin_atencion,
-          prereserva:prereservas!atenciones_prereserva_id_fkey(
-            id,
-            baterias:prereserva_baterias(paquete_id, paquete:paquetes_examenes(id, nombre))
-          )
+          fecha_fin_atencion
         `)
         .in("paciente_id", pacienteIds)
         .eq("estado", "completado")
@@ -142,6 +138,25 @@ const EmpresaEstadosPago = () => {
         setGenerando(false);
         return;
       }
+
+      // 2b. Obtener baterías de atencion_baterias (nueva tabla de trazabilidad)
+      const atencionIds = atenciones.map((a: any) => a.id);
+      const { data: atencionBaterias } = await supabase
+        .from("atencion_baterias")
+        .select("atencion_id, paquete_id, paquete:paquetes_examenes(id, nombre)")
+        .in("atencion_id", atencionIds);
+
+      // Agrupar baterías por atención
+      const bateriasPorAtencion: Record<string, { paquete_id: string; nombre: string }[]> = {};
+      (atencionBaterias || []).forEach((ab: any) => {
+        if (!bateriasPorAtencion[ab.atencion_id]) {
+          bateriasPorAtencion[ab.atencion_id] = [];
+        }
+        bateriasPorAtencion[ab.atencion_id].push({
+          paquete_id: ab.paquete_id,
+          nombre: ab.paquete?.nombre || "Batería"
+        });
+      });
 
       // 3. Obtener valores de baterías para la empresa
       const { data: empresaBaterias } = await supabase
@@ -174,12 +189,11 @@ const EmpresaEstadosPago = () => {
         const bateriasConValor: { nombre: string; valor: number }[] = [];
         let subtotal = 0;
 
-        // Baterías de la prereserva (si existe)
-        const prereservaBaterias = atencion.prereserva?.baterias || [];
-        prereservaBaterias.forEach((b: any) => {
-          const paqueteId = b.paquete?.id || b.paquete_id;
-          const valor = bateriaValores[paqueteId] || 0;
-          bateriasConValor.push({ nombre: b.paquete?.nombre || "Batería", valor });
+        // Baterías registradas en atencion_baterias
+        const bateriasDeAtencion = bateriasPorAtencion[atencion.id] || [];
+        bateriasDeAtencion.forEach((b) => {
+          const valor = bateriaValores[b.paquete_id] || 0;
+          bateriasConValor.push({ nombre: b.nombre, valor });
           subtotal += valor;
         });
 

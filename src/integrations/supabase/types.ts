@@ -92,6 +92,42 @@ export type Database = {
           },
         ]
       }
+      atencion_baterias: {
+        Row: {
+          atencion_id: string
+          created_at: string
+          id: string
+          paquete_id: string
+        }
+        Insert: {
+          atencion_id: string
+          created_at?: string
+          id?: string
+          paquete_id: string
+        }
+        Update: {
+          atencion_id?: string
+          created_at?: string
+          id?: string
+          paquete_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atencion_baterias_atencion_id_fkey"
+            columns: ["atencion_id"]
+            isOneToOne: false
+            referencedRelation: "atenciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atencion_baterias_paquete_id_fkey"
+            columns: ["paquete_id"]
+            isOneToOne: false
+            referencedRelation: "paquetes_examenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       atencion_documentos: {
         Row: {
           atencion_id: string

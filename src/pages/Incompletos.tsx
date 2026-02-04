@@ -215,6 +215,23 @@ const Incompletos = () => {
 
       if (examenesError) throw examenesError;
 
+      // Copiar las baterías de la atención original a la nueva
+      const { data: bateriasOriginales } = await supabase
+        .from("atencion_baterias")
+        .select("paquete_id")
+        .eq("atencion_id", atencionOriginal.id);
+
+      if (bateriasOriginales && bateriasOriginales.length > 0) {
+        const nuevasBaterias = bateriasOriginales.map(b => ({
+          atencion_id: nuevaAtencion.id,
+          paquete_id: b.paquete_id
+        }));
+
+        await supabase
+          .from("atencion_baterias")
+          .insert(nuevasBaterias);
+      }
+
       toast.success(`Paciente reactivado con nuevo número de atención #${nuevaAtencion.numero_ingreso}`);
       setReactivateDialog({ open: false, atencion: null });
       await loadAtenciones();
