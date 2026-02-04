@@ -26,7 +26,7 @@ interface PacienteAtendido {
   faena: { nombre: string } | null;
   baterias: { paquete: { nombre: string } }[];
   atencion: {
-    estado: string;
+    estado: string | null;
     fecha_fin_atencion: string | null;
   } | null;
 }
@@ -54,22 +54,56 @@ const EmpresaPacientes = () => {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("prereservas")
-        .select(`
-          id, fecha, nombre, rut, cargo, estado,
-          faena:faenas(nombre),
-          baterias:prereserva_baterias(paquete:paquetes_examenes(nombre)),
-          atencion:atenciones!prereservas_atencion_id_fkey(estado, fecha_fin_atencion)
-        `)
-        .eq("empresa_id", currentEmpresaId)
-        .in("estado", ["confirmado", "atendido"])
-        .gte("fecha", fechaDesde)
-        .lte("fecha", fechaHasta)
-        .order("fecha", { ascending: false });
+      // Nota: En este proyecto las atenciones no están ligadas a prereservas (prereserva_id viene null),
+      // por lo que el historial de atendidos se arma desde atenciones + pacientes.
+      const { data: pacientesData, error: pacientesError } = await supabase
+        .from("pacientes")
+        .select("id, nombre, rut, cargo, faena:faenas(nombre)")
+        .eq("empresa_id", currentEmpresaId);
 
-      if (error) throw error;
-      setPacientes((data as unknown as PacienteAtendido[]) || []);
+      if (pacientesError) throw pacientesError;
+
+      const pacienteIds = (pacientesData ?? []).map((p: any) => p.id).filter(Boolean);
+      if (pacienteIds.length === 0) {
+        setPacientes([]);
+        return;
+      }
+
+      let atQuery = supabase
+        .from("atenciones")
+        .select("id, paciente_id, fecha_ingreso, estado, fecha_fin_atencion")
+        .in("paciente_id", pacienteIds)
+        .order("fecha_ingreso", { ascending: false });
+
+      if (fechaDesde) atQuery = atQuery.gte("fecha_ingreso", `${fechaDesde}T00:00:00`);
+      if (fechaHasta) atQuery = atQuery.lte("fecha_ingreso", `${fechaHasta}T23:59:59`);
+
+      const { data: atencionesData, error: atencionesError } = await atQuery.limit(1000);
+      if (atencionesError) throw atencionesError;
+
+      const pacienteById = new Map<string, any>((pacientesData ?? []).map((p: any) => [p.id, p]));
+      const rows: PacienteAtendido[] = (atencionesData ?? []).map((a: any) => {
+        const p = pacienteById.get(a.paciente_id);
+        const fecha = a.fecha_ingreso ? String(a.fecha_ingreso).slice(0, 10) : "";
+        const estado = a.estado ?? "";
+
+        return {
+          id: a.id,
+          fecha,
+          nombre: p?.nombre ?? "",
+          rut: p?.rut ?? "-",
+          cargo: p?.cargo ?? "-",
+          estado,
+          faena: p?.faena ?? null,
+          baterias: [],
+          atencion: {
+            estado: a.estado ?? null,
+            fecha_fin_atencion: a.fecha_fin_atencion ?? null,
+          },
+        };
+      });
+
+      setPacientes(rows);
     } catch (error) {
       console.error("Error cargando pacientes:", error);
     } finally {
@@ -83,20 +117,23 @@ const EmpresaPacientes = () => {
     return pacientes.filter(
       (p) =>
         p.nombre.toLowerCase().includes(search) ||
-        p.rut.toLowerCase().includes(search) ||
+        (p.rut ?? "").toLowerCase().includes(search) ||
         p.cargo?.toLowerCase().includes(search)
     );
   }, [pacientes, searchFilter]);
 
   const getEstadoBadge = (paciente: PacienteAtendido) => {
-    if (paciente.estado === "atendido" || paciente.atencion?.estado === "completado") {
+    if (paciente.atencion?.estado === "completado") {
       return <Badge className="bg-green-600 text-white">Completado</Badge>;
     }
     if (paciente.atencion?.estado === "en_atencion") {
       return <Badge className="bg-blue-600 text-white">En Atención</Badge>;
     }
-    if (paciente.estado === "confirmado") {
-      return <Badge className="bg-amber-600 text-white">Confirmado</Badge>;
+    if (paciente.atencion?.estado === "en_espera") {
+      return <Badge className="bg-amber-600 text-white">En espera</Badge>;
+    }
+    if (paciente.atencion?.estado === "incompleto") {
+      return <Badge variant="destructive">Incompleto</Badge>;
     }
     return <Badge variant="secondary">Pendiente</Badge>;
   };
@@ -143,7 +180,7 @@ const EmpresaPacientes = () => {
                 <div className="p-2 rounded-lg bg-muted"><Users className="h-5 w-5 text-primary" /></div>
                 <div>
                   <p className="text-sm text-muted-foreground">Total Atendidos</p>
-                  <p className="text-2xl font-bold">{pacientes.filter((p) => p.estado === "atendido").length}</p>
+                  <p className="text-2xl font-bold">{pacientes.filter((p) => p.atencion?.estado === "completado").length}</p>
                 </div>
               </div>
             </CardContent>
@@ -164,8 +201,8 @@ const EmpresaPacientes = () => {
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-muted"><Users className="h-5 w-5 text-primary" /></div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Confirmados</p>
-                  <p className="text-2xl font-bold">{pacientes.filter((p) => p.estado === "confirmado").length}</p>
+                  <p className="text-sm text-muted-foreground">En espera</p>
+                  <p className="text-2xl font-bold">{pacientes.filter((p) => p.atencion?.estado === "en_espera").length}</p>
                 </div>
               </div>
             </CardContent>
