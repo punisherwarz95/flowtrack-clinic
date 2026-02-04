@@ -161,28 +161,26 @@ const Empresas = () => {
     if (!selectedEmpresa) return;
 
     try {
-      // Eliminar baterías existentes
-      await supabase
-        .from("empresa_baterias")
-        .delete()
-        .eq("empresa_id", selectedEmpresa.id);
+      // IMPORTANTE: No borramos vínculos.
+      // Las baterías pueden venir auto-vinculadas por faena con valor=0 (pendiente de precio)
+      // y deben permanecer para que la info sea transversal.
+      const linkedPaqueteIds = Array.from(new Set(empresaBaterias.map((eb) => eb.paquete_id)));
 
-      // Insertar nuevos precios
-      const preciosData = Object.entries(bateriaPrecios)
-        .filter(([_, valor]) => valor && parseFloat(valor) > 0)
-        .map(([paqueteId, valor]) => ({
-          empresa_id: selectedEmpresa.id,
-          paquete_id: paqueteId,
-          valor: parseFloat(valor),
-        }));
+      const updates = linkedPaqueteIds.map((paqueteId) => {
+        const raw = (bateriaPrecios[paqueteId] ?? "").trim();
+        const parsed = raw === "" ? 0 : Number(raw);
+        const valor = Number.isFinite(parsed) ? parsed : 0;
 
-      if (preciosData.length > 0) {
-        const { error } = await supabase
+        return supabase
           .from("empresa_baterias")
-          .insert(preciosData);
+          .update({ valor, activo: true })
+          .eq("empresa_id", selectedEmpresa.id)
+          .eq("paquete_id", paqueteId);
+      });
 
-        if (error) throw error;
-      }
+      const results = await Promise.all(updates);
+      const firstError = results.find((r) => r.error)?.error;
+      if (firstError) throw firstError;
 
       toast.success("Baterías contratadas actualizadas");
       setOpenBateriasDialog(false);
@@ -410,49 +408,60 @@ const Empresas = () => {
             
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Define los precios específicos para cada batería/paquete contratado por esta empresa.
+                Define los precios para las baterías vinculadas a esta empresa. Si una batería tiene precio $0, queda como pendiente de configurar.
               </p>
-              
-              <div className="border rounded-md divide-y max-h-96 overflow-y-auto">
-                {paquetes
-                  .filter((paquete) => {
-                    const precio = bateriaPrecios[paquete.id];
-                    return precio && parseFloat(precio) > 0;
-                  })
-                  .map((paquete) => (
-                    <div key={paquete.id} className="flex items-center justify-between p-3 gap-4">
-                      <span className="text-sm font-medium flex-1">{paquete.nombre}</span>
-                      <div className="flex items-center gap-1">
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
-                        <Input
-                          type="number"
-                          step="any"
-                          value={bateriaPrecios[paquete.id] || ""}
-                          onChange={(e) => setBateriaPrecios({
-                            ...bateriaPrecios,
-                            [paquete.id]: e.target.value
-                          })}
-                          placeholder="Precio"
-                          className="w-28 h-8"
-                        />
-                      </div>
+
+              {(() => {
+                const linkedPaqueteIds = new Set(empresaBaterias.map((eb) => eb.paquete_id));
+                const linkedPaquetes = paquetes.filter((p) => linkedPaqueteIds.has(p.id));
+
+                const conPrecioCount = linkedPaquetes.filter((p) => {
+                  const v = (bateriaPrecios[p.id] ?? "").trim();
+                  return v !== "" && Number(v) > 0;
+                }).length;
+
+                return (
+                  <>
+                    <div className="border rounded-md divide-y max-h-96 overflow-y-auto">
+                      {linkedPaquetes.map((paquete) => (
+                        <div key={paquete.id} className="flex items-center justify-between p-3 gap-4">
+                          <span className="text-sm font-medium flex-1">{paquete.nombre}</span>
+                          <div className="flex items-center gap-1">
+                            <DollarSign className="h-4 w-4 text-muted-foreground" />
+                            <Input
+                              type="number"
+                              step="any"
+                              value={bateriaPrecios[paquete.id] ?? ""}
+                              onChange={(e) =>
+                                setBateriaPrecios({
+                                  ...bateriaPrecios,
+                                  [paquete.id]: e.target.value,
+                                })
+                              }
+                              placeholder="0"
+                              className="w-28 h-8"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                      {linkedPaquetes.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-8">
+                          Esta empresa no tiene baterías vinculadas. Primero vincula una faena con baterías.
+                        </p>
+                      )}
                     </div>
-                  ))}
-                {Object.values(bateriaPrecios).filter(v => v && parseFloat(v) > 0).length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    Esta empresa no tiene baterías con precio asignado.
-                  </p>
-                )}
-              </div>
-              
-              <div className="flex justify-between items-center pt-2">
-                <p className="text-xs text-muted-foreground">
-                  {Object.values(bateriaPrecios).filter(v => v && parseFloat(v) > 0).length} baterías con precio asignado
-                </p>
-                <Button onClick={handleSaveBaterias}>
-                  Guardar Cambios
-                </Button>
-              </div>
+
+                    <div className="flex justify-between items-center pt-2">
+                      <p className="text-xs text-muted-foreground">
+                        {linkedPaquetes.length} vinculadas · {conPrecioCount} con precio &gt; 0
+                      </p>
+                      <Button onClick={handleSaveBaterias} disabled={linkedPaquetes.length === 0}>
+                        Guardar Cambios
+                      </Button>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </DialogContent>
         </Dialog>

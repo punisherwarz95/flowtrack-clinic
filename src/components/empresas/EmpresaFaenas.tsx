@@ -51,7 +51,8 @@ interface BateriaFaena {
   id: string;
   paquete_id: string;
   faena_id: string;
-  activo: boolean;
+  // En BD puede venir null por datos antiguos; lo tratamos como activo mientras no sea false.
+  activo: boolean | null;
 }
 
 interface EmpresaFaena {
@@ -125,7 +126,7 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
 
   // Faenas asignadas a esta empresa
   const assignedFaenaIds = new Set(
-    empresaFaenas.filter(ef => ef.activo).map(ef => ef.faena_id)
+    empresaFaenas.filter((ef) => ef.activo !== false).map((ef) => ef.faena_id)
   );
   
   const assignedFaenas = allFaenas.filter(f => assignedFaenaIds.has(f.id));
@@ -224,8 +225,17 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
       }
 
       // Copiar baterías de la faena a empresa_baterias (si no existen)
-      const bateriasDeEstaFaena = bateriasFaenas.filter(
-        bf => bf.faena_id === faenaId && bf.activo
+      // Importante: consultamos en backend para evitar estado desactualizado y
+      // tratamos activo=null como activo (solo excluimos activo=false).
+      const { data: bateriasDeFaenaRaw, error: bateriasFaenaError } = await supabase
+        .from("bateria_faenas")
+        .select("paquete_id, activo")
+        .eq("faena_id", faenaId);
+
+      if (bateriasFaenaError) throw bateriasFaenaError;
+
+      const bateriasDeEstaFaena = (bateriasDeFaenaRaw || []).filter(
+        (bf: { paquete_id: string; activo: boolean | null }) => bf.activo !== false
       );
 
       if (bateriasDeEstaFaena.length > 0) {
@@ -256,8 +266,9 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
           
           if (batError) {
             console.error("Error agregando baterías:", batError);
-            // No lanzar error, solo advertir
-            toast.warning(`Faena asignada. ${nuevasBaterias.length} baterías agregadas (precio $0, configúralas).`);
+            toast.warning(
+              `Faena asignada, pero no se pudieron vincular ${nuevasBaterias.length} baterías. Revisa permisos/políticas y reintenta.`
+            );
           } else {
             toast.success(`Faena asignada con ${nuevasBaterias.length} baterías agregadas`);
           }
@@ -325,7 +336,7 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
 
   const isBateriaAsignada = (faenaId: string, paqueteId: string) => {
     return bateriasFaenas.some(
-      (bf) => bf.faena_id === faenaId && bf.paquete_id === paqueteId && bf.activo
+      (bf) => bf.faena_id === faenaId && bf.paquete_id === paqueteId && bf.activo !== false
     );
   };
 
@@ -359,7 +370,7 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
   };
 
   const getBateriasCount = (faenaId: string) => {
-    return bateriasFaenas.filter((bf) => bf.faena_id === faenaId && bf.activo).length;
+    return bateriasFaenas.filter((bf) => bf.faena_id === faenaId && bf.activo !== false).length;
   };
 
   const renderFaenaCard = (faena: Faena, isAssigned: boolean) => (
