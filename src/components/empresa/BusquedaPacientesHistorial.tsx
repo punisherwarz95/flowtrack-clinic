@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -57,12 +57,12 @@ const BusquedaPacientesHistorial = ({
   const [loading, setLoading] = useState(false);
   const [buscado, setBuscado] = useState(false);
 
-  // Cargar empresas si es staff admin
-  useState(() => {
-    if (isStaffAdmin) {
+  // Cargar empresas si es staff admin o si no hay empresaId fijo
+  useEffect(() => {
+    if (isStaffAdmin || !empresaId) {
       loadEmpresas();
     }
-  });
+  }, [isStaffAdmin, empresaId]);
 
   const loadEmpresas = async () => {
     const { data } = await supabase
@@ -192,8 +192,8 @@ const BusquedaPacientesHistorial = ({
             />
           </div>
 
-          {/* Filtro empresa (solo para staff admin) */}
-          {isStaffAdmin && !empresaId && (
+          {/* Filtro empresa (para staff admin o cuando no hay empresaId fijo) */}
+          {(isStaffAdmin || !empresaId) && (
             <div className="space-y-2">
               <Label className="flex items-center gap-1">
                 <Building2 className="h-4 w-4" />

@@ -14,6 +14,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import BusquedaPacientesHistorial from "@/components/empresa/BusquedaPacientesHistorial";
 
 interface AtencionIngresada {
   id: string;
@@ -894,6 +895,11 @@ const Dashboard = () => {
               )}
             </CardContent>
           </Card>
+        </section>
+
+        {/* SECCIÓN 4: Búsqueda de Historial de Pacientes */}
+        <section className="mb-10">
+          <BusquedaPacientesHistorial isStaffAdmin={true} />
         </section>
       </main>
     </div>
