@@ -99,29 +99,51 @@ const EmpresaEstadosPago = () => {
 
     setGenerando(true);
     try {
-      // Obtener atenciones del período
-      const { data: atenciones, error: atencionesError } = await supabase
-        .from("prereservas")
-        .select(`
-          *,
-          faena:faenas(nombre),
-          baterias:prereserva_baterias(paquete:paquetes_examenes(nombre)),
-          atencion:atenciones(id, fecha_fin_atencion)
-        `)
-        .eq("empresa_id", currentEmpresaId)
-        .eq("estado", "atendido")
-        .gte("fecha", fechaDesde)
-        .lte("fecha", fechaHasta);
+      // 1. Obtener IDs de pacientes de esta empresa
+      const { data: pacientesEmpresa, error: pacError } = await supabase
+        .from("pacientes")
+        .select("id, nombre, rut, cargo, faena:faenas(nombre)")
+        .eq("empresa_id", currentEmpresaId);
 
-      if (atencionesError) throw atencionesError;
+      if (pacError) throw pacError;
 
-      if (!atenciones || atenciones.length === 0) {
-        toast({ title: "No hay atenciones en el período seleccionado", variant: "destructive" });
+      if (!pacientesEmpresa || pacientesEmpresa.length === 0) {
+        toast({ title: "No hay pacientes registrados para esta empresa", variant: "destructive" });
         setGenerando(false);
         return;
       }
 
-      // Obtener valores de baterías para la empresa
+      const pacienteIds = pacientesEmpresa.map((p) => p.id);
+      const pacientesMap = new Map(pacientesEmpresa.map((p) => [p.id, p]));
+
+      // 2. Obtener atenciones completadas en el período
+      const { data: atenciones, error: atencionesError } = await supabase
+        .from("atenciones")
+        .select(`
+          id,
+          paciente_id,
+          fecha_ingreso,
+          estado,
+          fecha_fin_atencion,
+          prereserva:prereservas!atenciones_prereserva_id_fkey(
+            id,
+            baterias:prereserva_baterias(paquete_id, paquete:paquetes_examenes(id, nombre))
+          )
+        `)
+        .in("paciente_id", pacienteIds)
+        .eq("estado", "completado")
+        .gte("fecha_ingreso", `${fechaDesde}T00:00:00`)
+        .lte("fecha_ingreso", `${fechaHasta}T23:59:59`);
+
+      if (atencionesError) throw atencionesError;
+
+      if (!atenciones || atenciones.length === 0) {
+        toast({ title: "No hay atenciones completadas en el período seleccionado", variant: "destructive" });
+        setGenerando(false);
+        return;
+      }
+
+      // 3. Obtener valores de baterías para la empresa
       const { data: empresaBaterias } = await supabase
         .from("empresa_baterias")
         .select("paquete_id, valor")
@@ -129,40 +151,62 @@ const EmpresaEstadosPago = () => {
 
       const bateriaValores: Record<string, number> = {};
       empresaBaterias?.forEach((eb: any) => {
-        bateriaValores[eb.paquete_id] = eb.valor;
+        bateriaValores[eb.paquete_id] = eb.valor || 0;
       });
 
-      // Calcular items y totales
+      // 4. Calcular items y totales
       let totalNeto = 0;
-      const items: any[] = [];
+      const items: {
+        atencion_id: string;
+        paciente_nombre: string;
+        paciente_rut: string | null;
+        cargo: string | null;
+        faena: string | null;
+        fecha_atencion: string;
+        baterias: { nombre: string; valor: number }[];
+        subtotal: number;
+      }[] = [];
 
       atenciones.forEach((atencion: any) => {
+        const paciente = pacientesMap.get(atencion.paciente_id);
+        if (!paciente) return;
+
         const bateriasConValor: { nombre: string; valor: number }[] = [];
         let subtotal = 0;
 
-        atencion.baterias?.forEach((b: any) => {
-          const valor = bateriaValores[b.paquete?.id] || 0;
-          bateriasConValor.push({ nombre: b.paquete?.nombre || "", valor });
+        // Baterías de la prereserva (si existe)
+        const prereservaBaterias = atencion.prereserva?.baterias || [];
+        prereservaBaterias.forEach((b: any) => {
+          const paqueteId = b.paquete?.id || b.paquete_id;
+          const valor = bateriaValores[paqueteId] || 0;
+          bateriasConValor.push({ nombre: b.paquete?.nombre || "Batería", valor });
           subtotal += valor;
         });
 
         totalNeto += subtotal;
 
         items.push({
-          paciente_nombre: atencion.nombre,
-          paciente_rut: atencion.rut,
-          cargo: atencion.cargo,
-          faena: atencion.faena?.nombre,
-          fecha_atencion: atencion.fecha,
+          atencion_id: atencion.id,
+          paciente_nombre: paciente.nombre,
+          paciente_rut: paciente.rut,
+          cargo: paciente.cargo,
+          faena: (paciente.faena as any)?.nombre || null,
+          fecha_atencion: atencion.fecha_ingreso?.split("T")[0] || fechaDesde,
           baterias: bateriasConValor,
           subtotal,
         });
       });
 
-      const totalIva = totalNeto * 0.19;
+      if (items.length === 0) {
+        toast({ title: "No se encontraron ítems válidos para generar", variant: "destructive" });
+        setGenerando(false);
+        return;
+      }
+
+      const totalIva = Math.ceil(totalNeto * 0.19);
       const total = totalNeto + totalIva;
 
-      // Crear estado de pago
+      // 5. Crear estado de pago
       const { data: estadoPago, error: estadoError } = await supabase
         .from("estados_pago")
         .insert({
@@ -180,20 +224,31 @@ const EmpresaEstadosPago = () => {
 
       if (estadoError) throw estadoError;
 
-      // Crear items
+      // 6. Crear items
       const itemsInsert = items.map((item) => ({
         estado_pago_id: estadoPago.id,
-        atencion_id: atenciones.find((a: any) => a.nombre === item.paciente_nombre)?.atencion?.id,
-        ...item,
+        atencion_id: item.atencion_id,
+        paciente_nombre: item.paciente_nombre,
+        paciente_rut: item.paciente_rut,
+        cargo: item.cargo,
+        faena: item.faena,
+        fecha_atencion: item.fecha_atencion,
+        baterias: item.baterias,
+        subtotal: item.subtotal,
       }));
 
-      await supabase.from("estado_pago_items").insert(itemsInsert);
+      const { error: itemsError } = await supabase.from("estado_pago_items").insert(itemsInsert);
+      if (itemsError) throw itemsError;
 
-      toast({ title: "Estado de pago generado exitosamente" });
+      toast({ title: `Estado de pago N° ${estadoPago.numero} generado con ${items.length} atenciones` });
       loadEstadosPago();
     } catch (error: any) {
       console.error("Error generando estado de pago:", error);
-      toast({ title: "Error al generar estado de pago", variant: "destructive" });
+      toast({ 
+        title: "Error al generar estado de pago", 
+        description: error.message || "Revisa la consola para más detalles",
+        variant: "destructive" 
+      });
     } finally {
       setGenerando(false);
     }
