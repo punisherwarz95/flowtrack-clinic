@@ -3,6 +3,7 @@ import { useEmpresaAuth } from "@/contexts/EmpresaAuthContext";
 import EmpresaLayout from "@/components/empresa/EmpresaLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import BusquedaPacientesHistorial from "@/components/empresa/BusquedaPacientesHistorial";
 import {
   Calendar,
   Users,
@@ -264,6 +265,12 @@ const EmpresaDashboard = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Búsqueda de Historial de Pacientes */}
+        <BusquedaPacientesHistorial
+          empresaId={currentEmpresaId}
+          isStaffAdmin={isStaffAdmin}
+        />
       </div>
     </EmpresaLayout>
   );
