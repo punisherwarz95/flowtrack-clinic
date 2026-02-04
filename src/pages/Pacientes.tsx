@@ -781,6 +781,8 @@ const Pacientes = () => {
       setBateriasDisponibles([]);
       setSelectedExamenes([]);
       setSelectedPaquetes([]);
+      setBateriaFilter("");
+      setFiltroFaenaIdBateria("__all__");
       loadPatients();
     } catch (error: any) {
       console.error("Error:", error);
