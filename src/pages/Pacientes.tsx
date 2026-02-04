@@ -83,6 +83,10 @@ interface BateriaFaena {
   paquete_id: string;
 }
 
+interface PaqueteFaenaMap {
+  [paqueteId: string]: string[]; // paquete_id -> faena_ids
+}
+
 interface Examen {
   id: string;
   nombre: string;
@@ -144,6 +148,12 @@ const Pacientes = () => {
   const [faenasEmpresa, setFaenasEmpresa] = useState<Faena[]>([]);
   const [bateriasDisponibles, setBateriasDisponibles] = useState<string[]>([]);
   const [loadingFaenas, setLoadingFaenas] = useState(false);
+  
+  // Estados para filtro de baterías por faena (como en cotizaciones)
+  const [allFaenas, setAllFaenas] = useState<Faena[]>([]);
+  const [paqueteFaenasMap, setPaqueteFaenasMap] = useState<PaqueteFaenaMap>({});
+  const [bateriaFilter, setBateriaFilter] = useState("");
+  const [filtroFaenaIdBateria, setFiltroFaenaIdBateria] = useState<string>("__all__");
   
   // Estado para el código del día
   const [codigoDelDia, setCodigoDelDia] = useState<string | null>(null);
@@ -244,6 +254,7 @@ const Pacientes = () => {
     loadEmpresas();
     loadExamenes();
     loadPaquetes();
+    loadAllFaenasAndBateriaFaenas();
 
     // Auto-refresh every 5 seconds
     const interval = setInterval(() => {
@@ -252,6 +263,33 @@ const Pacientes = () => {
 
     return () => clearInterval(interval);
   }, [selectedDate]);
+
+  // Cargar todas las faenas y mapeo bateria-faena
+  const loadAllFaenasAndBateriaFaenas = async () => {
+    try {
+      const [faenasRes, bateriaFaenasRes] = await Promise.all([
+        supabase.from("faenas").select("id, nombre, direccion").eq("activo", true).order("nombre"),
+        supabase.from("bateria_faenas").select("paquete_id, faena_id").eq("activo", true)
+      ]);
+
+      if (faenasRes.error) throw faenasRes.error;
+      if (bateriaFaenasRes.error) throw bateriaFaenasRes.error;
+
+      setAllFaenas(faenasRes.data || []);
+
+      // Crear mapa de paquete -> faenas
+      const map: PaqueteFaenaMap = {};
+      (bateriaFaenasRes.data || []).forEach((bf: any) => {
+        if (!map[bf.paquete_id]) {
+          map[bf.paquete_id] = [];
+        }
+        map[bf.paquete_id].push(bf.faena_id);
+      });
+      setPaqueteFaenasMap(map);
+    } catch (error) {
+      console.error("Error loading faenas and bateria_faenas:", error);
+    }
+  };
 
   // Load document counts for patients
   const loadDocumentCounts = async (patientIds: string[]) => {
@@ -948,6 +986,8 @@ const Pacientes = () => {
                 setSelectedExamenes([]);
                 setSelectedPaquetes([]);
                 setExamenFilter("");
+                setBateriaFilter("");
+                setFiltroFaenaIdBateria("__all__");
               }
             }}>
               <DialogTrigger asChild>
@@ -1150,57 +1190,124 @@ const Pacientes = () => {
                       <div>
                         <Label className="text-sm font-medium">
                           Baterías de Exámenes
-                          {formData.faena_id && bateriasDisponibles.length > 0 && (
+                          {selectedPaquetes.length > 0 && (
                             <span className="text-xs text-muted-foreground ml-2">
-                              ({bateriasDisponibles.length} disponibles para esta faena)
+                              ({selectedPaquetes.length} seleccionadas)
                             </span>
                           )}
                         </Label>
-                        {formData.empresa_id && !formData.faena_id && faenasEmpresa.length > 0 ? (
-                          <div className="border rounded-md p-3 bg-muted/30 mt-1 text-sm text-muted-foreground">
-                            Seleccione una faena para ver las baterías disponibles
+                        
+                        {/* Filtros para baterías */}
+                        <div className="flex gap-2 mt-1 mb-2">
+                          <div className="flex-1 relative">
+                            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              placeholder="Buscar batería..."
+                              value={bateriaFilter}
+                              onChange={(e) => setBateriaFilter(e.target.value)}
+                              className="pl-8 h-9"
+                            />
                           </div>
-                        ) : (
-                          <div className="border rounded-md p-3 max-h-64 overflow-y-auto space-y-2 bg-muted/30 mt-1">
-                            {paquetes
-                              .filter((paquete) => {
-                                // Si no hay faena seleccionada o no hay baterías cargadas, mostrar todas
-                                if (!formData.faena_id || bateriasDisponibles.length === 0) return true;
-                                // Filtrar solo las baterías disponibles para la faena
-                                return bateriasDisponibles.includes(paquete.id);
-                              })
-                              .map((paquete) => (
-                              <label key={paquete.id} className="flex items-start gap-2 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedPaquetes.includes(paquete.id)}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setSelectedPaquetes([...selectedPaquetes, paquete.id]);
-                                      const examenesIds = paquete.paquete_examen_items.map(item => item.examen_id);
-                                      const nuevosExamenes = examenesIds.filter(id => !selectedExamenes.includes(id));
-                                      setSelectedExamenes([...selectedExamenes, ...nuevosExamenes]);
-                                    } else {
-                                      setSelectedPaquetes(selectedPaquetes.filter(id => id !== paquete.id));
-                                    }
-                                  }}
-                                  className="w-4 h-4 mt-0.5"
-                                />
-                                <div className="flex-1">
-                                  <span className="text-sm font-medium">{paquete.nombre}</span>
-                                  {paquete.descripcion && (
-                                    <p className="text-xs text-muted-foreground">{paquete.descripcion}</p>
-                                  )}
-                                </div>
-                              </label>
+                          <select
+                            value={filtroFaenaIdBateria}
+                            onChange={(e) => setFiltroFaenaIdBateria(e.target.value)}
+                            className="h-9 px-2 rounded-md border border-input bg-background text-sm min-w-[140px]"
+                          >
+                            <option value="__all__">Todas las faenas</option>
+                            {allFaenas.map((f) => (
+                              <option key={f.id} value={f.id}>
+                                {f.nombre}
+                              </option>
                             ))}
-                            {formData.faena_id && bateriasDisponibles.length === 0 && (
-                              <div className="text-sm text-muted-foreground text-center py-2">
-                                No hay baterías asignadas a esta faena
+                            <option value="__none__">Sin faena</option>
+                          </select>
+                        </div>
+
+                        <div className="border rounded-md p-3 max-h-64 overflow-y-auto bg-muted/30">
+                          {(() => {
+                            // Agrupar paquetes por faena
+                            const grupos: { faenaId: string; faenaNombre: string; paquetes: typeof paquetes }[] = [];
+                            const sinFaena: typeof paquetes = [];
+
+                            paquetes.forEach((paquete) => {
+                              // Filtrar por búsqueda de texto
+                              if (bateriaFilter && !paquete.nombre.toLowerCase().includes(bateriaFilter.toLowerCase())) {
+                                return;
+                              }
+
+                              const faenaIds = paqueteFaenasMap[paquete.id] || [];
+                              if (faenaIds.length === 0) {
+                                sinFaena.push(paquete);
+                              } else {
+                                faenaIds.forEach((faenaId) => {
+                                  const faena = allFaenas.find((f) => f.id === faenaId);
+                                  if (!faena) return;
+                                  let grupo = grupos.find((g) => g.faenaId === faenaId);
+                                  if (!grupo) {
+                                    grupo = { faenaId, faenaNombre: faena.nombre, paquetes: [] };
+                                    grupos.push(grupo);
+                                  }
+                                  if (!grupo.paquetes.some((p) => p.id === paquete.id)) {
+                                    grupo.paquetes.push(paquete);
+                                  }
+                                });
+                              }
+                            });
+
+                            grupos.sort((a, b) => a.faenaNombre.localeCompare(b.faenaNombre));
+                            if (sinFaena.length > 0) {
+                              grupos.push({ faenaId: "__none__", faenaNombre: "Sin faena asignada", paquetes: sinFaena });
+                            }
+
+                            // Aplicar filtro de faena
+                            const gruposFiltrados = filtroFaenaIdBateria === "__all__" 
+                              ? grupos 
+                              : grupos.filter(g => g.faenaId === filtroFaenaIdBateria);
+
+                            if (gruposFiltrados.length === 0) {
+                              return (
+                                <div className="text-sm text-muted-foreground text-center py-4">
+                                  No se encontraron baterías
+                                </div>
+                              );
+                            }
+
+                            return gruposFiltrados.map((grupo) => (
+                              <div key={grupo.faenaId} className="mb-3 last:mb-0">
+                                <div className="text-xs font-semibold text-muted-foreground bg-muted/60 py-1 px-2 rounded mb-1 sticky top-0">
+                                  📍 {grupo.faenaNombre}
+                                </div>
+                                <div className="space-y-1 pl-2">
+                                  {grupo.paquetes.map((paquete) => (
+                                    <label key={paquete.id} className="flex items-start gap-2 cursor-pointer py-0.5">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedPaquetes.includes(paquete.id)}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setSelectedPaquetes([...selectedPaquetes, paquete.id]);
+                                            const examenesIds = paquete.paquete_examen_items.map(item => item.examen_id);
+                                            const nuevosExamenes = examenesIds.filter(id => !selectedExamenes.includes(id));
+                                            setSelectedExamenes([...selectedExamenes, ...nuevosExamenes]);
+                                          } else {
+                                            setSelectedPaquetes(selectedPaquetes.filter(id => id !== paquete.id));
+                                          }
+                                        }}
+                                        className="w-4 h-4 mt-0.5"
+                                      />
+                                      <div className="flex-1">
+                                        <span className="text-sm font-medium">{paquete.nombre}</span>
+                                        {paquete.descripcion && (
+                                          <p className="text-xs text-muted-foreground">{paquete.descripcion}</p>
+                                        )}
+                                      </div>
+                                    </label>
+                                  ))}
+                                </div>
                               </div>
-                            )}
-                          </div>
-                        )}
+                            ));
+                          })()}
+                        </div>
                       </div>
                     </div>
 
