@@ -78,6 +78,26 @@ const BusquedaPacientesHistorial = ({
     setBuscado(true);
 
     try {
+      // Determinar empresa a filtrar
+      const empresaIdToFilter = empresaId || (empresaFiltro !== "__all__" ? empresaFiltro : null);
+
+      // Si hay filtro de empresa, primero obtener los IDs de pacientes de esa empresa
+      let pacienteIds: string[] | null = null;
+      if (empresaIdToFilter) {
+        const { data: pacientesData } = await supabase
+          .from("pacientes")
+          .select("id")
+          .eq("empresa_id", empresaIdToFilter);
+        pacienteIds = pacientesData?.map(p => p.id) || [];
+        
+        // Si no hay pacientes de esa empresa, retornar vacío
+        if (pacienteIds.length === 0) {
+          setResultados([]);
+          setLoading(false);
+          return;
+        }
+      }
+
       // Construir query base
       let query = supabase
         .from("atenciones")
@@ -85,7 +105,7 @@ const BusquedaPacientesHistorial = ({
           id,
           fecha_ingreso,
           estado,
-          pacientes!inner (
+          pacientes (
             id,
             nombre,
             rut,
@@ -102,10 +122,9 @@ const BusquedaPacientesHistorial = ({
         `)
         .order("fecha_ingreso", { ascending: false });
 
-      // Filtro por empresa
-      const empresaIdToFilter = empresaId || (empresaFiltro !== "__all__" ? empresaFiltro : null);
-      if (empresaIdToFilter) {
-        query = query.eq("pacientes.empresa_id", empresaIdToFilter);
+      // Filtro por pacientes de la empresa
+      if (pacienteIds && pacienteIds.length > 0) {
+        query = query.in("paciente_id", pacienteIds);
       }
 
       // Filtro por rango de fechas
@@ -116,7 +135,7 @@ const BusquedaPacientesHistorial = ({
         query = query.lte("fecha_ingreso", `${fechaHasta}T23:59:59`);
       }
 
-      // Ejecutar query - aumentar límite para búsquedas por empresa sin otros filtros
+      // Ejecutar query
       const { data, error } = await query.limit(500);
 
       if (error) {
