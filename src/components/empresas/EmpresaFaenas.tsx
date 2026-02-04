@@ -223,7 +223,51 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
         if (error) throw error;
       }
 
-      toast.success("Faena asignada a la empresa");
+      // Copiar baterías de la faena a empresa_baterias (si no existen)
+      const bateriasDeEstaFaena = bateriasFaenas.filter(
+        bf => bf.faena_id === faenaId && bf.activo
+      );
+
+      if (bateriasDeEstaFaena.length > 0) {
+        // Obtener baterías ya existentes en la empresa
+        const { data: empresaBateriasExistentes } = await supabase
+          .from("empresa_baterias")
+          .select("paquete_id")
+          .eq("empresa_id", empresaId);
+
+        const paquetesExistentes = new Set(
+          empresaBateriasExistentes?.map(eb => eb.paquete_id) || []
+        );
+
+        // Filtrar baterías que aún no están en la empresa
+        const nuevasBaterias = bateriasDeEstaFaena
+          .filter(bf => !paquetesExistentes.has(bf.paquete_id))
+          .map(bf => ({
+            empresa_id: empresaId,
+            paquete_id: bf.paquete_id,
+            valor: 0, // Precio inicial 0, el staff debe configurarlo
+            activo: true,
+          }));
+
+        if (nuevasBaterias.length > 0) {
+          const { error: batError } = await supabase
+            .from("empresa_baterias")
+            .insert(nuevasBaterias);
+          
+          if (batError) {
+            console.error("Error agregando baterías:", batError);
+            // No lanzar error, solo advertir
+            toast.warning(`Faena asignada. ${nuevasBaterias.length} baterías agregadas (precio $0, configúralas).`);
+          } else {
+            toast.success(`Faena asignada con ${nuevasBaterias.length} baterías agregadas`);
+          }
+        } else {
+          toast.success("Faena asignada (baterías ya existían)");
+        }
+      } else {
+        toast.success("Faena asignada a la empresa");
+      }
+
       loadData();
     } catch (error: any) {
       console.error("Error:", error);
