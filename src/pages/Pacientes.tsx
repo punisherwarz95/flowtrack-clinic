@@ -1039,15 +1039,15 @@ const Pacientes = () => {
                   Nuevo Paciente
                 </Button>
               </DialogTrigger>
-              <DialogContent className="w-[70vw] h-[70vh] max-w-none overflow-y-auto">
-                <DialogHeader>
+              <DialogContent className="w-[90vw] h-[85vh] max-w-none flex flex-col">
+                <DialogHeader className="flex-shrink-0">
                   <DialogTitle>{editingPatient ? "Editar Paciente" : "Agregar Nuevo Paciente"}</DialogTitle>
                 </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Columna izquierda - Datos personales del paciente */}
-                    <div className="space-y-4">
-                      <h3 className="font-semibold text-sm text-muted-foreground border-b pb-2">Datos Personales</h3>
+                <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+                  <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 overflow-hidden">
+                    {/* Columna 1 - Datos personales del paciente */}
+                    <div className="flex flex-col space-y-3 overflow-y-auto pr-2">
+                      <h3 className="font-semibold text-sm text-muted-foreground border-b pb-2 sticky top-0 bg-background z-10">Datos Personales</h3>
                       <div>
                         <Label htmlFor="nombre" className="text-sm font-medium">Nombre Completo *</Label>
                         <Input
@@ -1055,7 +1055,7 @@ const Pacientes = () => {
                           required
                           value={formData.nombre}
                           onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                          className="h-10 mt-1"
+                          className="h-9 mt-1"
                         />
                       </div>
                       <div>
@@ -1065,7 +1065,7 @@ const Pacientes = () => {
                           value={formData.rut}
                           onChange={(e) => setFormData({ ...formData, rut: e.target.value })}
                           placeholder="12.345.678-9"
-                          className="h-10 mt-1"
+                          className="h-9 mt-1"
                         />
                       </div>
                       <div>
@@ -1075,7 +1075,7 @@ const Pacientes = () => {
                           type="date"
                           value={formData.fecha_nacimiento}
                           onChange={(e) => setFormData({ ...formData, fecha_nacimiento: e.target.value })}
-                          className="h-10 mt-1"
+                          className="h-9 mt-1"
                         />
                       </div>
                       <div>
@@ -1086,7 +1086,7 @@ const Pacientes = () => {
                           value={formData.email}
                           onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                           placeholder="correo@ejemplo.com"
-                          className="h-10 mt-1"
+                          className="h-9 mt-1"
                         />
                       </div>
                       <div>
@@ -1097,7 +1097,7 @@ const Pacientes = () => {
                           value={formData.telefono}
                           onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
                           placeholder="+56 9 1234 5678"
-                          className="h-10 mt-1"
+                          className="h-9 mt-1"
                         />
                       </div>
                       <div>
@@ -1107,14 +1107,14 @@ const Pacientes = () => {
                           value={formData.direccion}
                           onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
                           placeholder="Av. Principal 123, Comuna"
-                          className="h-10 mt-1"
+                          className="h-9 mt-1"
                         />
                       </div>
                     </div>
 
-                    {/* Columna central - Servicio y empresa */}
-                    <div className="space-y-4">
-                      <h3 className="font-semibold text-sm text-muted-foreground border-b pb-2">Servicio y Empresa</h3>
+                    {/* Columna 2 - Servicio y empresa */}
+                    <div className="flex flex-col space-y-3 overflow-y-auto pr-2">
+                      <h3 className="font-semibold text-sm text-muted-foreground border-b pb-2 sticky top-0 bg-background z-10">Servicio y Empresa</h3>
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Tipo de Servicio *</Label>
                         <div className="flex flex-col gap-2">
@@ -1174,7 +1174,7 @@ const Pacientes = () => {
                             placeholder="Buscar empresa..."
                             value={empresaSearchFilter}
                             onChange={(e) => setEmpresaSearchFilter(e.target.value)}
-                            className="pl-10 mb-1"
+                            className="pl-10 h-9 mb-1"
                           />
                         </div>
                         <select
@@ -1182,7 +1182,7 @@ const Pacientes = () => {
                           required={formData.tipo_servicio === "jenner"}
                           value={formData.empresa_id}
                           onChange={(e) => handleEmpresaChange(e.target.value)}
-                          className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                          className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
                         >
                           <option value="">Seleccione una empresa</option>
                           {empresas
@@ -1205,11 +1205,11 @@ const Pacientes = () => {
                             Faena / Centro de Trabajo
                           </Label>
                           {loadingFaenas ? (
-                            <div className="h-10 flex items-center text-sm text-muted-foreground">
+                            <div className="h-9 flex items-center text-sm text-muted-foreground">
                               Cargando faenas...
                             </div>
                           ) : faenasEmpresa.length === 0 ? (
-                            <div className="h-10 flex items-center text-sm text-amber-600">
+                            <div className="h-9 flex items-center text-sm text-amber-600">
                               Esta empresa no tiene faenas asignadas
                             </div>
                           ) : (
@@ -1217,7 +1217,7 @@ const Pacientes = () => {
                               id="faena"
                               value={formData.faena_id}
                               onChange={(e) => handleFaenaChange(e.target.value)}
-                              className="w-full h-10 px-3 rounded-md border border-input bg-background mt-1"
+                              className="w-full h-9 px-3 rounded-md border border-input bg-background mt-1 text-sm"
                             >
                               <option value="">Seleccione una faena</option>
                               {faenasEmpresa.map((faena) => (
@@ -1229,44 +1229,111 @@ const Pacientes = () => {
                           )}
                         </div>
                       )}
+                    </div>
 
-                      <div>
-                        <Label className="text-sm font-medium">
-                          Baterías de Exámenes
-                          {selectedPaquetes.length > 0 && (
-                            <span className="text-xs text-muted-foreground ml-2">
-                              ({selectedPaquetes.length} seleccionadas)
-                            </span>
-                          )}
-                        </Label>
-                        
-                        {/* Filtros para baterías */}
-                        <div className="flex gap-2 mt-1 mb-2">
-                          <div className="flex-1 relative">
-                            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                              placeholder="Buscar batería..."
-                              value={bateriaFilter}
-                              onChange={(e) => setBateriaFilter(e.target.value)}
-                              className="pl-8 h-9"
-                            />
+                    {/* Columna 3 - Exámenes seleccionados (confirmación) */}
+                    <div className="flex flex-col overflow-hidden">
+                      <h3 className="font-semibold text-sm text-muted-foreground border-b pb-2 mb-2 flex-shrink-0">
+                        Exámenes a Realizar
+                        {selectedExamenes.length > 0 && (
+                          <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                            {selectedExamenes.length}
+                          </span>
+                        )}
+                      </h3>
+                      <div className="flex-1 border rounded-md bg-muted/30 overflow-y-auto">
+                        {selectedExamenes.length === 0 ? (
+                          <div className="flex items-center justify-center h-full text-sm text-muted-foreground p-4 text-center">
+                            Seleccione baterías o exámenes individuales desde la columna derecha
                           </div>
-                          <select
-                            value={filtroFaenaIdBateria}
-                            onChange={(e) => setFiltroFaenaIdBateria(e.target.value)}
-                            className="h-9 px-2 rounded-md border border-input bg-background text-sm min-w-[140px]"
-                          >
-                            <option value="__all__">Todas las faenas</option>
-                            {allFaenas.map((f) => (
-                              <option key={f.id} value={f.id}>
-                                {f.nombre}
-                              </option>
-                            ))}
-                            <option value="__none__">Sin faena</option>
-                          </select>
+                        ) : (
+                          <div className="p-2 space-y-1">
+                            {selectedExamenes.map((examenId) => {
+                              const examen = examenes.find(e => e.id === examenId);
+                              if (!examen) return null;
+                              return (
+                                <div
+                                  key={examenId}
+                                  className="flex items-center justify-between py-1.5 px-2 bg-background rounded border text-sm"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <span className="truncate block">{examen.nombre}</span>
+                                    {examen.codigo && (
+                                      <span className="text-xs text-muted-foreground">{examen.codigo}</span>
+                                    )}
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 shrink-0"
+                                    onClick={() => setSelectedExamenes(prev => prev.filter(id => id !== examenId))}
+                                  >
+                                    <Trash2 className="h-3 w-3 text-destructive" />
+                                  </Button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                      {selectedPaquetes.length > 0 && (
+                        <div className="mt-2 flex-shrink-0">
+                          <div className="text-xs text-muted-foreground mb-1">Baterías seleccionadas:</div>
+                          <div className="flex flex-wrap gap-1">
+                            {selectedPaquetes.map((paqueteId) => {
+                              const paquete = paquetes.find(p => p.id === paqueteId);
+                              return paquete ? (
+                                <Badge key={paqueteId} variant="secondary" className="text-xs">
+                                  {paquete.nombre}
+                                </Badge>
+                              ) : null;
+                            })}
+                          </div>
                         </div>
+                      )}
+                    </div>
 
-                        <div className="border rounded-md p-3 max-h-64 overflow-y-auto bg-muted/30">
+                    {/* Columna 4 - Buscador de baterías y exámenes */}
+                    <div className="flex flex-col overflow-hidden">
+                      <h3 className="font-semibold text-sm text-muted-foreground border-b pb-2 mb-2 flex-shrink-0">
+                        Agregar Exámenes
+                      </h3>
+                      
+                      {/* Filtro de faena arriba */}
+                      <div className="flex-shrink-0 mb-2">
+                        <Label className="text-xs text-muted-foreground mb-1 block">Filtrar por faena:</Label>
+                        <select
+                          value={filtroFaenaIdBateria}
+                          onChange={(e) => setFiltroFaenaIdBateria(e.target.value)}
+                          className="w-full h-8 px-2 rounded-md border border-input bg-background text-sm"
+                        >
+                          <option value="__all__">📍 Todas las faenas</option>
+                          {allFaenas.map((f) => (
+                            <option key={f.id} value={f.id}>
+                              📍 {f.nombre}
+                            </option>
+                          ))}
+                          <option value="__none__">Sin faena</option>
+                        </select>
+                      </div>
+
+                      {/* Buscador */}
+                      <div className="flex-shrink-0 relative mb-2">
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Buscar batería o examen..."
+                          value={bateriaFilter}
+                          onChange={(e) => setBateriaFilter(e.target.value)}
+                          className="pl-8 h-8 text-sm"
+                        />
+                      </div>
+
+                      {/* Lista de baterías y exámenes */}
+                      <div className="flex-1 border rounded-md bg-muted/30 overflow-y-auto">
+                        {/* Baterías */}
+                        <div className="p-2">
+                          <div className="text-xs font-semibold text-muted-foreground mb-2">BATERÍAS</div>
                           {(() => {
                             // Agrupar paquetes por faena
                             const grupos: { faenaId: string; faenaNombre: string; paquetes: typeof paquetes }[] = [];
@@ -1309,20 +1376,20 @@ const Pacientes = () => {
 
                             if (gruposFiltrados.length === 0) {
                               return (
-                                <div className="text-sm text-muted-foreground text-center py-4">
+                                <div className="text-xs text-muted-foreground text-center py-2">
                                   No se encontraron baterías
                                 </div>
                               );
                             }
 
                             return gruposFiltrados.map((grupo) => (
-                              <div key={grupo.faenaId} className="mb-3 last:mb-0">
-                                <div className="text-xs font-semibold text-muted-foreground bg-muted/60 py-1 px-2 rounded mb-1 sticky top-0">
-                                  📍 {grupo.faenaNombre}
+                              <div key={grupo.faenaId} className="mb-2 last:mb-0">
+                                <div className="text-xs font-medium text-muted-foreground bg-muted py-1 px-2 rounded mb-1">
+                                  {grupo.faenaNombre}
                                 </div>
-                                <div className="space-y-1 pl-2">
+                                <div className="space-y-0.5 pl-1">
                                   {grupo.paquetes.map((paquete) => (
-                                    <label key={paquete.id} className="flex items-start gap-2 cursor-pointer py-0.5">
+                                    <label key={paquete.id} className="flex items-center gap-2 cursor-pointer py-1 px-1 hover:bg-accent rounded text-sm">
                                       <input
                                         type="checkbox"
                                         checked={selectedPaquetes.includes(paquete.id)}
@@ -1330,20 +1397,19 @@ const Pacientes = () => {
                                           if (e.target.checked) {
                                             setSelectedPaquetes([...selectedPaquetes, paquete.id]);
                                             const examenesIds = paquete.paquete_examen_items.map(item => item.examen_id);
-                                            const nuevosExamenes = examenesIds.filter(id => !selectedExamenes.includes(id));
-                                            setSelectedExamenes([...selectedExamenes, ...nuevosExamenes]);
+                                            setSelectedExamenes(prev => [...new Set([...prev, ...examenesIds])]);
                                           } else {
                                             setSelectedPaquetes(selectedPaquetes.filter(id => id !== paquete.id));
+                                            const examenesIds = paquete.paquete_examen_items.map(item => item.examen_id);
+                                            setSelectedExamenes(prev => prev.filter(id => !examenesIds.includes(id)));
                                           }
                                         }}
-                                        className="w-4 h-4 mt-0.5"
+                                        className="w-3.5 h-3.5"
                                       />
-                                      <div className="flex-1">
-                                        <span className="text-sm font-medium">{paquete.nombre}</span>
-                                        {paquete.descripcion && (
-                                          <p className="text-xs text-muted-foreground">{paquete.descripcion}</p>
-                                        )}
-                                      </div>
+                                      <span className="truncate">{paquete.nombre}</span>
+                                      <span className="text-xs text-muted-foreground ml-auto shrink-0">
+                                        ({paquete.paquete_examen_items.length})
+                                      </span>
                                     </label>
                                   ))}
                                 </div>
@@ -1351,107 +1417,64 @@ const Pacientes = () => {
                             ));
                           })()}
                         </div>
-                      </div>
-                    </div>
 
-                    {/* Columna derecha - Exámenes */}
-                    <div className="space-y-4">
-                      <h3 className="font-semibold text-sm text-muted-foreground border-b pb-2">Exámenes a Realizar</h3>
-                      
-                      {/* Cuadro de exámenes agregados */}
-                      {selectedExamenes.length > 0 && (
-                        <div className="border-2 border-primary/30 rounded-md p-3 bg-primary/5">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-semibold text-primary">
-                              Exámenes Agregados ({selectedExamenes.length})
-                            </span>
-                          </div>
-                          <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
-                            {selectedExamenes.map((examenId) => {
-                              const examen = examenes.find(e => e.id === examenId);
-                              if (!examen) return null;
-                              return (
-                                <Badge 
-                                  key={examenId} 
-                                  variant="secondary"
-                                  className="flex items-center gap-1 cursor-pointer hover:bg-destructive hover:text-destructive-foreground transition-colors"
-                                  onClick={() => {
-                                    setSelectedExamenes(selectedExamenes.filter(id => id !== examenId));
-                                    const paquetesConExamen = paquetes.filter(p => 
-                                      p.paquete_examen_items.some(item => item.examen_id === examenId)
-                                    );
-                                    const paquetesARemover = paquetesConExamen.filter(p => selectedPaquetes.includes(p.id));
-                                    if (paquetesARemover.length > 0) {
-                                      setSelectedPaquetes(selectedPaquetes.filter(id => 
-                                        !paquetesARemover.map(p => p.id).includes(id)
-                                      ));
-                                    }
-                                  }}
-                                >
-                                  {examen.codigo && <span className="font-mono text-xs">[{examen.codigo}]</span>}
-                                  <span className="text-xs">{examen.nombre}</span>
-                                  <Trash2 className="h-3 w-3 ml-1" />
-                                </Badge>
-                              );
-                            })}
+                        {/* Separador */}
+                        <div className="border-t mx-2 my-2" />
+
+                        {/* Exámenes individuales */}
+                        <div className="p-2">
+                          <div className="text-xs font-semibold text-muted-foreground mb-2">EXÁMENES INDIVIDUALES</div>
+                          <div className="space-y-0.5">
+                            {examenes
+                              .filter(examen => 
+                                !bateriaFilter || 
+                                examen.nombre.toLowerCase().includes(bateriaFilter.toLowerCase()) ||
+                                (examen.codigo && examen.codigo.toLowerCase().includes(bateriaFilter.toLowerCase()))
+                              )
+                              .slice(0, 50)
+                              .map((examen) => (
+                                <label key={examen.id} className="flex items-center gap-2 cursor-pointer py-1 px-1 hover:bg-accent rounded text-sm">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedExamenes.includes(examen.id)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setSelectedExamenes([...selectedExamenes, examen.id]);
+                                      } else {
+                                        setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
+                                      }
+                                    }}
+                                    className="w-3.5 h-3.5"
+                                  />
+                                  <span className="truncate flex-1">{examen.nombre}</span>
+                                  {examen.codigo && (
+                                    <span className="text-xs text-muted-foreground shrink-0">{examen.codigo}</span>
+                                  )}
+                                </label>
+                              ))}
+                            {examenes.filter(examen => 
+                              !bateriaFilter || 
+                              examen.nombre.toLowerCase().includes(bateriaFilter.toLowerCase()) ||
+                              (examen.codigo && examen.codigo.toLowerCase().includes(bateriaFilter.toLowerCase()))
+                            ).length > 50 && (
+                              <div className="text-xs text-muted-foreground text-center py-1">
+                                Use el buscador para filtrar más resultados...
+                              </div>
+                            )}
                           </div>
                         </div>
-                      )}
-
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="Buscar por código o nombre..."
-                          value={examenFilter}
-                          onChange={(e) => setExamenFilter(e.target.value)}
-                          className="pl-9"
-                        />
-                      </div>
-                      <div className="border rounded-md p-3 max-h-[250px] overflow-y-auto space-y-2 bg-muted/30">
-                        {examenes
-                          .filter((examen) => {
-                            if (!examenFilter.trim()) return true;
-                            const searchLower = examenFilter.toLowerCase().trim();
-                            const codigoMatch = examen.codigo?.toLowerCase().includes(searchLower) || false;
-                            const nombreMatch = examen.nombre.toLowerCase().includes(searchLower);
-                            return codigoMatch || nombreMatch;
-                          })
-                          .map((examen) => (
-                          <label key={examen.id} className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={selectedExamenes.includes(examen.id)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedExamenes([...selectedExamenes, examen.id]);
-                                } else {
-                                  setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
-                                  const paquetesConExamen = paquetes.filter(p => 
-                                    p.paquete_examen_items.some(item => item.examen_id === examen.id)
-                                  );
-                                  const paquetesARemover = paquetesConExamen.filter(p => selectedPaquetes.includes(p.id));
-                                  if (paquetesARemover.length > 0) {
-                                    setSelectedPaquetes(selectedPaquetes.filter(id => 
-                                      !paquetesARemover.map(p => p.id).includes(id)
-                                    ));
-                                  }
-                                }
-                              }}
-                              className="w-4 h-4"
-                            />
-                            <span className="text-sm">
-                              {examen.codigo && <span className="font-mono text-xs text-muted-foreground mr-1">[{examen.codigo}]</span>}
-                              {examen.nombre}
-                            </span>
-                          </label>
-                        ))}
                       </div>
                     </div>
                   </div>
 
-                  <Button type="submit" className="w-full h-11" disabled={isSubmitting}>
-                    {isSubmitting ? "Guardando..." : (editingPatient ? "Actualizar Paciente" : "Guardar Paciente")}
-                  </Button>
+                  <div className="flex justify-end gap-3 pt-4 border-t flex-shrink-0 mt-4">
+                    <Button type="button" variant="outline" onClick={() => setOpenDialog(false)}>
+                      Cancelar
+                    </Button>
+                    <Button type="submit" disabled={isSubmitting}>
+                      {isSubmitting ? "Guardando..." : (editingPatient ? "Guardar Cambios" : "Agregar Paciente")}
+                    </Button>
+                  </div>
                 </form>
               </DialogContent>
             </Dialog>
