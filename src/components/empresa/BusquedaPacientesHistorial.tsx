@@ -116,8 +116,8 @@ const BusquedaPacientesHistorial = ({
         query = query.lte("fecha_ingreso", `${fechaHasta}T23:59:59`);
       }
 
-      // Ejecutar query
-      const { data, error } = await query.limit(200);
+      // Ejecutar query - aumentar límite para búsquedas por empresa sin otros filtros
+      const { data, error } = await query.limit(500);
 
       if (error) {
         console.error("Error buscando historial:", error);
