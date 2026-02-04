@@ -60,7 +60,7 @@ const EmpresaPacientes = () => {
           id, fecha, nombre, rut, cargo, estado,
           faena:faenas(nombre),
           baterias:prereserva_baterias(paquete:paquetes_examenes(nombre)),
-          atencion:atenciones(estado, fecha_fin_atencion)
+          atencion:atenciones!prereservas_atencion_id_fkey(estado, fecha_fin_atencion)
         `)
         .eq("empresa_id", currentEmpresaId)
         .in("estado", ["confirmado", "atendido"])
