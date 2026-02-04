@@ -56,6 +56,8 @@ const BusquedaPacientesHistorial = ({
   const [resultados, setResultados] = useState<VisitaHistorial[]>([]);
   const [loading, setLoading] = useState(false);
   const [buscado, setBuscado] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
   // Cargar empresas si es staff admin o si no hay empresaId fijo
   useEffect(() => {
@@ -76,70 +78,88 @@ const BusquedaPacientesHistorial = ({
   const buscarHistorial = async () => {
     setLoading(true);
     setBuscado(true);
+    setErrorMsg(null);
+    setDebugInfo(null);
 
     try {
       // Determinar empresa a filtrar
       const empresaIdToFilter = empresaId || (empresaFiltro !== "__all__" ? empresaFiltro : null);
 
-      // Si hay filtro de empresa, primero obtener los IDs de pacientes de esa empresa
-      let pacienteIds: string[] | null = null;
+      const selectQuery = `
+        id,
+        fecha_ingreso,
+        estado,
+        pacientes!inner (
+          id,
+          nombre,
+          rut,
+          empresa_id,
+          empresas ( nombre ),
+          faena_id,
+          faenas ( nombre )
+        ),
+        prereservas (
+          prereserva_baterias (
+            paquetes_examenes ( nombre )
+          )
+        )
+      `;
+
+      // Intento 1: filtro por empresa vía join (más eficiente)
+      let query = supabase
+        .from("atenciones")
+        .select(selectQuery)
+        .order("fecha_ingreso", { ascending: false });
+
       if (empresaIdToFilter) {
-        const { data: pacientesData } = await supabase
+        query = query.eq("pacientes.empresa_id", empresaIdToFilter);
+      }
+      if (fechaDesde) query = query.gte("fecha_ingreso", fechaDesde);
+      if (fechaHasta) query = query.lte("fecha_ingreso", `${fechaHasta}T23:59:59`);
+
+      let { data, error } = await query.limit(500);
+
+      // Fallback: si por alguna razón el join no devuelve nada, filtrar por paciente_id
+      if (!error && empresaIdToFilter && (!data || data.length === 0)) {
+        const { data: pacientesData, error: pacientesError } = await supabase
           .from("pacientes")
           .select("id")
           .eq("empresa_id", empresaIdToFilter);
-        pacienteIds = pacientesData?.map(p => p.id) || [];
-        
-        // Si no hay pacientes de esa empresa, retornar vacío
-        if (pacienteIds.length === 0) {
+
+        if (pacientesError) {
+          console.error("Error cargando pacientes de empresa:", pacientesError);
+          setErrorMsg("No se pudieron cargar los pacientes de la empresa seleccionada.");
           setResultados([]);
-          setLoading(false);
           return;
         }
-      }
 
-      // Construir query base
-      let query = supabase
-        .from("atenciones")
-        .select(`
-          id,
-          fecha_ingreso,
-          estado,
-          pacientes (
-            id,
-            nombre,
-            rut,
-            empresa_id,
-            empresas ( nombre ),
-            faena_id,
-            faenas ( nombre )
-          ),
-          prereservas (
-            prereserva_baterias (
-              paquetes_examenes ( nombre )
-            )
-          )
-        `)
-        .order("fecha_ingreso", { ascending: false });
+        const pacienteIds = pacientesData?.map((p: any) => p.id) || [];
+        if (pacienteIds.length === 0) {
+          setResultados([]);
+          setDebugInfo(`empresa=${empresaIdToFilter} · pacientes=0 · atenciones=0`);
+          return;
+        }
 
-      // Filtro por pacientes de la empresa
-      if (pacienteIds && pacienteIds.length > 0) {
-        query = query.in("paciente_id", pacienteIds);
-      }
+        let query2 = supabase
+          .from("atenciones")
+          .select(selectQuery)
+          .order("fecha_ingreso", { ascending: false })
+          .in("paciente_id", pacienteIds);
 
-      // Filtro por rango de fechas
-      if (fechaDesde) {
-        query = query.gte("fecha_ingreso", fechaDesde);
-      }
-      if (fechaHasta) {
-        query = query.lte("fecha_ingreso", `${fechaHasta}T23:59:59`);
-      }
+        if (fechaDesde) query2 = query2.gte("fecha_ingreso", fechaDesde);
+        if (fechaHasta) query2 = query2.lte("fecha_ingreso", `${fechaHasta}T23:59:59`);
 
-      // Ejecutar query
-      const { data, error } = await query.limit(500);
+        const res2 = await query2.limit(500);
+        data = res2.data;
+        error = res2.error;
+        setDebugInfo(`fallback · empresa=${empresaIdToFilter} · pacientes=${pacienteIds.length} · atenciones=${data?.length ?? 0}`);
+      } else {
+        setDebugInfo(`join · empresa=${empresaIdToFilter ?? "__all__"} · atenciones=${data?.length ?? 0}`);
+      }
 
       if (error) {
         console.error("Error buscando historial:", error);
+        setErrorMsg("No se pudo ejecutar la búsqueda. Intenta nuevamente.");
         setResultados([]);
         return;
       }
@@ -171,6 +191,7 @@ const BusquedaPacientesHistorial = ({
       setResultados(visitas);
     } catch (err) {
       console.error("Error en búsqueda:", err);
+      setErrorMsg("Ocurrió un error inesperado al buscar.");
       setResultados([]);
     } finally {
       setLoading(false);
@@ -268,6 +289,18 @@ const BusquedaPacientesHistorial = ({
             {loading ? "Buscando..." : "Buscar"}
           </Button>
         </div>
+
+        {errorMsg && (
+          <div className="text-sm text-destructive">
+            {errorMsg}
+          </div>
+        )}
+
+        {debugInfo && (
+          <div className="text-xs text-muted-foreground">
+            {debugInfo}
+          </div>
+        )}
 
         {/* Resultados */}
         {buscado && (
