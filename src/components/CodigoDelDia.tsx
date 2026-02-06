@@ -227,22 +227,6 @@ const CodigoDelDia = ({ className }: CodigoDelDiaProps) => {
     }
   };
 
-  // Verificar si debe regenerarse automáticamente
-  const verificarAutoRegen = useCallback(async () => {
-    const today = getChileDateString();
-    
-    // Verificar si ya existe código para hoy
-    const { data } = await supabase
-      .from("codigos_diarios")
-      .select("codigo, created_at")
-      .eq("fecha", today)
-      .maybeSingle();
-
-    if (!data) {
-      // No hay código para hoy, generar uno
-      await generarNuevoCodigo();
-    }
-  }, []);
 
   // Efecto para cargar datos iniciales
   useEffect(() => {
@@ -261,18 +245,27 @@ const CodigoDelDia = ({ className }: CodigoDelDiaProps) => {
 
   // Efecto para verificar auto-regeneración cada minuto
   useEffect(() => {
-    const checkRegen = setInterval(() => {
+    let lastRegenDate = "";
+    
+    const checkRegen = setInterval(async () => {
       const chileTime = getChileTime();
       const [resetHora, resetMinuto] = horaReset.split(':').map(Number);
+      const todayStr = getChileDateString();
       
-      // Si es exactamente la hora de reset (con margen de 1 minuto)
-      if (chileTime.getHours() === resetHora && chileTime.getMinutes() === resetMinuto) {
-        verificarAutoRegen();
+      // Si es la hora de reset y no hemos regenerado hoy a esta hora
+      if (
+        chileTime.getHours() === resetHora && 
+        chileTime.getMinutes() === resetMinuto &&
+        lastRegenDate !== todayStr
+      ) {
+        console.log("Auto-regenerando código del día a las", horaReset);
+        lastRegenDate = todayStr;
+        await generarNuevoCodigo();
       }
-    }, 60000);
+    }, 30000); // Verificar cada 30 segundos para no perder el minuto exacto
 
     return () => clearInterval(checkRegen);
-  }, [horaReset, verificarAutoRegen]);
+  }, [horaReset]);
 
   return (
     <Card className={`border-primary/30 bg-primary/5 ${className}`}>
