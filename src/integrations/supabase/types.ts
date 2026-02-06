@@ -492,6 +492,7 @@ export type Database = {
           created_by: string | null
           fecha: string
           id: string
+          indice_secuencia: number | null
         }
         Insert: {
           codigo: string
@@ -499,6 +500,7 @@ export type Database = {
           created_by?: string | null
           fecha?: string
           id?: string
+          indice_secuencia?: number | null
         }
         Update: {
           codigo?: string
@@ -506,6 +508,7 @@ export type Database = {
           created_by?: string | null
           fecha?: string
           id?: string
+          indice_secuencia?: number | null
         }
         Relationships: []
       }
