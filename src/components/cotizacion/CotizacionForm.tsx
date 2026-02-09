@@ -635,11 +635,7 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
       errores.push("Al menos un ítem en la cotización");
     }
     
-    // Validar que cada ítem tenga margen seleccionado
-    const itemsSinMargen = items.filter(item => !item.margen_id && item.valor_margen === 0 && item.margen_nombre !== "Personalizado");
-    if (itemsSinMargen.length > 0) {
-      errores.push(`Margen de utilidad para ${itemsSinMargen.length} ítem(s)`);
-    }
+    // Margen ya no es obligatorio - se puede editar manualmente
 
     if (errores.length > 0) {
       toast.error(
