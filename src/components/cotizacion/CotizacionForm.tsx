@@ -557,6 +557,27 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
     );
   };
 
+  const handleUpdateMargenValor = (itemId: string, nuevoValorMargen: number) => {
+    setItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== itemId) return item;
+
+        const valorConIva = item.valor_con_iva;
+        const porcentajeCalculado = valorConIva > 0 ? (nuevoValorMargen / valorConIva) * 100 : 0;
+        const valorFinal = valorConIva + nuevoValorMargen;
+
+        return {
+          ...item,
+          valor_margen: nuevoValorMargen,
+          margen_porcentaje: Math.round(porcentajeCalculado * 100) / 100,
+          valor_final: valorFinal,
+          margen_id: null,
+          margen_nombre: "Personalizado",
+        };
+      })
+    );
+  };
+
   const handleRemoveItem = (itemId: string) => {
     setItems((prev) =>
       prev
@@ -615,7 +636,7 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
     }
     
     // Validar que cada ítem tenga margen seleccionado
-    const itemsSinMargen = items.filter(item => !item.margen_id);
+    const itemsSinMargen = items.filter(item => !item.margen_id && item.valor_margen === 0 && item.margen_nombre !== "Personalizado");
     if (itemsSinMargen.length > 0) {
       errores.push(`Margen de utilidad para ${itemsSinMargen.length} ítem(s)`);
     }
@@ -1174,9 +1195,17 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
                       )}
                       <div>
                         <span className="text-muted-foreground">
-                          {item.margen_nombre ? `${item.margen_nombre} (${item.margen_porcentaje}%):` : "Margen:"}
+                          Margen ({item.margen_porcentaje}%):
                         </span>
-                        <div className="font-mono">{formatCurrency(item.valor_margen)}</div>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={item.valor_margen}
+                          onChange={(e) =>
+                            handleUpdateMargenValor(item.id, parseFloat(e.target.value) || 0)
+                          }
+                          className="h-7 w-28 font-mono text-sm mt-0.5"
+                        />
                       </div>
                       <div>
                         <span className="text-muted-foreground">Total Ítem:</span>
