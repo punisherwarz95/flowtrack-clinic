@@ -150,7 +150,7 @@ const Dashboard = () => {
       const startOfDay = new Date(dateToUse.getFullYear(), dateToUse.getMonth(), dateToUse.getDate(), 0, 0, 0, 0).toISOString();
       const endOfDay = new Date(dateToUse.getFullYear(), dateToUse.getMonth(), dateToUse.getDate(), 23, 59, 59, 999).toISOString();
 
-      const [atencionesRes, completadosRes, examenesRes, examenesRealizadosRes] = await Promise.all([
+      const [atencionesRes, completadosRes, examenesRes, examenesRealizadosRes, boxExamenesRes] = await Promise.all([
         supabase
           .from("atenciones")
           .select("estado, pacientes(tipo_servicio)")
@@ -166,9 +166,12 @@ const Dashboard = () => {
         supabase.from("examenes").select("id", { count: "exact", head: true }),
         supabase
           .from("atencion_examenes")
-          .select("id, examen_id, estado, examenes(nombre), atencion_id, atenciones!inner(fecha_ingreso, boxes(nombre))")
+          .select("id, examen_id, estado, examenes(nombre), atencion_id, atenciones!inner(fecha_ingreso)")
           .gte("atenciones.fecha_ingreso", startOfDay)
           .lte("atenciones.fecha_ingreso", endOfDay),
+        supabase
+          .from("box_examenes")
+          .select("examen_id, boxes(nombre)"),
       ]);
 
       const enEsperaData = atencionesRes.data?.filter((a: any) => a.estado === "en_espera") || [];
@@ -181,12 +184,19 @@ const Dashboard = () => {
       const completadosWM = completadosRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "workmed").length || 0;
       const completadosJ = completadosRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "jenner").length || 0;
 
+      // Crear mapa examen_id -> box nombre (desde box_examenes)
+      const examenBoxMap = new Map<string, string>();
+      boxExamenesRes.data?.forEach((be: any) => {
+        const boxNombre = be.boxes?.nombre || "Sin Box";
+        examenBoxMap.set(be.examen_id, boxNombre);
+      });
+
       // Conteo de exámenes diarios (global y por box)
       const conteoExamenes: Record<string, { asignados: number; completados: number }> = {};
       const conteoPorBox: Record<string, Record<string, { asignados: number; completados: number }>> = {};
       examenesRealizadosRes.data?.forEach((ae: any) => {
         const nombreExamen = ae.examenes?.nombre || "Sin nombre";
-        const boxNombre = ae.atenciones?.boxes?.nombre || "Sin Box";
+        const boxNombre = examenBoxMap.get(ae.examen_id) || "Sin Box";
         
         // Global
         if (!conteoExamenes[nombreExamen]) {
@@ -197,7 +207,7 @@ const Dashboard = () => {
           conteoExamenes[nombreExamen].completados += 1;
         }
         
-        // Por box
+        // Por box (según configuración box_examenes)
         if (!conteoPorBox[boxNombre]) {
           conteoPorBox[boxNombre] = {};
         }
