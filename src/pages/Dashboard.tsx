@@ -72,11 +72,11 @@ const Dashboard = () => {
   const [filterEstadoListo, setFilterEstadoListo] = useState<boolean>(true);
   
   const [atencionesIngresadas, setAtencionesIngresadas] = useState<AtencionIngresada[]>([]);
-  const [examenes, setExamenes] = useState<Examen[]>([]);
   
   
   // Stats diarias
   const [examenesConteoDiario, setExamenesConteoDiario] = useState<Record<string, { asignados: number; completados: number }>>({});
+  const [examenesConteoDiarioPorBox, setExamenesConteoDiarioPorBox] = useState<Record<string, Record<string, { asignados: number; completados: number }>>>({});
   const [statsDaily, setStatsDaily] = useState({
     enEspera: 0,
     enAtencion: 0,
@@ -94,10 +94,6 @@ const Dashboard = () => {
     pacientesMensuales: { total: 0, workmed: 0, jenner: 0 },
     examenesRealizadosMes: 0,
   });
-
-  useEffect(() => {
-    loadExamenes();
-  }, []);
 
   useEffect(() => {
     loadDailyStats();
@@ -122,11 +118,7 @@ const Dashboard = () => {
     return () => clearInterval(interval);
   }, [selectedDateDaily, selectedMonth, selectedDateTable]);
 
-  const loadExamenes = async () => {
-    const { data } = await supabase.from("examenes").select("id, nombre").order("nombre");
-    setExamenes(data || []);
-  };
-
+  // Extraer empresas únicas de las atenciones cargadas
   // Extraer empresas únicas de las atenciones cargadas
   const empresasDelDia = (() => {
     const empresasMap = new Map<string, Empresa>();
@@ -137,6 +129,19 @@ const Dashboard = () => {
       }
     });
     return Array.from(empresasMap.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  })();
+
+  // Extraer exámenes únicos de las atenciones cargadas (solo los del día)
+  const examenesDelDia = (() => {
+    const examenesMap = new Map<string, Examen>();
+    atencionesIngresadas.forEach(a => {
+      a.atencion_examenes.forEach(ae => {
+        if (ae.examenes?.id && ae.examenes?.nombre) {
+          examenesMap.set(ae.examenes.id, { id: ae.examenes.id, nombre: ae.examenes.nombre });
+        }
+      });
+    });
+    return Array.from(examenesMap.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
   })();
 
   const loadDailyStats = async () => {
@@ -161,7 +166,7 @@ const Dashboard = () => {
         supabase.from("examenes").select("id", { count: "exact", head: true }),
         supabase
           .from("atencion_examenes")
-          .select("id, examen_id, estado, examenes(nombre), atencion_id, atenciones!inner(fecha_ingreso)")
+          .select("id, examen_id, estado, examenes(nombre), atencion_id, atenciones!inner(fecha_ingreso, boxes(nombre))")
           .gte("atenciones.fecha_ingreso", startOfDay)
           .lte("atenciones.fecha_ingreso", endOfDay),
       ]);
@@ -176,10 +181,14 @@ const Dashboard = () => {
       const completadosWM = completadosRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "workmed").length || 0;
       const completadosJ = completadosRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "jenner").length || 0;
 
-      // Conteo de exámenes diarios
+      // Conteo de exámenes diarios (global y por box)
       const conteoExamenes: Record<string, { asignados: number; completados: number }> = {};
+      const conteoPorBox: Record<string, Record<string, { asignados: number; completados: number }>> = {};
       examenesRealizadosRes.data?.forEach((ae: any) => {
         const nombreExamen = ae.examenes?.nombre || "Sin nombre";
+        const boxNombre = ae.atenciones?.boxes?.nombre || "Sin Box";
+        
+        // Global
         if (!conteoExamenes[nombreExamen]) {
           conteoExamenes[nombreExamen] = { asignados: 0, completados: 0 };
         }
@@ -187,8 +196,21 @@ const Dashboard = () => {
         if (ae.estado === "completado") {
           conteoExamenes[nombreExamen].completados += 1;
         }
+        
+        // Por box
+        if (!conteoPorBox[boxNombre]) {
+          conteoPorBox[boxNombre] = {};
+        }
+        if (!conteoPorBox[boxNombre][nombreExamen]) {
+          conteoPorBox[boxNombre][nombreExamen] = { asignados: 0, completados: 0 };
+        }
+        conteoPorBox[boxNombre][nombreExamen].asignados += 1;
+        if (ae.estado === "completado") {
+          conteoPorBox[boxNombre][nombreExamen].completados += 1;
+        }
       });
       setExamenesConteoDiario(conteoExamenes);
+      setExamenesConteoDiarioPorBox(conteoPorBox);
 
       setStatsDaily({
         enEspera: enEsperaData.length,
@@ -533,12 +555,12 @@ const Dashboard = () => {
             </Card>
           </div>
 
-          {/* Exámenes del Día */}
+          {/* Exámenes del Día - por Box */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ClipboardCheck className="h-5 w-5 text-primary" />
-                Exámenes del Día
+                Exámenes del Día por Box
               </CardTitle>
               <p className="text-sm text-muted-foreground">
                 {format(selectedDateDaily || new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })}
@@ -546,7 +568,48 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-4xl font-bold text-foreground mb-4">{statsDaily.examenesRealizadosHoy}</div>
-              {renderExamenesGrid(examenesConteoDiario, statsDaily.examenesRealizadosHoy)}
+              {Object.keys(examenesConteoDiarioPorBox).length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sin exámenes asignados</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {Object.entries(examenesConteoDiarioPorBox)
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([boxNombre, examenes]) => {
+                      const sortedExamenes = Object.entries(examenes).sort((a, b) => b[1].asignados - a[1].asignados);
+                      const totalBox = sortedExamenes.reduce((sum, [, c]) => sum + c.asignados, 0);
+                      const completadosBox = sortedExamenes.reduce((sum, [, c]) => sum + c.completados, 0);
+                      return (
+                        <Card key={boxNombre} className="border">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-semibold flex items-center justify-between">
+                              <span>{boxNombre}</span>
+                              <Badge variant="secondary">{completadosBox}/{totalBox}</Badge>
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            <table className="w-full">
+                              <tbody>
+                                {sortedExamenes.map(([nombre, c]) => (
+                                  <tr key={nombre}>
+                                    <td className="text-xs text-muted-foreground py-0.5 pr-2">{nombre}</td>
+                                    <td className="py-0.5 text-right">
+                                      <Badge 
+                                        variant="outline"
+                                        className={`text-xs ${c.completados === c.asignados ? "bg-green-100 text-green-800 border-green-300" : ""}`}
+                                      >
+                                        {c.completados}/{c.asignados}
+                                      </Badge>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </section>
@@ -742,7 +805,7 @@ const Dashboard = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos los exámenes</SelectItem>
-                      {examenes.map((examen) => (
+                      {examenesDelDia.map((examen) => (
                         <SelectItem key={examen.id} value={examen.id}>{examen.nombre}</SelectItem>
                       ))}
                     </SelectContent>
