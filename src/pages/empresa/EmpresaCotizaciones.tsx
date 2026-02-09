@@ -66,6 +66,16 @@ interface Solicitud {
   }[];
 }
 
+interface CotizacionDirecta {
+  id: string;
+  numero_cotizacion: number;
+  fecha_cotizacion: string;
+  estado: string | null;
+  total_con_iva: number | null;
+  observaciones: string | null;
+  items: CotizacionItem[];
+}
+
 interface Faena {
   id: string;
   nombre: string;
@@ -81,6 +91,7 @@ const EmpresaCotizaciones = () => {
   const { toast } = useToast();
 
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
+  const [cotizacionesDirectas, setCotizacionesDirectas] = useState<CotizacionDirecta[]>([]);
   const [faenas, setFaenas] = useState<Faena[]>([]);
   const [baterias, setBaterias] = useState<Bateria[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,6 +139,19 @@ const EmpresaCotizaciones = () => {
         .order("created_at", { ascending: false });
 
       setSolicitudes((solicitudesData as unknown as Solicitud[]) || []);
+
+      // Cargar cotizaciones directas (creadas por staff sin solicitud)
+      const { data: directasData } = await supabase
+        .from("cotizaciones")
+        .select(`
+          id, numero_cotizacion, fecha_cotizacion, estado, total_con_iva, observaciones,
+          items:cotizacion_items(nombre_prestacion, valor_final, paquete_id)
+        `)
+        .eq("empresa_id", currentEmpresaId)
+        .is("solicitud_id", null)
+        .order("created_at", { ascending: false });
+
+      setCotizacionesDirectas((directasData as unknown as CotizacionDirecta[]) || []);
 
       // Cargar faenas
       const { data: faenasData } = await supabase
@@ -332,6 +356,53 @@ const EmpresaCotizaciones = () => {
     }
   };
 
+  const handleAceptarDirecta = async (cotizacionId: string) => {
+    if (!confirm("¿Está seguro de aceptar esta cotización? Los precios se actualizarán automáticamente.")) return;
+    try {
+      const { data: items } = await supabase
+        .from("cotizacion_items")
+        .select("paquete_id, valor_final")
+        .eq("cotizacion_id", cotizacionId)
+        .not("paquete_id", "is", null);
+
+      await supabase.from("cotizaciones").update({ estado: "aceptada" }).eq("id", cotizacionId);
+
+      if (items && items.length > 0 && currentEmpresaId) {
+        for (const item of items) {
+          if (!item.paquete_id) continue;
+          const { data: existing } = await supabase
+            .from("empresa_baterias")
+            .select("id")
+            .eq("empresa_id", currentEmpresaId)
+            .eq("paquete_id", item.paquete_id)
+            .maybeSingle();
+          if (existing) {
+            await supabase.from("empresa_baterias").update({ valor: item.valor_final || 0, activo: true, updated_at: new Date().toISOString() }).eq("id", existing.id);
+          } else {
+            await supabase.from("empresa_baterias").insert({ empresa_id: currentEmpresaId, paquete_id: item.paquete_id, valor: item.valor_final || 0, activo: true });
+          }
+        }
+      }
+      toast({ title: "Cotización aceptada y precios actualizados" });
+      loadData();
+    } catch (error) {
+      console.error("Error aceptando cotización directa:", error);
+      toast({ title: "Error al aceptar", variant: "destructive" });
+    }
+  };
+
+  const handleRechazarDirecta = async (cotizacionId: string) => {
+    if (!confirm("¿Está seguro de rechazar esta cotización?")) return;
+    try {
+      await supabase.from("cotizaciones").update({ estado: "rechazada" }).eq("id", cotizacionId);
+      toast({ title: "Cotización rechazada" });
+      loadData();
+    } catch (error) {
+      console.error("Error rechazando cotización directa:", error);
+      toast({ title: "Error al rechazar", variant: "destructive" });
+    }
+  };
+
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
       case "pendiente":
@@ -339,7 +410,8 @@ const EmpresaCotizaciones = () => {
       case "en_revision":
         return <Badge className="bg-blue-500"><FileText className="h-3 w-3 mr-1" />En Revisión</Badge>;
       case "respondida":
-        return <Badge className="bg-amber-500"><FileText className="h-3 w-3 mr-1" />Respondida</Badge>;
+      case "borrador":
+        return <Badge className="bg-amber-500"><FileText className="h-3 w-3 mr-1" />Por Revisar</Badge>;
       case "aceptada":
         return <Badge className="bg-green-500"><CheckCircle className="h-3 w-3 mr-1" />Aceptada</Badge>;
       case "rechazada":
@@ -348,6 +420,10 @@ const EmpresaCotizaciones = () => {
         return <Badge variant="outline">{estado}</Badge>;
     }
   };
+
+  // Cotizaciones directas separadas por estado
+  const directasPorRevisar = cotizacionesDirectas.filter(c => !c.estado || c.estado === "borrador" || c.estado === "respondida");
+  const directasFinalizadas = cotizacionesDirectas.filter(c => c.estado === "aceptada" || c.estado === "rechazada");
 
   const pendientes = solicitudes.filter((s) => ["pendiente", "en_revision"].includes(s.estado));
   const respondidas = solicitudes.filter((s) => s.estado === "respondida");
@@ -441,6 +517,59 @@ const EmpresaCotizaciones = () => {
             >
               <XCircle className="h-4 w-4 mr-1" />
               Rechazar
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  const CotizacionDirectaCard = ({ cotizacion }: { cotizacion: CotizacionDirecta }) => (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-start justify-between">
+          <div>
+            <CardTitle className="text-base">Cotización N° {cotizacion.numero_cotizacion}</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {format(new Date(cotizacion.fecha_cotizacion), "dd/MM/yyyy")}
+            </p>
+          </div>
+          {getEstadoBadge(cotizacion.estado || "borrador")}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {cotizacion.observaciones && (
+          <p className="text-sm text-muted-foreground">{cotizacion.observaciones}</p>
+        )}
+
+        <div className="p-3 rounded-lg bg-muted space-y-2">
+          {cotizacion.items?.filter(item => item.paquete_id).map((item, idx) => (
+            <div key={idx} className="flex justify-between text-sm">
+              <span className="text-muted-foreground">{item.nombre_prestacion}</span>
+              <span className="font-medium">
+                ${Math.ceil(item.valor_final || 0).toLocaleString("es-CL")}
+              </span>
+            </div>
+          ))}
+          {cotizacion.total_con_iva && (
+            <div className="border-t pt-2 mt-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">TOTAL</span>
+                <span className="text-lg font-bold">
+                  ${Math.ceil(cotizacion.total_con_iva).toLocaleString("es-CL")}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {(!cotizacion.estado || cotizacion.estado === "borrador" || cotizacion.estado === "respondida") && (
+          <div className="flex gap-2 pt-2">
+            <Button size="sm" className="bg-green-500 hover:bg-green-600" onClick={() => handleAceptarDirecta(cotizacion.id)}>
+              <CheckCircle className="h-4 w-4 mr-1" />Aceptar
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => handleRechazarDirecta(cotizacion.id)}>
+              <XCircle className="h-4 w-4 mr-1" />Rechazar
             </Button>
           </div>
         )}
@@ -555,25 +684,42 @@ const EmpresaCotizaciones = () => {
           </Dialog>
         </div>
 
-        <Tabs defaultValue="pendientes">
+        <Tabs defaultValue="por_revisar">
           <TabsList>
-            <TabsTrigger value="pendientes">
-              Pendientes ({pendientes.length})
+            <TabsTrigger value="por_revisar">
+              Por Revisar ({respondidas.length + directasPorRevisar.length})
             </TabsTrigger>
-            <TabsTrigger value="respondidas">
-              Por Revisar ({respondidas.length})
+            <TabsTrigger value="pendientes">
+              Mis Solicitudes ({pendientes.length})
             </TabsTrigger>
             <TabsTrigger value="finalizadas">
-              Finalizadas ({finalizadas.length})
+              Finalizadas ({finalizadas.length + directasFinalizadas.length})
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="pendientes" className="mt-4">
+          <TabsContent value="por_revisar" className="mt-4">
             {loading ? (
               <div className="flex justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
-            ) : pendientes.length === 0 ? (
+            ) : (respondidas.length + directasPorRevisar.length) === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No hay cotizaciones por revisar
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {respondidas.map((solicitud) => (
+                  <SolicitudCard key={solicitud.id} solicitud={solicitud} />
+                ))}
+                {directasPorRevisar.map((cot) => (
+                  <CotizacionDirectaCard key={cot.id} cotizacion={cot} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="pendientes" className="mt-4">
+            {pendientes.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 No hay solicitudes pendientes
               </div>
@@ -586,22 +732,8 @@ const EmpresaCotizaciones = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="respondidas" className="mt-4">
-            {respondidas.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No hay cotizaciones por revisar
-              </div>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2">
-                {respondidas.map((solicitud) => (
-                  <SolicitudCard key={solicitud.id} solicitud={solicitud} />
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
           <TabsContent value="finalizadas" className="mt-4">
-            {finalizadas.length === 0 ? (
+            {(finalizadas.length + directasFinalizadas.length) === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 No hay cotizaciones finalizadas
               </div>
@@ -609,6 +741,9 @@ const EmpresaCotizaciones = () => {
               <div className="grid gap-4 md:grid-cols-2">
                 {finalizadas.map((solicitud) => (
                   <SolicitudCard key={solicitud.id} solicitud={solicitud} />
+                ))}
+                {directasFinalizadas.map((cot) => (
+                  <CotizacionDirectaCard key={cot.id} cotizacion={cot} />
                 ))}
               </div>
             )}
