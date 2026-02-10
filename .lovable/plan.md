@@ -1,159 +1,72 @@
 
-# Plan: Agregar Gestión de Faenas al Módulo de Configuración
+
+# Crear 4 Documentos + Mejoras al Visor de Formularios
 
 ## Resumen
 
-Agregar una nueva pestaña "Faenas" al módulo de Configuración (`/configuracion`) que permita gestionar las faenas (centros de trabajo) de forma centralizada y más cómoda. Esta pestaña será el lugar principal para crear faenas globales y asignarles baterías, estableciendo la relación faena-baterías que luego se usará transversalmente en todo el sistema.
+Se crearán 4 documentos digitales en la base de datos y se harán mejoras al componente `DocumentoFormViewer` para soportar puntajes automáticos y lógica condicional en Lake Louis.
 
-## Flujo de Datos Propuesto
+## Parte 1: Cambios en el Frontend (DocumentoFormViewer.tsx)
 
-```text
-+-------------------+       +-------------------+       +-------------------+
-|      FAENAS       | ----> |  BATERIA_FAENAS   | <---- |  PAQUETES_EXAMENES|
-|  (centros trabajo)|       | (asignación)      |       |    (baterías)     |
-+-------------------+       +-------------------+       +-------------------+
-         |
-         v
-+-------------------+
-|  EMPRESA_FAENAS   | ----> Empresas usan faenas con sus baterías ya configuradas
-+-------------------+
-```
+Se agregará soporte para dos nuevas funcionalidades usando el campo `opciones` de la base de datos para almacenar metadatos adicionales:
 
-## Funcionalidades de la Nueva Pestaña
+### A. Campo tipo "puntaje" (score summary)
+- Nuevo tipo de campo `puntaje` que calcula la suma de campos tipo `radio` que tengan opciones numéricas
+- Se configurará en `opciones` con `{"campos_suma": ["id1", "id2", ...]}` indicando qué campos sumar
+- Mostrará el puntaje total en tiempo real
 
-1. **Listado de Faenas Globales**: Tabla con todas las faenas del sistema mostrando nombre, dirección, estado (activo/inactivo), y cantidad de baterías asignadas
+### B. Lógica condicional para Lake Louis
+- Cuando el paciente responda "NO" a "Ha estado sobre 3000m", los campos de experiencia en altitud se auto-completarán como vacíos/0 y se deshabilitarán
+- Cuando todos los síntomas queden en 0, las preguntas de seguimiento (requirió atención médica, etc.) se auto-completarán como "NO"
+- Se implementará usando el campo `opciones` con `{"depende_de": "campo_id", "valor_activacion": "SI"}` para campos condicionales
 
-2. **CRUD de Faenas**: 
-   - Crear nuevas faenas globales
-   - Editar nombre y dirección
-   - Activar/desactivar faenas
-   - Eliminar faenas (con confirmación)
+## Parte 2: Inserciones en Base de Datos
 
-3. **Gestión de Baterías por Faena**: 
-   - Cada faena es expandible (collapsible)
-   - Al expandir, muestra lista de baterías con checkboxes
-   - Permite buscar/filtrar baterías
-   - Las baterías asignadas aquí son las que aparecerán en cotizaciones, agendamiento y atención de pacientes
+### Documento 1: DECLARACION DE SALUD
+- Texto informativo con variables del paciente
+- Campos para examen ocupacional y antecedentes laborales
+- Tabla de 26 enfermedades como campos radio SI/NO
+- Secciones de fármacos, hábitos, alergias, cirugías
+- Antecedentes familiares y laborales
+- Sección condicional para mujeres
+- Texto legal declarativo
+- Firma obligatoria
 
-## Impacto Transversal
+### Documento 2: CONSENTIMIENTO INFORMADO ALCOHOL Y DROGAS
+- Texto informativo con variables
+- Campo radio: acepta/no acepta voluntariamente
+- Campo radio: toma medicamentos SI/NO
+- Campo condicional: detalle de medicamentos
+- Firma obligatoria
 
-Una vez configurada la relación faena-baterías desde Configuración:
-- **Cotizaciones**: Al seleccionar empresa y faena, solo mostrar baterías de esa faena
-- **Agendamiento (Portal Empresa)**: Al seleccionar faena, solo mostrar baterías asignadas
-- **Atención de Pacientes**: Al asignar baterías, filtrar por faena seleccionada
-- **Módulo Empresas**: La pestaña de faenas en cada empresa solo asigna/desasigna faenas existentes (ya configuradas con sus baterías)
+### Documento 3: ESCALA DE SOMNOLENCIA DE EPWORTH
+- Texto informativo explicativo
+- 8 preguntas situacionales con radio 0-3
+- Campo puntaje automático que suma las 8 respuestas
+- Firma obligatoria
 
----
+### Documento 4: ENCUESTA DE LAKE LOUIS MODIFICADA
+- Texto informativo con variables
+- Pregunta gatillo: ha estado sobre 3000m (SI/NO)
+- Campos condicionales de experiencia en altitud (se deshabilitan si responde NO)
+- 5 síntomas con escala 0-3
+- Campo puntaje automático de síntomas
+- 5 preguntas SI/NO condicionales (se auto-completan como NO si puntaje de síntomas es 0)
+- Firma obligatoria
 
-## Detalles Técnicos
+## Detalles Tecnicos
 
-### Archivo a Modificar
+### Archivos a modificar
+1. **`src/components/DocumentoFormViewer.tsx`**: Agregar renderizado del tipo `puntaje`, lógica condicional basada en `opciones.depende_de`, y auto-completado de campos dependientes
 
-**`src/pages/Configuracion.tsx`**
+### Migracion SQL
+- 4 inserts en `documentos_formularios`
+- Aproximadamente 80-100 inserts en `documento_campos` con los campos de cada formulario
+- Todas las firmas con `requerido = true`
+- Campos condicionales con metadata en `opciones` (jsonb)
 
-### Cambios Específicos
+### Flujo condicional Lake Louis
+- Si "Ha estado sobre 3000m" = "NO": campos de experiencia se deshabilitan y quedan vacíos
+- Si todos los síntomas = 0: campos de "requirió atención", "requirió descenso", etc. se auto-completan como "NO" y se deshabilitan
+- El paciente puede cambiar su respuesta y los campos se reactivan automáticamente
 
-1. **Nuevos estados**:
-   - `faenas`: Lista de todas las faenas globales
-   - `paquetes`: Lista de todas las baterías disponibles
-   - `bateriasFaenas`: Relaciones faena-batería (tabla `bateria_faenas`)
-   - `expandedFaenas`: Set de IDs de faenas expandidas
-   - Estados para el diálogo de crear/editar faena
-
-2. **Nueva pestaña en TabsList**:
-   - Agregar `<TabsTrigger value="faenas">` con icono `MapPin`
-
-3. **TabsContent para faenas**:
-   - Card con cabecera y botón "Nueva Faena"
-   - Tabla/lista de faenas con:
-     - Nombre y dirección
-     - Badge con cantidad de baterías
-     - Switch para activar/desactivar
-     - Botones editar y eliminar
-     - Collapsible para mostrar/asignar baterías
-
-4. **Funciones de gestión**:
-   - `loadFaenas()`: Cargar todas las faenas
-   - `loadPaquetes()`: Cargar todas las baterías
-   - `loadBateriasFaenas()`: Cargar relaciones existentes
-   - `handleFaenaSubmit()`: Crear/actualizar faena
-   - `handleToggleFaenaActivo()`: Cambiar estado activo
-   - `handleDeleteFaena()`: Eliminar faena
-   - `handleToggleBateria()`: Asignar/desasignar batería a faena
-
-5. **UI de asignación de baterías**:
-   - Input de búsqueda para filtrar baterías
-   - ScrollArea con lista de baterías (checkbox + nombre)
-   - Actualización en tiempo real del badge de conteo
-
-### Componentes UI Utilizados
-
-- `Tabs`, `TabsList`, `TabsTrigger`, `TabsContent`
-- `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`
-- `Table`, `TableHeader`, `TableRow`, `TableHead`, `TableBody`, `TableCell`
-- `Dialog`, `DialogTrigger`, `DialogContent`, `DialogHeader`, `DialogTitle`
-- `AlertDialog` (confirmación de eliminación)
-- `Collapsible`, `CollapsibleTrigger`, `CollapsibleContent`
-- `Checkbox`, `Switch`, `Input`, `Label`, `Badge`, `Button`
-- `ScrollArea` (para lista de baterías)
-
-### Iconos Adicionales
-
-- `MapPin` (faenas)
-- `Package` (baterías)
-- `ChevronDown`, `ChevronUp` (collapsible)
-
-### Queries a Base de Datos
-
-```typescript
-// Cargar faenas
-supabase.from("faenas").select("*").order("nombre")
-
-// Cargar baterías
-supabase.from("paquetes_examenes").select("id, nombre, descripcion").order("nombre")
-
-// Cargar relaciones
-supabase.from("bateria_faenas").select("*")
-
-// Crear faena
-supabase.from("faenas").insert([{ nombre, direccion }])
-
-// Actualizar faena
-supabase.from("faenas").update({ nombre, direccion }).eq("id", faenaId)
-
-// Toggle activo
-supabase.from("faenas").update({ activo: !currentActivo }).eq("id", faenaId)
-
-// Eliminar faena
-supabase.from("faenas").delete().eq("id", faenaId)
-
-// Toggle batería en faena
-supabase.from("bateria_faenas").insert([...]) // o update activo
-```
-
-### Estructura Visual Propuesta
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│  [Bloques Horarios]  [Faenas]                               │
-├─────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ 📍 Faenas / Centros de Trabajo    [+ Nueva Faena]   │    │
-│  │ Gestiona las faenas y sus baterías asignadas        │    │
-│  ├─────────────────────────────────────────────────────┤    │
-│  │ Nombre           Baterías   Activo   Acciones       │    │
-│  │ ─────────────────────────────────────────────────── │    │
-│  │ ▼ Homologación   [5]        [✓]      [✏️] [🗑️]     │    │
-│  │   ┌─────────────────────────────────────────────┐   │    │
-│  │   │ 🔍 Buscar baterías...                       │   │    │
-│  │   │ ☑ Batería Pre-ocupacional                   │   │    │
-│  │   │ ☑ Batería Altura Física                     │   │    │
-│  │   │ ☐ Batería Conductor                         │   │    │
-│  │   │ ☑ Batería Exposición Sílice                 │   │    │
-│  │   │ ...                                         │   │    │
-│  │   └─────────────────────────────────────────────┘   │    │
-│  │ ► Zaldivar        [3]        [✓]      [✏️] [🗑️]     │    │
-│  │ ► Sierra Gorda    [4]        [✓]      [✏️] [🗑️]     │    │
-│  └─────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────┘
-```
