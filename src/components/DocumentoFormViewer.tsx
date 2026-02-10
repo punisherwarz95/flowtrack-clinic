@@ -69,7 +69,30 @@ const getOpcionesArray = (opciones: unknown): string[] => {
   if (Array.isArray(opciones)) {
     return opciones.filter((o): o is string => typeof o === "string");
   }
+  // If opciones is an object with an "items" array, use that
+  if (opciones && typeof opciones === "object" && "items" in (opciones as any)) {
+    const items = (opciones as any).items;
+    if (Array.isArray(items)) {
+      return items.filter((o: unknown): o is string => typeof o === "string");
+    }
+  }
   return [];
+};
+
+// Helper to get opciones metadata object
+const getOpcionesMeta = (opciones: unknown): Record<string, any> => {
+  if (opciones && typeof opciones === "object" && !Array.isArray(opciones)) {
+    return opciones as Record<string, any>;
+  }
+  return {};
+};
+
+// Extract numeric value from a radio option string like "0 - Ninguna posibilidad"
+const extractNumericValue = (value: unknown): number => {
+  if (value === undefined || value === null || value === "") return 0;
+  const str = String(value);
+  const match = str.match(/^(\d+)/);
+  return match ? parseInt(match[1], 10) : 0;
 };
 
 // Calculate age from birth date
@@ -144,6 +167,58 @@ export const DocumentoFormViewer = ({
   const isComplete = atencionDocumento.estado === "completado";
   const isReviewed = atencionDocumento.estado === "revisado";
 
+  // Build a map of campo id -> campo for quick lookups
+  const campoMap = new Map(campos.map(c => [c.id, c]));
+
+  // Check if a field should be disabled due to conditional logic
+  const isFieldDisabled = (campo: DocumentoCampo): boolean => {
+    const meta = getOpcionesMeta(campo.opciones);
+    if (meta.depende_de) {
+      const parentValue = String(respuestas[meta.depende_de] || "");
+      if (meta.valor_activacion) {
+        return parentValue !== meta.valor_activacion;
+      }
+    }
+    if (meta.depende_de_puntaje) {
+      const puntaje = calculatePuntaje(meta.depende_de_puntaje);
+      if (meta.puntaje_activacion !== undefined) {
+        return puntaje <= meta.puntaje_activacion;
+      }
+    }
+    return false;
+  };
+
+  // Calculate puntaje (sum) from a list of field IDs
+  const calculatePuntaje = (campoIds: string[]): number => {
+    return campoIds.reduce((sum, id) => {
+      return sum + extractNumericValue(respuestas[id]);
+    }, 0);
+  };
+
+  // Apply conditional logic - auto-fill disabled fields
+  useEffect(() => {
+    let changed = false;
+    const newRespuestas = { ...respuestas };
+
+    for (const campo of campos) {
+      const meta = getOpcionesMeta(campo.opciones);
+      if (!meta.depende_de && !meta.depende_de_puntaje) continue;
+
+      const disabled = isFieldDisabled(campo);
+      if (disabled) {
+        const defaultVal = meta.valor_default ?? "";
+        if (newRespuestas[campo.id] !== defaultVal) {
+          newRespuestas[campo.id] = defaultVal;
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      setRespuestas(newRespuestas);
+    }
+  }, [respuestas, campos]);
+
   const handleChange = (fieldId: string, value: unknown) => {
     if (readonly || isComplete || isReviewed) return;
     setRespuestas((prev) => ({ ...prev, [fieldId]: value }));
@@ -151,7 +226,7 @@ export const DocumentoFormViewer = ({
 
   const validateForm = (): boolean => {
     for (const campo of campos) {
-      if (campo.requerido) {
+      if (campo.requerido && !isFieldDisabled(campo)) {
         const valor = respuestas[campo.id];
         if (valor === undefined || valor === null || valor === "") {
           toast({
@@ -262,9 +337,9 @@ export const DocumentoFormViewer = ({
     handleChange(fieldId, "");
   };
 
-  const renderField = (campo: DocumentoCampo) => {
+  const renderField = (campo: DocumentoCampo, fieldDisabled: boolean) => {
     const value = respuestas[campo.id];
-    const isDisabled = readonly || isComplete || isReviewed;
+    const isDisabled = readonly || isComplete || isReviewed || fieldDisabled;
 
     switch (campo.tipo_campo) {
       case "texto_informativo":
@@ -416,6 +491,18 @@ export const DocumentoFormViewer = ({
           </div>
         );
 
+      case "puntaje": {
+        const meta = getOpcionesMeta(campo.opciones);
+        const camposSuma = meta.campos_suma || [];
+        const total = calculatePuntaje(camposSuma);
+        return (
+          <div className="bg-primary/10 border-2 border-primary/30 rounded-md p-4 text-center">
+            <span className="text-2xl font-bold text-primary">{total}</span>
+            <span className="text-sm text-muted-foreground ml-2">puntos</span>
+          </div>
+        );
+      }
+
       default:
         return (
           <Input
@@ -466,17 +553,21 @@ export const DocumentoFormViewer = ({
         ) : (
           campos
             .sort((a, b) => a.orden - b.orden)
-            .map((campo) => (
-              <div key={campo.id} className="space-y-2">
-                {campo.tipo_campo !== "checkbox" && campo.tipo_campo !== "texto_informativo" && (
-                  <Label className="flex items-center gap-1">
-                    {campo.etiqueta}
-                    {campo.requerido && <span className="text-destructive">*</span>}
-                  </Label>
-                )}
-                {renderField(campo)}
-              </div>
-            ))
+            .map((campo) => {
+              const fieldDisabled = isFieldDisabled(campo);
+              const hidden = fieldDisabled && campo.tipo_campo !== "puntaje";
+              return (
+                <div key={campo.id} className={`space-y-2 ${fieldDisabled ? "opacity-50" : ""}`}>
+                  {campo.tipo_campo !== "checkbox" && campo.tipo_campo !== "texto_informativo" && campo.tipo_campo !== "puntaje" && (
+                    <Label className="flex items-center gap-1">
+                      {campo.etiqueta}
+                      {campo.requerido && !fieldDisabled && <span className="text-destructive">*</span>}
+                    </Label>
+                  )}
+                  {renderField(campo, fieldDisabled)}
+                </div>
+              );
+            })
         )}
       </CardContent>
       {!readonly && !isComplete && !isReviewed && campos.length > 0 && (
