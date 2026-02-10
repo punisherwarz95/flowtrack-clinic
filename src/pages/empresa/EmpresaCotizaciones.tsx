@@ -56,7 +56,7 @@ interface Solicitud {
   cotizacion: {
     id: string;
     numero_cotizacion: number;
-    total_con_iva: number | null;
+    total_con_margen: number | null;
     items: CotizacionItem[];
   } | null;
   items: {
@@ -71,7 +71,7 @@ interface CotizacionDirecta {
   numero_cotizacion: number;
   fecha_cotizacion: string;
   estado: string | null;
-  total_con_iva: number | null;
+  total_con_margen: number | null;
   observaciones: string | null;
   items: CotizacionItem[];
 }
@@ -126,7 +126,7 @@ const EmpresaCotizaciones = () => {
           cotizacion:cotizaciones!cotizacion_solicitudes_cotizacion_id_fkey(
             id, 
             numero_cotizacion, 
-            total_con_iva,
+            total_con_margen,
             items:cotizacion_items(nombre_prestacion, valor_final, paquete_id)
           ),
           items:cotizacion_solicitud_items(
@@ -144,7 +144,7 @@ const EmpresaCotizaciones = () => {
       const { data: directasData } = await supabase
         .from("cotizaciones")
         .select(`
-          id, numero_cotizacion, fecha_cotizacion, estado, total_con_iva, observaciones,
+          id, numero_cotizacion, fecha_cotizacion, estado, total_con_margen, observaciones,
           items:cotizacion_items(nombre_prestacion, valor_final, paquete_id)
         `)
         .eq("empresa_id", currentEmpresaId)
@@ -487,12 +487,12 @@ const EmpresaCotizaciones = () => {
             )}
             
             {/* Total redondeado hacia arriba */}
-            {solicitud.cotizacion.total_con_iva && (
+            {solicitud.cotizacion.total_con_margen && (
               <div className="border-t pt-2 mt-2">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium">TOTAL</span>
                   <span className="text-lg font-bold">
-                    ${Math.ceil(solicitud.cotizacion.total_con_iva).toLocaleString("es-CL")}
+                    ${Math.ceil(solicitud.cotizacion.total_con_margen).toLocaleString("es-CL")}
                   </span>
                 </div>
               </div>
@@ -551,12 +551,12 @@ const EmpresaCotizaciones = () => {
               </span>
             </div>
           ))}
-          {cotizacion.total_con_iva && (
+          {cotizacion.total_con_margen && (
             <div className="border-t pt-2 mt-2">
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium">TOTAL</span>
                 <span className="text-lg font-bold">
-                  ${Math.ceil(cotizacion.total_con_iva).toLocaleString("es-CL")}
+                  ${Math.ceil(cotizacion.total_con_margen).toLocaleString("es-CL")}
                 </span>
               </div>
             </div>
