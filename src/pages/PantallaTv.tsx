@@ -16,6 +16,8 @@ import {
   QrCode,
   Volume2,
   ArrowLeft,
+  ArrowUp,
+  ArrowDown,
   Timer,
   User,
   Plus,
@@ -273,6 +275,20 @@ const PantallaTv = () => {
     toast.success("QR eliminado");
   };
 
+  const moveQR = async (qr: QRCode, direction: "up" | "down") => {
+    const currentIndex = qrCodes.findIndex((q) => q.id === qr.id);
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= qrCodes.length) return;
+
+    const target = qrCodes[targetIndex];
+    // Swap orden values
+    await Promise.all([
+      supabase.from("pantalla_qr_codes").update({ orden: target.orden }).eq("id", qr.id),
+      supabase.from("pantalla_qr_codes").update({ orden: qr.orden }).eq("id", target.id),
+    ]);
+    loadQRCodes();
+  };
+
   // ─── Start display ───────────────────────
   const startDisplay = () => {
     if (selectedBoxIds.length === 0) {
@@ -386,17 +402,38 @@ const PantallaTv = () => {
                 </p>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  {qrCodes.map((qr) => (
+                  {qrCodes.map((qr, index) => (
                     <div
                       key={qr.id}
                       className="relative border rounded-lg p-3 text-center space-y-2"
                     >
-              <img
+                      <img
                         src={qr.imagen_url}
                         alt={qr.titulo}
                         className="w-48 h-48 object-contain rounded mx-auto"
                       />
                       <p className="text-sm font-medium">{qr.titulo}</p>
+                      <div className="flex items-center justify-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          disabled={index === 0}
+                          onClick={() => moveQR(qr, "up")}
+                        >
+                          <ArrowUp className="h-4 w-4" />
+                        </Button>
+                        <span className="text-xs text-muted-foreground font-mono w-6">{index + 1}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          disabled={index === qrCodes.length - 1}
+                          onClick={() => moveQR(qr, "down")}
+                        >
+                          <ArrowDown className="h-4 w-4" />
+                        </Button>
+                      </div>
                       <Button
                         variant="ghost"
                         size="icon"
