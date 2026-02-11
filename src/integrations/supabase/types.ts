@@ -1480,6 +1480,33 @@ export type Database = {
           },
         ]
       }
+      pantalla_qr_codes: {
+        Row: {
+          activo: boolean | null
+          created_at: string | null
+          id: string
+          imagen_url: string
+          orden: number | null
+          titulo: string
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string | null
+          id?: string
+          imagen_url: string
+          orden?: number | null
+          titulo: string
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string | null
+          id?: string
+          imagen_url?: string
+          orden?: number | null
+          titulo?: string
+        }
+        Relationships: []
+      }
       paquete_examen_items: {
         Row: {
           created_at: string | null
