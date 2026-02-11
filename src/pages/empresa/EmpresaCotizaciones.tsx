@@ -255,7 +255,7 @@ const EmpresaCotizaciones = () => {
       // 2. Obtener los items de la cotización (baterías con precios)
       const { data: items, error: itemsError } = await supabase
         .from("cotizacion_items")
-        .select("paquete_id, valor_final")
+        .select("paquete_id, valor_final, cantidad")
         .eq("cotizacion_id", solicitud.cotizacion_id)
         .not("paquete_id", "is", null);
 
@@ -294,7 +294,7 @@ const EmpresaCotizaciones = () => {
             await supabase
               .from("empresa_baterias")
               .update({ 
-                valor: item.valor_final || 0,
+                valor: Math.round((item.valor_final || 0) / (item.cantidad || 1)),
                 activo: true,
                 updated_at: new Date().toISOString()
               })
@@ -306,7 +306,7 @@ const EmpresaCotizaciones = () => {
               .insert({
                 empresa_id: solicitud.empresa_id,
                 paquete_id: item.paquete_id,
-                valor: item.valor_final || 0,
+                valor: Math.round((item.valor_final || 0) / (item.cantidad || 1)),
                 activo: true,
               });
           }
@@ -361,7 +361,7 @@ const EmpresaCotizaciones = () => {
     try {
       const { data: items } = await supabase
         .from("cotizacion_items")
-        .select("paquete_id, valor_final")
+        .select("paquete_id, valor_final, cantidad")
         .eq("cotizacion_id", cotizacionId)
         .not("paquete_id", "is", null);
 
@@ -376,10 +376,11 @@ const EmpresaCotizaciones = () => {
             .eq("empresa_id", currentEmpresaId)
             .eq("paquete_id", item.paquete_id)
             .maybeSingle();
+          const valorUnitario = Math.round((item.valor_final || 0) / (item.cantidad || 1));
           if (existing) {
-            await supabase.from("empresa_baterias").update({ valor: item.valor_final || 0, activo: true, updated_at: new Date().toISOString() }).eq("id", existing.id);
+            await supabase.from("empresa_baterias").update({ valor: valorUnitario, activo: true, updated_at: new Date().toISOString() }).eq("id", existing.id);
           } else {
-            await supabase.from("empresa_baterias").insert({ empresa_id: currentEmpresaId, paquete_id: item.paquete_id, valor: item.valor_final || 0, activo: true });
+            await supabase.from("empresa_baterias").insert({ empresa_id: currentEmpresaId, paquete_id: item.paquete_id, valor: valorUnitario, activo: true });
           }
         }
       }
