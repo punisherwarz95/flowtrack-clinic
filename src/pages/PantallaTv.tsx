@@ -479,35 +479,38 @@ const PantallaTv = () => {
           >
             {selectedBoxes.map((box) => {
               const boxAtenciones = atenciones.filter((a) => a.box_id === box.id);
-              const current = boxAtenciones[0];
 
               return (
                 <div
                   key={box.id}
-                  className={`rounded-2xl p-6 flex flex-col items-center justify-center text-center transition-all ${
-                    current
+                  className={`rounded-2xl p-6 flex flex-col items-center text-center transition-all ${
+                    boxAtenciones.length > 0
                       ? "bg-gradient-to-br from-sky-600/80 to-sky-800/80 border-2 border-sky-400/40 shadow-lg shadow-sky-500/20"
                       : "bg-slate-800/60 border border-slate-700/50"
                   }`}
                 >
-                  <p className="text-sm uppercase tracking-widest text-slate-300 mb-2">
+                  <p className="text-sm uppercase tracking-widest text-slate-300 mb-3">
                     {box.nombre}
                   </p>
 
-                  {current ? (
-                    <>
-                      <div className="bg-white/10 rounded-full w-20 h-20 flex items-center justify-center mb-3">
-                        <User className="h-10 w-10 text-sky-200" />
-                      </div>
-                      <p className="text-3xl font-bold mb-1 leading-tight">
-                        {current.pacientes?.nombre || "—"}
-                      </p>
-                      {current.numero_ingreso && (
-                        <span className="bg-sky-400/20 text-sky-200 px-3 py-1 rounded-full text-sm font-mono">
-                          #{current.numero_ingreso}
-                        </span>
-                      )}
-                    </>
+                  {boxAtenciones.length > 0 ? (
+                    <div className="space-y-3 w-full">
+                      {boxAtenciones.map((atencion) => (
+                        <div key={atencion.id} className="flex flex-col items-center gap-1">
+                          <div className="bg-white/10 rounded-full w-14 h-14 flex items-center justify-center">
+                            <User className="h-7 w-7 text-sky-200" />
+                          </div>
+                          <p className="text-xl font-bold leading-tight">
+                            {atencion.pacientes?.nombre || "—"}
+                          </p>
+                          {atencion.numero_ingreso && (
+                            <span className="bg-sky-400/20 text-sky-200 px-2 py-0.5 rounded-full text-xs font-mono">
+                              #{atencion.numero_ingreso}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   ) : (
                     <div className="opacity-40">
                       <div className="bg-white/5 rounded-full w-20 h-20 flex items-center justify-center mb-3">
