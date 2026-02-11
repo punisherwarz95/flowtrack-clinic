@@ -486,17 +486,22 @@ const EmpresaCotizaciones = () => {
               </div>
             )}
             
-            {/* Total redondeado hacia arriba */}
-            {solicitud.cotizacion.total_con_margen && (
-              <div className="border-t pt-2 mt-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">TOTAL</span>
-                  <span className="text-lg font-bold">
-                    ${Math.ceil(solicitud.cotizacion.total_con_margen).toLocaleString("es-CL")}
-                  </span>
+            {/* Total calculado desde items */}
+            {(() => {
+              const itemsFiltrados = solicitud.cotizacion.items?.filter(item => item.paquete_id) || [];
+              const totalCalculado = itemsFiltrados.reduce((acc, item) => acc + (item.valor_final || 0), 0);
+              const totalFinal = totalCalculado > 0 ? totalCalculado : solicitud.cotizacion.total_con_margen;
+              return totalFinal ? (
+                <div className="border-t pt-2 mt-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">TOTAL</span>
+                    <span className="text-lg font-bold">
+                      ${Math.ceil(totalFinal).toLocaleString("es-CL")}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
+              ) : null;
+            })()}
           </div>
         )}
 
@@ -551,16 +556,21 @@ const EmpresaCotizaciones = () => {
               </span>
             </div>
           ))}
-          {cotizacion.total_con_margen && (
-            <div className="border-t pt-2 mt-2">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">TOTAL</span>
-                <span className="text-lg font-bold">
-                  ${Math.ceil(cotizacion.total_con_margen).toLocaleString("es-CL")}
-                </span>
+          {(() => {
+            const itemsFiltrados = cotizacion.items?.filter(item => item.paquete_id) || [];
+            const totalCalculado = itemsFiltrados.reduce((acc, item) => acc + (item.valor_final || 0), 0);
+            const totalFinal = totalCalculado > 0 ? totalCalculado : cotizacion.total_con_margen;
+            return totalFinal ? (
+              <div className="border-t pt-2 mt-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">TOTAL</span>
+                  <span className="text-lg font-bold">
+                    ${Math.ceil(totalFinal).toLocaleString("es-CL")}
+                  </span>
+                </div>
               </div>
-            </div>
-          )}
+            ) : null;
+          })()}
         </div>
 
         {(!cotizacion.estado || cotizacion.estado === "borrador" || cotizacion.estado === "respondida") && (
