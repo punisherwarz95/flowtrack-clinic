@@ -545,6 +545,27 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
 
         const newCantidad = field === "cantidad" ? (value as number) : item.cantidad;
         const newMargenId = field === "margen_id" ? (value as string) : item.margen_id;
+
+        // Si el campo es cantidad y el margen es personalizado, recalcular manualmente
+        if (field === "cantidad" && item.margen_nombre === "Personalizado") {
+          const valorTotalNeto = item.valor_unitario_neto * newCantidad;
+          const valorIva = afectoIva ? valorTotalNeto * 0.19 : 0;
+          const valorConIva = valorTotalNeto + valorIva;
+          const margenPorcentaje = item.margen_porcentaje || 0;
+          const valorMargen = valorConIva * (margenPorcentaje / 100);
+          const valorFinal = valorConIva + valorMargen;
+
+          return {
+            ...item,
+            cantidad: newCantidad,
+            valor_total_neto: valorTotalNeto,
+            valor_iva: valorIva,
+            valor_con_iva: valorConIva,
+            valor_margen: valorMargen,
+            valor_final: valorFinal,
+          };
+        }
+
         const calculatedValues = calculateItemValues(item.valor_unitario_neto, newCantidad, newMargenId, afectoIva);
 
         return {
