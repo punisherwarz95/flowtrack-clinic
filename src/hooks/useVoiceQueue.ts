@@ -55,7 +55,7 @@ export const useVoiceQueue = () => {
   }, [processQueue]);
 
   const announcePatient = useCallback((patientName: string, boxName: string) => {
-    const message = `${patientName}, por favor dirigirse a ${boxName}`;
+    const message = `${patientName}, por favor dirigirse al Box ${boxName}`;
     enqueue(message);
   }, [enqueue]);
 
