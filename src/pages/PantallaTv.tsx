@@ -59,7 +59,7 @@ const getChileDateString = (): string => getChileTime().toISOString().split("T")
 
 // ────────────────────────────────────────────────────
 const PantallaTv = () => {
-  const [mode, setMode] = useState<"config" | "display">("config");
+  const [mode, setMode] = useState<"config" | "display" | "display-qr">("config");
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [selectedBoxIds, setSelectedBoxIds] = useState<string[]>([]);
   const [atenciones, setAtenciones] = useState<AtencionConPaciente[]>([]);
@@ -412,21 +412,36 @@ const PantallaTv = () => {
             </CardContent>
           </Card>
 
-          {/* Start */}
-          <Button size="lg" className="w-full gap-2 text-lg h-14" onClick={startDisplay}>
-            <Play className="h-5 w-5" />
-            Iniciar Pantalla ({selectedBoxIds.length} boxes)
-          </Button>
+          {/* Start buttons */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Button size="lg" className="gap-2 text-lg h-14" onClick={startDisplay}>
+              <Play className="h-5 w-5" />
+              Iniciar con Boxes ({selectedBoxIds.length})
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="gap-2 text-lg h-14"
+              onClick={() => {
+                setMode("display-qr");
+                document.documentElement.requestFullscreen?.().catch(() => {});
+              }}
+            >
+              <QrCode className="h-5 w-5" />
+              Iniciar solo QR
+            </Button>
+          </div>
         </div>
       </div>
     );
   }
 
   // ═════════════════════════════════════════
-  // DISPLAY MODE
+  // DISPLAY MODE - BOXES
   // ═════════════════════════════════════════
   const selectedBoxes = boxes.filter((b) => selectedBoxIds.includes(b.id));
 
+  if (mode === "display") {
   return (
     <div className="fixed inset-0 bg-slate-950 text-white flex flex-col overflow-hidden">
       {/* Header */}
@@ -547,10 +562,83 @@ const PantallaTv = () => {
               <p className="text-sm">Sin QR configurados</p>
             </div>
           )}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  // ═════════════════════════════════════════
+  // DISPLAY MODE - QR ONLY
+  // ═════════════════════════════════════════
+  if (mode === "display-qr") {
+    return (
+      <div className="fixed inset-0 bg-slate-950 text-white flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-3 bg-slate-900/80 border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <QrCode className="h-6 w-6 text-sky-400" />
+            <h1 className="text-xl font-bold tracking-tight">Centro Médico Jenner</h1>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={exitDisplay}
+            className="text-slate-400 hover:text-white hover:bg-slate-800"
+          >
+            <Settings className="h-4 w-4 mr-1" />
+            Configurar
+          </Button>
+        </div>
+
+        {/* QR content */}
+        <div className="flex-1 flex items-center justify-center p-8 overflow-auto">
+          <div className="flex flex-wrap gap-8 items-start justify-center max-w-6xl">
+            {/* Daily code */}
+            <div className="bg-gradient-to-br from-sky-900/50 to-slate-800/50 rounded-2xl p-8 text-center border border-sky-700/30 min-w-[280px]">
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <Key className="h-6 w-6 text-sky-400" />
+                <p className="text-base text-sky-300 font-medium uppercase tracking-wide">
+                  Código del Día
+                </p>
+              </div>
+              <p className="text-6xl font-bold font-mono tracking-[0.2em] text-white mb-4">
+                {codigoDelDia || "..."}
+              </p>
+              <div className="flex items-center justify-center gap-2 text-slate-400 text-sm">
+                <Timer className="h-4 w-4" />
+                <span>Próximo en {countdown}</span>
+              </div>
+            </div>
+
+            {/* QR codes */}
+            {qrCodes.map((qr) => (
+              <div
+                key={qr.id}
+                className="bg-white rounded-2xl p-6 text-center space-y-3 min-w-[220px] max-w-[300px]"
+              >
+                <img
+                  src={qr.imagen_url}
+                  alt={qr.titulo}
+                  className="w-full aspect-square object-contain"
+                />
+                <p className="text-slate-900 font-semibold">{qr.titulo}</p>
+              </div>
+            ))}
+
+            {qrCodes.length === 0 && (
+              <div className="flex flex-col items-center justify-center gap-3 text-slate-500 py-12">
+                <QrCode className="h-16 w-16" />
+                <p className="text-lg">Sin QR configurados</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 };
 
 export default PantallaTv;
