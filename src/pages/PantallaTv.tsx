@@ -72,6 +72,7 @@ const PantallaTv = () => {
   const [isUploadingQR, setIsUploadingQR] = useState(false);
   const [newQRTitle, setNewQRTitle] = useState("");
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [selectedQRIds, setSelectedQRIds] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { announcePatient } = useVoiceQueue();
 
@@ -98,7 +99,11 @@ const PantallaTv = () => {
       .select("*")
       .eq("activo", true)
       .order("orden");
-    if (data) setQRCodes(data as QRCode[]);
+    if (data) {
+      setQRCodes(data as QRCode[]);
+      // Initialize selectedQRIds with all QRs if not yet set
+      setSelectedQRIds((prev) => prev.length === 0 ? (data as QRCode[]).map(q => q.id) : prev);
+    }
   }, []);
 
   useEffect(() => {
@@ -156,11 +161,14 @@ const PantallaTv = () => {
     if (mode !== "display" || selectedBoxIds.length === 0) return;
 
     const poll = async () => {
+      const todayStr = getChileDateString();
       const { data } = await supabase
         .from("atenciones")
         .select("id, box_id, estado, numero_ingreso, pacientes(nombre, rut)")
         .in("box_id", selectedBoxIds)
-        .eq("estado", "en_atencion");
+        .eq("estado", "en_atencion")
+        .gte("fecha_ingreso", `${todayStr}T00:00:00`)
+        .lt("fecha_ingreso", `${todayStr}T23:59:59`);
 
       if (data) {
         const typed = data as unknown as AtencionConPaciente[];
@@ -405,8 +413,18 @@ const PantallaTv = () => {
                   {qrCodes.map((qr, index) => (
                     <div
                       key={qr.id}
-                      className="relative border rounded-lg p-3 text-center space-y-2"
+                      className={`relative border rounded-lg p-3 text-center space-y-2 ${selectedQRIds.includes(qr.id) ? 'ring-2 ring-primary' : 'opacity-50'}`}
                     >
+                      <div className="absolute top-2 left-2">
+                        <Checkbox
+                          checked={selectedQRIds.includes(qr.id)}
+                          onCheckedChange={(checked) => {
+                            setSelectedQRIds(prev =>
+                              checked ? [...prev, qr.id] : prev.filter(id => id !== qr.id)
+                            );
+                          }}
+                        />
+                      </div>
                       <img
                         src={qr.imagen_url}
                         alt={qr.titulo}
@@ -526,8 +544,8 @@ const PantallaTv = () => {
                       : "bg-slate-800/60 border border-slate-700/50"
                   }`}
                 >
-                  <p className="text-sm uppercase tracking-widest text-slate-300 mb-3">
-                    {box.nombre}
+                  <p className="text-4xl font-extrabold uppercase tracking-widest text-white mb-4">
+                    Box {box.nombre}
                   </p>
 
                   {boxAtenciones.length > 0 ? (
@@ -537,7 +555,7 @@ const PantallaTv = () => {
                           <div className="bg-white/10 rounded-full w-14 h-14 flex items-center justify-center">
                             <User className="h-7 w-7 text-sky-200" />
                           </div>
-                          <p className="text-xl font-bold leading-tight">
+                          <p className="text-2xl font-bold leading-tight">
                             {atencion.pacientes?.nombre || "—"}
                           </p>
                           {atencion.numero_ingreso && (
@@ -553,7 +571,7 @@ const PantallaTv = () => {
                       <div className="bg-white/5 rounded-full w-20 h-20 flex items-center justify-center mb-3">
                         <User className="h-10 w-10" />
                       </div>
-                      <p className="text-xl text-slate-400">Disponible</p>
+                      <p className="text-2xl text-slate-400">Disponible</p>
                     </div>
                   )}
                 </div>
@@ -582,7 +600,7 @@ const PantallaTv = () => {
           </div>
 
           {/* QR codes */}
-          {qrCodes.map((qr) => (
+          {qrCodes.filter(qr => selectedQRIds.includes(qr.id)).map((qr) => (
             <div
               key={qr.id}
               className="bg-white rounded-xl p-4 text-center space-y-2"
@@ -596,7 +614,7 @@ const PantallaTv = () => {
             </div>
           ))}
 
-          {qrCodes.length === 0 && (
+          {qrCodes.filter(qr => selectedQRIds.includes(qr.id)).length === 0 && (
             <div className="flex flex-col items-center justify-center gap-2 text-slate-500 py-6">
               <QrCode className="h-10 w-10" />
               <p className="text-sm">Sin QR configurados</p>
@@ -652,7 +670,7 @@ const PantallaTv = () => {
             </div>
 
             {/* QR codes */}
-            {qrCodes.map((qr) => (
+            {qrCodes.filter(qr => selectedQRIds.includes(qr.id)).map((qr) => (
               <div
                 key={qr.id}
                 className="bg-white rounded-2xl p-6 text-center space-y-3 w-[280px]"
@@ -666,7 +684,7 @@ const PantallaTv = () => {
               </div>
             ))}
 
-            {qrCodes.length === 0 && (
+            {qrCodes.filter(qr => selectedQRIds.includes(qr.id)).length === 0 && (
               <div className="flex flex-col items-center justify-center gap-3 text-slate-500 py-12">
                 <QrCode className="h-16 w-16" />
                 <p className="text-lg">Sin QR configurados</p>
