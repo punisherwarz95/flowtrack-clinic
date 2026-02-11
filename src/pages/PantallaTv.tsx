@@ -174,8 +174,9 @@ const PantallaTv = () => {
         const typed = data as unknown as AtencionConPaciente[];
         // Detect new arrivals to announce
         typed.forEach((a) => {
-          if (a.box_id && !announcedRef.current.has(a.id)) {
-            announcedRef.current.add(a.id);
+          const announceKey = `${a.id}_${a.box_id}`;
+          if (a.box_id && !announcedRef.current.has(announceKey)) {
+            announcedRef.current.add(announceKey);
             const box = boxes.find((b) => b.id === a.box_id);
             if (box && a.pacientes?.nombre) {
               announcePatient(a.pacientes.nombre, box.nombre);
@@ -202,13 +203,14 @@ const PantallaTv = () => {
         { event: "UPDATE", schema: "public", table: "atenciones" },
         async (payload) => {
           const newRow = payload.new as any;
+          const announceKey = `${newRow.id}_${newRow.box_id}`;
           if (
             newRow.box_id &&
             selectedBoxIds.includes(newRow.box_id) &&
             newRow.estado === "en_atencion" &&
-            !announcedRef.current.has(newRow.id)
+            !announcedRef.current.has(announceKey)
           ) {
-            announcedRef.current.add(newRow.id);
+            announcedRef.current.add(announceKey);
             // Fetch patient name
             const { data: pac } = await supabase
               .from("pacientes")
