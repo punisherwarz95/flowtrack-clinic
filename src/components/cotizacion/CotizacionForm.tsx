@@ -338,11 +338,11 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
             })) || [];
             
             const costoTotal = detalleExamenes.reduce((sum, e) => sum + e.costo_neto, 0);
-            const valorTotalNeto = costoTotal * cantidad;
-            const valorIva = afectoIva ? valorTotalNeto * 0.19 : 0;
+            const valorTotalNeto = Math.round(costoTotal * cantidad);
+            const valorIva = Math.round(afectoIva ? valorTotalNeto * 0.19 : 0);
             const valorConIva = valorTotalNeto + valorIva;
             const margenPorcentaje = defaultMargen?.porcentaje || 0;
-            const valorMargen = valorConIva * (margenPorcentaje / 100);
+            const valorMargen = Math.round(valorConIva * (margenPorcentaje / 100));
             const valorFinal = valorConIva + valorMargen;
 
             newItems.push({
@@ -370,11 +370,11 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
           // It's an examen
           const examen = examenes.find((e) => e.id === item.examen_id);
           if (examen) {
-            const valorTotalNeto = (examen.costo_neto || 0) * cantidad;
-            const valorIva = afectoIva ? valorTotalNeto * 0.19 : 0;
+            const valorTotalNeto = Math.round((examen.costo_neto || 0) * cantidad);
+            const valorIva = Math.round(afectoIva ? valorTotalNeto * 0.19 : 0);
             const valorConIva = valorTotalNeto + valorIva;
             const margenPorcentaje = defaultMargen?.porcentaje || 0;
-            const valorMargen = valorConIva * (margenPorcentaje / 100);
+            const valorMargen = Math.round(valorConIva * (margenPorcentaje / 100));
             const valorFinal = valorConIva + valorMargen;
 
             newItems.push({
@@ -455,13 +455,13 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
     margenId: string | null,
     aplicaIva: boolean = true
   ) => {
-    const valorTotalNeto = valorUnitarioNeto * cantidad;
-    const valorIva = aplicaIva ? valorTotalNeto * 0.19 : 0;
+    const valorTotalNeto = Math.round(valorUnitarioNeto * cantidad);
+    const valorIva = Math.round(aplicaIva ? valorTotalNeto * 0.19 : 0);
     const valorConIva = valorTotalNeto + valorIva;
 
     const margen = margenes.find((m) => m.id === margenId);
     const margenPorcentaje = margen?.porcentaje || 0;
-    const valorMargen = valorConIva * (margenPorcentaje / 100);
+    const valorMargen = Math.round(valorConIva * (margenPorcentaje / 100));
     const valorFinal = valorConIva + valorMargen;
 
     return {
@@ -548,11 +548,11 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
 
         // Si el campo es cantidad y el margen es personalizado, recalcular manualmente
         if (field === "cantidad" && item.margen_nombre === "Personalizado") {
-          const valorTotalNeto = item.valor_unitario_neto * newCantidad;
-          const valorIva = afectoIva ? valorTotalNeto * 0.19 : 0;
+          const valorTotalNeto = Math.round(item.valor_unitario_neto * newCantidad);
+          const valorIva = Math.round(afectoIva ? valorTotalNeto * 0.19 : 0);
           const valorConIva = valorTotalNeto + valorIva;
           const margenPorcentaje = item.margen_porcentaje || 0;
-          const valorMargen = valorConIva * (margenPorcentaje / 100);
+          const valorMargen = Math.round(valorConIva * (margenPorcentaje / 100));
           const valorFinal = valorConIva + valorMargen;
 
           return {
@@ -585,11 +585,11 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
 
         const valorConIva = item.valor_con_iva;
         const porcentajeCalculado = valorConIva > 0 ? (nuevoValorMargen / valorConIva) * 100 : 0;
-        const valorFinal = valorConIva + nuevoValorMargen;
+        const valorFinal = valorConIva + Math.round(nuevoValorMargen);
 
         return {
           ...item,
-          valor_margen: nuevoValorMargen,
+          valor_margen: Math.round(nuevoValorMargen),
           margen_porcentaje: Math.round(porcentajeCalculado * 100) / 100,
           valor_final: valorFinal,
           margen_id: null,
@@ -732,10 +732,10 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
         empresa_contacto: empresaForm.contacto || null,
         empresa_email: empresaForm.email || null,
         empresa_telefono: empresaForm.telefono || null,
-        subtotal_neto: totals.subtotalNeto,
-        total_iva: totals.totalIva,
-        total_con_iva: totals.totalConIva,
-        total_con_margen: totals.totalFinal,
+        subtotal_neto: Math.round(totals.subtotalNeto),
+        total_iva: Math.round(totals.totalIva),
+        total_con_iva: Math.round(totals.totalConIva),
+        total_con_margen: Math.round(totals.totalFinal),
         estado,
         observaciones: observaciones || null,
         afecto_iva: afectoIva,
