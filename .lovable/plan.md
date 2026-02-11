@@ -1,72 +1,42 @@
 
+# Fix: Total de Cotizacion en Portal Empresa
 
-# Crear 4 Documentos + Mejoras al Visor de Formularios
+## Problema Detectado
 
-## Resumen
+Despues de analizar el codigo y la base de datos, encontre lo siguiente:
 
-Se crearán 4 documentos digitales en la base de datos y se harán mejoras al componente `DocumentoFormViewer` para soportar puntajes automáticos y lógica condicional en Lake Louis.
+- Los valores por item SI incluyen margen correctamente ($82.500, $125.000, $125.000)
+- El total que se muestra ($267.500) corresponde al campo `subtotal_neto` (sin margen), NO al `total_con_margen` ($332.500)
+- En la base de datos actual, `total_con_margen` ya tiene el valor correcto ($332.500)
+- El codigo ya usa `total_con_margen` para mostrar el total
 
-## Parte 1: Cambios en el Frontend (DocumentoFormViewer.tsx)
+La causa mas probable es que la cotizacion 304 fue creada antes de que el calculo de `total_con_margen` estuviera correctamente implementado, y el valor guardado en ese momento fue igual al `subtotal_neto`.
 
-Se agregará soporte para dos nuevas funcionalidades usando el campo `opciones` de la base de datos para almacenar metadatos adicionales:
+## Solucion
 
-### A. Campo tipo "puntaje" (score summary)
-- Nuevo tipo de campo `puntaje` que calcula la suma de campos tipo `radio` que tengan opciones numéricas
-- Se configurará en `opciones` con `{"campos_suma": ["id1", "id2", ...]}` indicando qué campos sumar
-- Mostrará el puntaje total en tiempo real
+Para prevenir este problema en el futuro y corregir cualquier dato inconsistente, hare dos cosas:
 
-### B. Lógica condicional para Lake Louis
-- Cuando el paciente responda "NO" a "Ha estado sobre 3000m", los campos de experiencia en altitud se auto-completarán como vacíos/0 y se deshabilitarán
-- Cuando todos los síntomas queden en 0, las preguntas de seguimiento (requirió atención médica, etc.) se auto-completarán como "NO"
-- Se implementará usando el campo `opciones` con `{"depende_de": "campo_id", "valor_activacion": "SI"}` para campos condicionales
+### 1. Calcular el total desde los items en el portal (no depender solo del campo guardado)
 
-## Parte 2: Inserciones en Base de Datos
+En `src/pages/empresa/EmpresaCotizaciones.tsx`, en lugar de confiar unicamente en `cotizacion.total_con_margen`, calcular el total sumando los `valor_final` de los items visibles. Esto garantiza que el total siempre coincida con los items mostrados.
 
-### Documento 1: DECLARACION DE SALUD
-- Texto informativo con variables del paciente
-- Campos para examen ocupacional y antecedentes laborales
-- Tabla de 26 enfermedades como campos radio SI/NO
-- Secciones de fármacos, hábitos, alergias, cirugías
-- Antecedentes familiares y laborales
-- Sección condicional para mujeres
-- Texto legal declarativo
-- Firma obligatoria
+**Cambio en `CotizacionDirectaCard`** (linea 554-563):
+- Calcular `totalCalculado` como la suma de `item.valor_final` de los items filtrados
+- Usar `totalCalculado` si es mayor que 0, de lo contrario usar `cotizacion.total_con_margen` como fallback
 
-### Documento 2: CONSENTIMIENTO INFORMADO ALCOHOL Y DROGAS
-- Texto informativo con variables
-- Campo radio: acepta/no acepta voluntariamente
-- Campo radio: toma medicamentos SI/NO
-- Campo condicional: detalle de medicamentos
-- Firma obligatoria
+**Mismo cambio en `SolicitudCard`** (linea 489-499):
+- Aplicar la misma logica para cotizaciones asociadas a solicitudes
 
-### Documento 3: ESCALA DE SOMNOLENCIA DE EPWORTH
-- Texto informativo explicativo
-- 8 preguntas situacionales con radio 0-3
-- Campo puntaje automático que suma las 8 respuestas
-- Firma obligatoria
+### 2. Actualizar datos historicos inconsistentes
 
-### Documento 4: ENCUESTA DE LAKE LOUIS MODIFICADA
-- Texto informativo con variables
-- Pregunta gatillo: ha estado sobre 3000m (SI/NO)
-- Campos condicionales de experiencia en altitud (se deshabilitan si responde NO)
-- 5 síntomas con escala 0-3
-- Campo puntaje automático de síntomas
-- 5 preguntas SI/NO condicionales (se auto-completan como NO si puntaje de síntomas es 0)
-- Firma obligatoria
+Verificar y corregir cualquier cotizacion donde `total_con_margen` no coincida con la suma de `valor_final` de sus items.
 
-## Detalles Tecnicos
+## Archivo a Modificar
 
-### Archivos a modificar
-1. **`src/components/DocumentoFormViewer.tsx`**: Agregar renderizado del tipo `puntaje`, lógica condicional basada en `opciones.depende_de`, y auto-completado de campos dependientes
+| Archivo | Cambio |
+|---------|--------|
+| `src/pages/empresa/EmpresaCotizaciones.tsx` | Calcular total desde items en vez de usar solo el campo guardado |
 
-### Migracion SQL
-- 4 inserts en `documentos_formularios`
-- Aproximadamente 80-100 inserts en `documento_campos` con los campos de cada formulario
-- Todas las firmas con `requerido = true`
-- Campos condicionales con metadata en `opciones` (jsonb)
+## Resultado Esperado
 
-### Flujo condicional Lake Louis
-- Si "Ha estado sobre 3000m" = "NO": campos de experiencia se deshabilitan y quedan vacíos
-- Si todos los síntomas = 0: campos de "requirió atención", "requirió descenso", etc. se auto-completan como "NO" y se deshabilitan
-- El paciente puede cambiar su respuesta y los campos se reactivan automáticamente
-
+El cliente vera el total correcto ($332.500 para la cotizacion 304) que coincide con la suma de los valores individuales mostrados, independientemente de si el campo `total_con_margen` fue guardado correctamente o no.
