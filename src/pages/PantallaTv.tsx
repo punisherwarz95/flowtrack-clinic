@@ -391,10 +391,10 @@ const PantallaTv = () => {
                       key={qr.id}
                       className="relative border rounded-lg p-3 text-center space-y-2"
                     >
-                      <img
+              <img
                         src={qr.imagen_url}
                         alt={qr.titulo}
-                        className="w-full aspect-square object-contain rounded"
+                        className="w-48 h-48 object-contain rounded mx-auto"
                       />
                       <p className="text-sm font-medium">{qr.titulo}</p>
                       <Button
@@ -553,7 +553,7 @@ const PantallaTv = () => {
               <img
                 src={qr.imagen_url}
                 alt={qr.titulo}
-                className="w-full aspect-square object-contain"
+                className="w-48 h-48 object-contain mx-auto"
               />
               <p className="text-slate-900 font-semibold text-sm">{qr.titulo}</p>
             </div>
@@ -618,12 +618,12 @@ const PantallaTv = () => {
             {qrCodes.map((qr) => (
               <div
                 key={qr.id}
-                className="bg-white rounded-2xl p-6 text-center space-y-3 min-w-[220px] max-w-[300px]"
+                className="bg-white rounded-2xl p-6 text-center space-y-3 w-[280px]"
               >
                 <img
                   src={qr.imagen_url}
                   alt={qr.titulo}
-                  className="w-full aspect-square object-contain"
+                  className="w-48 h-48 object-contain mx-auto"
                 />
                 <p className="text-slate-900 font-semibold">{qr.titulo}</p>
               </div>
