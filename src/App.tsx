@@ -25,6 +25,7 @@ import BoxView from "./pages/BoxView";
 import Usuarios from "./pages/Usuarios";
 import PortalPaciente from "./pages/PortalPaciente";
 import NotFound from "./pages/NotFound";
+import PantallaTv from "./pages/PantallaTv";
 import { InitAdmin } from "./components/InitAdmin";
 import ProtectedRoute from "./components/ProtectedRoute";
 import EmpresaProtectedRoute from "./components/empresa/EmpresaProtectedRoute";
@@ -53,6 +54,7 @@ const App = () => (
                 {/* Staff routes */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/portal-paciente" element={<PortalPaciente />} />
+                <Route path="/pantalla" element={<PantallaTv />} />
                 <Route path="/" element={<ProtectedRoute path="/"><Dashboard /></ProtectedRoute>} />
                 <Route path="/flujo" element={<ProtectedRoute path="/flujo"><Flujo /></ProtectedRoute>} />
                 <Route path="/mi-box" element={<ProtectedRoute path="/mi-box"><MiBox /></ProtectedRoute>} />
