@@ -90,6 +90,7 @@ const Dashboard = () => {
   
   // Stats mensuales
   const [examenesConteoMensual, setExamenesConteoMensual] = useState<Record<string, { asignados: number; completados: number }>>({});
+  const [examenesConteoMensualPorBox, setExamenesConteoMensualPorBox] = useState<Record<string, Record<string, { asignados: number; completados: number }>>>({});
   const [statsMonthly, setStatsMonthly] = useState({
     pacientesMensuales: { total: 0, workmed: 0, jenner: 0 },
     examenesRealizadosMes: 0,
@@ -243,16 +244,28 @@ const Dashboard = () => {
       const startOfMonth = new Date(monthToUse.getFullYear(), monthToUse.getMonth(), 1, 0, 0, 0, 0).toISOString();
       const endOfMonth = new Date(monthToUse.getFullYear(), monthToUse.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
 
-      // Obtener pacientes mensuales
-      const pacientesMensualesRes = await supabase
-        .from("atenciones")
-        .select("id, pacientes(tipo_servicio)")
-        .gte("fecha_ingreso", startOfMonth)
-        .lte("fecha_ingreso", endOfMonth);
+      // Obtener pacientes mensuales y box_examenes en paralelo
+      const [pacientesMensualesRes, boxExamenesRes] = await Promise.all([
+        supabase
+          .from("atenciones")
+          .select("id, pacientes(tipo_servicio)")
+          .gte("fecha_ingreso", startOfMonth)
+          .lte("fecha_ingreso", endOfMonth),
+        supabase
+          .from("box_examenes")
+          .select("examen_id, boxes(nombre)"),
+      ]);
 
       const pacientesMensualesWM = pacientesMensualesRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "workmed").length || 0;
       const pacientesMensualesJ = pacientesMensualesRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "jenner").length || 0;
       const pacientesMensualesTotal = pacientesMensualesRes.data?.length || 0;
+
+      // Crear mapa examen_id -> box nombre
+      const examenBoxMap = new Map<string, string>();
+      boxExamenesRes.data?.forEach((be: any) => {
+        const boxNombre = be.boxes?.nombre || "Sin Box";
+        examenBoxMap.set(be.examen_id, boxNombre);
+      });
 
       // Obtener todos los exámenes mensuales con paginación para evitar límite de 1000
       let allExamenes: any[] = [];
@@ -282,10 +295,14 @@ const Dashboard = () => {
         }
       }
 
-      // Conteo de exámenes mensuales
+      // Conteo de exámenes mensuales (global y por box)
       const conteoExamenes: Record<string, { asignados: number; completados: number }> = {};
+      const conteoPorBox: Record<string, Record<string, { asignados: number; completados: number }>> = {};
       allExamenes.forEach((ae: any) => {
         const nombreExamen = ae.examenes?.nombre || "Sin nombre";
+        const boxNombre = examenBoxMap.get(ae.examen_id) || "Sin Box";
+        
+        // Global
         if (!conteoExamenes[nombreExamen]) {
           conteoExamenes[nombreExamen] = { asignados: 0, completados: 0 };
         }
@@ -293,8 +310,21 @@ const Dashboard = () => {
         if (ae.estado === "completado") {
           conteoExamenes[nombreExamen].completados += 1;
         }
+        
+        // Por box
+        if (!conteoPorBox[boxNombre]) {
+          conteoPorBox[boxNombre] = {};
+        }
+        if (!conteoPorBox[boxNombre][nombreExamen]) {
+          conteoPorBox[boxNombre][nombreExamen] = { asignados: 0, completados: 0 };
+        }
+        conteoPorBox[boxNombre][nombreExamen].asignados += 1;
+        if (ae.estado === "completado") {
+          conteoPorBox[boxNombre][nombreExamen].completados += 1;
+        }
       });
       setExamenesConteoMensual(conteoExamenes);
+      setExamenesConteoMensualPorBox(conteoPorBox);
 
       setStatsMonthly({
         pacientesMensuales: { total: pacientesMensualesTotal, workmed: pacientesMensualesWM, jenner: pacientesMensualesJ },
@@ -720,12 +750,12 @@ const Dashboard = () => {
             </Card>
           </div>
 
-          {/* Exámenes del Mes */}
+          {/* Exámenes del Mes - por Box */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ClipboardCheck className="h-5 w-5 text-primary" />
-                Exámenes del Mes
+                Exámenes del Mes por Box
               </CardTitle>
               <p className="text-sm text-muted-foreground">
                 {format(selectedMonth || new Date(), "MMMM 'de' yyyy", { locale: es })}
@@ -733,7 +763,48 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-4xl font-bold text-foreground mb-4">{statsMonthly.examenesRealizadosMes}</div>
-              {renderExamenesGrid(examenesConteoMensual, statsMonthly.examenesRealizadosMes)}
+              {Object.keys(examenesConteoMensualPorBox).length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sin exámenes asignados</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {Object.entries(examenesConteoMensualPorBox)
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([boxNombre, examenes]) => {
+                      const sortedExamenes = Object.entries(examenes).sort((a, b) => b[1].asignados - a[1].asignados);
+                      const totalBox = sortedExamenes.reduce((sum, [, c]) => sum + c.asignados, 0);
+                      const completadosBox = sortedExamenes.reduce((sum, [, c]) => sum + c.completados, 0);
+                      return (
+                        <Card key={boxNombre} className="border">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-semibold flex items-center justify-between">
+                              <span>{boxNombre}</span>
+                              <Badge variant="secondary">{completadosBox}/{totalBox}</Badge>
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            <table className="w-full">
+                              <tbody>
+                                {sortedExamenes.map(([nombre, c]) => (
+                                  <tr key={nombre}>
+                                    <td className="text-xs text-muted-foreground py-0.5 pr-2">{nombre}</td>
+                                    <td className="py-0.5 text-right">
+                                      <Badge 
+                                        variant="outline"
+                                        className={`text-xs ${c.completados === c.asignados ? "bg-green-100 text-green-800 border-green-300" : ""}`}
+                                      >
+                                        {c.completados}/{c.asignados}
+                                      </Badge>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </section>
