@@ -91,6 +91,9 @@ const Dashboard = () => {
   // Stats mensuales
   const [examenesConteoMensual, setExamenesConteoMensual] = useState<Record<string, { asignados: number; completados: number }>>({});
   const [examenesConteoMensualPorPrestador, setExamenesConteoMensualPorPrestador] = useState<Record<string, Record<string, { asignados: number; completados: number }>>>({});
+  const [examenesConteoMensualPorBox, setExamenesConteoMensualPorBox] = useState<Record<string, Record<string, { asignados: number; completados: number }>>>({});
+  const [selectedMonthlyPrestadorFilter, setSelectedMonthlyPrestadorFilter] = useState<string>("all");
+  const [selectedMonthlyBoxFilter, setSelectedMonthlyBoxFilter] = useState<string>("all");
   const [statsMonthly, setStatsMonthly] = useState({
     pacientesMensuales: { total: 0, workmed: 0, jenner: 0 },
     examenesRealizadosMes: 0,
@@ -244,8 +247,8 @@ const Dashboard = () => {
       const startOfMonth = new Date(monthToUse.getFullYear(), monthToUse.getMonth(), 1, 0, 0, 0, 0).toISOString();
       const endOfMonth = new Date(monthToUse.getFullYear(), monthToUse.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
 
-      // Obtener pacientes mensuales y prestador_examenes en paralelo
-      const [pacientesMensualesRes, prestadorExamenesRes] = await Promise.all([
+      // Obtener pacientes mensuales, prestador_examenes y box_examenes en paralelo
+      const [pacientesMensualesRes, prestadorExamenesRes, boxExamenesMonthlyRes] = await Promise.all([
         supabase
           .from("atenciones")
           .select("id, pacientes(tipo_servicio)")
@@ -254,6 +257,9 @@ const Dashboard = () => {
         supabase
           .from("prestador_examenes")
           .select("examen_id, prestadores(nombre)"),
+        supabase
+          .from("box_examenes")
+          .select("examen_id, boxes(nombre)"),
       ]);
 
       const pacientesMensualesWM = pacientesMensualesRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "workmed").length || 0;
@@ -265,6 +271,13 @@ const Dashboard = () => {
       prestadorExamenesRes.data?.forEach((pe: any) => {
         const prestadorNombre = pe.prestadores?.nombre || "Sin Prestador";
         examenPrestadorMap.set(pe.examen_id, prestadorNombre);
+      });
+
+      // Crear mapa examen_id -> box nombre
+      const examenBoxMonthlyMap = new Map<string, string>();
+      boxExamenesMonthlyRes.data?.forEach((be: any) => {
+        const boxNombre = be.boxes?.nombre || "Sin Box";
+        examenBoxMonthlyMap.set(be.examen_id, boxNombre);
       });
 
       // Obtener todos los exámenes mensuales con paginación para evitar límite de 1000
@@ -295,12 +308,14 @@ const Dashboard = () => {
         }
       }
 
-      // Conteo de exámenes mensuales (global y por prestador)
+      // Conteo de exámenes mensuales (global, por prestador y por box)
       const conteoExamenes: Record<string, { asignados: number; completados: number }> = {};
       const conteoPorPrestador: Record<string, Record<string, { asignados: number; completados: number }>> = {};
+      const conteoPorBox: Record<string, Record<string, { asignados: number; completados: number }>> = {};
       allExamenes.forEach((ae: any) => {
         const nombreExamen = ae.examenes?.nombre || "Sin nombre";
         const prestadorNombre = examenPrestadorMap.get(ae.examen_id) || "Sin Prestador";
+        const boxNombre = examenBoxMonthlyMap.get(ae.examen_id) || "Sin Box";
         
         // Global
         if (!conteoExamenes[nombreExamen]) {
@@ -322,9 +337,22 @@ const Dashboard = () => {
         if (ae.estado === "completado") {
           conteoPorPrestador[prestadorNombre][nombreExamen].completados += 1;
         }
+
+        // Por box
+        if (!conteoPorBox[boxNombre]) {
+          conteoPorBox[boxNombre] = {};
+        }
+        if (!conteoPorBox[boxNombre][nombreExamen]) {
+          conteoPorBox[boxNombre][nombreExamen] = { asignados: 0, completados: 0 };
+        }
+        conteoPorBox[boxNombre][nombreExamen].asignados += 1;
+        if (ae.estado === "completado") {
+          conteoPorBox[boxNombre][nombreExamen].completados += 1;
+        }
       });
       setExamenesConteoMensual(conteoExamenes);
       setExamenesConteoMensualPorPrestador(conteoPorPrestador);
+      setExamenesConteoMensualPorBox(conteoPorBox);
 
       setStatsMonthly({
         pacientesMensuales: { total: pacientesMensualesTotal, workmed: pacientesMensualesWM, jenner: pacientesMensualesJ },
@@ -750,61 +778,115 @@ const Dashboard = () => {
             </Card>
           </div>
 
-          {/* Exámenes del Mes - por Prestador */}
+          {/* Exámenes del Mes - con filtros */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ClipboardCheck className="h-5 w-5 text-primary" />
-                Exámenes del Mes por Prestador
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {format(selectedMonth || new Date(), "MMMM 'de' yyyy", { locale: es })}
-              </p>
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <ClipboardCheck className="h-5 w-5 text-primary" />
+                      Exámenes del Mes
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {format(selectedMonth || new Date(), "MMMM 'de' yyyy", { locale: es })}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Select value={selectedMonthlyPrestadorFilter} onValueChange={(v) => { setSelectedMonthlyPrestadorFilter(v); if (v !== "all") setSelectedMonthlyBoxFilter("all"); }}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Filtrar por prestador" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los prestadores</SelectItem>
+                      {Object.keys(examenesConteoMensualPorPrestador).sort().map((nombre) => (
+                        <SelectItem key={nombre} value={nombre}>{nombre}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={selectedMonthlyBoxFilter} onValueChange={(v) => { setSelectedMonthlyBoxFilter(v); if (v !== "all") setSelectedMonthlyPrestadorFilter("all"); }}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Filtrar por box" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los boxes</SelectItem>
+                      {Object.keys(examenesConteoMensualPorBox).sort().map((nombre) => (
+                        <SelectItem key={nombre} value={nombre}>{nombre}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="text-4xl font-bold text-foreground mb-4">{statsMonthly.examenesRealizadosMes}</div>
-              {Object.keys(examenesConteoMensualPorPrestador).length === 0 ? (
-                <p className="text-sm text-muted-foreground">Sin exámenes asignados</p>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {Object.entries(examenesConteoMensualPorPrestador)
-                    .sort(([a], [b]) => a.localeCompare(b))
-                    .map(([prestadorNombre, examenes]) => {
-                      const sortedExamenes = Object.entries(examenes).sort((a, b) => b[1].asignados - a[1].asignados);
-                      const totalPrestador = sortedExamenes.reduce((sum, [, c]) => sum + c.asignados, 0);
-                      const completadosPrestador = sortedExamenes.reduce((sum, [, c]) => sum + c.completados, 0);
-                      return (
-                        <Card key={prestadorNombre} className="border">
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-semibold flex items-center justify-between">
-                              <span>{prestadorNombre}</span>
-                              <Badge variant="secondary">{completadosPrestador}/{totalPrestador}</Badge>
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent className="pt-0">
-                            <table className="w-full">
-                              <tbody>
-                                {sortedExamenes.map(([nombre, c]) => (
-                                  <tr key={nombre}>
-                                    <td className="text-xs text-muted-foreground py-0.5 pr-2">{nombre}</td>
-                                    <td className="py-0.5 text-right">
-                                      <Badge 
-                                        variant="outline"
-                                        className={`text-xs ${c.completados === c.asignados ? "bg-green-100 text-green-800 border-green-300" : ""}`}
-                                      >
-                                        {c.completados}/{c.asignados}
-                                      </Badge>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                </div>
-              )}
+              {(() => {
+                // Determine which data to show based on filters
+                let dataToShow: Record<string, Record<string, { asignados: number; completados: number }>>;
+                let groupLabel: string;
+
+                if (selectedMonthlyBoxFilter !== "all") {
+                  // Filter by specific box
+                  const boxData = examenesConteoMensualPorBox[selectedMonthlyBoxFilter];
+                  dataToShow = boxData ? { [selectedMonthlyBoxFilter]: boxData } : {};
+                  groupLabel = "Box";
+                } else if (selectedMonthlyPrestadorFilter !== "all") {
+                  // Filter by specific prestador
+                  const prestadorData = examenesConteoMensualPorPrestador[selectedMonthlyPrestadorFilter];
+                  dataToShow = prestadorData ? { [selectedMonthlyPrestadorFilter]: prestadorData } : {};
+                  groupLabel = "Prestador";
+                } else {
+                  // Show all grouped by prestador (default)
+                  dataToShow = examenesConteoMensualPorPrestador;
+                  groupLabel = "Prestador";
+                }
+
+                if (Object.keys(dataToShow).length === 0) {
+                  return <p className="text-sm text-muted-foreground">Sin exámenes asignados</p>;
+                }
+
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {Object.entries(dataToShow)
+                      .sort(([a], [b]) => a.localeCompare(b))
+                      .map(([groupName, examenes]) => {
+                        const sortedExamenes = Object.entries(examenes).sort((a, b) => b[1].asignados - a[1].asignados);
+                        const totalGroup = sortedExamenes.reduce((sum, [, c]) => sum + c.asignados, 0);
+                        const completadosGroup = sortedExamenes.reduce((sum, [, c]) => sum + c.completados, 0);
+                        return (
+                          <Card key={groupName} className="border">
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm font-semibold flex items-center justify-between">
+                                <span>{groupName}</span>
+                                <Badge variant="secondary">{completadosGroup}/{totalGroup}</Badge>
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent className="pt-0">
+                              <table className="w-full">
+                                <tbody>
+                                  {sortedExamenes.map(([nombre, c]) => (
+                                    <tr key={nombre}>
+                                      <td className="text-xs text-muted-foreground py-0.5 pr-2">{nombre}</td>
+                                      <td className="py-0.5 text-right">
+                                        <Badge 
+                                          variant="outline"
+                                          className={`text-xs ${c.completados === c.asignados ? "bg-green-100 text-green-800 border-green-300" : ""}`}
+                                        >
+                                          {c.completados}/{c.asignados}
+                                        </Badge>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         </section>
