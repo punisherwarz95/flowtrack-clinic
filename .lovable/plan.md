@@ -1,76 +1,39 @@
 
-# Fix: Valor Unitario, Margen con Cantidad, y Mayusculas en Examenes
 
-## Problema 1: Guardar valor unitario al aceptar cotizacion
+## Modificaciones al Codigo del Dia
 
-Cuando el cliente acepta una cotizacion, el sistema guarda `valor_final` (que es precio unitario con margen x cantidad) en `empresa_baterias`. Debe guardar el **valor unitario** (valor_final / cantidad).
+### Cambio 1: Generacion aleatoria en vez de correlativa
 
-### Cambios en `src/pages/empresa/EmpresaCotizaciones.tsx`
+Actualmente el codigo se genera de forma deterministica usando un indice secuencial (1, 2, 3...), lo que produce codigos predecibles. Se cambiara para que el codigo sea completamente aleatorio, manteniendo la misma estructura de 3 letras + 2 numeros no repetidos.
 
-**handleAceptarCotizacion (lineas 256-310)**:
-- Cambiar query de items para incluir `cantidad`: `select("paquete_id, valor_final, cantidad")`
-- Calcular valor unitario: `valor: (item.valor_final || 0) / (item.cantidad || 1)`
-- Aplicar en las lineas 297 y 309
+- Se reemplazara `generarCodigoPorIndice()` por una funcion `generarCodigoAleatorio()` que seleccione letras y numeros al azar
+- Se eliminara el campo `indice_secuencia` de la logica (ya no se necesita)
+- Para evitar codigos repetidos, se verificara contra la base de datos antes de insertar. Si hay colision, se regenera
 
-**handleAceptarDirecta (lineas 362-384)**:
-- Mismo cambio: incluir `cantidad` en query (linea 364)
-- Calcular valor unitario en lineas 380 y 382
+### Cambio 2: Reset solo cuando hay hora configurada
 
----
+Actualmente el sistema siempre tiene un countdown y auto-regenera el codigo a la hora configurada. Se cambiara para que:
 
-## Problema 2: Cambiar cantidad resetea el margen personalizado
+- Si no hay hora de reset configurada en `codigo_diario_config` (o el valor es null/vacio), el codigo NO se resetea automaticamente y no se muestra countdown
+- Si hay una hora configurada, se mantiene el comportamiento actual: countdown visible y auto-regeneracion a esa hora
+- En la configuracion se agregara la opcion de limpiar/desactivar la hora de reset
 
-En `src/components/cotizacion/CotizacionForm.tsx`, `handleUpdateItem` (linea 541) siempre llama a `calculateItemValues` con el `margen_id` del item. Cuando el margen es personalizado, `margen_id` es null, asi que `calculateItemValues` no encuentra margen y usa 0%.
+### Detalle tecnico
 
-### Cambio en `handleUpdateItem` (lineas 541-558)
+**Archivo:** `src/components/CodigoDelDia.tsx`
 
-Agregar logica condicional: si el item tiene `margen_nombre === "Personalizado"`, recalcular manualmente usando `item.margen_porcentaje` en vez de llamar a `calculateItemValues`:
+**Funcion de generacion aleatoria:**
+- Seleccionar 3 letras al azar del conjunto LETRAS (A-Z sin I, O)
+- Seleccionar 2 numeros distintos al azar del conjunto NUMEROS (2-9)
+- Concatenar para formar el codigo de 5 caracteres
 
-```text
-if campo es "cantidad" y margen es "Personalizado":
-  - Recalcular valor_total_neto, valor_iva, valor_con_iva con nueva cantidad
-  - Aplicar item.margen_porcentaje al nuevo valor_con_iva
-  - Calcular valor_margen y valor_final
-else:
-  - Usar calculateItemValues como hasta ahora
-```
+**Logica de reset condicional:**
+- `horaReset` pasara a ser `string | null` en vez de siempre tener un valor
+- El intervalo de auto-regeneracion solo se activa si `horaReset` tiene valor
+- El countdown solo se muestra si `horaReset` tiene valor
+- En el dialog de configuracion se agrega un boton para desactivar el reset automatico
 
----
+**Migracion de base de datos:**
+- Modificar la columna `hora_reset` en `codigo_diario_config` para permitir valores null (actualmente tiene default '00:00:00')
+- Eliminar la columna `indice_secuencia` de `codigos_diarios` si existe (ya no se usa)
 
-## Problema 3: Nombres de examenes en mayusculas (solucion en base de datos)
-
-En vez de aplicar `.toUpperCase()` en el frontend, actualizar directamente los nombres en la tabla `examenes` para que queden en mayusculas de raiz.
-
-### Migracion SQL
-
-```sql
-UPDATE examenes SET nombre = UPPER(nombre);
-```
-
-Esto actualiza los ~200+ examenes existentes de una sola vez. Los nuevos examenes que se creen en el futuro deberian ingresarse en mayusculas (se puede agregar un trigger opcional para forzar esto automaticamente).
-
-### Trigger opcional para futuros registros
-
-```sql
-CREATE OR REPLACE FUNCTION uppercase_examen_nombre()
-RETURNS trigger AS $$
-BEGIN
-  NEW.nombre = UPPER(NEW.nombre);
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER tr_uppercase_examen_nombre
-BEFORE INSERT OR UPDATE ON examenes
-FOR EACH ROW EXECUTE FUNCTION uppercase_examen_nombre();
-```
-
----
-
-## Resumen de cambios
-
-| Archivo / Recurso | Cambio |
-|---|---|
-| `src/pages/empresa/EmpresaCotizaciones.tsx` | Guardar valor unitario (valor_final / cantidad) al aceptar |
-| `src/components/cotizacion/CotizacionForm.tsx` | Preservar margen personalizado al cambiar cantidad |
-| Migracion SQL | UPDATE examenes con UPPER + trigger para futuros |
