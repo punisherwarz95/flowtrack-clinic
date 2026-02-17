@@ -1171,7 +1171,7 @@ const Pacientes = () => {
                                   className="flex items-center justify-between py-1.5 px-2 bg-background rounded border text-sm"
                                 >
                                   <div className="flex-1 min-w-0">
-                                    <span className="truncate block">{examen.nombre}</span>
+                                    <span className="block break-words">{examen.nombre}</span>
                                     {examen.codigo && (
                                       <span className="text-xs text-muted-foreground">{examen.codigo}</span>
                                     )}
@@ -1320,7 +1320,7 @@ const Pacientes = () => {
                                         }}
                                         className="w-3.5 h-3.5"
                                       />
-                                      <span className="truncate">{paquete.nombre}</span>
+                                      <span className="break-words">{paquete.nombre}</span>
                                       <span className="text-xs text-muted-foreground ml-auto shrink-0">
                                         ({paquete.paquete_examen_items.length})
                                       </span>
@@ -1360,7 +1360,7 @@ const Pacientes = () => {
                                     }}
                                     className="w-3.5 h-3.5"
                                   />
-                                  <span className="truncate flex-1">{examen.nombre}</span>
+                                  <span className="break-words flex-1">{examen.nombre}</span>
                                   {examen.codigo && (
                                     <span className="text-xs text-muted-foreground shrink-0">{examen.codigo}</span>
                                   )}
