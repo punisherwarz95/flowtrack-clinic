@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Trash2, Pencil, Calendar as CalendarIcon, ClipboardList, FileText } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Calendar as CalendarIcon, ClipboardList, FileText, ClipboardPaste } from "lucide-react";
 import CodigoDelDia from "@/components/CodigoDelDia";
 import { useGenerateDocumentosFromBateria } from "@/hooks/useAtencionDocumentos";
 import { supabase } from "@/integrations/supabase/client";
@@ -141,6 +141,8 @@ const Pacientes = () => {
   const [paqueteFaenasMap, setPaqueteFaenasMap] = useState<PaqueteFaenaMap>({});
   const [bateriaFilter, setBateriaFilter] = useState("");
   const [filtroFaenaIdBateria, setFiltroFaenaIdBateria] = useState<string>("__all__");
+  const [textoWorkmed, setTextoWorkmed] = useState("");
+  const [mostrarPegarTexto, setMostrarPegarTexto] = useState(false);
   
   const { generateDocuments } = useGenerateDocumentosFromBateria();
   
@@ -883,6 +885,57 @@ const Pacientes = () => {
     }
   };
 
+  // Función para parsear texto de Workmed y auto-seleccionar exámenes
+  const handleParsearTextoWorkmed = () => {
+    if (!textoWorkmed.trim()) {
+      toast.error("Pegue el texto de Workmed primero");
+      return;
+    }
+
+    // Normalizar texto: convertir a mayúsculas y limpiar
+    const textoNormalizado = textoWorkmed.toUpperCase();
+    
+    // Extraer todas las líneas no vacías del texto pegado
+    const lineas = textoNormalizado
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => l.length > 0);
+
+    let coincidencias = 0;
+    const nuevosExamenes = [...selectedExamenes];
+
+    examenes.forEach((examen) => {
+      const nombreExamen = examen.nombre.toUpperCase().trim();
+      const codigoExamen = examen.codigo?.toUpperCase().trim() || "";
+
+      // Buscar si alguna línea del texto coincide con el nombre o código del examen
+      const encontrado = lineas.some(linea => {
+        // Coincidencia exacta o si la línea contiene el nombre del examen
+        if (linea === nombreExamen || linea.includes(nombreExamen)) return true;
+        // Coincidencia por código
+        if (codigoExamen && (linea === codigoExamen || linea.includes(codigoExamen))) return true;
+        // Coincidencia inversa: el nombre del examen contiene la línea (para nombres parciales)
+        if (linea.length >= 5 && nombreExamen.includes(linea)) return true;
+        return false;
+      });
+
+      if (encontrado && !nuevosExamenes.includes(examen.id)) {
+        nuevosExamenes.push(examen.id);
+        coincidencias++;
+      }
+    });
+
+    setSelectedExamenes(nuevosExamenes);
+    
+    if (coincidencias > 0) {
+      toast.success(`${coincidencias} examen(es) encontrado(s) y seleccionado(s)`);
+      setTextoWorkmed("");
+      setMostrarPegarTexto(false);
+    } else {
+      toast.error("No se encontraron coincidencias con los exámenes registrados");
+    }
+  };
+
   const filteredPatients = patients
     .filter(
       (p) =>
@@ -945,6 +998,8 @@ const Pacientes = () => {
                 setExamenFilter("");
                 setBateriaFilter("");
                 setFiltroFaenaIdBateria("__all__");
+                setTextoWorkmed("");
+                setMostrarPegarTexto(false);
               }
             }}>
               <DialogTrigger asChild>
@@ -1210,9 +1265,51 @@ const Pacientes = () => {
 
                     {/* Columna 4 - Buscador de baterías y exámenes */}
                     <div className="flex flex-col overflow-hidden">
-                      <h3 className="font-semibold text-sm text-muted-foreground border-b pb-2 mb-2 flex-shrink-0">
+                      <h3 className="font-semibold text-sm text-muted-foreground border-b pb-2 mb-2 flex-shrink-0 flex items-center justify-between">
                         Agregar Exámenes
+                        <Button
+                          type="button"
+                          variant={mostrarPegarTexto ? "secondary" : "outline"}
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          onClick={() => setMostrarPegarTexto(!mostrarPegarTexto)}
+                        >
+                          <ClipboardPaste className="h-3 w-3" />
+                          Pegar texto
+                        </Button>
                       </h3>
+
+                      {/* Pegar texto Workmed */}
+                      {mostrarPegarTexto && (
+                        <div className="flex-shrink-0 mb-2 p-2 border rounded-md bg-muted/50 space-y-2">
+                          <Label className="text-xs text-muted-foreground">Pegue el extracto de exámenes de Workmed:</Label>
+                          <textarea
+                            value={textoWorkmed}
+                            onChange={(e) => setTextoWorkmed(e.target.value)}
+                            placeholder={"Antropometría\nANTROPOMETRIA Y CONTROL DE SIGNOS VITALES\nConsulta médica\nCONSULTA MÉDICA\n..."}
+                            className="w-full h-28 p-2 text-xs rounded-md border border-input bg-background resize-none"
+                          />
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="h-7 text-xs flex-1"
+                              onClick={handleParsearTextoWorkmed}
+                            >
+                              Analizar y seleccionar
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs"
+                              onClick={() => { setTextoWorkmed(""); setMostrarPegarTexto(false); }}
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                       
                       {/* Filtro de faena arriba */}
                       <div className="flex-shrink-0 mb-2">
