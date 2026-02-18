@@ -901,6 +901,7 @@ const Dashboard = () => {
                     <CardTitle className="flex items-center gap-2">
                       <Users className="h-5 w-5 text-primary" />
                       Pacientes Ingresados
+                      <Badge variant="secondary" className="ml-2 text-base">{filteredAtenciones.length}</Badge>
                     </CardTitle>
                     <p className="text-sm text-muted-foreground mt-1">
                       {format(selectedDateTable || new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })}
@@ -1001,7 +1002,7 @@ const Dashboard = () => {
                     >
                       {filterEstadoListo && <Check className="h-3 w-3" />}
                     </div>
-                    <span className="text-sm">Listos ({conteosEstado.listos})</span>
+                    <span className="text-sm">En Atención ({conteosEstado.listos})</span>
                   </label>
                 </div>
                 
