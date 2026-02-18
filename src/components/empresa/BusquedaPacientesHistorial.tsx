@@ -19,13 +19,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Calendar, Building2, User } from "lucide-react";
+import { Search, Calendar, Building2, User, Download } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import * as XLSX from "xlsx";
 
 interface Empresa {
   id: string;
   nombre: string;
+}
+
+interface ExamenHistorial {
+  codigo: string | null;
+  nombre: string;
+  estado: string;
 }
 
 interface VisitaHistorial {
@@ -37,6 +44,7 @@ interface VisitaHistorial {
   empresa_nombre: string;
   faena_nombre: string | null;
   baterias: string[];
+  examenes: ExamenHistorial[];
 }
 
 interface BusquedaPacientesHistorialProps {
@@ -59,7 +67,6 @@ const BusquedaPacientesHistorial = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
-  // Cargar empresas si es staff admin o si no hay empresaId fijo
   useEffect(() => {
     if (isStaffAdmin || !empresaId) {
       loadEmpresas();
@@ -82,7 +89,6 @@ const BusquedaPacientesHistorial = ({
     setDebugInfo(null);
 
     try {
-      // Determinar empresa a filtrar
       const empresaIdToFilter = empresaId || (empresaFiltro !== "__all__" ? empresaFiltro : null);
 
       const selectQuery = `
@@ -98,14 +104,17 @@ const BusquedaPacientesHistorial = ({
           faena_id,
           faenas ( nombre )
         ),
-         prereservas!atenciones_prereserva_id_fkey (
+        prereservas!atenciones_prereserva_id_fkey (
           prereserva_baterias (
             paquetes_examenes ( nombre )
           )
+        ),
+        atencion_examenes (
+          estado,
+          examenes ( nombre, codigo )
         )
       `;
 
-      // Intento 1: filtro por empresa vía join (más eficiente)
       let query = supabase
         .from("atenciones")
         .select(selectQuery)
@@ -119,7 +128,7 @@ const BusquedaPacientesHistorial = ({
 
       let { data, error } = await query.limit(500);
 
-      // Fallback: si por alguna razón el join no devuelve nada, filtrar por paciente_id
+      // Fallback
       if (!error && empresaIdToFilter && (!data || data.length === 0)) {
         const { data: pacientesData, error: pacientesError } = await supabase
           .from("pacientes")
@@ -127,7 +136,6 @@ const BusquedaPacientesHistorial = ({
           .eq("empresa_id", empresaIdToFilter);
 
         if (pacientesError) {
-          console.error("Error cargando pacientes de empresa:", pacientesError);
           setErrorMsg("No se pudieron cargar los pacientes de la empresa seleccionada.");
           setResultados([]);
           return;
@@ -164,7 +172,6 @@ const BusquedaPacientesHistorial = ({
         return;
       }
 
-      // Procesar resultados
       let visitas: VisitaHistorial[] = (data || []).map((atencion: any) => ({
         id: atencion.id,
         fecha_ingreso: atencion.fecha_ingreso,
@@ -176,9 +183,13 @@ const BusquedaPacientesHistorial = ({
         baterias: atencion.prereservas?.prereserva_baterias?.map(
           (pb: any) => pb.paquetes_examenes?.nombre
         ).filter(Boolean) || [],
+        examenes: (atencion.atencion_examenes || []).map((ae: any) => ({
+          codigo: ae.examenes?.codigo || null,
+          nombre: ae.examenes?.nombre || "",
+          estado: ae.estado || "pendiente",
+        })),
       }));
 
-      // Filtro global (nombre o RUT)
       if (busquedaGlobal.trim()) {
         const termino = busquedaGlobal.toLowerCase().trim();
         visitas = visitas.filter(
@@ -196,6 +207,62 @@ const BusquedaPacientesHistorial = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  const formatEstadoExamen = (estado: string) => {
+    const map: Record<string, string> = {
+      pendiente: "Pendiente",
+      completado: "Completado",
+      incompleto: "Incompleto",
+    };
+    return map[estado] || estado;
+  };
+
+  const exportarExcel = () => {
+    const rows: any[] = [];
+
+    resultados.forEach((visita) => {
+      const fecha = visita.fecha_ingreso
+        ? format(new Date(visita.fecha_ingreso), "dd/MM/yyyy HH:mm")
+        : "";
+
+      if (visita.examenes.length > 0) {
+        visita.examenes.forEach((ex) => {
+          rows.push({
+            Fecha: fecha,
+            RUT: visita.paciente_rut || "",
+            Nombre: visita.paciente_nombre,
+            Empresa: visita.empresa_nombre,
+            "Código Examen": ex.codigo || "",
+            "Nombre Examen": ex.nombre,
+            "Estado Examen": formatEstadoExamen(ex.estado),
+          });
+        });
+      } else {
+        rows.push({
+          Fecha: fecha,
+          RUT: visita.paciente_rut || "",
+          Nombre: visita.paciente_nombre,
+          Empresa: visita.empresa_nombre,
+          "Código Examen": "",
+          "Nombre Examen": "Sin exámenes",
+          "Estado Examen": "",
+        });
+      }
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Historial");
+
+    // Auto-width columns
+    const colWidths = Object.keys(rows[0] || {}).map((key) => ({
+      wch: Math.max(key.length, ...rows.map((r) => String(r[key] || "").length)) + 2,
+    }));
+    ws["!cols"] = colWidths;
+
+    const fileName = `historial_pacientes_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`;
+    XLSX.writeFile(wb, fileName);
   };
 
   const formatEstado = (estado: string) => {
@@ -219,7 +286,6 @@ const BusquedaPacientesHistorial = ({
       <CardContent className="space-y-4">
         {/* Filtros */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {/* Búsqueda global */}
           <div className="space-y-2">
             <Label className="flex items-center gap-1">
               <User className="h-4 w-4" />
@@ -232,7 +298,6 @@ const BusquedaPacientesHistorial = ({
             />
           </div>
 
-          {/* Filtro empresa (para staff admin o cuando no hay empresaId fijo) */}
           {(isStaffAdmin || !empresaId) && (
             <div className="space-y-2">
               <Label className="flex items-center gap-1">
@@ -255,7 +320,6 @@ const BusquedaPacientesHistorial = ({
             </div>
           )}
 
-          {/* Fecha desde */}
           <div className="space-y-2">
             <Label className="flex items-center gap-1">
               <Calendar className="h-4 w-4" />
@@ -268,7 +332,6 @@ const BusquedaPacientesHistorial = ({
             />
           </div>
 
-          {/* Fecha hasta */}
           <div className="space-y-2">
             <Label className="flex items-center gap-1">
               <Calendar className="h-4 w-4" />
@@ -282,8 +345,14 @@ const BusquedaPacientesHistorial = ({
           </div>
         </div>
 
-        {/* Botón buscar */}
-        <div className="flex justify-end">
+        {/* Botones */}
+        <div className="flex justify-end gap-2">
+          {resultados.length > 0 && (
+            <Button variant="outline" onClick={exportarExcel}>
+              <Download className="h-4 w-4 mr-2" />
+              Exportar Excel
+            </Button>
+          )}
           <Button onClick={buscarHistorial} disabled={loading}>
             <Search className="h-4 w-4 mr-2" />
             {loading ? "Buscando..." : "Buscar"}
@@ -324,6 +393,7 @@ const BusquedaPacientesHistorial = ({
                         <TableHead>Empresa</TableHead>
                         <TableHead>Faena</TableHead>
                         <TableHead>Baterías</TableHead>
+                        <TableHead>Exámenes</TableHead>
                         <TableHead>Estado</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -357,6 +427,29 @@ const BusquedaPacientesHistorial = ({
                                 </div>
                               ) : (
                                 "-"
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {visita.examenes.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {visita.examenes.map((ex, idx) => (
+                                    <span
+                                      key={idx}
+                                      className={`px-2 py-0.5 text-xs rounded ${
+                                        ex.estado === "completado"
+                                          ? "bg-green-100 text-green-800"
+                                          : ex.estado === "incompleto"
+                                          ? "bg-red-100 text-red-800"
+                                          : "bg-amber-100 text-amber-800"
+                                      }`}
+                                    >
+                                      {ex.estado === "completado" && "✓ "}
+                                      {ex.codigo ? `${ex.codigo} - ` : ""}{ex.nombre}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">Sin exámenes</span>
                               )}
                             </TableCell>
                             <TableCell>
