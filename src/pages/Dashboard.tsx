@@ -568,7 +568,11 @@ const Dashboard = () => {
                 <div className="text-3xl font-bold text-foreground">
                   {statsDaily.enEspera + statsDaily.enAtencion + statsDaily.completados}
                 </div>
-                <div className="mt-2 text-xs text-muted-foreground">
+                <div className="mt-2 flex gap-2 text-xs text-muted-foreground">
+                  <span>WM: {(statsDaily.enEsperaDistribucion.workmed + statsDaily.enAtencionDistribucion.workmed + statsDaily.completadosDistribucion.workmed).toString().padStart(2, "0")}</span>
+                  <span>J: {(statsDaily.enEsperaDistribucion.jenner + statsDaily.enAtencionDistribucion.jenner + statsDaily.completadosDistribucion.jenner).toString().padStart(2, "0")}</span>
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">
                   {format(selectedDateDaily || new Date(), "dd/MM/yyyy", { locale: es })}
                 </div>
               </CardContent>
