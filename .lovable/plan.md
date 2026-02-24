@@ -1,39 +1,37 @@
 
 
-## Modificaciones al Codigo del Dia
+## Plan: Agregar conteo WM y J en "Total Pacientes"
 
-### Cambio 1: Generacion aleatoria en vez de correlativa
+### Problema
+La tarjeta "Total Pacientes" en las estadísticas diarias del Dashboard solo muestra el total general y la fecha, pero no incluye el desglose por tipo de servicio (WM y J) como las demás tarjetas (En Espera, En Atención, Completados).
 
-Actualmente el codigo se genera de forma deterministica usando un indice secuencial (1, 2, 3...), lo que produce codigos predecibles. Se cambiara para que el codigo sea completamente aleatorio, manteniendo la misma estructura de 3 letras + 2 numeros no repetidos.
+### Cambio
 
-- Se reemplazara `generarCodigoPorIndice()` por una funcion `generarCodigoAleatorio()` que seleccione letras y numeros al azar
-- Se eliminara el campo `indice_secuencia` de la logica (ya no se necesita)
-- Para evitar codigos repetidos, se verificara contra la base de datos antes de insertar. Si hay colision, se regenera
+**Archivo:** `src/pages/Dashboard.tsx`
 
-### Cambio 2: Reset solo cuando hay hora configurada
+En la tarjeta "Total Pacientes" (lineas ~567-574), agregar debajo del total una linea con badges WM y J, calculando la suma de workmed y jenner de los tres estados:
 
-Actualmente el sistema siempre tiene un countdown y auto-regenera el codigo a la hora configurada. Se cambiara para que:
+```
+WM: (enEsperaWM + enAtencionWM + completadosWM)
+J:  (enEsperaJ + enAtencionJ + completadosJ)
+```
 
-- Si no hay hora de reset configurada en `codigo_diario_config` (o el valor es null/vacio), el codigo NO se resetea automaticamente y no se muestra countdown
-- Si hay una hora configurada, se mantiene el comportamiento actual: countdown visible y auto-regeneracion a esa hora
-- En la configuracion se agregara la opcion de limpiar/desactivar la hora de reset
+Se reemplazara la linea que muestra la fecha por el mismo formato de badges que usan las otras tarjetas:
 
-### Detalle tecnico
+```tsx
+<div className="mt-2 flex gap-2 text-xs text-muted-foreground">
+  <span>WM: {totalWM}</span>
+  <span>J: {totalJ}</span>
+</div>
+```
 
-**Archivo:** `src/components/CodigoDelDia.tsx`
+Donde:
+- `totalWM` = `statsDaily.enEsperaDistribucion.workmed + statsDaily.enAtencionDistribucion.workmed + statsDaily.completadosDistribucion.workmed`
+- `totalJ` = `statsDaily.enEsperaDistribucion.jenner + statsDaily.enAtencionDistribucion.jenner + statsDaily.completadosDistribucion.jenner`
 
-**Funcion de generacion aleatoria:**
-- Seleccionar 3 letras al azar del conjunto LETRAS (A-Z sin I, O)
-- Seleccionar 2 numeros distintos al azar del conjunto NUMEROS (2-9)
-- Concatenar para formar el codigo de 5 caracteres
+La fecha se mantendra debajo del desglose WM/J para no perder esa informacion.
 
-**Logica de reset condicional:**
-- `horaReset` pasara a ser `string | null` en vez de siempre tener un valor
-- El intervalo de auto-regeneracion solo se activa si `horaReset` tiene valor
-- El countdown solo se muestra si `horaReset` tiene valor
-- En el dialog de configuracion se agrega un boton para desactivar el reset automatico
+### Resultado visual esperado
 
-**Migracion de base de datos:**
-- Modificar la columna `hora_reset` en `codigo_diario_config` para permitir valores null (actualmente tiene default '00:00:00')
-- Eliminar la columna `indice_secuencia` de `codigos_diarios` si existe (ya no se usa)
+La tarjeta "Total Pacientes" pasara de mostrar solo el numero grande y la fecha, a incluir el desglose WM/J con el mismo estilo visual que las demas tarjetas del Dashboard.
 
