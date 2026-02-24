@@ -733,7 +733,8 @@ const Pacientes = () => {
 
       setOpenDialog(false);
       setEditingPatient(null);
-      setFormData({ nombre: "", tipo_servicio: "", empresa_id: "", faena_id: "", rut: "", email: "", telefono: "", fecha_nacimiento: "", direccion: "" });
+      const workmedEmpresaReset = empresas.find(emp => emp.nombre.toUpperCase() === "WORKMED");
+      setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: workmedEmpresaReset?.id || "", faena_id: "", rut: "", email: "", telefono: "", fecha_nacimiento: "", direccion: "" });
       setFaenasEmpresa([]);
       setBateriasDisponibles([]);
       setSelectedExamenes([]);
@@ -990,7 +991,8 @@ const Pacientes = () => {
               setOpenDialog(open);
               if (!open) {
                 setEditingPatient(null);
-                setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: "", faena_id: "", rut: "", email: "", telefono: "", fecha_nacimiento: "", direccion: "" });
+                const workmedEmpresa = empresas.find(emp => emp.nombre.toUpperCase() === "WORKMED");
+                setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: workmedEmpresa?.id || "", faena_id: "", rut: "", email: "", telefono: "", fecha_nacimiento: "", direccion: "" });
                 setFaenasEmpresa([]);
                 setBateriasDisponibles([]);
                 setSelectedExamenes([]);
