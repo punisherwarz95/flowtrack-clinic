@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -127,6 +127,8 @@ const Pacientes = () => {
   const [selectedPaquetes, setSelectedPaquetes] = useState<string[]>([]);
   const [examenFilter, setExamenFilter] = useState("");
   const [empresaSearchFilter, setEmpresaSearchFilter] = useState("");
+  const [empresaDropdownOpen, setEmpresaDropdownOpen] = useState(false);
+  const empresaDropdownRef = useRef<HTMLDivElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [documentosPendientes, setDocumentosPendientes] = useState<{[patientId: string]: number}>({});
@@ -145,6 +147,17 @@ const Pacientes = () => {
   const [mostrarPegarTexto, setMostrarPegarTexto] = useState(false);
   
   const { generateDocuments } = useGenerateDocumentosFromBateria();
+
+  // Cerrar dropdown de empresa al hacer click fuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (empresaDropdownRef.current && !empresaDropdownRef.current.contains(event.target as Node)) {
+        setEmpresaDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
   
   // Estado para el diálogo de exámenes completados
   const [examenesCompletadosDialog, setExamenesCompletadosDialog] = useState<{
@@ -1147,34 +1160,73 @@ const Pacientes = () => {
                         <Label htmlFor="empresa" className="text-sm font-medium">
                           Empresa {formData.tipo_servicio === "jenner" && "*"}
                         </Label>
-                        <div className="relative mt-1">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
-                          <Input
-                            placeholder="Buscar empresa..."
-                            value={empresaSearchFilter}
-                            onChange={(e) => setEmpresaSearchFilter(e.target.value)}
-                            className="pl-10 h-9 mb-1"
-                          />
+                        <div className="relative mt-1" ref={empresaDropdownRef}>
+                          <div
+                            className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm flex items-center justify-between cursor-pointer"
+                            onClick={() => {
+                              setEmpresaDropdownOpen(!empresaDropdownOpen);
+                              setEmpresaSearchFilter("");
+                            }}
+                          >
+                            <span className={formData.empresa_id ? "text-foreground" : "text-muted-foreground"}>
+                              {formData.empresa_id
+                                ? empresas.find(e => e.id === formData.empresa_id)?.nombre || "Seleccione"
+                                : "Seleccione una empresa"}
+                            </span>
+                            <svg className="w-3 h-3 text-muted-foreground" fill="none" viewBox="0 0 10 6">
+                              <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m1 1 4 4 4-4"/>
+                            </svg>
+                          </div>
+                          {empresaDropdownOpen && (
+                            <div className="absolute z-50 mt-1 w-full bg-popover border border-border rounded-md shadow-lg max-h-60 flex flex-col">
+                              <div className="p-2 border-b border-border flex-shrink-0">
+                                <div className="relative">
+                                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                  <Input
+                                    placeholder="Buscar empresa..."
+                                    value={empresaSearchFilter}
+                                    onChange={(e) => setEmpresaSearchFilter(e.target.value)}
+                                    className="pl-8 h-8 text-sm"
+                                    autoFocus
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                </div>
+                              </div>
+                              <div className="overflow-y-auto flex-1">
+                                <div
+                                  className="px-3 py-2 text-sm cursor-pointer hover:bg-accent text-muted-foreground"
+                                  onClick={() => {
+                                    handleEmpresaChange("");
+                                    setEmpresaDropdownOpen(false);
+                                    setEmpresaSearchFilter("");
+                                  }}
+                                >
+                                  Sin empresa
+                                </div>
+                                {empresas
+                                  .filter((empresa) =>
+                                    !empresaSearchFilter ||
+                                    empresa.nombre.toLowerCase().includes(empresaSearchFilter.toLowerCase())
+                                  )
+                                  .map((empresa) => (
+                                    <div
+                                      key={empresa.id}
+                                      className={`px-3 py-2 text-sm cursor-pointer hover:bg-accent ${
+                                        formData.empresa_id === empresa.id ? "bg-accent font-medium" : ""
+                                      }`}
+                                      onClick={() => {
+                                        handleEmpresaChange(empresa.id);
+                                        setEmpresaDropdownOpen(false);
+                                        setEmpresaSearchFilter("");
+                                      }}
+                                    >
+                                      {empresa.nombre}
+                                    </div>
+                                  ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        <select
-                          id="empresa"
-                          required={formData.tipo_servicio === "jenner"}
-                          value={formData.empresa_id}
-                          onChange={(e) => handleEmpresaChange(e.target.value)}
-                          className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
-                        >
-                          <option value="">Seleccione una empresa</option>
-                          {empresas
-                            .filter((empresa) => 
-                              !empresaSearchFilter || 
-                              empresa.nombre.toLowerCase().includes(empresaSearchFilter.toLowerCase())
-                            )
-                            .map((empresa) => (
-                              <option key={empresa.id} value={empresa.id}>
-                                {empresa.nombre}
-                              </option>
-                            ))}
-                        </select>
                       </div>
 
                       {/* Selector de Faena - solo visible si hay empresa seleccionada */}
