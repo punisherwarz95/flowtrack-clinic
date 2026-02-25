@@ -409,6 +409,12 @@ const Pacientes = () => {
         .filter((f: any) => f !== null) as Faena[];
       
       setFaenasEmpresa(faenas);
+      
+      // Auto-asignar si solo hay una faena disponible
+      if (faenas.length === 1) {
+        setFormData(prev => ({ ...prev, faena_id: faenas[0].id }));
+        loadBateriasDisponibles(faenas[0].id);
+      }
     } catch (error) {
       console.error("Error loading faenas:", error);
       setFaenasEmpresa([]);
