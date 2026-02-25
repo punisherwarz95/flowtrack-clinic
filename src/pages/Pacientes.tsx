@@ -413,6 +413,7 @@ const Pacientes = () => {
       // Auto-asignar si solo hay una faena disponible
       if (faenas.length === 1) {
         setFormData(prev => ({ ...prev, faena_id: faenas[0].id }));
+        setFiltroFaenaIdBateria(faenas[0].id);
         loadBateriasDisponibles(faenas[0].id);
       }
     } catch (error) {
@@ -458,6 +459,7 @@ const Pacientes = () => {
   // Manejar cambio de faena
   const handleFaenaChange = async (faenaId: string) => {
     setFormData(prev => ({ ...prev, faena_id: faenaId }));
+    setFiltroFaenaIdBateria(faenaId || "__all__");
     setSelectedPaquetes([]);
     await loadBateriasDisponibles(faenaId);
   };
