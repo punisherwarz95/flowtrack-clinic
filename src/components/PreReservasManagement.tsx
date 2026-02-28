@@ -20,10 +20,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Calendar as CalendarIcon, Trash2, Ban, ChevronDown, ChevronRight, Users } from "lucide-react";
 
 interface Prereserva {
@@ -58,18 +60,29 @@ interface Bloque {
   cupo_maximo: number;
 }
 
+interface Empresa {
+  id: string;
+  nombre: string;
+}
+
 const PreReservasManagement = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [prereservas, setPrereservas] = useState<Prereserva[]>([]);
   const [bloques, setBloques] = useState<Bloque[]>([]);
   const [cupos, setCupos] = useState<AgendaCupo[]>([]);
+  const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [loading, setLoading] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [blockCupo, setBlockCupo] = useState<{ bloqueId: string; empresaId: string; empresaNombre: string } | null>(null);
   const [expandedEmpresas, setExpandedEmpresas] = useState<Set<string>>(new Set());
 
+  // Block cupo form state
+  const [blockEmpresaId, setBlockEmpresaId] = useState("");
+  const [blockBloqueId, setBlockBloqueId] = useState("");
+
   useEffect(() => {
     loadBloques();
+    loadEmpresas();
   }, []);
 
   useEffect(() => {
@@ -83,6 +96,15 @@ const PreReservasManagement = () => {
       .eq("activo", true)
       .order("orden");
     setBloques(data || []);
+  };
+
+  const loadEmpresas = async () => {
+    const { data } = await supabase
+      .from("empresas")
+      .select("id, nombre")
+      .eq("activo", true)
+      .order("nombre");
+    setEmpresas(data || []);
   };
 
   const loadData = async () => {
@@ -129,16 +151,13 @@ const PreReservasManagement = () => {
     if (!deleteId) return;
 
     try {
-      // Delete prereserva_baterias first
       await supabase.from("prereserva_baterias").delete().eq("prereserva_id", deleteId);
 
-      // Find the prereserva to update cupos
       const prereserva = prereservas.find(p => p.id === deleteId);
 
       const { error } = await supabase.from("prereservas").delete().eq("id", deleteId);
       if (error) throw error;
 
-      // Decrement cupo
       if (prereserva) {
         const cupo = cupos.find(
           c => c.bloque_id === prereserva.bloque_id && c.empresa_id === prereserva.empresa_id
@@ -160,13 +179,12 @@ const PreReservasManagement = () => {
     }
   };
 
-  const handleBlockCupo = async () => {
+  const handleBlockCupoConfirm = async () => {
     if (!blockCupo) return;
 
     try {
       const fechaStr = format(selectedDate, "yyyy-MM-dd");
 
-      // Find existing cupo or create one
       const existingCupo = cupos.find(
         c => c.bloque_id === blockCupo.bloqueId && c.empresa_id === blockCupo.empresaId
       );
@@ -194,11 +212,26 @@ const PreReservasManagement = () => {
 
       toast.success("Cupo bloqueado exitosamente");
       setBlockCupo(null);
+      setBlockEmpresaId("");
+      setBlockBloqueId("");
       loadData();
     } catch (error) {
       console.error("Error blocking cupo:", error);
       toast.error("Error al bloquear cupo");
     }
+  };
+
+  const handleBlockCupoRequest = () => {
+    if (!blockEmpresaId || !blockBloqueId) {
+      toast.error("Selecciona empresa y bloque");
+      return;
+    }
+    const empresa = empresas.find(e => e.id === blockEmpresaId);
+    setBlockCupo({
+      bloqueId: blockBloqueId,
+      empresaId: blockEmpresaId,
+      empresaNombre: empresa?.nombre || "",
+    });
   };
 
   // Group prereservas by empresa
@@ -217,11 +250,11 @@ const PreReservasManagement = () => {
       case "pendiente":
         return <Badge variant="secondary">Pendiente</Badge>;
       case "confirmado":
-        return <Badge className="bg-green-500">Confirmado</Badge>;
+        return <Badge className="bg-primary text-primary-foreground">Confirmado</Badge>;
       case "cancelado":
         return <Badge variant="destructive">Cancelado</Badge>;
       case "atendido":
-        return <Badge className="bg-blue-500">Atendido</Badge>;
+        return <Badge className="bg-accent text-accent-foreground">Atendido</Badge>;
       default:
         return <Badge variant="outline">{estado}</Badge>;
     }
@@ -244,12 +277,11 @@ const PreReservasManagement = () => {
     });
   };
 
-  // Get unique empresa IDs from prereservas for cupo blocking
   const empresasConPrereservas = Object.entries(prereservasByEmpresa);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-2xl font-bold text-foreground">Pre-Reservas</h2>
           <p className="text-muted-foreground">Gestiona pre-reservas agrupadas por empresa</p>
@@ -275,6 +307,47 @@ const PreReservasManagement = () => {
         </Popover>
       </div>
 
+      {/* Block cupo section */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Bloquear cupo</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-end gap-3 flex-wrap">
+            <div className="flex-1 min-w-[200px]">
+              <Select value={blockEmpresaId} onValueChange={setBlockEmpresaId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar empresa" />
+                </SelectTrigger>
+                <SelectContent>
+                  {empresas.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex-1 min-w-[200px]">
+              <Select value={blockBloqueId} onValueChange={setBlockBloqueId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar bloque" />
+                </SelectTrigger>
+                <SelectContent>
+                  {bloques.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.nombre} ({b.hora_inicio.slice(0, 5)} - {b.hora_fin.slice(0, 5)})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={handleBlockCupoRequest} className="gap-2" disabled={!blockEmpresaId || !blockBloqueId}>
+              <Ban className="h-4 w-4" />
+              Bloquear cupo
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {loading ? (
         <p className="text-muted-foreground text-center py-8">Cargando...</p>
       ) : empresasConPrereservas.length === 0 ? (
@@ -288,7 +361,6 @@ const PreReservasManagement = () => {
           {empresasConPrereservas.map(([empresaId, { nombre, prereservas: empresaPrereservas }]) => {
             const isExpanded = expandedEmpresas.has(empresaId);
 
-            // Group by bloque
             const byBloque = empresaPrereservas.reduce<Record<string, Prereserva[]>>((acc, p) => {
               const bloqueId = p.bloque_id;
               if (!acc[bloqueId]) acc[bloqueId] = [];
@@ -323,25 +395,13 @@ const PreReservasManagement = () => {
 
                       return (
                         <div key={bloqueId} className="border rounded-lg p-4 space-y-3">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between flex-wrap gap-2">
                             <div className="flex items-center gap-2">
                               <span className="font-semibold">{bloqueNombre}</span>
                               <Badge variant={cuposInfo.disponibles > 0 ? "outline" : "destructive"}>
                                 {cuposInfo.reservados}/{cuposInfo.maximo} cupos
                               </Badge>
                             </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                setBlockCupo({ bloqueId, empresaId, empresaNombre: nombre })
-                              }
-                              disabled={cuposInfo.disponibles <= 0}
-                              className="gap-1"
-                            >
-                              <Ban className="h-4 w-4" />
-                              Bloquear cupo
-                            </Button>
                           </div>
 
                           <div className="divide-y">
@@ -412,12 +472,12 @@ const PreReservasManagement = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Bloquear cupo</AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Deseas bloquear un cupo disponible para {blockCupo?.empresaNombre}? Esto reducirá la disponibilidad sin crear una pre-reserva.
+              ¿Deseas bloquear un cupo para {blockCupo?.empresaNombre} en el bloque seleccionado? Esto reducirá la disponibilidad sin crear una pre-reserva.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBlockCupo}>Bloquear</AlertDialogAction>
+            <AlertDialogAction onClick={handleBlockCupoConfirm}>Bloquear</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

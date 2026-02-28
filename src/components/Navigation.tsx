@@ -34,8 +34,8 @@ const Navigation = () => {
   return (
     <nav className="border-b border-border bg-card shadow-sm">
       <div className="container mx-auto px-4">
-        <div className="flex items-center gap-8 h-16">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4 py-3">
+          <div className="flex items-center gap-2 shrink-0">
             <Activity className="h-6 w-6 text-primary" />
             <span className="font-bold text-lg text-foreground">MediFlow</span>
             <Button
@@ -53,7 +53,7 @@ const Navigation = () => {
             </Button>
           </div>
           
-          <div className="flex gap-1 flex-1 overflow-x-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+          <div className="flex flex-wrap gap-1 flex-1">
             {links.map((link) => {
               const Icon = link.icon;
               const isActive = location.pathname === link.to;
@@ -62,20 +62,20 @@ const Navigation = () => {
                 <Link
                   key={link.to}
                   to={link.to}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors whitespace-nowrap shrink-0 ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors text-sm ${
                     isActive
                       ? "bg-accent text-accent-foreground font-medium"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   }`}
                 >
                   <Icon className="h-4 w-4" />
-                  <span className="text-sm">{link.label}</span>
+                  <span>{link.label}</span>
                 </Link>
               );
             })}
           </div>
           
-          <Button variant="outline" size="sm" onClick={signOut}>
+          <Button variant="outline" size="sm" onClick={signOut} className="shrink-0">
             <LogOut className="h-4 w-4 mr-2" />
             Cerrar Sesión
           </Button>
