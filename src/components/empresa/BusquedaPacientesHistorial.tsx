@@ -35,6 +35,11 @@ interface ExamenHistorial {
   estado: string;
 }
 
+interface BateriaHistorial {
+  nombre: string;
+  examenes: ExamenHistorial[];
+}
+
 interface VisitaHistorial {
   id: string;
   fecha_ingreso: string;
@@ -44,6 +49,7 @@ interface VisitaHistorial {
   empresa_nombre: string;
   faena_nombre: string | null;
   baterias: string[];
+  bateriasDetalle: BateriaHistorial[];
   examenes: ExamenHistorial[];
 }
 
@@ -109,8 +115,18 @@ const BusquedaPacientesHistorial = ({
             paquetes_examenes ( nombre )
           )
         ),
+        atencion_baterias (
+          paquetes_examenes (
+            id,
+            nombre,
+            paquete_examen_items (
+              examenes ( id, nombre, codigo )
+            )
+          )
+        ),
         atencion_examenes (
           estado,
+          examen_id,
           examenes ( nombre, codigo )
         )
       `;
@@ -172,23 +188,46 @@ const BusquedaPacientesHistorial = ({
         return;
       }
 
-      let visitas: VisitaHistorial[] = (data || []).map((atencion: any) => ({
-        id: atencion.id,
-        fecha_ingreso: atencion.fecha_ingreso,
-        estado: atencion.estado,
-        paciente_nombre: atencion.pacientes?.nombre || "",
-        paciente_rut: atencion.pacientes?.rut || "",
-        empresa_nombre: atencion.pacientes?.empresas?.nombre || "Sin empresa",
-        faena_nombre: atencion.pacientes?.faenas?.nombre || null,
-        baterias: atencion.prereservas?.prereserva_baterias?.map(
-          (pb: any) => pb.paquetes_examenes?.nombre
-        ).filter(Boolean) || [],
-        examenes: (atencion.atencion_examenes || []).map((ae: any) => ({
-          codigo: ae.examenes?.codigo || null,
-          nombre: ae.examenes?.nombre || "",
-          estado: ae.estado || "pendiente",
-        })),
-      }));
+      let visitas: VisitaHistorial[] = (data || []).map((atencion: any) => {
+        // Build atencion_examenes map by examen_id for status lookup
+        const examenEstadoMap = new Map<string, string>();
+        (atencion.atencion_examenes || []).forEach((ae: any) => {
+          if (ae.examen_id) examenEstadoMap.set(ae.examen_id, ae.estado || "pendiente");
+        });
+
+        // Build bateriasDetalle from atencion_baterias
+        const bateriasDetalle: BateriaHistorial[] = (atencion.atencion_baterias || []).map((ab: any) => {
+          const paquete = ab.paquetes_examenes;
+          const examenesDelPaquete: ExamenHistorial[] = (paquete?.paquete_examen_items || []).map((item: any) => ({
+            codigo: item.examenes?.codigo || null,
+            nombre: item.examenes?.nombre || "",
+            estado: examenEstadoMap.get(item.examenes?.id) || "pendiente",
+          }));
+          return {
+            nombre: paquete?.nombre || "Sin nombre",
+            examenes: examenesDelPaquete,
+          };
+        });
+
+        return {
+          id: atencion.id,
+          fecha_ingreso: atencion.fecha_ingreso,
+          estado: atencion.estado,
+          paciente_nombre: atencion.pacientes?.nombre || "",
+          paciente_rut: atencion.pacientes?.rut || "",
+          empresa_nombre: atencion.pacientes?.empresas?.nombre || "Sin empresa",
+          faena_nombre: atencion.pacientes?.faenas?.nombre || null,
+          baterias: atencion.prereservas?.prereserva_baterias?.map(
+            (pb: any) => pb.paquetes_examenes?.nombre
+          ).filter(Boolean) || [],
+          bateriasDetalle,
+          examenes: (atencion.atencion_examenes || []).map((ae: any) => ({
+            codigo: ae.examenes?.codigo || null,
+            nombre: ae.examenes?.nombre || "",
+            estado: ae.estado || "pendiente",
+          })),
+        };
+      });
 
       if (busquedaGlobal.trim()) {
         const termino = busquedaGlobal.toLowerCase().trim();
@@ -226,13 +265,43 @@ const BusquedaPacientesHistorial = ({
         ? format(new Date(visita.fecha_ingreso), "dd/MM/yyyy HH:mm")
         : "";
 
-      if (visita.examenes.length > 0) {
+      if (visita.bateriasDetalle.length > 0) {
+        visita.bateriasDetalle.forEach((bat) => {
+          if (bat.examenes.length > 0) {
+            bat.examenes.forEach((ex) => {
+              rows.push({
+                Fecha: fecha,
+                RUT: visita.paciente_rut || "",
+                Nombre: visita.paciente_nombre,
+                Empresa: visita.empresa_nombre,
+                Batería: bat.nombre,
+                "Código Examen": ex.codigo || "",
+                "Nombre Examen": ex.nombre,
+                "Estado Examen": formatEstadoExamen(ex.estado),
+              });
+            });
+          } else {
+            rows.push({
+              Fecha: fecha,
+              RUT: visita.paciente_rut || "",
+              Nombre: visita.paciente_nombre,
+              Empresa: visita.empresa_nombre,
+              Batería: bat.nombre,
+              "Código Examen": "",
+              "Nombre Examen": "Sin exámenes en batería",
+              "Estado Examen": "",
+            });
+          }
+        });
+      } else if (visita.examenes.length > 0) {
+        // Exámenes sueltos sin batería
         visita.examenes.forEach((ex) => {
           rows.push({
             Fecha: fecha,
             RUT: visita.paciente_rut || "",
             Nombre: visita.paciente_nombre,
             Empresa: visita.empresa_nombre,
+            Batería: "Sin batería",
             "Código Examen": ex.codigo || "",
             "Nombre Examen": ex.nombre,
             "Estado Examen": formatEstadoExamen(ex.estado),
@@ -244,6 +313,7 @@ const BusquedaPacientesHistorial = ({
           RUT: visita.paciente_rut || "",
           Nombre: visita.paciente_nombre,
           Empresa: visita.empresa_nombre,
+          Batería: "",
           "Código Examen": "",
           "Nombre Examen": "Sin exámenes",
           "Estado Examen": "",
