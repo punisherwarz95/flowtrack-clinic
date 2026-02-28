@@ -217,9 +217,9 @@ const BusquedaPacientesHistorial = ({
           paciente_rut: atencion.pacientes?.rut || "",
           empresa_nombre: atencion.pacientes?.empresas?.nombre || "Sin empresa",
           faena_nombre: atencion.pacientes?.faenas?.nombre || null,
-          baterias: atencion.prereservas?.prereserva_baterias?.map(
-            (pb: any) => pb.paquetes_examenes?.nombre
-          ).filter(Boolean) || [],
+          baterias: (atencion.atencion_baterias || []).map(
+            (ab: any) => ab.paquetes_examenes?.nombre
+          ).filter(Boolean),
           bateriasDetalle,
           examenes: (atencion.atencion_examenes || []).map((ae: any) => ({
             codigo: ae.examenes?.codigo || null,
