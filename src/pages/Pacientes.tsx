@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Search, Trash2, Pencil, Calendar as CalendarIcon, ClipboardList, FileText, ClipboardPaste } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import PreReservasManagement from "@/components/PreReservasManagement";
 import CodigoDelDia from "@/components/CodigoDelDia";
 import { useGenerateDocumentosFromBateria } from "@/hooks/useAtencionDocumentos";
 import { supabase } from "@/integrations/supabase/client";
@@ -983,6 +985,13 @@ const Pacientes = () => {
       <Navigation />
 
       <main className="container mx-auto px-4 py-8">
+        <Tabs defaultValue="pacientes" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="pacientes">Pacientes del Día</TabsTrigger>
+            <TabsTrigger value="prereservas">Pre-Reservas</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="pacientes">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">Pacientes</h1>
@@ -1736,6 +1745,12 @@ const Pacientes = () => {
             </div>
           </DialogContent>
         </Dialog>
+          </TabsContent>
+
+          <TabsContent value="prereservas">
+            <PreReservasManagement />
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );
