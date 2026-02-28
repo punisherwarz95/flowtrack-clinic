@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useEmpresaAuth } from "@/contexts/EmpresaAuthContext";
 import EmpresaLayout from "@/components/empresa/EmpresaLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -73,11 +73,6 @@ interface Prereserva {
   baterias: { paquete: Bateria }[];
 }
 
-interface CupoDisponible {
-  bloque_id: string;
-  cupo_disponible: number;
-}
-
 const EmpresaAgendamiento = () => {
   const { currentEmpresaId, empresaUsuario, isStaffAdmin } = useEmpresaAuth();
   const { toast } = useToast();
@@ -96,8 +91,6 @@ const EmpresaAgendamiento = () => {
   const [formNombre, setFormNombre] = useState("");
   const [formRut, setFormRut] = useState("");
   const [formCargo, setFormCargo] = useState("");
-  const [formEmail, setFormEmail] = useState("");
-  const [formTelefono, setFormTelefono] = useState("");
   const [formBloqueId, setFormBloqueId] = useState("");
   const [formFaenaId, setFormFaenaId] = useState("");
   const [formBateriasSeleccionadas, setFormBateriasSeleccionadas] = useState<string[]>([]);
@@ -105,6 +98,7 @@ const EmpresaAgendamiento = () => {
 
   const [searchFilter, setSearchFilter] = useState("");
 
+  // Load bloques and faenas on mount
   useEffect(() => {
     if (currentEmpresaId) {
       loadInitialData();
@@ -113,16 +107,28 @@ const EmpresaAgendamiento = () => {
     }
   }, [currentEmpresaId]);
 
+  // Load prereservas when date changes
   useEffect(() => {
     if (selectedDate && currentEmpresaId) {
       loadPrereservas();
-      loadCuposDisponibles();
     }
   }, [selectedDate, currentEmpresaId]);
 
+  // Recalculate cupos when bloques load or date changes
+  useEffect(() => {
+    if (selectedDate && currentEmpresaId && bloques.length > 0) {
+      loadCuposDisponibles();
+    }
+  }, [selectedDate, currentEmpresaId, bloques]);
+
+  // Load baterías when faena changes
   useEffect(() => {
     if (formFaenaId) {
       loadBateriasForFaena(formFaenaId);
+      setFormBateriasSeleccionadas([]);
+    } else {
+      setBaterias([]);
+      setFormBateriasSeleccionadas([]);
     }
   }, [formFaenaId]);
 
@@ -139,15 +145,19 @@ const EmpresaAgendamiento = () => {
 
       setBloques(bloquesData || []);
 
-      // Cargar faenas de la empresa
-      const { data: faenasData } = await supabase
-        .from("faenas")
-        .select("*")
+      // Cargar faenas de la empresa desde empresa_faenas (relación many-to-many)
+      const { data: empresaFaenasData } = await supabase
+        .from("empresa_faenas")
+        .select("faena:faenas(id, nombre)")
         .eq("empresa_id", currentEmpresaId)
-        .eq("activo", true)
-        .order("nombre");
+        .eq("activo", true);
 
-      setFaenas(faenasData || []);
+      const faenasList = (empresaFaenasData || [])
+        .map((ef: any) => ef.faena)
+        .filter(Boolean)
+        .sort((a: Faena, b: Faena) => a.nombre.localeCompare(b.nombre));
+
+      setFaenas(faenasList);
     } catch (error) {
       console.error("Error cargando datos iniciales:", error);
     } finally {
@@ -174,15 +184,13 @@ const EmpresaAgendamiento = () => {
   };
 
   const loadCuposDisponibles = async () => {
-    if (!currentEmpresaId) return;
+    if (!currentEmpresaId || bloques.length === 0) return;
 
-    // Obtener cupos reservados para la fecha
     const { data: cuposData } = await supabase
       .from("agenda_cupos")
       .select("bloque_id, cupos_reservados")
       .eq("fecha", selectedDate);
 
-    // Calcular cupos disponibles por bloque
     const cuposMap: Record<string, number> = {};
     bloques.forEach((bloque) => {
       const cupoReservado = cuposData?.find((c) => c.bloque_id === bloque.id)?.cupos_reservados || 0;
@@ -201,7 +209,6 @@ const EmpresaAgendamiento = () => {
 
     const bateriasFromFaena = data?.map((d: any) => d.paquete).filter(Boolean) || [];
     
-    // Si no hay baterías específicas de faena, cargar todas las baterías de la empresa
     if (bateriasFromFaena.length === 0 && currentEmpresaId) {
       const { data: empresaBaterias } = await supabase
         .from("empresa_baterias")
@@ -212,6 +219,18 @@ const EmpresaAgendamiento = () => {
       setBaterias(empresaBaterias?.map((d: any) => d.paquete).filter(Boolean) || []);
     } else {
       setBaterias(bateriasFromFaena);
+    }
+  };
+
+  const handleRutChange = (value: string) => {
+    // Permitir solo caracteres válidos para RUT
+    const cleaned = value.replace(/[^0-9kK.\-]/g, "");
+    setFormRut(cleaned);
+  };
+
+  const handleRutBlur = () => {
+    if (formRut) {
+      setFormRut(formatRutStandard(formRut));
     }
   };
 
@@ -233,7 +252,6 @@ const EmpresaAgendamiento = () => {
       return;
     }
 
-    // Verificar cupo disponible
     if ((cuposDisponibles[formBloqueId] || 0) <= 0) {
       toast({ title: "No hay cupos disponibles para este bloque", variant: "destructive" });
       return;
@@ -242,7 +260,6 @@ const EmpresaAgendamiento = () => {
     setSubmitting(true);
 
     try {
-      // Crear prereserva
       const { data: prereserva, error } = await supabase
         .from("prereservas")
         .insert({
@@ -251,10 +268,8 @@ const EmpresaAgendamiento = () => {
           faena_id: formFaenaId,
           fecha: selectedDate,
           rut: formatRutStandard(formRut),
-          nombre: formNombre,
+          nombre: formNombre.toUpperCase(),
           cargo: formCargo,
-          email: formEmail || null,
-          telefono: formTelefono || null,
           created_by: empresaUsuario?.id,
           estado: "pendiente",
         })
@@ -263,7 +278,6 @@ const EmpresaAgendamiento = () => {
 
       if (error) throw error;
 
-      // Crear baterías asociadas
       const bateriasInsert = formBateriasSeleccionadas.map((paqueteId) => ({
         prereserva_id: prereserva.id,
         paquete_id: paqueteId,
@@ -271,7 +285,6 @@ const EmpresaAgendamiento = () => {
 
       await supabase.from("prereserva_baterias").insert(bateriasInsert);
 
-      // Actualizar cupos
       const { data: existingCupo } = await supabase
         .from("agenda_cupos")
         .select("*")
@@ -296,17 +309,14 @@ const EmpresaAgendamiento = () => {
 
       toast({ title: "Pre-reserva creada exitosamente" });
       
-      // Reset form
       setFormNombre("");
       setFormRut("");
       setFormCargo("");
-      setFormEmail("");
-      setFormTelefono("");
       setFormBloqueId("");
+      setFormFaenaId("");
       setFormBateriasSeleccionadas([]);
       setDialogOpen(false);
       
-      // Reload data
       loadPrereservas();
       loadCuposDisponibles();
     } catch (error: any) {
@@ -372,7 +382,13 @@ const EmpresaAgendamiento = () => {
             </p>
           </div>
 
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog open={dialogOpen} onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) {
+              setFormFaenaId("");
+              setFormBateriasSeleccionadas([]);
+            }
+          }}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
@@ -385,6 +401,7 @@ const EmpresaAgendamiento = () => {
               </DialogHeader>
               
               <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Fecha y Bloque */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Fecha *</Label>
@@ -404,7 +421,7 @@ const EmpresaAgendamiento = () => {
                       </SelectTrigger>
                       <SelectContent>
                         {bloques.filter((b) => b.id).map((bloque) => {
-                          const cupoDisp = cuposDisponibles[bloque.id] || 0;
+                          const cupoDisp = cuposDisponibles[bloque.id] ?? 0;
                           return (
                             <SelectItem
                               key={bloque.id}
@@ -421,6 +438,38 @@ const EmpresaAgendamiento = () => {
                   </div>
                 </div>
 
+                {/* Nombre y RUT */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Nombre Completo *</Label>
+                    <Input
+                      value={formNombre}
+                      onChange={(e) => setFormNombre(e.target.value)}
+                      placeholder="Juan Pérez González"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>RUT *</Label>
+                    <Input
+                      value={formRut}
+                      onChange={(e) => handleRutChange(e.target.value)}
+                      onBlur={handleRutBlur}
+                      placeholder="12.345.678-9"
+                    />
+                  </div>
+                </div>
+
+                {/* Cargo */}
+                <div className="space-y-2">
+                  <Label>Cargo *</Label>
+                  <Input
+                    value={formCargo}
+                    onChange={(e) => setFormCargo(e.target.value)}
+                    placeholder="Operador de maquinaria"
+                  />
+                </div>
+
+                {/* Faena */}
                 <div className="space-y-2">
                   <Label>Faena *</Label>
                   <Select value={formFaenaId} onValueChange={setFormFaenaId}>
@@ -437,54 +486,7 @@ const EmpresaAgendamiento = () => {
                   </Select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Nombre Completo *</Label>
-                    <Input
-                      value={formNombre}
-                      onChange={(e) => setFormNombre(e.target.value)}
-                      placeholder="Juan Pérez González"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>RUT *</Label>
-                    <Input
-                      value={formRut}
-                      onChange={(e) => setFormRut(e.target.value)}
-                      placeholder="12.345.678-9"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Cargo *</Label>
-                    <Input
-                      value={formCargo}
-                      onChange={(e) => setFormCargo(e.target.value)}
-                      placeholder="Operador de maquinaria"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Email</Label>
-                    <Input
-                      type="email"
-                      value={formEmail}
-                      onChange={(e) => setFormEmail(e.target.value)}
-                      placeholder="trabajador@empresa.com"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Teléfono</Label>
-                  <Input
-                    value={formTelefono}
-                    onChange={(e) => setFormTelefono(e.target.value)}
-                    placeholder="+56 9 1234 5678"
-                  />
-                </div>
-
+                {/* Baterías */}
                 {formFaenaId && (
                   <div className="space-y-2">
                     <Label>Baterías * (seleccione al menos 1)</Label>
@@ -565,7 +567,7 @@ const EmpresaAgendamiento = () => {
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4" />
                   <span className="font-medium">
-                    {cuposDisponibles[bloque.id] || 0} / {bloque.cupo_maximo} disponibles
+                    {cuposDisponibles[bloque.id] ?? 0} / {bloque.cupo_maximo} disponibles
                   </span>
                 </div>
               </CardContent>
