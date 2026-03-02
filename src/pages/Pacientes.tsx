@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Trash2, Pencil, Calendar as CalendarIcon, ClipboardList, FileText, ClipboardPaste } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Calendar as CalendarIcon, ClipboardList, FileText, ClipboardPaste, X } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PreReservasManagement from "@/components/PreReservasManagement";
 import CodigoDelDia from "@/components/CodigoDelDia";
@@ -1464,7 +1464,12 @@ const Pacientes = () => {
                   {/* Buscador */}
                   <div className="flex-shrink-0 relative mb-2">
                     <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Buscar batería o examen..." value={bateriaFilter} onChange={(e) => setBateriaFilter(e.target.value)} className="pl-8 h-8 text-sm" />
+                    <Input placeholder="Buscar batería o examen..." value={bateriaFilter} onChange={(e) => setBateriaFilter(e.target.value)} className="pl-8 pr-8 h-8 text-sm" />
+                    {bateriaFilter && (
+                      <button type="button" onClick={() => setBateriaFilter("")} className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground hover:text-foreground">
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
 
                   {/* Pestañas Baterías / Exámenes */}
@@ -1515,7 +1520,6 @@ const Pacientes = () => {
                                             const examenesIds = paquete.paquete_examen_items.map(item => item.examen_id);
                                             setSelectedExamenes(prev => prev.filter(id => !examenesIds.includes(id)));
                                           }
-                                          setBateriaFilter("");
                                         }} className="w-3.5 h-3.5" />
                                       <span className="break-words">{paquete.nombre}</span>
                                       <span className="text-xs text-muted-foreground ml-auto shrink-0">({paquete.paquete_examen_items.length})</span>
@@ -1555,7 +1559,6 @@ const Pacientes = () => {
                                       onChange={(e) => {
                                         if (e.target.checked) setSelectedExamenes([...selectedExamenes, examen.id]);
                                         else setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
-                                        setBateriaFilter("");
                                       }} className="w-3.5 h-3.5" />
                                     <span className="break-words flex-1">{examen.nombre}</span>
                                     {examen.codigo && <span className="text-xs text-muted-foreground shrink-0">{examen.codigo}</span>}
