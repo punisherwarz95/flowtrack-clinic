@@ -1515,6 +1515,7 @@ const Pacientes = () => {
                                             const examenesIds = paquete.paquete_examen_items.map(item => item.examen_id);
                                             setSelectedExamenes(prev => prev.filter(id => !examenesIds.includes(id)));
                                           }
+                                          setBateriaFilter("");
                                         }} className="w-3.5 h-3.5" />
                                       <span className="break-words">{paquete.nombre}</span>
                                       <span className="text-xs text-muted-foreground ml-auto shrink-0">({paquete.paquete_examen_items.length})</span>
@@ -1554,6 +1555,7 @@ const Pacientes = () => {
                                       onChange={(e) => {
                                         if (e.target.checked) setSelectedExamenes([...selectedExamenes, examen.id]);
                                         else setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
+                                        setBateriaFilter("");
                                       }} className="w-3.5 h-3.5" />
                                     <span className="break-words flex-1">{examen.nombre}</span>
                                     {examen.codigo && <span className="text-xs text-muted-foreground shrink-0">{examen.codigo}</span>}
