@@ -1299,6 +1299,48 @@ export type Database = {
         }
         Relationships: []
       }
+      faena_examenes: {
+        Row: {
+          activo: boolean | null
+          created_at: string | null
+          examen_id: string
+          faena_id: string
+          id: string
+          valor_venta: number
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string | null
+          examen_id: string
+          faena_id: string
+          id?: string
+          valor_venta?: number
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string | null
+          examen_id?: string
+          faena_id?: string
+          id?: string
+          valor_venta?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "faena_examenes_examen_id_fkey"
+            columns: ["examen_id"]
+            isOneToOne: false
+            referencedRelation: "examenes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "faena_examenes_faena_id_fkey"
+            columns: ["faena_id"]
+            isOneToOne: false
+            referencedRelation: "faenas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       faenas: {
         Row: {
           activo: boolean | null
