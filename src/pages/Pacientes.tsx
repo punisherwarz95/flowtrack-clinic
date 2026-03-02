@@ -1334,7 +1334,7 @@ const Pacientes = () => {
                       )}
                     </div>
 
-                    {/* Columna 4 - Buscador de baterías y exámenes */}
+                    {/* Columna 4 - Buscador de baterías y exámenes con pestañas */}
                     <div className="flex flex-col overflow-hidden">
                       <h3 className="font-semibold text-sm text-muted-foreground border-b pb-2 mb-2 flex-shrink-0 flex items-center justify-between">
                         Agregar Exámenes
@@ -1411,141 +1411,144 @@ const Pacientes = () => {
                         />
                       </div>
 
-                      {/* Lista de baterías y exámenes */}
-                      <div className="flex-1 border rounded-md bg-muted/30 overflow-y-auto">
-                        {/* Baterías */}
-                        <div className="p-2">
-                          <div className="text-xs font-semibold text-muted-foreground mb-2">BATERÍAS</div>
-                          {(() => {
-                            // Agrupar paquetes por faena
-                            const grupos: { faenaId: string; faenaNombre: string; paquetes: typeof paquetes }[] = [];
-                            const sinFaena: typeof paquetes = [];
+                      {/* Pestañas Baterías / Exámenes */}
+                      <Tabs defaultValue="baterias" className="flex-1 flex flex-col overflow-hidden">
+                        <TabsList className="flex-shrink-0 w-full">
+                          <TabsTrigger value="baterias" className="flex-1 text-xs">Baterías</TabsTrigger>
+                          <TabsTrigger value="examenes" className="flex-1 text-xs">Exámenes</TabsTrigger>
+                        </TabsList>
 
-                            paquetes.forEach((paquete) => {
-                              // Filtrar por búsqueda de texto
-                              if (bateriaFilter && !paquete.nombre.toLowerCase().includes(bateriaFilter.toLowerCase())) {
-                                return;
-                              }
+                        <TabsContent value="baterias" className="flex-1 overflow-hidden mt-2">
+                          <div className="h-full border rounded-md bg-muted/30 overflow-y-auto">
+                            <div className="p-2">
+                              {(() => {
+                                const grupos: { faenaId: string; faenaNombre: string; paquetes: typeof paquetes }[] = [];
+                                const sinFaena: typeof paquetes = [];
 
-                              const faenaIds = paqueteFaenasMap[paquete.id] || [];
-                              if (faenaIds.length === 0) {
-                                sinFaena.push(paquete);
-                              } else {
-                                faenaIds.forEach((faenaId) => {
-                                  const faena = allFaenas.find((f) => f.id === faenaId);
-                                  if (!faena) return;
-                                  let grupo = grupos.find((g) => g.faenaId === faenaId);
-                                  if (!grupo) {
-                                    grupo = { faenaId, faenaNombre: faena.nombre, paquetes: [] };
-                                    grupos.push(grupo);
+                                paquetes.forEach((paquete) => {
+                                  if (bateriaFilter && !paquete.nombre.toLowerCase().includes(bateriaFilter.toLowerCase())) {
+                                    return;
                                   }
-                                  if (!grupo.paquetes.some((p) => p.id === paquete.id)) {
-                                    grupo.paquetes.push(paquete);
+
+                                  const faenaIds = paqueteFaenasMap[paquete.id] || [];
+                                  if (faenaIds.length === 0) {
+                                    sinFaena.push(paquete);
+                                  } else {
+                                    faenaIds.forEach((faenaId) => {
+                                      const faena = allFaenas.find((f) => f.id === faenaId);
+                                      if (!faena) return;
+                                      let grupo = grupos.find((g) => g.faenaId === faenaId);
+                                      if (!grupo) {
+                                        grupo = { faenaId, faenaNombre: faena.nombre, paquetes: [] };
+                                        grupos.push(grupo);
+                                      }
+                                      if (!grupo.paquetes.some((p) => p.id === paquete.id)) {
+                                        grupo.paquetes.push(paquete);
+                                      }
+                                    });
                                   }
                                 });
-                              }
-                            });
 
-                            grupos.sort((a, b) => a.faenaNombre.localeCompare(b.faenaNombre));
-                            if (sinFaena.length > 0) {
-                              grupos.push({ faenaId: "__none__", faenaNombre: "Sin faena asignada", paquetes: sinFaena });
-                            }
+                                grupos.sort((a, b) => a.faenaNombre.localeCompare(b.faenaNombre));
+                                if (sinFaena.length > 0) {
+                                  grupos.push({ faenaId: "__none__", faenaNombre: "Sin faena asignada", paquetes: sinFaena });
+                                }
 
-                            // Aplicar filtro de faena
-                            const gruposFiltrados = filtroFaenaIdBateria === "__all__" 
-                              ? grupos 
-                              : grupos.filter(g => g.faenaId === filtroFaenaIdBateria);
+                                const gruposFiltrados = filtroFaenaIdBateria === "__all__" 
+                                  ? grupos 
+                                  : grupos.filter(g => g.faenaId === filtroFaenaIdBateria);
 
-                            if (gruposFiltrados.length === 0) {
-                              return (
-                                <div className="text-xs text-muted-foreground text-center py-2">
-                                  No se encontraron baterías
-                                </div>
-                              );
-                            }
+                                if (gruposFiltrados.length === 0) {
+                                  return (
+                                    <div className="text-xs text-muted-foreground text-center py-2">
+                                      No se encontraron baterías
+                                    </div>
+                                  );
+                                }
 
-                            return gruposFiltrados.map((grupo) => (
-                              <div key={grupo.faenaId} className="mb-2 last:mb-0">
-                                <div className="text-xs font-medium text-muted-foreground bg-muted py-1 px-2 rounded mb-1">
-                                  {grupo.faenaNombre}
-                                </div>
-                                <div className="space-y-0.5 pl-1">
-                                  {grupo.paquetes.map((paquete) => (
-                                    <label key={paquete.id} className="flex items-center gap-2 cursor-pointer py-1 px-1 hover:bg-accent rounded text-sm">
+                                return gruposFiltrados.map((grupo) => (
+                                  <div key={grupo.faenaId} className="mb-2 last:mb-0">
+                                    <div className="text-xs font-medium text-muted-foreground bg-muted py-1 px-2 rounded mb-1">
+                                      {grupo.faenaNombre}
+                                    </div>
+                                    <div className="space-y-0.5 pl-1">
+                                      {grupo.paquetes.map((paquete) => (
+                                        <label key={paquete.id} className="flex items-center gap-2 cursor-pointer py-1 px-1 hover:bg-accent rounded text-sm">
+                                          <input
+                                            type="checkbox"
+                                            checked={selectedPaquetes.includes(paquete.id)}
+                                            onChange={(e) => {
+                                              if (e.target.checked) {
+                                                setSelectedPaquetes([...selectedPaquetes, paquete.id]);
+                                                const examenesIds = paquete.paquete_examen_items.map(item => item.examen_id);
+                                                setSelectedExamenes(prev => [...new Set([...prev, ...examenesIds])]);
+                                              } else {
+                                                setSelectedPaquetes(selectedPaquetes.filter(id => id !== paquete.id));
+                                                const examenesIds = paquete.paquete_examen_items.map(item => item.examen_id);
+                                                setSelectedExamenes(prev => prev.filter(id => !examenesIds.includes(id)));
+                                              }
+                                            }}
+                                            className="w-3.5 h-3.5"
+                                          />
+                                          <span className="break-words">{paquete.nombre}</span>
+                                          <span className="text-xs text-muted-foreground ml-auto shrink-0">
+                                            ({paquete.paquete_examen_items.length})
+                                          </span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ));
+                              })()}
+                            </div>
+                          </div>
+                        </TabsContent>
+
+                        <TabsContent value="examenes" className="flex-1 overflow-hidden mt-2">
+                          <div className="h-full border rounded-md bg-muted/30 overflow-y-auto">
+                            <div className="p-2">
+                              <div className="space-y-0.5">
+                                {examenes
+                                  .filter(examen => 
+                                    !bateriaFilter || 
+                                    examen.nombre.toLowerCase().includes(bateriaFilter.toLowerCase()) ||
+                                    (examen.codigo && examen.codigo.toLowerCase().includes(bateriaFilter.toLowerCase()))
+                                  )
+                                  .slice(0, 50)
+                                  .map((examen) => (
+                                    <label key={examen.id} className="flex items-center gap-2 cursor-pointer py-1 px-1 hover:bg-accent rounded text-sm">
                                       <input
                                         type="checkbox"
-                                        checked={selectedPaquetes.includes(paquete.id)}
+                                        checked={selectedExamenes.includes(examen.id)}
                                         onChange={(e) => {
                                           if (e.target.checked) {
-                                            setSelectedPaquetes([...selectedPaquetes, paquete.id]);
-                                            const examenesIds = paquete.paquete_examen_items.map(item => item.examen_id);
-                                            setSelectedExamenes(prev => [...new Set([...prev, ...examenesIds])]);
+                                            setSelectedExamenes([...selectedExamenes, examen.id]);
                                           } else {
-                                            setSelectedPaquetes(selectedPaquetes.filter(id => id !== paquete.id));
-                                            const examenesIds = paquete.paquete_examen_items.map(item => item.examen_id);
-                                            setSelectedExamenes(prev => prev.filter(id => !examenesIds.includes(id)));
+                                            setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
                                           }
                                         }}
                                         className="w-3.5 h-3.5"
                                       />
-                                      <span className="break-words">{paquete.nombre}</span>
-                                      <span className="text-xs text-muted-foreground ml-auto shrink-0">
-                                        ({paquete.paquete_examen_items.length})
-                                      </span>
+                                      <span className="break-words flex-1">{examen.nombre}</span>
+                                      {examen.codigo && (
+                                        <span className="text-xs text-muted-foreground shrink-0">{examen.codigo}</span>
+                                      )}
                                     </label>
                                   ))}
-                                </div>
+                                {examenes.filter(examen => 
+                                  !bateriaFilter || 
+                                  examen.nombre.toLowerCase().includes(bateriaFilter.toLowerCase()) ||
+                                  (examen.codigo && examen.codigo.toLowerCase().includes(bateriaFilter.toLowerCase()))
+                                ).length > 50 && (
+                                  <div className="text-xs text-muted-foreground text-center py-1">
+                                    Use el buscador para filtrar más resultados...
+                                  </div>
+                                )}
                               </div>
-                            ));
-                          })()}
-                        </div>
-
-                        {/* Separador */}
-                        <div className="border-t mx-2 my-2" />
-
-                        {/* Exámenes individuales */}
-                        <div className="p-2">
-                          <div className="text-xs font-semibold text-muted-foreground mb-2">EXÁMENES INDIVIDUALES</div>
-                          <div className="space-y-0.5">
-                            {examenes
-                              .filter(examen => 
-                                !bateriaFilter || 
-                                examen.nombre.toLowerCase().includes(bateriaFilter.toLowerCase()) ||
-                                (examen.codigo && examen.codigo.toLowerCase().includes(bateriaFilter.toLowerCase()))
-                              )
-                              .slice(0, 50)
-                              .map((examen) => (
-                                <label key={examen.id} className="flex items-center gap-2 cursor-pointer py-1 px-1 hover:bg-accent rounded text-sm">
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedExamenes.includes(examen.id)}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setSelectedExamenes([...selectedExamenes, examen.id]);
-                                      } else {
-                                        setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
-                                      }
-                                    }}
-                                    className="w-3.5 h-3.5"
-                                  />
-                                  <span className="break-words flex-1">{examen.nombre}</span>
-                                  {examen.codigo && (
-                                    <span className="text-xs text-muted-foreground shrink-0">{examen.codigo}</span>
-                                  )}
-                                </label>
-                              ))}
-                            {examenes.filter(examen => 
-                              !bateriaFilter || 
-                              examen.nombre.toLowerCase().includes(bateriaFilter.toLowerCase()) ||
-                              (examen.codigo && examen.codigo.toLowerCase().includes(bateriaFilter.toLowerCase()))
-                            ).length > 50 && (
-                              <div className="text-xs text-muted-foreground text-center py-1">
-                                Use el buscador para filtrar más resultados...
-                              </div>
-                            )}
+                            </div>
                           </div>
-                        </div>
-                      </div>
+                        </TabsContent>
+                      </Tabs>
                     </div>
                   </div>
 
