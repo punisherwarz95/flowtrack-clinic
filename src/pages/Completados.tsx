@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
-import { CheckCircle, Calendar as CalendarIcon, RotateCcw } from "lucide-react";
+import { CheckCircle, Calendar as CalendarIcon, RotateCcw, BarChart3 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -14,6 +14,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import MetricasCompletados from "@/components/MetricasCompletados";
 
 interface AtencionCompletada {
   id: string;
@@ -175,85 +177,104 @@ const Completados = () => {
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-3">
-              <CheckCircle className="h-5 w-5 text-green-600" />
-              <span>Total Completadas: {atenciones.length}</span>
-              <div className="flex gap-2 text-sm font-normal text-muted-foreground">
-                <span>WM: {distribucion.workmed.toString().padStart(2, "0")}</span>
-                <span>J: {distribucion.jenner.toString().padStart(2, "0")}</span>
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {atenciones.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No hay atenciones completadas para esta fecha
-              </div>
-            ) : (
-              atenciones.map((atencion) => (
-                <div
-                  key={atencion.id}
-                  className="p-4 rounded-lg border border-border bg-card hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="outline" className="font-bold">#{atencion.numero_ingreso}</Badge>
-                        <div className="font-medium text-foreground">
-                          {atencion.pacientes.nombre}
-                        </div>
-                        <Badge variant="outline" className="text-xs">
-                          {atencion.pacientes.tipo_servicio === "workmed" ? "WM" : "J"}
-                        </Badge>
-                        <Badge className="bg-green-600">Completado</Badge>
-                      </div>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => handleOpenRevertDialog(atencion)}
-                      className="shrink-0"
-                    >
-                      <RotateCcw className="h-4 w-4 mr-1" />
-                      Devolver
-                    </Button>
-                      <div className="text-sm text-muted-foreground">
-                        Empresa: {atencion.pacientes.empresas?.nombre || "Sin empresa"}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-2">
-                        <div>Ingreso: {atencion.fecha_ingreso ? format(new Date(atencion.fecha_ingreso), "dd/MM/yyyy HH:mm", { locale: es }) : "Sin fecha"}</div>
-                        <div>Finalizado: {atencion.fecha_fin_atencion ? format(new Date(atencion.fecha_fin_atencion), "dd/MM/yyyy HH:mm", { locale: es }) : "Sin fecha"}</div>
-                        {atencion.fecha_ingreso && atencion.fecha_fin_atencion && (
-                          <div className="font-medium mt-1">
-                            Tiempo en centro: {Math.floor((new Date(atencion.fecha_fin_atencion).getTime() - new Date(atencion.fecha_ingreso).getTime()) / 60000)} min
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+        <Tabs defaultValue="completados" className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="completados" className="gap-2">
+              <CheckCircle className="h-4 w-4" />
+              Completados ({atenciones.length})
+            </TabsTrigger>
+            <TabsTrigger value="metricas" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Métricas
+            </TabsTrigger>
+          </TabsList>
 
-                  <div className="mt-3 p-3 bg-muted/50 rounded-md">
-                    <div className="text-xs font-medium text-muted-foreground mb-2">
-                      Exámenes realizados:
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {atencion.atencion_examenes.map((ae) => (
-                        <Badge
-                          key={ae.id}
-                          variant={ae.estado === "completado" ? "default" : "secondary"}
-                          className="text-xs"
-                        >
-                          {ae.examenes.nombre} {ae.estado === "completado" ? "✓" : "○"}
-                        </Badge>
-                      ))}
-                    </div>
+          <TabsContent value="completados">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <span>Total Completadas: {atenciones.length}</span>
+                  <div className="flex gap-2 text-sm font-normal text-muted-foreground">
+                    <span>WM: {distribucion.workmed.toString().padStart(2, "0")}</span>
+                    <span>J: {distribucion.jenner.toString().padStart(2, "0")}</span>
                   </div>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {atenciones.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No hay atenciones completadas para esta fecha
+                  </div>
+                ) : (
+                  atenciones.map((atencion) => (
+                    <div
+                      key={atencion.id}
+                      className="p-4 rounded-lg border border-border bg-card hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge variant="outline" className="font-bold">#{atencion.numero_ingreso}</Badge>
+                            <div className="font-medium text-foreground">
+                              {atencion.pacientes.nombre}
+                            </div>
+                            <Badge variant="outline" className="text-xs">
+                              {atencion.pacientes.tipo_servicio === "workmed" ? "WM" : "J"}
+                            </Badge>
+                            <Badge className="bg-green-600">Completado</Badge>
+                          </div>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleOpenRevertDialog(atencion)}
+                          className="shrink-0"
+                        >
+                          <RotateCcw className="h-4 w-4 mr-1" />
+                          Devolver
+                        </Button>
+                          <div className="text-sm text-muted-foreground">
+                            Empresa: {atencion.pacientes.empresas?.nombre || "Sin empresa"}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-2">
+                            <div>Ingreso: {atencion.fecha_ingreso ? format(new Date(atencion.fecha_ingreso), "dd/MM/yyyy HH:mm", { locale: es }) : "Sin fecha"}</div>
+                            <div>Finalizado: {atencion.fecha_fin_atencion ? format(new Date(atencion.fecha_fin_atencion), "dd/MM/yyyy HH:mm", { locale: es }) : "Sin fecha"}</div>
+                            {atencion.fecha_ingreso && atencion.fecha_fin_atencion && (
+                              <div className="font-medium mt-1">
+                                Tiempo en centro: {Math.floor((new Date(atencion.fecha_fin_atencion).getTime() - new Date(atencion.fecha_ingreso).getTime()) / 60000)} min
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 p-3 bg-muted/50 rounded-md">
+                        <div className="text-xs font-medium text-muted-foreground mb-2">
+                          Exámenes realizados:
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {atencion.atencion_examenes.map((ae) => (
+                            <Badge
+                              key={ae.id}
+                              variant={ae.estado === "completado" ? "default" : "secondary"}
+                              className="text-xs"
+                            >
+                              {ae.examenes.nombre} {ae.estado === "completado" ? "✓" : "○"}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="metricas">
+            <MetricasCompletados selectedDate={selectedDate} />
+          </TabsContent>
+        </Tabs>
 
         {/* Dialog para revertir atención */}
         <Dialog open={revertDialog.open} onOpenChange={(open) => {
