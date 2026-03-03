@@ -337,6 +337,12 @@ const MiBox = () => {
         return;
       }
 
+      // Registrar visita al box
+      await supabase.from("atencion_box_visitas").insert({
+        atencion_id: atencionId,
+        box_id: selectedBoxId!,
+      });
+
       const paciente = pacientesEnEspera.find(p => p.id === atencionId);
       toast.success(`🔔 Paciente ${paciente?.pacientes.nombre} entró al box`, {
         duration: 5000,
@@ -399,6 +405,16 @@ const MiBox = () => {
           .eq("atencion_id", atencionId)
           .in("examen_id", boxExamIds)
           .in("estado", ["pendiente", "incompleto"]);
+      }
+
+      // Cerrar visita al box (registrar fecha_salida)
+      if (selectedBoxId) {
+        await supabase
+          .from("atencion_box_visitas")
+          .update({ fecha_salida: new Date().toISOString() })
+          .eq("atencion_id", atencionId)
+          .eq("box_id", selectedBoxId)
+          .is("fecha_salida", null);
       }
 
       const { data: examenesPendientesData } = await supabase

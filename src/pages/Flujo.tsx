@@ -458,6 +458,12 @@ const Flujo = () => {
         return { ...prev, [atencionId]: filteredExamenes };
       });
 
+      // Registrar visita al box
+      await supabase.from("atencion_box_visitas").insert({
+        atencion_id: atencionId,
+        box_id: boxId,
+      });
+
       toast.success(`🔔 Paciente ${atenciones.find(a => a.id === atencionId)?.pacientes.nombre} entró a ${boxes.find(b => b.id === boxId)?.nombre}`, {
         duration: 5000,
         style: {
@@ -577,6 +583,16 @@ const Flujo = () => {
             if (error) throw error;
           }
         }
+      }
+
+      // Cerrar visita al box (registrar fecha_salida)
+      if (currentBoxId) {
+        await supabase
+          .from("atencion_box_visitas")
+          .update({ fecha_salida: new Date().toISOString() })
+          .eq("atencion_id", atencionId)
+          .eq("box_id", currentBoxId)
+          .is("fecha_salida", null);
       }
 
       // Limpiar selección local

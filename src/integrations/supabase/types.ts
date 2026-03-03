@@ -128,6 +128,48 @@ export type Database = {
           },
         ]
       }
+      atencion_box_visitas: {
+        Row: {
+          atencion_id: string
+          box_id: string
+          created_at: string
+          fecha_entrada: string
+          fecha_salida: string | null
+          id: string
+        }
+        Insert: {
+          atencion_id: string
+          box_id: string
+          created_at?: string
+          fecha_entrada?: string
+          fecha_salida?: string | null
+          id?: string
+        }
+        Update: {
+          atencion_id?: string
+          box_id?: string
+          created_at?: string
+          fecha_entrada?: string
+          fecha_salida?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atencion_box_visitas_atencion_id_fkey"
+            columns: ["atencion_id"]
+            isOneToOne: false
+            referencedRelation: "atenciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atencion_box_visitas_box_id_fkey"
+            columns: ["box_id"]
+            isOneToOne: false
+            referencedRelation: "boxes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       atencion_documentos: {
         Row: {
           atencion_id: string
