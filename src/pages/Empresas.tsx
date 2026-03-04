@@ -30,6 +30,7 @@ interface Empresa {
   contacto?: string;
   email?: string;
   telefono?: string;
+  centro_costo?: string;
   created_at: string;
 }
 
@@ -61,6 +62,12 @@ const Empresas = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [formData, setFormData] = useState({
     nombre: "",
+    rut: "",
+    razon_social: "",
+    contacto: "",
+    email: "",
+    telefono: "",
+    centro_costo: "",
   });
 
   // Filtrar empresas por nombre
@@ -126,22 +133,26 @@ const Empresas = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const payload = {
+        nombre: formData.nombre,
+        rut: formData.rut || null,
+        razon_social: formData.razon_social || null,
+        contacto: formData.contacto || null,
+        email: formData.email || null,
+        telefono: formData.telefono || null,
+        centro_costo: formData.centro_costo || null,
+      };
+
       if (editingEmpresa) {
         const { error } = await supabase
           .from("empresas")
-          .update({
-            nombre: formData.nombre,
-          })
+          .update(payload)
           .eq("id", editingEmpresa.id);
 
         if (error) throw error;
         toast.success("Empresa actualizada exitosamente");
       } else {
-        const { error } = await supabase.from("empresas").insert([
-          {
-            nombre: formData.nombre,
-          },
-        ]);
+        const { error } = await supabase.from("empresas").insert([payload]);
 
         if (error) throw error;
         toast.success("Empresa agregada exitosamente");
@@ -149,7 +160,7 @@ const Empresas = () => {
       
       setOpenDialog(false);
       setEditingEmpresa(null);
-      setFormData({ nombre: "" });
+      setFormData({ nombre: "", rut: "", razon_social: "", contacto: "", email: "", telefono: "", centro_costo: "" });
       loadEmpresas();
     } catch (error: any) {
       console.error("Error:", error);
@@ -260,7 +271,7 @@ const Empresas = () => {
               setOpenDialog(open);
               if (!open) {
                 setEditingEmpresa(null);
-                setFormData({ nombre: "" });
+                setFormData({ nombre: "", rut: "", razon_social: "", contacto: "", email: "", telefono: "", centro_costo: "" });
               }
             }}>
               <DialogTrigger asChild>
@@ -269,20 +280,77 @@ const Empresas = () => {
                   Nueva Empresa
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>{editingEmpresa ? "Editar Empresa" : "Agregar Nueva Empresa"}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div>
-                    <Label htmlFor="nombre">Nombre de la Empresa *</Label>
-                    <Input
-                      id="nombre"
-                      required
-                      value={formData.nombre}
-                      onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                      placeholder="Ej: Empresa ABC S.A."
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="col-span-2">
+                      <Label htmlFor="nombre">Nombre *</Label>
+                      <Input
+                        id="nombre"
+                        required
+                        value={formData.nombre}
+                        onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                        placeholder="Ej: Empresa ABC S.A."
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="rut">RUT</Label>
+                      <Input
+                        id="rut"
+                        value={formData.rut}
+                        onChange={(e) => setFormData({ ...formData, rut: e.target.value })}
+                        placeholder="12.345.678-9"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="razon_social">Razón Social</Label>
+                      <Input
+                        id="razon_social"
+                        value={formData.razon_social}
+                        onChange={(e) => setFormData({ ...formData, razon_social: e.target.value })}
+                        placeholder="Razón social"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="contacto">Contacto</Label>
+                      <Input
+                        id="contacto"
+                        value={formData.contacto}
+                        onChange={(e) => setFormData({ ...formData, contacto: e.target.value })}
+                        placeholder="Nombre contacto"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        placeholder="correo@empresa.cl"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="telefono">Teléfono</Label>
+                      <Input
+                        id="telefono"
+                        value={formData.telefono}
+                        onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+                        placeholder="+56 9 1234 5678"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="centro_costo">Centro de Costo</Label>
+                      <Input
+                        id="centro_costo"
+                        value={formData.centro_costo}
+                        onChange={(e) => setFormData({ ...formData, centro_costo: e.target.value })}
+                        placeholder="Código centro costo"
+                      />
+                    </div>
                   </div>
                   <Button type="submit" className="w-full">
                     {editingEmpresa ? "Actualizar Empresa" : "Guardar Empresa"}
@@ -362,7 +430,15 @@ const Empresas = () => {
                       size="icon"
                       onClick={() => {
                         setEditingEmpresa(empresa);
-                        setFormData({ nombre: empresa.nombre });
+                        setFormData({
+                          nombre: empresa.nombre || "",
+                          rut: empresa.rut || "",
+                          razon_social: empresa.razon_social || "",
+                          contacto: empresa.contacto || "",
+                          email: empresa.email || "",
+                          telefono: empresa.telefono || "",
+                          centro_costo: empresa.centro_costo || "",
+                        });
                         setOpenDialog(true);
                       }}
                     >
@@ -379,12 +455,17 @@ const Empresas = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Registrada: {new Date(empresa.created_at).toLocaleDateString()}
-                </p>
-                {empresa.rut && (
-                  <p className="text-sm text-muted-foreground">RUT: {empresa.rut}</p>
-                )}
+                <div className="text-sm text-muted-foreground space-y-0.5">
+                  {empresa.rut && <p>RUT: {empresa.rut}</p>}
+                  {empresa.razon_social && <p>Razón Social: {empresa.razon_social}</p>}
+                  {empresa.contacto && <p>Contacto: {empresa.contacto}</p>}
+                  {empresa.email && <p>Email: {empresa.email}</p>}
+                  {empresa.telefono && <p>Tel: {empresa.telefono}</p>}
+                  {empresa.centro_costo && <p>C. Costo: {empresa.centro_costo}</p>}
+                  {!empresa.rut && !empresa.contacto && !empresa.email && (
+                    <p>Registrada: {new Date(empresa.created_at).toLocaleDateString()}</p>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}
