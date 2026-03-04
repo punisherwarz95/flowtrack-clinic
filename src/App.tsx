@@ -27,6 +27,7 @@ import PortalPaciente from "./pages/PortalPaciente";
 import NotFound from "./pages/NotFound";
 import PantallaTv from "./pages/PantallaTv";
 import { InitAdmin } from "./components/InitAdmin";
+import VersionChecker from "./components/VersionChecker";
 import ProtectedRoute from "./components/ProtectedRoute";
 import EmpresaProtectedRoute from "./components/empresa/EmpresaProtectedRoute";
 import EmpresaLogin from "./pages/empresa/EmpresaLogin";
@@ -47,6 +48,7 @@ const App = () => (
         <InitAdmin />
         <Toaster />
         <Sonner />
+        <VersionChecker />
         <BrowserRouter>
           <AuthProvider>
             <EmpresaAuthProvider>
