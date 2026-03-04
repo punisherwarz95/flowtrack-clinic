@@ -1466,7 +1466,7 @@ const Pacientes = () => {
                     <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input placeholder="Buscar batería o examen..." value={bateriaFilter} onChange={(e) => setBateriaFilter(e.target.value)} className="pl-8 pr-8 h-8 text-sm" />
                     {bateriaFilter && (
-                      <button type="button" onClick={() => setBateriaFilter("")} className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground hover:text-foreground">
+                      <button type="button" tabIndex={-1} onClick={() => setBateriaFilter("")} className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground hover:text-foreground">
                         <X className="h-4 w-4" />
                       </button>
                     )}
@@ -1475,8 +1475,8 @@ const Pacientes = () => {
                   {/* Pestañas Baterías / Exámenes */}
                   <Tabs defaultValue="baterias" className="flex-1 flex flex-col overflow-hidden">
                     <TabsList className="flex-shrink-0 w-full">
-                      <TabsTrigger value="baterias" className="flex-1 text-xs">Baterías</TabsTrigger>
-                      <TabsTrigger value="examenes" className="flex-1 text-xs">Exámenes</TabsTrigger>
+                      <TabsTrigger value="baterias" tabIndex={-1} className="flex-1 text-xs">Baterías</TabsTrigger>
+                      <TabsTrigger value="examenes" tabIndex={-1} className="flex-1 text-xs">Exámenes</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="baterias" className="flex-1 overflow-hidden mt-2">
