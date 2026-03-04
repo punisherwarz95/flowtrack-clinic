@@ -459,10 +459,11 @@ const Flujo = () => {
       });
 
       // Registrar visita al box
-      await supabase.from("atencion_box_visitas").insert({
+      const { error: visitaError } = await supabase.from("atencion_box_visitas").insert({
         atencion_id: atencionId,
         box_id: boxId,
       });
+      if (visitaError) console.error("Error registrando visita:", visitaError);
 
       toast.success(`🔔 Paciente ${atenciones.find(a => a.id === atencionId)?.pacientes.nombre} entró a ${boxes.find(b => b.id === boxId)?.nombre}`, {
         duration: 5000,
