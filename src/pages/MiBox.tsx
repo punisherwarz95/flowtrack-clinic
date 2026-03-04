@@ -338,10 +338,11 @@ const MiBox = () => {
       }
 
       // Registrar visita al box
-      await supabase.from("atencion_box_visitas").insert({
+      const { error: visitaError } = await supabase.from("atencion_box_visitas").insert({
         atencion_id: atencionId,
         box_id: selectedBoxId!,
       });
+      if (visitaError) console.error("Error registrando visita:", visitaError);
 
       const paciente = pacientesEnEspera.find(p => p.id === atencionId);
       toast.success(`🔔 Paciente ${paciente?.pacientes.nombre} entró al box`, {
