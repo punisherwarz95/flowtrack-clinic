@@ -1474,12 +1474,12 @@ const Pacientes = () => {
 
                   {/* Pestañas Baterías / Exámenes */}
                   <Tabs defaultValue="baterias" className="flex-1 flex flex-col overflow-hidden">
-                    <TabsList className="flex-shrink-0 w-full">
+                    <TabsList tabIndex={-1} className="flex-shrink-0 w-full">
                       <TabsTrigger value="baterias" tabIndex={-1} className="flex-1 text-xs">Baterías</TabsTrigger>
                       <TabsTrigger value="examenes" tabIndex={-1} className="flex-1 text-xs">Exámenes</TabsTrigger>
                     </TabsList>
 
-                    <TabsContent value="baterias" className="flex-1 overflow-hidden mt-2">
+                    <TabsContent value="baterias" tabIndex={-1} className="flex-1 overflow-hidden mt-2">
                       <div className="h-full border rounded-md bg-muted/30 overflow-y-auto">
                         <div className="p-2">
                           {(() => {
@@ -1533,7 +1533,7 @@ const Pacientes = () => {
                       </div>
                     </TabsContent>
 
-                    <TabsContent value="examenes" className="flex-1 overflow-hidden mt-2">
+                    <TabsContent value="examenes" tabIndex={-1} className="flex-1 overflow-hidden mt-2">
                       <div className="h-full border rounded-md bg-muted/30 overflow-y-auto">
                         <div className="p-2">
                           {faenaExamenesIds.length === 0 && formData.faena_id ? (
