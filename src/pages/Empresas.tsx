@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Upload, Building2, Trash2, Pencil, Package, DollarSign, MapPin, Eye, Search } from "lucide-react";
+import { Plus, Upload, Building2, Trash2, Pencil, Package, DollarSign, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
@@ -47,32 +47,32 @@ interface EmpresaBateria {
   paquete?: { nombre: string };
 }
 
+const emptyForm = {
+  nombre: "",
+  rut: "",
+  razon_social: "",
+  contacto: "",
+  email: "",
+  telefono: "",
+  centro_costo: "",
+};
+
 const Empresas = () => {
-  useAuth(); // Protect route
+  useAuth();
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [paquetes, setPaquetes] = useState<Paquete[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
-  const [openBateriasDialog, setOpenBateriasDialog] = useState(false);
-  const [openFaenasDialog, setOpenFaenasDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState("datos");
   const [empresaToDelete, setEmpresaToDelete] = useState<string | null>(null);
   const [editingEmpresa, setEditingEmpresa] = useState<Empresa | null>(null);
-  const [selectedEmpresa, setSelectedEmpresa] = useState<Empresa | null>(null);
   const [empresaBaterias, setEmpresaBaterias] = useState<EmpresaBateria[]>([]);
   const [bateriaPrecios, setBateriaPrecios] = useState<Record<string, string>>({});
   const [searchTerm, setSearchTerm] = useState("");
-  const [formData, setFormData] = useState({
-    nombre: "",
-    rut: "",
-    razon_social: "",
-    contacto: "",
-    email: "",
-    telefono: "",
-    centro_costo: "",
-  });
+  const [formData, setFormData] = useState(emptyForm);
 
-  // Filtrar empresas por nombre
   const filteredEmpresas = empresas.filter((empresa) =>
-    empresa.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+    empresa.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (empresa.rut && empresa.rut.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   useEffect(() => {
@@ -82,11 +82,7 @@ const Empresas = () => {
 
   const loadEmpresas = async () => {
     try {
-      const { data, error } = await supabase
-        .from("empresas")
-        .select("*")
-        .order("nombre");
-
+      const { data, error } = await supabase.from("empresas").select("*").order("nombre");
       if (error) throw error;
       setEmpresas(data || []);
     } catch (error) {
@@ -97,11 +93,7 @@ const Empresas = () => {
 
   const loadPaquetes = async () => {
     try {
-      const { data, error } = await supabase
-        .from("paquetes_examenes")
-        .select("id, nombre")
-        .order("nombre");
-
+      const { data, error } = await supabase.from("paquetes_examenes").select("id, nombre").order("nombre");
       if (error) throw error;
       setPaquetes(data || []);
     } catch (error) {
@@ -115,11 +107,8 @@ const Empresas = () => {
         .from("empresa_baterias")
         .select("*, paquete:paquetes_examenes(nombre)")
         .eq("empresa_id", empresaId);
-
       if (error) throw error;
       setEmpresaBaterias(data || []);
-      
-      // Cargar precios en el estado
       const precios: Record<string, string> = {};
       data?.forEach(eb => {
         precios[eb.paquete_id] = eb.valor?.toString() || "";
@@ -128,6 +117,31 @@ const Empresas = () => {
     } catch (error) {
       console.error("Error:", error);
     }
+  };
+
+  const openEmpresaDialog = async (empresa: Empresa) => {
+    setEditingEmpresa(empresa);
+    setFormData({
+      nombre: empresa.nombre || "",
+      rut: empresa.rut || "",
+      razon_social: empresa.razon_social || "",
+      contacto: empresa.contacto || "",
+      email: empresa.email || "",
+      telefono: empresa.telefono || "",
+      centro_costo: empresa.centro_costo || "",
+    });
+    await loadEmpresaBaterias(empresa.id);
+    setActiveTab("datos");
+    setOpenDialog(true);
+  };
+
+  const openNewDialog = () => {
+    setEditingEmpresa(null);
+    setFormData(emptyForm);
+    setEmpresaBaterias([]);
+    setBateriaPrecios({});
+    setActiveTab("datos");
+    setOpenDialog(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -144,59 +158,43 @@ const Empresas = () => {
       };
 
       if (editingEmpresa) {
-        const { error } = await supabase
-          .from("empresas")
-          .update(payload)
-          .eq("id", editingEmpresa.id);
-
+        const { error } = await supabase.from("empresas").update(payload).eq("id", editingEmpresa.id);
         if (error) throw error;
         toast.success("Empresa actualizada exitosamente");
       } else {
-        const { error } = await supabase.from("empresas").insert([payload]);
-
+        const { data, error } = await supabase.from("empresas").insert([payload]).select().single();
         if (error) throw error;
         toast.success("Empresa agregada exitosamente");
+        // Switch to editing mode so tabs are available
+        if (data) {
+          setEditingEmpresa(data as Empresa);
+        }
       }
-      
-      setOpenDialog(false);
-      setEditingEmpresa(null);
-      setFormData({ nombre: "", rut: "", razon_social: "", contacto: "", email: "", telefono: "", centro_costo: "" });
       loadEmpresas();
     } catch (error: any) {
       console.error("Error:", error);
-      toast.error(error.message || (editingEmpresa ? "Error al actualizar empresa" : "Error al agregar empresa"));
+      toast.error(error.message || "Error al guardar empresa");
     }
   };
 
   const handleSaveBaterias = async () => {
-    if (!selectedEmpresa) return;
-
+    if (!editingEmpresa) return;
     try {
-      // IMPORTANTE: No borramos vínculos.
-      // Las baterías pueden venir auto-vinculadas por faena con valor=0 (pendiente de precio)
-      // y deben permanecer para que la info sea transversal.
       const linkedPaqueteIds = Array.from(new Set(empresaBaterias.map((eb) => eb.paquete_id)));
-
       const updates = linkedPaqueteIds.map((paqueteId) => {
         const raw = (bateriaPrecios[paqueteId] ?? "").trim();
         const parsed = raw === "" ? 0 : Number(raw);
         const valor = Number.isFinite(parsed) ? parsed : 0;
-
         return supabase
           .from("empresa_baterias")
           .update({ valor, activo: true })
-          .eq("empresa_id", selectedEmpresa.id)
+          .eq("empresa_id", editingEmpresa.id)
           .eq("paquete_id", paqueteId);
       });
-
       const results = await Promise.all(updates);
       const firstError = results.find((r) => r.error)?.error;
       if (firstError) throw firstError;
-
-      toast.success("Baterías contratadas actualizadas");
-      setOpenBateriasDialog(false);
-      setSelectedEmpresa(null);
-      setBateriaPrecios({});
+      toast.success("Precios de baterías actualizados");
     } catch (error: any) {
       console.error("Error:", error);
       toast.error(error.message || "Error al guardar baterías");
@@ -206,22 +204,15 @@ const Empresas = () => {
   const handleEmpresasUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     try {
       const text = await file.text();
       const rows = text.split("\n").map((row) => row.split(","));
-      
       const empresasData = rows
         .slice(1)
         .filter((row) => row.length >= 1 && row[0]?.trim())
-        .map((row) => ({
-          nombre: row[0]?.trim() || "",
-        }));
-
+        .map((row) => ({ nombre: row[0]?.trim() || "" }));
       const { error } = await supabase.from("empresas").insert(empresasData);
-
       if (error) throw error;
-      
       toast.success(`${empresasData.length} empresas importadas`);
       loadEmpresas();
     } catch (error: any) {
@@ -232,15 +223,9 @@ const Empresas = () => {
 
   const handleDelete = async () => {
     if (!empresaToDelete) return;
-
     try {
-      const { error } = await supabase
-        .from("empresas")
-        .delete()
-        .eq("id", empresaToDelete);
-
+      const { error } = await supabase.from("empresas").delete().eq("id", empresaToDelete);
       if (error) throw error;
-      
       toast.success("Empresa eliminada exitosamente");
       setEmpresaToDelete(null);
       loadEmpresas();
@@ -250,10 +235,8 @@ const Empresas = () => {
     }
   };
 
-  const getBateriasCount = (empresaId: string) => {
-    // Esta función se puede optimizar si es necesario
-    return 0; // Por ahora no mostramos count en la card
-  };
+  const linkedPaqueteIds = new Set(empresaBaterias.map((eb) => eb.paquete_id));
+  const linkedPaquetes = paquetes.filter((p) => linkedPaqueteIds.has(p.id));
 
   return (
     <div className="min-h-screen bg-background">
@@ -265,25 +248,111 @@ const Empresas = () => {
             <h1 className="text-3xl font-bold text-foreground mb-2">Empresas</h1>
             <p className="text-muted-foreground">Administra las empresas asociadas y sus baterías contratadas</p>
           </div>
-          
           <div className="flex gap-3">
-            <Dialog open={openDialog} onOpenChange={(open) => {
-              setOpenDialog(open);
-              if (!open) {
-                setEditingEmpresa(null);
-                setFormData({ nombre: "", rut: "", razon_social: "", contacto: "", email: "", telefono: "", centro_costo: "" });
+            <Button className="gap-2" onClick={openNewDialog}>
+              <Plus className="h-4 w-4" />
+              Nueva Empresa
+            </Button>
+            <Button variant="secondary" className="gap-2" asChild>
+              <label>
+                <Upload className="h-4 w-4" />
+                Importar CSV
+                <input type="file" accept=".csv" className="hidden" onChange={handleEmpresasUpload} />
+              </label>
+            </Button>
+          </div>
+        </div>
+
+        {/* Buscador */}
+        <div className="mb-6">
+          <div className="relative w-full max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar empresa por nombre o RUT..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          {searchTerm && (
+            <p className="text-sm text-muted-foreground mt-2">
+              {filteredEmpresas.length} empresa(s) encontrada(s)
+            </p>
+          )}
+        </div>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredEmpresas.map((empresa) => (
+            <Card key={empresa.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => openEmpresaDialog(empresa)}>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Building2 className="h-5 w-5 text-primary" />
+                    {empresa.nombre}
+                  </CardTitle>
+                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setEmpresaToDelete(empresa.id)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm text-muted-foreground space-y-0.5">
+                  {empresa.rut && <p>RUT: {empresa.rut}</p>}
+                  {empresa.razon_social && <p>{empresa.razon_social}</p>}
+                  {empresa.contacto && <p>Contacto: {empresa.contacto}</p>}
+                  {empresa.email && <p>{empresa.email}</p>}
+                  {empresa.telefono && <p>Tel: {empresa.telefono}</p>}
+                  {!empresa.rut && !empresa.contacto && !empresa.email && (
+                    <p>Registrada: {new Date(empresa.created_at).toLocaleDateString()}</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Dialog centralizado */}
+        <Dialog open={openDialog} onOpenChange={(open) => {
+          setOpenDialog(open);
+          if (!open) {
+            setEditingEmpresa(null);
+            setFormData(emptyForm);
+            setEmpresaBaterias([]);
+            setBateriaPrecios({});
+          }
+        }}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                {editingEmpresa ? editingEmpresa.nombre : "Nueva Empresa"}
+              </DialogTitle>
+            </DialogHeader>
+
+            <Tabs value={activeTab} onValueChange={(tab) => {
+              setActiveTab(tab);
+              if (tab === "baterias" && editingEmpresa) {
+                loadEmpresaBaterias(editingEmpresa.id);
               }
             }}>
-              <DialogTrigger asChild>
-                <Button className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Nueva Empresa
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>{editingEmpresa ? "Editar Empresa" : "Agregar Nueva Empresa"}</DialogTitle>
-                </DialogHeader>
+              <TabsList className="w-full">
+                <TabsTrigger value="datos" className="flex-1">Datos Generales</TabsTrigger>
+                <TabsTrigger value="faenas" className="flex-1" disabled={!editingEmpresa}>
+                  Faenas
+                </TabsTrigger>
+                <TabsTrigger value="baterias" className="flex-1" disabled={!editingEmpresa}>
+                  Baterías y Precios
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Tab: Datos Generales */}
+              <TabsContent value="datos" className="mt-4">
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
@@ -353,214 +422,73 @@ const Empresas = () => {
                     </div>
                   </div>
                   <Button type="submit" className="w-full">
-                    {editingEmpresa ? "Actualizar Empresa" : "Guardar Empresa"}
+                    {editingEmpresa ? "Guardar Cambios" : "Crear Empresa"}
                   </Button>
                 </form>
-              </DialogContent>
-            </Dialog>
+              </TabsContent>
 
-            <Button variant="secondary" className="gap-2" asChild>
-              <label>
-                <Upload className="h-4 w-4" />
-                Importar CSV
-                <input
-                  type="file"
-                  accept=".csv"
-                  className="hidden"
-                  onChange={handleEmpresasUpload}
-                />
-              </label>
-            </Button>
-          </div>
-        </div>
+              {/* Tab: Faenas */}
+              <TabsContent value="faenas" className="mt-4">
+                {editingEmpresa && (
+                  <EmpresaFaenas
+                    empresaId={editingEmpresa.id}
+                    empresaNombre={editingEmpresa.nombre}
+                  />
+                )}
+              </TabsContent>
 
-        {/* Buscador */}
-        <div className="mb-6">
-          <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar empresa por nombre..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          {searchTerm && (
-            <p className="text-sm text-muted-foreground mt-2">
-              {filteredEmpresas.length} empresa(s) encontrada(s)
-            </p>
-          )}
-        </div>
+              {/* Tab: Baterías y Precios */}
+              <TabsContent value="baterias" className="mt-4">
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Define los precios para las baterías vinculadas a esta empresa. Si una batería tiene precio $0, queda como pendiente de configurar.
+                  </p>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredEmpresas.map((empresa) => (
-            <Card key={empresa.id}>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Building2 className="h-5 w-5 text-primary" />
-                    {empresa.nombre}
-                  </CardTitle>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      title="Faenas / Centros de Trabajo"
-                      onClick={() => {
-                        setSelectedEmpresa(empresa);
-                        setOpenFaenasDialog(true);
-                      }}
-                    >
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      title="Baterías Contratadas"
-                      onClick={async () => {
-                        setSelectedEmpresa(empresa);
-                        await loadEmpresaBaterias(empresa.id);
-                        setOpenBateriasDialog(true);
-                      }}
-                    >
-                      <Package className="h-4 w-4 text-primary" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setEditingEmpresa(empresa);
-                        setFormData({
-                          nombre: empresa.nombre || "",
-                          rut: empresa.rut || "",
-                          razon_social: empresa.razon_social || "",
-                          contacto: empresa.contacto || "",
-                          email: empresa.email || "",
-                          telefono: empresa.telefono || "",
-                          centro_costo: empresa.centro_costo || "",
-                        });
-                        setOpenDialog(true);
-                      }}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setEmpresaToDelete(empresa.id)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm text-muted-foreground space-y-0.5">
-                  {empresa.rut && <p>RUT: {empresa.rut}</p>}
-                  {empresa.razon_social && <p>Razón Social: {empresa.razon_social}</p>}
-                  {empresa.contacto && <p>Contacto: {empresa.contacto}</p>}
-                  {empresa.email && <p>Email: {empresa.email}</p>}
-                  {empresa.telefono && <p>Tel: {empresa.telefono}</p>}
-                  {empresa.centro_costo && <p>C. Costo: {empresa.centro_costo}</p>}
-                  {!empresa.rut && !empresa.contacto && !empresa.email && (
-                    <p>Registrada: {new Date(empresa.created_at).toLocaleDateString()}</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Dialog de Baterías Contratadas */}
-        <Dialog open={openBateriasDialog} onOpenChange={(open) => {
-          setOpenBateriasDialog(open);
-          if (!open) {
-            setSelectedEmpresa(null);
-            setBateriaPrecios({});
-          }
-        }}>
-          <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Baterías Contratadas - {selectedEmpresa?.nombre}
-              </DialogTitle>
-            </DialogHeader>
-            
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Define los precios para las baterías vinculadas a esta empresa. Si una batería tiene precio $0, queda como pendiente de configurar.
-              </p>
-
-              {(() => {
-                const linkedPaqueteIds = new Set(empresaBaterias.map((eb) => eb.paquete_id));
-                const linkedPaquetes = paquetes.filter((p) => linkedPaqueteIds.has(p.id));
-
-                const conPrecioCount = linkedPaquetes.filter((p) => {
-                  const v = (bateriaPrecios[p.id] ?? "").trim();
-                  return v !== "" && Number(v) > 0;
-                }).length;
-
-                return (
-                  <>
-                    <div className="border rounded-md divide-y max-h-96 overflow-y-auto">
-                      {linkedPaquetes.map((paquete) => (
-                        <div key={paquete.id} className="flex items-center justify-between p-3 gap-4">
-                          <span className="text-sm font-medium flex-1">{paquete.nombre}</span>
-                          <div className="flex items-center gap-1">
-                            <DollarSign className="h-4 w-4 text-muted-foreground" />
-                            <Input
-                              type="number"
-                              step="any"
-                              value={bateriaPrecios[paquete.id] ?? ""}
-                              onChange={(e) =>
-                                setBateriaPrecios({
-                                  ...bateriaPrecios,
-                                  [paquete.id]: e.target.value,
-                                })
-                              }
-                              placeholder="0"
-                              className="w-28 h-8"
-                            />
-                          </div>
+                  <div className="border rounded-md divide-y max-h-96 overflow-y-auto">
+                    {linkedPaquetes.map((paquete) => (
+                      <div key={paquete.id} className="flex items-center justify-between p-3 gap-4">
+                        <span className="text-sm font-medium flex-1">{paquete.nombre}</span>
+                        <div className="flex items-center gap-1">
+                          <DollarSign className="h-4 w-4 text-muted-foreground" />
+                          <Input
+                            type="number"
+                            step="any"
+                            value={bateriaPrecios[paquete.id] ?? ""}
+                            onChange={(e) =>
+                              setBateriaPrecios({
+                                ...bateriaPrecios,
+                                [paquete.id]: e.target.value,
+                              })
+                            }
+                            placeholder="0"
+                            className="w-28 h-8"
+                          />
                         </div>
-                      ))}
-                      {linkedPaquetes.length === 0 && (
-                        <p className="text-sm text-muted-foreground text-center py-8">
-                          Esta empresa no tiene baterías vinculadas. Primero vincula una faena con baterías.
-                        </p>
-                      )}
-                    </div>
+                      </div>
+                    ))}
+                    {linkedPaquetes.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-8">
+                        Esta empresa no tiene baterías vinculadas. Primero vincula una faena con baterías en la pestaña "Faenas".
+                      </p>
+                    )}
+                  </div>
 
+                  {linkedPaquetes.length > 0 && (
                     <div className="flex justify-between items-center pt-2">
                       <p className="text-xs text-muted-foreground">
-                        {linkedPaquetes.length} vinculadas · {conPrecioCount} con precio &gt; 0
+                        {linkedPaquetes.length} vinculadas · {linkedPaquetes.filter((p) => {
+                          const v = (bateriaPrecios[p.id] ?? "").trim();
+                          return v !== "" && Number(v) > 0;
+                        }).length} con precio &gt; 0
                       </p>
-                      <Button onClick={handleSaveBaterias} disabled={linkedPaquetes.length === 0}>
-                        Guardar Cambios
+                      <Button onClick={handleSaveBaterias}>
+                        Guardar Precios
                       </Button>
                     </div>
-                  </>
-                );
-              })()}
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Dialog de Faenas */}
-        <Dialog open={openFaenasDialog} onOpenChange={(open) => {
-          setOpenFaenasDialog(open);
-          if (!open) {
-            setSelectedEmpresa(null);
-          }
-        }}>
-          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-            {selectedEmpresa && (
-              <EmpresaFaenas 
-                empresaId={selectedEmpresa.id} 
-                empresaNombre={selectedEmpresa.nombre} 
-              />
-            )}
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
           </DialogContent>
         </Dialog>
 
