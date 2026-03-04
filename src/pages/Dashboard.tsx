@@ -63,6 +63,7 @@ const Dashboard = () => {
   const [selectedExamenFilter, setSelectedExamenFilter] = useState<string>("all");
   const [selectedEmpresaFilter, setSelectedEmpresaFilter] = useState<string>("all");
   const [selectedTipoFilter, setSelectedTipoFilter] = useState<string>("all");
+  const [selectedBoxPendienteFilter, setSelectedBoxPendienteFilter] = useState<string>("all");
   const [filterCompletado, setFilterCompletado] = useState<boolean>(true);
   const [filterIncompleto, setFilterIncompleto] = useState<boolean>(true);
   const [filterNombre, setFilterNombre] = useState<string>("");
@@ -72,7 +73,7 @@ const Dashboard = () => {
   const [filterEstadoListo, setFilterEstadoListo] = useState<boolean>(true);
   
   const [atencionesIngresadas, setAtencionesIngresadas] = useState<AtencionIngresada[]>([]);
-  
+  const [boxExamenesMap, setBoxExamenesMap] = useState<Map<string, { boxId: string; boxNombre: string }>>(new Map());
   
   // Stats diarias
   const [examenesConteoDiario, setExamenesConteoDiario] = useState<Record<string, { asignados: number; completados: number }>>({});
@@ -146,6 +147,20 @@ const Dashboard = () => {
       });
     });
     return Array.from(examenesMap.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  })();
+
+  // Extraer boxes únicos del mapeo box_examenes que tienen exámenes en las atenciones del día
+  const boxesDelDia = (() => {
+    const boxesMap = new Map<string, { id: string; nombre: string }>();
+    atencionesIngresadas.forEach(a => {
+      a.atencion_examenes.forEach(ae => {
+        const boxInfo = boxExamenesMap.get(ae.examenes.id);
+        if (boxInfo) {
+          boxesMap.set(boxInfo.boxId, { id: boxInfo.boxId, nombre: boxInfo.boxNombre });
+        }
+      });
+    });
+    return Array.from(boxesMap.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
   })();
 
   const loadDailyStats = async () => {
@@ -369,36 +384,48 @@ const Dashboard = () => {
       const startOfDay = new Date(dateToUse.getFullYear(), dateToUse.getMonth(), dateToUse.getDate(), 0, 0, 0, 0).toISOString();
       const endOfDay = new Date(dateToUse.getFullYear(), dateToUse.getMonth(), dateToUse.getDate(), 23, 59, 59, 999).toISOString();
 
-      const { data } = await supabase
-        .from("atenciones")
-        .select(`
-          id,
-          numero_ingreso,
-          estado,
-          boxes (
-            nombre
-          ),
-          pacientes (
-            nombre,
-            tipo_servicio,
-            empresas (
-              id,
-              nombre
-            )
-          ),
-          atencion_examenes (
+      const [atencionesRes, boxExamenesRes] = await Promise.all([
+        supabase
+          .from("atenciones")
+          .select(`
+            id,
+            numero_ingreso,
             estado,
-            examenes (
-              id,
+            boxes (
               nombre
+            ),
+            pacientes (
+              nombre,
+              tipo_servicio,
+              empresas (
+                id,
+                nombre
+              )
+            ),
+            atencion_examenes (
+              estado,
+              examenes (
+                id,
+                nombre
+              )
             )
-          )
-        `)
-        .gte("fecha_ingreso", startOfDay)
-        .lte("fecha_ingreso", endOfDay)
-        .order("numero_ingreso", { ascending: true });
+          `)
+          .gte("fecha_ingreso", startOfDay)
+          .lte("fecha_ingreso", endOfDay)
+          .order("numero_ingreso", { ascending: true }),
+        supabase
+          .from("box_examenes")
+          .select("examen_id, box_id, boxes(id, nombre)"),
+      ]);
 
-      setAtencionesIngresadas((data as AtencionIngresada[]) || []);
+      setAtencionesIngresadas((atencionesRes.data as AtencionIngresada[]) || []);
+
+      // Build box-examen map
+      const beMap = new Map<string, { boxId: string; boxNombre: string }>();
+      boxExamenesRes.data?.forEach((be: any) => {
+        beMap.set(be.examen_id, { boxId: be.box_id, boxNombre: be.boxes?.nombre || "Sin Box" });
+      });
+      setBoxExamenesMap(beMap);
     } catch (error) {
       console.error("Error cargando tabla de pacientes:", error);
     }
@@ -470,6 +497,16 @@ const Dashboard = () => {
         if (!isCompleted && !filterIncompleto) return false;
       }
     }
+
+    // Filtro por box pendiente
+    if (selectedBoxPendienteFilter !== "all") {
+      const hasPendingInBox = a.atencion_examenes.some(ae => {
+        const boxInfo = boxExamenesMap.get(ae.examenes.id);
+        return boxInfo?.boxId === selectedBoxPendienteFilter && ae.estado !== "completado";
+      });
+      if (!hasPendingInBox) return false;
+    }
+
     return true;
   });
 
@@ -975,6 +1012,18 @@ const Dashboard = () => {
                       <SelectItem value="all">Todos los exámenes</SelectItem>
                       {examenesDelDia.map((examen) => (
                         <SelectItem key={examen.id} value={examen.id}>{examen.nombre}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={selectedBoxPendienteFilter} onValueChange={setSelectedBoxPendienteFilter}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Box pendiente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los boxes</SelectItem>
+                      {boxesDelDia.map((box) => (
+                        <SelectItem key={box.id} value={box.id}>{box.nombre}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
