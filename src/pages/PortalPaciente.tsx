@@ -96,6 +96,7 @@ export default function PortalPaciente() {
   const [testModalOpen, setTestModalOpen] = useState(false);
   const [currentTest, setCurrentTest] = useState<ExamenTest | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [agendaDiferidaMatch, setAgendaDiferidaMatch] = useState<any>(null);
   
   // Documentos del paciente
   const [selectedDocumentoIndex, setSelectedDocumentoIndex] = useState<number | null>(null);
@@ -339,12 +340,28 @@ export default function PortalPaciente() {
       return;
     }
 
-    // Convertir RUT al formato estándar para búsqueda
-    const rutFormateado = formatRutStandard(rut);
 
     setIsLoading(true);
     try {
-      // Buscar por RUT en formato estándar - usando limit(1) para evitar error de múltiples resultados
+      // Convertir RUT al formato estándar para búsqueda
+      const rutFormateado = formatRutStandard(rut);
+
+      // Buscar registros en agenda diferida pendientes para este RUT
+      const { data: agendaDiferidaData } = await supabase
+        .from("agenda_diferida")
+        .select("*, empresas(id, nombre), faenas(id, nombre)")
+        .eq("rut", rutFormateado)
+        .eq("estado", "pendiente")
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      const agendaDiferida = agendaDiferidaData?.[0] || null;
+      if (agendaDiferida) {
+        console.log("[Portal] Agenda diferida encontrada:", agendaDiferida.id);
+        setAgendaDiferidaMatch(agendaDiferida);
+      }
+
+      // Buscar por RUT en formato estándar
       const { data: pacientesData, error: pacienteError } = await supabase
         .from("pacientes")
         .select("*")
@@ -444,13 +461,28 @@ export default function PortalPaciente() {
         } else {
           console.log("[Portal] No se encontró atención existente, creando nueva para paciente:", pacienteData.id);
           
+          // Si hay agenda diferida, usar empresa/faena de ahí
+          const insertData: any = {
+            paciente_id: pacienteData.id,
+            estado: "en_espera",
+            fecha_ingreso: new Date().toISOString()
+          };
+
+          // Actualizar paciente con datos de agenda diferida si existen
+          if (agendaDiferida) {
+            if (agendaDiferida.empresa_id) {
+              await supabase.from("pacientes").update({
+                empresa_id: agendaDiferida.empresa_id,
+                faena_id: agendaDiferida.faena_id,
+                cargo: agendaDiferida.cargo || pacienteData.cargo,
+                tipo_servicio: agendaDiferida.tipo_servicio || pacienteData.tipo_servicio,
+              }).eq("id", pacienteData.id);
+            }
+          }
+
           const { data: newAtencion, error: atencionError } = await supabase
             .from("atenciones")
-            .insert({
-              paciente_id: pacienteData.id,
-              estado: "en_espera",
-              fecha_ingreso: new Date().toISOString()
-            })
+            .insert(insertData)
             .select("*, boxes(*)")
             .single();
 
@@ -461,6 +493,36 @@ export default function PortalPaciente() {
           
           console.log("[Portal] Atención creada:", newAtencion);
 
+          // Vincular agenda diferida si existe
+          if (agendaDiferida) {
+            await supabase.from("agenda_diferida").update({
+              estado: "vinculado",
+              atencion_id: newAtencion.id,
+              vinculado_at: new Date().toISOString()
+            }).eq("id", agendaDiferida.id);
+
+            // Crear atencion_baterias desde los paquetes de la agenda diferida
+            if (agendaDiferida.paquetes_ids?.length > 0) {
+              const baterias = agendaDiferida.paquetes_ids.map((pId: string) => ({
+                atencion_id: newAtencion.id,
+                paquete_id: pId
+              }));
+              await supabase.from("atencion_baterias").insert(baterias);
+            }
+
+            // Crear atencion_examenes desde los examenes de la agenda diferida
+            if (agendaDiferida.examenes_ids?.length > 0) {
+              const examenes = agendaDiferida.examenes_ids.map((eId: string) => ({
+                atencion_id: newAtencion.id,
+                examen_id: eId,
+                estado: "pendiente" as const
+              }));
+              await supabase.from("atencion_examenes").insert(examenes);
+            }
+
+            console.log("[Portal] Agenda diferida vinculada:", agendaDiferida.id);
+          }
+
           setAtencion({
             ...newAtencion,
             atencion_examenes: []
@@ -468,30 +530,35 @@ export default function PortalPaciente() {
           prevEstadoRef.current = "en_espera";
           prevBoxIdRef.current = null;
           
-          // Paciente existente sin atención hoy: permitir verificar/actualizar datos
-          // Pre-llenar el formulario con datos existentes
-          const nombreParts = pacienteData.nombre?.split(" ") || [];
-          const direccionParts = pacienteData.direccion?.split(", ") || [];
+          // Pre-llenar formulario - priorizar datos de agenda diferida si existen
+          const sourceData = agendaDiferida || pacienteData;
+          const nombreParts = (sourceData.nombre || pacienteData.nombre)?.split(" ") || [];
+          const direccionSource = agendaDiferida?.direccion || pacienteData.direccion;
+          const direccionParts = direccionSource?.split(", ") || [];
           
           setFormData({
             primerNombre: nombreParts[0] || "",
             apellidoPaterno: nombreParts[1] || "",
             apellidoMaterno: nombreParts.slice(2).join(" ") || "",
             rut: pacienteData.rut || rut,
-            fecha_nacimiento: pacienteData.fecha_nacimiento || "",
-            fecha_nacimiento_display: pacienteData.fecha_nacimiento 
-              ? format(new Date(pacienteData.fecha_nacimiento + "T12:00:00"), "dd/MM/yyyy")
+            fecha_nacimiento: agendaDiferida?.fecha_nacimiento || pacienteData.fecha_nacimiento || "",
+            fecha_nacimiento_display: (agendaDiferida?.fecha_nacimiento || pacienteData.fecha_nacimiento)
+              ? format(new Date((agendaDiferida?.fecha_nacimiento || pacienteData.fecha_nacimiento) + "T12:00:00"), "dd/MM/yyyy")
               : "",
-            email: pacienteData.email || "",
-            telefono: pacienteData.telefono || "",
+            email: agendaDiferida?.email || pacienteData.email || "",
+            telefono: agendaDiferida?.telefono || pacienteData.telefono || "",
             calle: direccionParts[0] || "",
             numeracion: direccionParts[1] || "",
             ciudad: direccionParts[2] || direccionParts[0] || ""
           });
           
+          const toastMsg = agendaDiferida
+            ? `Tiene una cita programada${agendaDiferida.empresas?.nombre ? ` con ${agendaDiferida.empresas.nombre}` : ""}. Verifique sus datos.`
+            : "Verifique sus datos. Si son correctos, confirme para continuar.";
+          
           toast({
             title: `Su número de atención es #${newAtencion.numero_ingreso}`,
-            description: "Verifique sus datos. Si son correctos, confirme para continuar.",
+            description: toastMsg,
           });
           
           setStep("registro");
@@ -505,14 +572,16 @@ export default function PortalPaciente() {
         const { data: newPaciente, error: createError } = await supabase
           .from("pacientes")
           .insert({
-            nombre: "PENDIENTE DE REGISTRO",
+            nombre: agendaDiferida?.nombre || "PENDIENTE DE REGISTRO",
             rut: rutFormateado,
-            fecha_nacimiento: null,
-            email: null,
-            telefono: null,
-            direccion: null,
-            empresa_id: null,
-            tipo_servicio: null
+            fecha_nacimiento: agendaDiferida?.fecha_nacimiento || null,
+            email: agendaDiferida?.email || null,
+            telefono: agendaDiferida?.telefono || null,
+            direccion: agendaDiferida?.direccion || null,
+            empresa_id: agendaDiferida?.empresa_id || null,
+            faena_id: agendaDiferida?.faena_id || null,
+            cargo: agendaDiferida?.cargo || null,
+            tipo_servicio: agendaDiferida?.tipo_servicio || null
           })
           .select()
           .single();
@@ -532,14 +601,64 @@ export default function PortalPaciente() {
 
         if (atencionError) throw atencionError;
 
-        // Mostrar número de atención inmediatamente
+        // Vincular agenda diferida si existe
+        if (agendaDiferida) {
+          await supabase.from("agenda_diferida").update({
+            estado: "vinculado",
+            atencion_id: newAtencion.id,
+            vinculado_at: new Date().toISOString()
+          }).eq("id", agendaDiferida.id);
+
+          if (agendaDiferida.paquetes_ids?.length > 0) {
+            const baterias = agendaDiferida.paquetes_ids.map((pId: string) => ({
+              atencion_id: newAtencion.id,
+              paquete_id: pId
+            }));
+            await supabase.from("atencion_baterias").insert(baterias);
+          }
+
+          if (agendaDiferida.examenes_ids?.length > 0) {
+            const examenes = agendaDiferida.examenes_ids.map((eId: string) => ({
+              atencion_id: newAtencion.id,
+              examen_id: eId,
+              estado: "pendiente" as const
+            }));
+            await supabase.from("atencion_examenes").insert(examenes);
+          }
+        }
+
+        // Pre-llenar formulario con datos de agenda diferida si existen
+        if (agendaDiferida && agendaDiferida.nombre !== "PENDIENTE DE REGISTRO") {
+          const nombreParts = agendaDiferida.nombre?.split(" ") || [];
+          const direccionParts = agendaDiferida.direccion?.split(", ") || [];
+          setFormData({
+            primerNombre: nombreParts[0] || "",
+            apellidoPaterno: nombreParts[1] || "",
+            apellidoMaterno: nombreParts.slice(2).join(" ") || "",
+            rut: rut,
+            fecha_nacimiento: agendaDiferida.fecha_nacimiento || "",
+            fecha_nacimiento_display: agendaDiferida.fecha_nacimiento
+              ? format(new Date(agendaDiferida.fecha_nacimiento + "T12:00:00"), "dd/MM/yyyy")
+              : "",
+            email: agendaDiferida.email || "",
+            telefono: agendaDiferida.telefono || "",
+            calle: direccionParts[0] || "",
+            numeracion: direccionParts[1] || "",
+            ciudad: direccionParts[2] || ""
+          });
+        } else {
+          setFormData(prev => ({ ...prev, rut: rut }));
+        }
+
+        const toastDesc = agendaDiferida
+          ? `Tiene una cita programada${agendaDiferida.empresas?.nombre ? ` con ${agendaDiferida.empresas.nombre}` : ""}. Verifique sus datos.`
+          : "Por favor complete sus datos a continuación";
+
         toast({
           title: `Su número de atención es #${newAtencion.numero_ingreso}`,
-          description: "Por favor complete sus datos a continuación",
+          description: toastDesc,
         });
 
-        // Ir a registro con el RUT ya establecido y guardar referencias
-        setFormData(prev => ({ ...prev, rut: rut }));
         setPaciente(newPaciente);
         setAtencion({ ...newAtencion, atencion_examenes: [], boxes: null });
         setStep("registro");
