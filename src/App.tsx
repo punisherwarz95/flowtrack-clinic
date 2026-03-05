@@ -28,6 +28,7 @@ import NotFound from "./pages/NotFound";
 import PantallaTv from "./pages/PantallaTv";
 import { InitAdmin } from "./components/InitAdmin";
 import VersionChecker from "./components/VersionChecker";
+import ActividadLog from "./pages/ActividadLog";
 import ProtectedRoute from "./components/ProtectedRoute";
 import EmpresaProtectedRoute from "./components/empresa/EmpresaProtectedRoute";
 import EmpresaLogin from "./pages/empresa/EmpresaLogin";
@@ -72,6 +73,7 @@ const App = () => (
                 <Route path="/documentos" element={<ProtectedRoute path="/documentos"><Documentos /></ProtectedRoute>} />
                 <Route path="/usuarios" element={<ProtectedRoute path="/usuarios"><Usuarios /></ProtectedRoute>} />
                 <Route path="/configuracion" element={<ProtectedRoute path="/configuracion"><Configuracion /></ProtectedRoute>} />
+                <Route path="/actividad" element={<ProtectedRoute path="/actividad"><ActividadLog /></ProtectedRoute>} />
                 
                 {/* Portal Empresa routes */}
                 <Route path="/empresa/login" element={<EmpresaLogin />} />
