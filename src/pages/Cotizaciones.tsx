@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Plus, FileText, Trash2, Eye, Pencil, Search, Settings, Calendar, X, Clock, MessageSquare, Building2 } from "lucide-react";
+import { Plus, FileText, Trash2, Eye, Pencil, Search, Settings, Calendar, X, Clock, MessageSquare, Building2, Copy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
@@ -111,6 +111,7 @@ const Cotizaciones = () => {
   const [openMargenesDialog, setOpenMargenesDialog] = useState(false);
   const [cotizacionToDelete, setCotizacionToDelete] = useState<string | null>(null);
   const [editingCotizacion, setEditingCotizacion] = useState<Cotizacion | null>(null);
+  const [duplicatingCotizacionId, setDuplicatingCotizacionId] = useState<string | null>(null);
   const [respondingSolicitud, setRespondingSolicitud] = useState<SolicitudCotizacion | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterEmpresa, setFilterEmpresa] = useState<string>("all");
@@ -193,6 +194,71 @@ const Cotizaciones = () => {
     } catch (error: any) {
       console.error("Error:", error);
       toast.error(error.message || "Error al eliminar cotización");
+    }
+  };
+
+  const handleDuplicateCotizacion = async (cotizacion: Cotizacion) => {
+    try {
+      const { data: original, error: cotError } = await supabase
+        .from("cotizaciones")
+        .select("*")
+        .eq("id", cotizacion.id)
+        .single();
+
+      if (cotError) throw cotError;
+
+      const { data: newCot, error: insertError } = await supabase
+        .from("cotizaciones")
+        .insert({
+          empresa_id: original.empresa_id,
+          empresa_nombre: original.empresa_nombre,
+          empresa_rut: original.empresa_rut,
+          empresa_razon_social: original.empresa_razon_social,
+          empresa_contacto: original.empresa_contacto,
+          empresa_email: original.empresa_email,
+          empresa_telefono: original.empresa_telefono,
+          subtotal_neto: original.subtotal_neto,
+          total_iva: original.total_iva,
+          total_con_iva: original.total_con_iva,
+          total_con_margen: original.total_con_margen,
+          estado: "borrador",
+          observaciones: original.observaciones,
+          afecto_iva: original.afecto_iva,
+        })
+        .select("id, numero_cotizacion")
+        .single();
+
+      if (insertError) throw insertError;
+
+      const { data: originalItems, error: itemsError } = await supabase
+        .from("cotizacion_items")
+        .select("*")
+        .eq("cotizacion_id", cotizacion.id);
+
+      if (itemsError) throw itemsError;
+
+      if (originalItems && originalItems.length > 0) {
+        const newItems = originalItems.map(({ id, cotizacion_id, created_at, ...rest }: any) => ({
+          ...rest,
+          cotizacion_id: newCot.id,
+        }));
+        const { error: copyError } = await supabase.from("cotizacion_items").insert(newItems);
+        if (copyError) throw copyError;
+      }
+
+      toast.success(`Cotización copiada como #${newCot.numero_cotizacion} (Borrador)`);
+      await loadCotizaciones();
+
+      setEditingCotizacion({
+        ...cotizacion,
+        id: newCot.id,
+        numero_cotizacion: newCot.numero_cotizacion,
+        estado: "borrador",
+      });
+      setOpenFormDialog(true);
+    } catch (error: any) {
+      console.error("Error duplicating:", error);
+      toast.error(error.message || "Error al copiar cotización");
     }
   };
 
@@ -541,6 +607,7 @@ const Cotizaciones = () => {
                           <Button
                             variant="ghost"
                             size="icon"
+                            title="Editar"
                             onClick={() => {
                               setEditingCotizacion(cotizacion);
                               setOpenFormDialog(true);
@@ -551,6 +618,15 @@ const Cotizaciones = () => {
                           <Button
                             variant="ghost"
                             size="icon"
+                            title="Copiar cotización"
+                            onClick={() => handleDuplicateCotizacion(cotizacion)}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Eliminar"
                             onClick={() => setCotizacionToDelete(cotizacion.id)}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
