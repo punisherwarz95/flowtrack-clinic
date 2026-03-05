@@ -6,14 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Search, Trash2, Calendar as CalendarIcon, Users, Clock, X } from "lucide-react";
+import { Plus, Search, Trash2, Calendar as CalendarIcon, Clock, Pencil, X } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn, formatRutStandard } from "@/lib/utils";
+import { formatRutStandard } from "@/lib/utils";
 import { logActivity } from "@/lib/activityLog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -67,6 +63,11 @@ interface AgendaItem {
   faenas?: { nombre: string } | null;
 }
 
+interface BateriaFaena {
+  paquete_id: string;
+  faena_id: string;
+}
+
 const AgendaDiferida = () => {
   const [items, setItems] = useState<AgendaItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,8 +75,10 @@ const AgendaDiferida = () => {
   const [paquetes, setPaquetes] = useState<Paquete[]>([]);
   const [examenes, setExamenes] = useState<Examen[]>([]);
   const [faenasEmpresa, setFaenasEmpresa] = useState<Faena[]>([]);
+  const [bateriaFaenas, setBateriaFaenas] = useState<BateriaFaena[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
   const [selectedPaquetes, setSelectedPaquetes] = useState<string[]>([]);
@@ -114,17 +117,19 @@ const AgendaDiferida = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [itemsRes, empresasRes, paquetesRes, examenesRes] = await Promise.all([
+      const [itemsRes, empresasRes, paquetesRes, examenesRes, bateriaFaenasRes] = await Promise.all([
         supabase.from("agenda_diferida").select("*, empresas(nombre), faenas(nombre)").eq("estado", "pendiente").order("created_at", { ascending: false }),
         supabase.from("empresas").select("id, nombre").eq("activo", true).order("nombre"),
         supabase.from("paquetes_examenes").select("*, paquete_examen_items(examen_id)").order("nombre"),
         supabase.from("examenes").select("id, nombre, codigo").order("nombre"),
+        supabase.from("bateria_faenas").select("paquete_id, faena_id").eq("activo", true),
       ]);
 
       setItems((itemsRes.data as any) || []);
       setEmpresas(empresasRes.data || []);
       setPaquetes(paquetesRes.data || []);
       setExamenes(examenesRes.data || []);
+      setBateriaFaenas(bateriaFaenasRes.data || []);
     } catch (error) {
       console.error("Error:", error);
     } finally {
@@ -144,6 +149,16 @@ const AgendaDiferida = () => {
     if (faenas.length === 1) setFormData(prev => ({ ...prev, faena_id: faenas[0].id }));
   };
 
+  // Get paquetes filtered by selected faena
+  const filteredPaquetesByFaena = (() => {
+    if (!formData.faena_id) return paquetes; // No faena selected → show all
+    const allowedPaqueteIds = bateriaFaenas
+      .filter(bf => bf.faena_id === formData.faena_id)
+      .map(bf => bf.paquete_id);
+    if (allowedPaqueteIds.length === 0) return paquetes; // No config → fallback to all
+    return paquetes.filter(p => allowedPaqueteIds.includes(p.id));
+  })();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.nombre || !formData.rut) {
@@ -155,7 +170,7 @@ const AgendaDiferida = () => {
       const { data: { user } } = await supabase.auth.getUser();
       const rutFormatted = formatRutStandard(formData.rut);
 
-      const { error } = await supabase.from("agenda_diferida").insert({
+      const payload = {
         nombre: formData.nombre.toUpperCase(),
         rut: rutFormatted,
         email: formData.email || null,
@@ -168,17 +183,51 @@ const AgendaDiferida = () => {
         examenes_ids: selectedExamenes,
         paquetes_ids: selectedPaquetes,
         fecha_programada: formData.fecha_programada || null,
-        created_by: user?.id || null,
-      });
+      };
 
-      if (error) throw error;
+      if (editingId) {
+        const { error } = await supabase.from("agenda_diferida").update(payload).eq("id", editingId);
+        if (error) throw error;
+        await logActivity("editar_agenda_diferida", { nombre: formData.nombre, rut: rutFormatted }, "/pacientes");
+        toast.success("Pre-registro actualizado");
+      } else {
+        const { error } = await supabase.from("agenda_diferida").insert({
+          ...payload,
+          created_by: user?.id || null,
+        });
+        if (error) throw error;
+        await logActivity("crear_agenda_diferida", { nombre: formData.nombre, rut: rutFormatted }, "/pacientes");
+        toast.success("Paciente agregado a agenda diferida");
+      }
 
-      await logActivity("crear_agenda_diferida", { nombre: formData.nombre, rut: rutFormatted }, "/pacientes");
-      toast.success("Paciente agregado a agenda diferida");
       resetForm();
       loadData();
     } catch (error: any) {
-      toast.error(error.message || "Error al crear registro");
+      toast.error(error.message || "Error al guardar registro");
+    }
+  };
+
+  const handleEdit = async (item: AgendaItem) => {
+    setFormData({
+      nombre: item.nombre,
+      rut: item.rut,
+      email: item.email || "",
+      telefono: item.telefono || "",
+      fecha_nacimiento: item.fecha_nacimiento || "",
+      tipo_servicio: (item.tipo_servicio as any) || "workmed",
+      empresa_id: item.empresa_id || "",
+      faena_id: item.faena_id || "",
+      cargo: item.cargo || "",
+      fecha_programada: item.fecha_programada || "",
+    });
+    setSelectedPaquetes(item.paquetes_ids || []);
+    setSelectedExamenes(item.examenes_ids || []);
+    setEditingId(item.id);
+    setShowForm(true);
+
+    if (item.empresa_id) {
+      setEmpresaSearch(item.empresas?.nombre || "");
+      await loadFaenas(item.empresa_id);
     }
   };
 
@@ -200,7 +249,16 @@ const AgendaDiferida = () => {
     setSelectedExamenes([]);
     setSelectedPaquetes([]);
     setShowForm(false);
+    setEditingId(null);
     setFaenasEmpresa([]);
+    setEmpresaSearch("");
+  };
+
+  const handleFaenaChange = (faenaId: string) => {
+    setFormData(prev => ({ ...prev, faena_id: faenaId }));
+    // Clear selected paquetes/examenes when faena changes
+    setSelectedPaquetes([]);
+    setSelectedExamenes([]);
   };
 
   const filteredItems = items.filter(
@@ -209,7 +267,7 @@ const AgendaDiferida = () => {
       i.rut.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredEmpresas = empresas.filter(e => 
+  const filteredEmpresas = empresas.filter(e =>
     !empresaSearch || e.nombre.toLowerCase().includes(empresaSearch.toLowerCase())
   );
 
@@ -223,7 +281,7 @@ const AgendaDiferida = () => {
           </h2>
           <p className="text-sm text-muted-foreground">Pacientes pre-registrados para atención futura</p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)}>
+        <Button onClick={() => { if (showForm && !editingId) { resetForm(); } else { resetForm(); setShowForm(true); } }}>
           <Plus className="h-4 w-4 mr-2" />
           Nuevo Pre-Registro
         </Button>
@@ -232,7 +290,9 @@ const AgendaDiferida = () => {
       {showForm && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Nuevo Pre-Registro</CardTitle>
+            <CardTitle className="text-base">
+              {editingId ? "Editar Pre-Registro" : "Nuevo Pre-Registro"}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -293,6 +353,8 @@ const AgendaDiferida = () => {
                               setFormData(prev => ({ ...prev, empresa_id: emp.id, faena_id: "" }));
                               setEmpresaSearch(emp.nombre);
                               setEmpresaDropdownOpen(false);
+                              setSelectedPaquetes([]);
+                              setSelectedExamenes([]);
                               loadFaenas(emp.id);
                             }}>
                             {emp.nombre}
@@ -304,7 +366,7 @@ const AgendaDiferida = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Faena</Label>
-                  <select value={formData.faena_id} onChange={(e) => setFormData(prev => ({ ...prev, faena_id: e.target.value }))}
+                  <select value={formData.faena_id} onChange={(e) => handleFaenaChange(e.target.value)}
                     className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
                     disabled={faenasEmpresa.length === 0}>
                     <option value="">Seleccionar faena...</option>
@@ -313,15 +375,22 @@ const AgendaDiferida = () => {
                 </div>
               </div>
 
-              {/* Baterías selector */}
+              {/* Baterías selector - filtered by faena */}
               <div className="space-y-2">
-                <Label>Baterías / Exámenes</Label>
+                <Label>
+                  Baterías / Exámenes
+                  {formData.faena_id && (
+                    <span className="text-xs text-muted-foreground ml-2">
+                      (filtradas por faena seleccionada)
+                    </span>
+                  )}
+                </Label>
                 <div className="relative mb-2">
                   <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input placeholder="Buscar batería..." value={bateriaFilter} onChange={(e) => setBateriaFilter(e.target.value)} className="pl-8 h-8 text-sm" />
                 </div>
                 <div className="border rounded-md bg-muted/30 max-h-40 overflow-y-auto p-2">
-                  {paquetes
+                  {filteredPaquetesByFaena
                     .filter(p => !bateriaFilter || p.nombre.toLowerCase().includes(bateriaFilter.toLowerCase()))
                     .map((paquete) => (
                       <label key={paquete.id} className="flex items-center gap-2 cursor-pointer py-1 px-1 hover:bg-accent rounded text-sm">
@@ -341,6 +410,9 @@ const AgendaDiferida = () => {
                         <span className="text-xs text-muted-foreground ml-auto">({paquete.paquete_examen_items.length})</span>
                       </label>
                     ))}
+                  {filteredPaquetesByFaena.filter(p => !bateriaFilter || p.nombre.toLowerCase().includes(bateriaFilter.toLowerCase())).length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-2">No hay baterías configuradas para esta faena</p>
+                  )}
                 </div>
                 {selectedPaquetes.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-1">
@@ -354,7 +426,7 @@ const AgendaDiferida = () => {
 
               <div className="flex gap-2 justify-end">
                 <Button type="button" variant="outline" onClick={resetForm}>Cancelar</Button>
-                <Button type="submit">Guardar Pre-Registro</Button>
+                <Button type="submit">{editingId ? "Actualizar" : "Guardar"} Pre-Registro</Button>
               </div>
             </form>
           </CardContent>
@@ -399,9 +471,14 @@ const AgendaDiferida = () => {
                       )}
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon" onClick={() => setDeleteId(item.id)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => handleEdit(item)}>
+                      <Pencil className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => setDeleteId(item.id)}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
