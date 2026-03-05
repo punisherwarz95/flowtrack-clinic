@@ -11,7 +11,7 @@ export type ActivityAction =
   | "crear_prereserva" | "eliminar_prereserva"
   | "cambiar_estado_examen"
   | "navegar_modulo"
-  | "crear_agenda_diferida" | "vincular_agenda_diferida"
+  | "crear_agenda_diferida" | "editar_agenda_diferida" | "vincular_agenda_diferida"
   | "generar_estado_pago"
   | "otro";
 
