@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Trash2, Pencil, Calendar as CalendarIcon, ClipboardList, FileText, ClipboardPaste, X } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Calendar as CalendarIcon, ClipboardList, FileText, ClipboardPaste, X, Clock } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PreReservasManagement from "@/components/PreReservasManagement";
 import CodigoDelDia from "@/components/CodigoDelDia";
@@ -34,6 +34,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn, formatRutStandard } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import AgendaDiferida from "@/components/AgendaDiferida";
 
 interface Patient {
   id: string;
@@ -1042,6 +1043,10 @@ const Pacientes = () => {
               {editingPatient ? "Editar Paciente" : "Nuevo Paciente"}
             </TabsTrigger>
             <TabsTrigger value="prereservas">Pre-Reservas</TabsTrigger>
+            <TabsTrigger value="agenda_diferida">
+              <Clock className="h-4 w-4 mr-1" />
+              Agenda Diferida
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="pacientes">
@@ -1589,6 +1594,10 @@ const Pacientes = () => {
 
           <TabsContent value="prereservas">
             <PreReservasManagement />
+          </TabsContent>
+
+          <TabsContent value="agenda_diferida">
+            <AgendaDiferida />
           </TabsContent>
         </Tabs>
       </main>

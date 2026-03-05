@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
+import CodigoDelDia from "@/components/CodigoDelDia";
 import { Clock, Play, CheckCircle, XCircle, RefreshCw, Box as BoxIcon, Settings, FileText, ClipboardList } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -582,6 +583,9 @@ const MiBox = () => {
             </Button>
           </div>
         </div>
+
+        {/* Código del Día */}
+        {selectedBoxId && <CodigoDelDia className="mb-6" />}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Pacientes en Espera */}

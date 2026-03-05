@@ -1,9 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
-import { Activity, Users, Box, ClipboardList, LayoutDashboard, Building2, CheckCircle, AlertCircle, UserCog, LogOut, Moon, Sun, FileText, UserCheck, FileEdit, Settings, Monitor } from "lucide-react";
+import { Activity, Users, Box, ClipboardList, LayoutDashboard, Building2, CheckCircle, AlertCircle, UserCog, LogOut, Moon, Sun, FileText, UserCheck, FileEdit, Settings, Monitor, ScrollText } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { Button } from "@/components/ui/button";
+import ChangeOwnPassword from "@/components/ChangeOwnPassword";
 
 const Navigation = () => {
   const location = useLocation();
@@ -26,6 +27,7 @@ const Navigation = () => {
     { to: "/documentos", icon: FileEdit, label: "Documentos" },
     { to: "/usuarios", icon: UserCog, label: "Usuarios" },
     { to: "/configuracion", icon: Settings, label: "Configuración" },
+    { to: "/actividad", icon: ScrollText, label: "Actividad" },
     { to: "/pantalla", icon: Monitor, label: "Pantalla TV" },
   ];
 
@@ -75,6 +77,7 @@ const Navigation = () => {
             })}
           </div>
           
+          <ChangeOwnPassword />
           <Button variant="outline" size="sm" onClick={signOut} className="shrink-0">
             <LogOut className="h-4 w-4 mr-2" />
             Cerrar Sesión

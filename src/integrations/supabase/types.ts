@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          module: string | null
+          user_id: string
+          username: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          module?: string | null
+          user_id: string
+          username?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          module?: string | null
+          user_id?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
       agenda_bloques: {
         Row: {
           activo: boolean | null
@@ -88,6 +118,94 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agenda_diferida: {
+        Row: {
+          atencion_id: string | null
+          cargo: string | null
+          created_at: string | null
+          created_by: string | null
+          direccion: string | null
+          email: string | null
+          empresa_id: string | null
+          estado: string | null
+          examenes_ids: string[] | null
+          faena_id: string | null
+          fecha_nacimiento: string | null
+          fecha_programada: string | null
+          id: string
+          nombre: string
+          paquetes_ids: string[] | null
+          rut: string
+          telefono: string | null
+          tipo_servicio: Database["public"]["Enums"]["tipo_servicio"] | null
+          vinculado_at: string | null
+        }
+        Insert: {
+          atencion_id?: string | null
+          cargo?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          direccion?: string | null
+          email?: string | null
+          empresa_id?: string | null
+          estado?: string | null
+          examenes_ids?: string[] | null
+          faena_id?: string | null
+          fecha_nacimiento?: string | null
+          fecha_programada?: string | null
+          id?: string
+          nombre: string
+          paquetes_ids?: string[] | null
+          rut: string
+          telefono?: string | null
+          tipo_servicio?: Database["public"]["Enums"]["tipo_servicio"] | null
+          vinculado_at?: string | null
+        }
+        Update: {
+          atencion_id?: string | null
+          cargo?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          direccion?: string | null
+          email?: string | null
+          empresa_id?: string | null
+          estado?: string | null
+          examenes_ids?: string[] | null
+          faena_id?: string | null
+          fecha_nacimiento?: string | null
+          fecha_programada?: string | null
+          id?: string
+          nombre?: string
+          paquetes_ids?: string[] | null
+          rut?: string
+          telefono?: string | null
+          tipo_servicio?: Database["public"]["Enums"]["tipo_servicio"] | null
+          vinculado_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agenda_diferida_atencion_id_fkey"
+            columns: ["atencion_id"]
+            isOneToOne: false
+            referencedRelation: "atenciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_diferida_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_diferida_faena_id_fkey"
+            columns: ["faena_id"]
+            isOneToOne: false
+            referencedRelation: "faenas"
             referencedColumns: ["id"]
           },
         ]
