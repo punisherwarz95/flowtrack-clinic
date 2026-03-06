@@ -583,7 +583,7 @@ const AntropometriaForm = ({ value, onChange, readonly = false, fechaNacimiento 
             <div className={`p-3 rounded-lg border-2 ${
               data.framingham_clasificacion === "Alto" ? "border-destructive bg-destructive/5" :
               data.framingham_clasificacion === "Moderado" ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20" :
-              "border-green-500 bg-green-50 dark:bg-green-950/20"
+              "border-border bg-muted/30"
             }`}>
               <div className="flex items-center justify-between">
                 <div>
@@ -600,7 +600,7 @@ const AntropometriaForm = ({ value, onChange, readonly = false, fechaNacimiento 
                     {data.framingham_clasificacion ? `Riesgo ${data.framingham_clasificacion}` : "Sin cálculo"}
                   </Badge>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Puntos: {data.framingham_puntos}
+                    Puntos: {data.framingham_puntos || "—"}
                   </p>
                 </div>
               </div>
