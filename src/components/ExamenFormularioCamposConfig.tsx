@@ -35,7 +35,7 @@ const TIPOS_CAMPO = [
   { value: "numero", label: "Número" },
   { value: "textarea", label: "Texto largo" },
   { value: "select", label: "Selección" },
-  { value: "multi_select", label: "Selección múltiple" },
+  
   { value: "checkbox", label: "Sí/No" },
   { value: "fecha", label: "Fecha" },
   { value: "archivo_pdf", label: "Archivo PDF" },
