@@ -42,6 +42,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
   const [archivosCompartidos, setArchivosCompartidos] = useState<ArchivoCompartido[]>([]);
   const [archivoVinculos, setArchivoVinculos] = useState<Record<string, string[]>>({});
   const [expandedExamen, setExpandedExamen] = useState<string | null>(null);
+  const [trazabilidadMap, setTrazabilidadMap] = useState<Record<string, string[]>>({});
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
