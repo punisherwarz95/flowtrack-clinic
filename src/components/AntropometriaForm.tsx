@@ -248,6 +248,33 @@ const AntropometriaForm = ({ value, onChange, readonly = false, fechaNacimiento 
     }
   }, [data.pa_timer_inicio]);
 
+  const getFraminghamResult = (source: AntropometriaData) => {
+    const edadF = parseFloat(source.edad);
+    const colTotal = parseFloat(source.colesterol_total);
+    const hdl = parseFloat(source.colesterol_hdl);
+    const pasSist1 = parseFloat(source.pa_sistolica_1);
+
+    if (
+      source.sexo &&
+      !isNaN(edadF) && edadF >= 30 && edadF <= 74 &&
+      !isNaN(colTotal) &&
+      !isNaN(hdl) &&
+      !isNaN(pasSist1)
+    ) {
+      return calcularFramingham(
+        edadF,
+        source.sexo,
+        colTotal,
+        hdl,
+        pasSist1,
+        source.diabetes === "si",
+        source.fumador === "si"
+      );
+    }
+
+    return null;
+  };
+
   const updateField = useCallback((field: keyof AntropometriaData, val: string | boolean | null) => {
     setData(prev => {
       const updated = { ...prev, [field]: val };
@@ -301,22 +328,42 @@ const AntropometriaForm = ({ value, onChange, readonly = false, fechaNacimiento 
       }
 
       // Framingham calculation
-      const edadF = parseFloat(updated.edad);
-      const colTotal = parseFloat(updated.colesterol_total);
-      const hdl = parseFloat(updated.colesterol_hdl);
-      const pasSist1 = parseFloat(updated.pa_sistolica_1);
-      if (updated.sexo && !isNaN(edadF) && edadF >= 30 && edadF <= 74 &&
-          !isNaN(colTotal) && !isNaN(hdl) && !isNaN(pasSist1)) {
-        const result = calcularFramingham(
-          edadF, updated.sexo, colTotal, hdl, pasSist1,
-          updated.diabetes === "si", updated.fumador === "si"
-        );
-        updated.framingham_puntos = String(result.puntos);
-        updated.framingham_riesgo = String(result.riesgo);
-        updated.framingham_clasificacion = result.clasificacion;
+      const framingham = getFraminghamResult(updated);
+      if (framingham) {
+        updated.framingham_puntos = String(framingham.puntos);
+        updated.framingham_riesgo = String(framingham.riesgo);
+        updated.framingham_clasificacion = framingham.clasificacion;
+      } else {
+        updated.framingham_puntos = "";
+        updated.framingham_riesgo = "";
+        updated.framingham_clasificacion = "";
       }
 
       return updated;
+    });
+  }, []);
+
+  useEffect(() => {
+    setData((prev) => {
+      const framingham = getFraminghamResult(prev);
+      if (!framingham) return prev;
+
+      const next = {
+        ...prev,
+        framingham_puntos: String(framingham.puntos),
+        framingham_riesgo: String(framingham.riesgo),
+        framingham_clasificacion: framingham.clasificacion,
+      };
+
+      if (
+        next.framingham_puntos === prev.framingham_puntos &&
+        next.framingham_riesgo === prev.framingham_riesgo &&
+        next.framingham_clasificacion === prev.framingham_clasificacion
+      ) {
+        return prev;
+      }
+
+      return next;
     });
   }, []);
 
