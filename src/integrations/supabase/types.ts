@@ -1429,6 +1429,163 @@ export type Database = {
           },
         ]
       }
+      examen_archivo_vinculos: {
+        Row: {
+          archivo_compartido_id: string
+          created_at: string
+          examen_id: string
+          id: string
+        }
+        Insert: {
+          archivo_compartido_id: string
+          created_at?: string
+          examen_id: string
+          id?: string
+        }
+        Update: {
+          archivo_compartido_id?: string
+          created_at?: string
+          examen_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "examen_archivo_vinculos_archivo_compartido_id_fkey"
+            columns: ["archivo_compartido_id"]
+            isOneToOne: false
+            referencedRelation: "examen_archivos_compartidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "examen_archivo_vinculos_examen_id_fkey"
+            columns: ["examen_id"]
+            isOneToOne: false
+            referencedRelation: "examenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      examen_archivos_compartidos: {
+        Row: {
+          archivo_url: string
+          atencion_id: string
+          created_at: string
+          id: string
+          nombre_archivo: string
+        }
+        Insert: {
+          archivo_url: string
+          atencion_id: string
+          created_at?: string
+          id?: string
+          nombre_archivo: string
+        }
+        Update: {
+          archivo_url?: string
+          atencion_id?: string
+          created_at?: string
+          id?: string
+          nombre_archivo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "examen_archivos_compartidos_atencion_id_fkey"
+            columns: ["atencion_id"]
+            isOneToOne: false
+            referencedRelation: "atenciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      examen_formulario_campos: {
+        Row: {
+          created_at: string
+          etiqueta: string
+          examen_id: string
+          grupo: string | null
+          id: string
+          opciones: Json | null
+          orden: number
+          requerido: boolean
+          tipo_campo: string
+        }
+        Insert: {
+          created_at?: string
+          etiqueta: string
+          examen_id: string
+          grupo?: string | null
+          id?: string
+          opciones?: Json | null
+          orden?: number
+          requerido?: boolean
+          tipo_campo?: string
+        }
+        Update: {
+          created_at?: string
+          etiqueta?: string
+          examen_id?: string
+          grupo?: string | null
+          id?: string
+          opciones?: Json | null
+          orden?: number
+          requerido?: boolean
+          tipo_campo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "examen_formulario_campos_examen_id_fkey"
+            columns: ["examen_id"]
+            isOneToOne: false
+            referencedRelation: "examenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      examen_resultados: {
+        Row: {
+          archivo_url: string | null
+          atencion_examen_id: string
+          campo_id: string
+          created_at: string
+          id: string
+          updated_at: string
+          valor: string | null
+        }
+        Insert: {
+          archivo_url?: string | null
+          atencion_examen_id: string
+          campo_id: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          valor?: string | null
+        }
+        Update: {
+          archivo_url?: string | null
+          atencion_examen_id?: string
+          campo_id?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          valor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "examen_resultados_atencion_examen_id_fkey"
+            columns: ["atencion_examen_id"]
+            isOneToOne: false
+            referencedRelation: "atencion_examenes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "examen_resultados_campo_id_fkey"
+            columns: ["campo_id"]
+            isOneToOne: false
+            referencedRelation: "examen_formulario_campos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       examenes: {
         Row: {
           codigo: string | null
