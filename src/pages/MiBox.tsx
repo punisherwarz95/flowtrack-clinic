@@ -65,7 +65,7 @@ interface Box {
 }
 
 const STORAGE_KEY = "mediflow_selected_box";
-
+const CALL_MODE_KEY = "mediflow_call_mode"; // "single" or "multi"
 const MiBox = () => {
   const { user } = useAuth();
   const { isAdmin } = usePermissions(user);
@@ -74,7 +74,9 @@ const MiBox = () => {
   const [showBoxSelector, setShowBoxSelector] = useState(false);
   const [tempSelectedBox, setTempSelectedBox] = useState<string>("");
   const [activeTab, setActiveTab] = useState("cola");
-
+  const [callMode, setCallMode] = useState<"single" | "multi">(() => {
+    return (localStorage.getItem(CALL_MODE_KEY) as "single" | "multi") || "single";
+  });
   const [pacientesEnEspera, setPacientesEnEspera] = useState<AtencionConExamenes[]>([]);
   const [pacientesEnAtencion, setPacientesEnAtencion] = useState<Atencion[]>([]);
   const [pacientesCompletados, setPacientesCompletados] = useState<AtencionConExamenes[]>([]);
