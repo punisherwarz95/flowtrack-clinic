@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,13 +44,24 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete }: Prop
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const prevAtencionIdRef = useRef<string | null>(null);
+  const prevExamenIdsRef = useRef<string>("");
 
+  // Only reload prestador data when atencionId changes or examen IDs actually change
   useEffect(() => {
-    loadPrestadorData();
+    const examenIdsKey = atencionExamenes.map(ae => ae.id).sort().join(",");
+    const isNewAtencion = atencionId !== prevAtencionIdRef.current;
+    const examenesChanged = examenIdsKey !== prevExamenIdsRef.current;
+
+    if (isNewAtencion || examenesChanged) {
+      prevAtencionIdRef.current = atencionId;
+      prevExamenIdsRef.current = examenIdsKey;
+      loadPrestadorData(isNewAtencion);
+    }
   }, [atencionId, atencionExamenes]);
 
-  const loadPrestadorData = async () => {
-    setLoading(true);
+  const loadPrestadorData = async (showLoader = false) => {
+    if (showLoader) setLoading(true);
     try {
       const examenIds = atencionExamenes.map(ae => ae.examen_id);
       if (examenIds.length === 0) { setLoading(false); return; }
