@@ -267,7 +267,7 @@ const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete
             {groupCampos.map((campo) => {
               const resultado = resultados[campo.id];
               return (
-                <div key={campo.id} className={`space-y-1 ${campo.tipo_campo === "audiometria" ? "col-span-full" : ""}`}>
+                <div key={campo.id} className={`space-y-1 ${(campo.tipo_campo === "audiometria" || campo.tipo_campo === "texto_largo") ? "col-span-full" : ""}`}>
                   <Label className="text-xs flex items-center gap-1">
                     {campo.etiqueta}
                     {campo.requerido && <span className="text-destructive">*</span>}
