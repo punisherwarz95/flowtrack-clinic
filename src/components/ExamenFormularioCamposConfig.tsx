@@ -40,6 +40,7 @@ const TIPOS_CAMPO = [
   { value: "fecha", label: "Fecha" },
   { value: "archivo_pdf", label: "Archivo PDF" },
   { value: "audiometria", label: "Audiometría" },
+  { value: "antropometria", label: "Antropometría" },
 ];
 
 const ExamenFormularioCamposConfig = ({ examenId, examenNombre, open, onOpenChange }: Props) => {

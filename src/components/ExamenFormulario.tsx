@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Save, Upload, FileText, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import AudiometriaForm from "@/components/AudiometriaForm";
+import AntropometriaForm from "@/components/AntropometriaForm";
 
 interface CampoFormulario {
   id: string;
@@ -267,7 +268,7 @@ const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete
             {groupCampos.map((campo) => {
               const resultado = resultados[campo.id];
               return (
-                <div key={campo.id} className={`space-y-1 ${(campo.tipo_campo === "audiometria" || campo.tipo_campo === "texto_largo") ? "col-span-full" : ""}`}>
+                <div key={campo.id} className={`space-y-1 ${(campo.tipo_campo === "audiometria" || campo.tipo_campo === "texto_largo" || campo.tipo_campo === "antropometria") ? "col-span-full" : ""}`}>
                   <Label className="text-xs flex items-center gap-1">
                     {campo.etiqueta}
                     {campo.requerido && <span className="text-destructive">*</span>}
@@ -445,6 +446,17 @@ const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete
                   {campo.tipo_campo === "audiometria" && (
                     <div className="col-span-full">
                       <AudiometriaForm
+                        value={resultado?.valor || null}
+                        onChange={(v) => updateResultado(campo.id, v)}
+                        readonly={readonly}
+                        fechaNacimiento={fechaNacimiento}
+                      />
+                    </div>
+                  )}
+
+                  {campo.tipo_campo === "antropometria" && (
+                    <div className="col-span-full">
+                      <AntropometriaForm
                         value={resultado?.valor || null}
                         onChange={(v) => updateResultado(campo.id, v)}
                         readonly={readonly}
