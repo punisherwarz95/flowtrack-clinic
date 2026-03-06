@@ -6,7 +6,7 @@ export type ActivityAction =
   | "crear_atencion" | "completar_atencion" | "incompleto_atencion"
   | "llamar_paciente" | "devolver_espera"
   | "crear_usuario" | "eliminar_usuario" | "cambiar_password"
-  | "crear_empresa" | "editar_empresa"
+  | "crear_empresa" | "editar_empresa" | "eliminar_empresa"
   | "crear_cotizacion" | "editar_cotizacion" | "eliminar_cotizacion" | "duplicar_cotizacion"
   | "crear_prereserva" | "eliminar_prereserva"
   | "cambiar_estado_examen"

@@ -12,6 +12,7 @@ import { Plus, Trash2, Building2, Package, ClipboardList, ChevronDown, ChevronUp
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { generateCotizacionPDF } from "./CotizacionPDF";
+import { logActivity } from "@/lib/activityLog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -843,6 +844,7 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
       }
 
       toast.success(cotizacionId ? "Cotización actualizada" : "Cotización creada exitosamente");
+      await logActivity(cotizacionId ? "editar_cotizacion" : "crear_cotizacion", { cotizacion_id: cotizacionId }, "/cotizaciones");
       onSuccess();
     } catch (error: any) {
       console.error("Error:", error);

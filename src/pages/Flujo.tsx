@@ -17,6 +17,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useAuth } from "@/hooks/useAuth";
 import { GlobalChat } from "@/components/GlobalChat";
+import { logActivity } from "@/lib/activityLog";
 
 interface Atencion {
   id: string;
@@ -465,7 +466,9 @@ const Flujo = () => {
       });
       if (visitaError) console.error("Error registrando visita:", visitaError);
 
-      toast.success(`🔔 Paciente ${atenciones.find(a => a.id === atencionId)?.pacientes.nombre} entró a ${boxes.find(b => b.id === boxId)?.nombre}`, {
+      const pacienteNombre = atenciones.find(a => a.id === atencionId)?.pacientes.nombre;
+      const boxNombre = boxes.find(b => b.id === boxId)?.nombre;
+      toast.success(`🔔 Paciente ${pacienteNombre} entró a ${boxNombre}`, {
         duration: 5000,
         style: {
           fontSize: '18px',
@@ -473,6 +476,7 @@ const Flujo = () => {
           fontWeight: 'bold'
         }
       });
+      await logActivity("llamar_paciente", { paciente: pacienteNombre, box: boxNombre, atencion_id: atencionId }, "/flujo");
       setSelectedBox((prev) => {
         const newState = { ...prev };
         delete newState[atencionId];
@@ -620,6 +624,7 @@ const Flujo = () => {
           .eq("id", atencionId);
         if (error) throw error;
         toast.success("Paciente devuelto a espera - tiene exámenes pendientes");
+        await logActivity("devolver_espera", { atencion_id: atencionId }, "/flujo");
       } else if (currentBoxId) {
         const { error } = await supabase
           .from("atenciones")
@@ -627,6 +632,7 @@ const Flujo = () => {
           .eq("id", atencionId);
         if (error) throw error;
         toast.success("Exámenes completados - paciente listo para finalizar");
+        await logActivity("cambiar_estado_examen", { atencion_id: atencionId, estado: "completado_box" }, "/flujo");
       } else {
         const { error } = await supabase
           .from("atenciones")
@@ -634,6 +640,7 @@ const Flujo = () => {
           .eq("id", atencionId);
         if (error) throw error;
         toast.success(estado === "completado" ? "Atención completada" : "Atención marcada como incompleta");
+        await logActivity(estado === "completado" ? "completar_atencion" : "incompleto_atencion", { atencion_id: atencionId, paciente: atencionActual?.pacientes.nombre }, "/flujo");
       }
 
       await loadData();

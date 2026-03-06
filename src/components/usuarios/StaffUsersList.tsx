@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { logActivity } from "@/lib/activityLog";
 import { Trash2, Plus, Save, Key, Search } from "lucide-react";
 import {
   Dialog,
@@ -124,6 +125,7 @@ const StaffUsersList = () => {
       }
 
       toast.success("Usuario creado exitosamente");
+      await logActivity("crear_usuario", { username: newUsername }, "/usuarios");
       setDialogOpen(false);
       setNewUsername("");
       setNewPassword("");
@@ -162,6 +164,7 @@ const StaffUsersList = () => {
       }
 
       toast.success("Usuario eliminado exitosamente");
+      await logActivity("eliminar_usuario", { username, userId }, "/usuarios");
       loadData();
     } catch (error: any) {
       toast.error("Error inesperado: " + error.message);
@@ -248,6 +251,7 @@ const StaffUsersList = () => {
       }
 
       toast.success("Contraseña actualizada exitosamente");
+      await logActivity("cambiar_password", { target_user: selectedUserForPassword }, "/usuarios");
       setPasswordDialogOpen(false);
       setSelectedUserForPassword(null);
       setNewUserPassword("");

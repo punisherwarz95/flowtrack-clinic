@@ -45,6 +45,7 @@ import CotizacionForm from "@/components/cotizacion/CotizacionForm";
 import MargenesConfig from "@/components/cotizacion/MargenesConfig";
 import { format, startOfDay, endOfDay, isWithinInterval } from "date-fns";
 import { es } from "date-fns/locale";
+import { logActivity } from "@/lib/activityLog";
 
 interface Cotizacion {
   id: string;
@@ -189,6 +190,7 @@ const Cotizaciones = () => {
       if (error) throw error;
       
       toast.success("Cotización eliminada exitosamente");
+      await logActivity("eliminar_cotizacion", { cotizacion_id: cotizacionToDelete }, "/cotizaciones");
       setCotizacionToDelete(null);
       loadCotizaciones();
     } catch (error: any) {
@@ -247,6 +249,7 @@ const Cotizaciones = () => {
       }
 
       toast.success(`Cotización copiada como #${newCot.numero_cotizacion} (Borrador)`);
+      await logActivity("duplicar_cotizacion", { original_id: cotizacion.id, nuevo_numero: newCot.numero_cotizacion }, "/cotizaciones");
       await loadCotizaciones();
 
       setEditingCotizacion({

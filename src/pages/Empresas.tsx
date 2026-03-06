@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/useAuth";
 import EmpresaFaenas from "@/components/empresas/EmpresaFaenas";
+import { logActivity } from "@/lib/activityLog";
 
 interface Empresa {
   id: string;
@@ -161,10 +162,12 @@ const Empresas = () => {
         const { error } = await supabase.from("empresas").update(payload).eq("id", editingEmpresa.id);
         if (error) throw error;
         toast.success("Empresa actualizada exitosamente");
+        await logActivity("editar_empresa", { empresa_id: editingEmpresa.id, nombre: formData.nombre }, "/empresas");
       } else {
         const { data, error } = await supabase.from("empresas").insert([payload]).select().single();
         if (error) throw error;
         toast.success("Empresa agregada exitosamente");
+        await logActivity("crear_empresa", { nombre: formData.nombre }, "/empresas");
         // Switch to editing mode so tabs are available
         if (data) {
           setEditingEmpresa(data as Empresa);
@@ -227,6 +230,7 @@ const Empresas = () => {
       const { error } = await supabase.from("empresas").delete().eq("id", empresaToDelete);
       if (error) throw error;
       toast.success("Empresa eliminada exitosamente");
+      await logActivity("eliminar_empresa", { empresa_id: empresaToDelete }, "/empresas");
       setEmpresaToDelete(null);
       loadEmpresas();
     } catch (error: any) {
