@@ -240,54 +240,31 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
                       </Badge>
                     </div>
                   </CardHeader>
-                  <CardContent className="pt-0 space-y-2">
-                    {rows.map((row) => (
-                      <Collapsible
-                        key={row.atencionExamenId}
-                        open={expandedExamen === row.atencionExamenId}
-                        onOpenChange={(open) => setExpandedExamen(open ? row.atencionExamenId : null)}
+                  <CardContent className="pt-0 space-y-3">
+                    {/* Upload PDF masivo para todos los exámenes del paciente */}
+                    <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        disabled={uploadingPdf === atencionId}
+                        onClick={() => {
+                          const input = document.createElement("input");
+                          input.type = "file";
+                          input.accept = ".pdf";
+                          input.onchange = (e) => {
+                            const file = (e.target as HTMLInputElement).files?.[0];
+                            if (file) handleUploadPdfMasivo(atencionId, rows, file);
+                          };
+                          input.click();
+                        }}
                       >
-                        <CollapsibleTrigger className="w-full">
-                          <div className="flex items-center justify-between border rounded-lg p-3 hover:bg-accent/30 transition-colors">
-                            <div className="flex items-center gap-2">
-                              {expandedExamen === row.atencionExamenId ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4" />
-                              )}
-                              <FlaskConical className="h-4 w-4 text-amber-600" />
-                              <span className="font-medium text-sm">{row.examenNombre}</span>
-                            </div>
-                            <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs">
-                              Muestra tomada
-                            </Badge>
-                          </div>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent className="border border-t-0 rounded-b-lg p-4 space-y-4">
-                          {/* Upload PDF */}
-                          <div className="flex items-center gap-3">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-2"
-                              disabled={uploadingPdf === row.atencionExamenId}
-                              onClick={() => {
-                                const input = document.createElement("input");
-                                input.type = "file";
-                                input.accept = ".pdf";
-                                input.onchange = (e) => {
-                                  const file = (e.target as HTMLInputElement).files?.[0];
-                                  if (file) handleUploadPdf(row.atencionExamenId, row.examenId, row.atencionId, file);
-                                };
-                                input.click();
-                              }}
-                            >
-                              {uploadingPdf === row.atencionExamenId ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Upload className="h-4 w-4" />
-                              )}
-                              Subir PDF del Lab
+                        {uploadingPdf === atencionId ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Upload className="h-4 w-4" />
+                        )}
+                        Subir PDF del Lab
                             </Button>
                             <span className="text-xs text-muted-foreground">
                               Sube el informe PDF del laboratorio externo
