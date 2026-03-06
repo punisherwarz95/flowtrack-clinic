@@ -302,6 +302,60 @@ const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete
                     </div>
                   )}
 
+                  {campo.tipo_campo === "multi_select" && (
+                    <div className="space-y-1">
+                      {(() => {
+                        const selected: string[] = resultado?.valor ? JSON.parse(resultado.valor) : [];
+                        const opciones = Array.isArray(campo.opciones) ? campo.opciones : [];
+                        const allSelected = opciones.length > 0 && opciones.every((opt: string) => selected.includes(opt));
+                        const noneSelected = selected.length === 0;
+                        return (
+                          <>
+                            <div className="flex gap-2 mb-1">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="text-xs h-7"
+                                disabled={readonly}
+                                onClick={() => updateResultado(campo.id, JSON.stringify(opciones))}
+                              >
+                                Marcar todos
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="text-xs h-7"
+                                disabled={readonly}
+                                onClick={() => updateResultado(campo.id, JSON.stringify([]))}
+                              >
+                                Limpiar
+                              </Button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1">
+                              {opciones.map((opt: string) => (
+                                <label key={opt} className="flex items-center gap-2 cursor-pointer text-sm p-1 rounded hover:bg-muted">
+                                  <Checkbox
+                                    checked={selected.includes(opt)}
+                                    disabled={readonly}
+                                    onCheckedChange={(checked) => {
+                                      const newSelected = checked
+                                        ? [...selected, opt]
+                                        : selected.filter((s: string) => s !== opt);
+                                      updateResultado(campo.id, JSON.stringify(newSelected));
+                                    }}
+                                  />
+                                  {opt}
+                                </label>
+                              ))}
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+
                   {campo.tipo_campo === "fecha" && (
                     <Input
                       type="date"
