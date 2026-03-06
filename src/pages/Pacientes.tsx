@@ -314,52 +314,60 @@ const Pacientes = () => {
   const loadPatients = async () => {
     try {
       const dateToUse = selectedDate || new Date();
-      const startOfDay = new Date(dateToUse.setHours(0, 0, 0, 0)).toISOString();
-      const endOfDay = new Date(dateToUse.setHours(23, 59, 59, 999)).toISOString();
+      const startOfDay = new Date(new Date(dateToUse).getFullYear(), new Date(dateToUse).getMonth(), new Date(dateToUse).getDate(), 0, 0, 0, 0).toISOString();
+      const endOfDay = new Date(new Date(dateToUse).getFullYear(), new Date(dateToUse).getMonth(), new Date(dateToUse).getDate(), 23, 59, 59, 999).toISOString();
 
-      // Obtener atenciones del día seleccionado (cualquier estado)
+      // Single query: get atenciones with patient data joined
       const { data: atencionesData, error: atencionesError } = await supabase
         .from("atenciones")
-        .select("paciente_id, numero_ingreso, fecha_ingreso, estado")
+        .select("id, paciente_id, numero_ingreso, fecha_ingreso, estado, pacientes(*, empresas(*))")
         .gte("fecha_ingreso", startOfDay)
         .lte("fecha_ingreso", endOfDay);
 
       if (atencionesError) throw atencionesError;
 
-      // Obtener IDs únicos de pacientes que tienen atención en el día
-      const pacienteIds = [...new Set(atencionesData?.map(a => a.paciente_id) || [])];
-
-      if (pacienteIds.length === 0) {
+      if (!atencionesData || atencionesData.length === 0) {
         setPatients([]);
+        setDocumentosPendientes({});
         return;
       }
 
-      // Obtener solo los pacientes que tienen atenciones en el día
-      const { data: patientsData, error: patientsError } = await supabase
-        .from("pacientes")
-        .select("*, empresas(*)")
-        .in("id", pacienteIds)
-        .order("nombre");
-
-      if (patientsError) throw patientsError;
-
-      // Mapear atenciones a pacientes
-      const patientsWithAtenciones = (patientsData || []).map(patient => {
-        const atencion = atencionesData?.find(a => a.paciente_id === patient.id);
-        return {
-          ...patient,
-          atencion_actual: atencion ? {
-            numero_ingreso: atencion.numero_ingreso,
-            fecha_ingreso: atencion.fecha_ingreso
-          } : null
-        };
+      // Deduplicate by patient and map atencion data
+      const patientMap = new Map<string, any>();
+      atencionesData.forEach((a: any) => {
+        if (!patientMap.has(a.paciente_id)) {
+          patientMap.set(a.paciente_id, {
+            ...a.pacientes,
+            atencion_actual: {
+              numero_ingreso: a.numero_ingreso,
+              fecha_ingreso: a.fecha_ingreso,
+            },
+          });
+        }
       });
 
+      const patientsWithAtenciones = Array.from(patientMap.values());
       setPatients(patientsWithAtenciones);
       
-      // Load document counts after patients
+      // Load document counts in parallel
+      const pacienteIds = Array.from(patientMap.keys());
       if (pacienteIds.length > 0) {
-        loadDocumentCounts(pacienteIds);
+        // Batch: get pending docs for all atenciones at once
+        const atencionIds = atencionesData.map(a => a.id);
+        const { data: docs } = await supabase
+          .from("atencion_documentos")
+          .select("atencion_id, estado")
+          .in("atencion_id", atencionIds)
+          .eq("estado", "pendiente");
+
+        const counts: {[patientId: string]: number} = {};
+        atencionesData.forEach(a => {
+          const pendingCount = (docs || []).filter(d => d.atencion_id === a.id).length;
+          if (pendingCount > 0) {
+            counts[a.paciente_id] = (counts[a.paciente_id] || 0) + pendingCount;
+          }
+        });
+        setDocumentosPendientes(counts);
       }
     } catch (error) {
       console.error("Error:", error);
