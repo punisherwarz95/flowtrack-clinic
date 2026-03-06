@@ -116,10 +116,10 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
     );
   });
 
-  const handleUploadPdf = async (atencionExamenId: string, examenId: string, atencionId: string, file: File) => {
-    setUploadingPdf(atencionExamenId);
+  const handleUploadPdfMasivo = async (atencionId: string, rows: PendienteRow[], file: File) => {
+    setUploadingPdf(atencionId);
     try {
-      const fileName = `lab-externo/${atencionId}/${atencionExamenId}/${Date.now()}_${file.name}`;
+      const fileName = `lab-externo/${atencionId}/${Date.now()}_${file.name}`;
       const { error: uploadError } = await supabase.storage
         .from("examen-resultados")
         .upload(fileName, file);
@@ -132,7 +132,7 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
 
       if (!urlData?.signedUrl) throw new Error("No se pudo generar URL");
 
-      // Create shared file record and link
+      // Create shared file record
       const { data: archivoData, error: archivoError } = await supabase
         .from("examen_archivos_compartidos")
         .insert({
@@ -145,12 +145,19 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
 
       if (archivoError) throw archivoError;
 
-      await supabase.from("examen_archivo_vinculos").insert({
+      // Link to ALL pending exams for this patient
+      const vinculos = rows.map((row) => ({
         archivo_compartido_id: archivoData.id,
-        examen_id: examenId,
-      });
+        examen_id: row.examenId,
+      }));
 
-      toast.success(`PDF "${file.name}" subido correctamente`);
+      const { error: vinculoError } = await supabase
+        .from("examen_archivo_vinculos")
+        .insert(vinculos);
+
+      if (vinculoError) throw vinculoError;
+
+      toast.success(`PDF "${file.name}" vinculado a ${rows.length} examen(es)`);
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al subir PDF");
