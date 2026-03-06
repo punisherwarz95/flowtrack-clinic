@@ -184,6 +184,10 @@ const Completados = () => {
               <CheckCircle className="h-4 w-4" />
               Completados ({atenciones.length})
             </TabsTrigger>
+            <TabsTrigger value="resultados-pendientes" className="gap-2">
+              <FlaskConical className="h-4 w-4" />
+              Resultados Pendientes
+            </TabsTrigger>
             <TabsTrigger value="metricas" className="gap-2">
               <BarChart3 className="h-4 w-4" />
               Métricas
@@ -270,6 +274,10 @@ const Completados = () => {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="resultados-pendientes">
+            <ResultadosPendientes selectedDate={selectedDate} />
           </TabsContent>
 
           <TabsContent value="metricas">
