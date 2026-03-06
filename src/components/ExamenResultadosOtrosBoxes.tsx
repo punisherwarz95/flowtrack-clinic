@@ -1,10 +1,19 @@
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, Eye, FileText } from "lucide-react";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ResponsiveContainer, ReferenceLine,
+} from "recharts";
 
 const AUDIO_FREQUENCIES = [250, 500, 1000, 2000, 3000, 4000, 6000, 8000];
+const FREQ_LABELS: Record<number, string> = {
+  250: "250Hz", 500: "500Hz", 1000: "1kHz", 2000: "2kHz",
+  3000: "3kHz", 4000: "4kHz", 6000: "6kHz", 8000: "8kHz",
+};
 
 function tryParseAudiometria(valor: string | null): any | null {
   if (!valor) return null;
@@ -150,8 +159,13 @@ const ExamenResultadosOtrosBoxes = ({ atencionId, currentBoxId }: Props) => {
                       {examen.resultados.map((r, ridx) => {
                         const audioData = tryParseAudiometria(r.valor);
                         if (audioData) {
+                          const chartData = AUDIO_FREQUENCIES.map((freq) => ({
+                            freq: FREQ_LABELS[freq],
+                            "Oído Derecho": audioData.oido_derecho?.[freq] ?? undefined,
+                            "Oído Izquierdo": audioData.oido_izquierdo?.[freq] ?? undefined,
+                          }));
                           return (
-                            <div key={ridx} className="col-span-2 text-xs space-y-1">
+                            <div key={ridx} className="col-span-2 text-xs space-y-2">
                               <span className="text-muted-foreground font-medium">{r.etiqueta}:</span>
                               <div className="grid grid-cols-2 gap-2 mt-1">
                                 <div className="border border-destructive/30 rounded p-2 bg-destructive/5">
@@ -167,7 +181,7 @@ const ExamenResultadosOtrosBoxes = ({ atencionId, currentBoxId }: Props) => {
                                   <div className="flex flex-wrap gap-x-2 gap-y-0.5">
                                     {AUDIO_FREQUENCIES.map(f => (
                                       <span key={f} className="text-muted-foreground">
-                                        {f}Hz: <span className="font-medium text-foreground">{audioData.oido_derecho?.[f] ?? "-"}</span>
+                                        {FREQ_LABELS[f]}: <span className="font-medium text-foreground">{audioData.oido_derecho?.[f] ?? "-"} dB</span>
                                       </span>
                                     ))}
                                   </div>
@@ -185,12 +199,42 @@ const ExamenResultadosOtrosBoxes = ({ atencionId, currentBoxId }: Props) => {
                                   <div className="flex flex-wrap gap-x-2 gap-y-0.5">
                                     {AUDIO_FREQUENCIES.map(f => (
                                       <span key={f} className="text-muted-foreground">
-                                        {f}Hz: <span className="font-medium text-foreground">{audioData.oido_izquierdo?.[f] ?? "-"}</span>
+                                        {FREQ_LABELS[f]}: <span className="font-medium text-foreground">{audioData.oido_izquierdo?.[f] ?? "-"} dB</span>
                                       </span>
                                     ))}
                                   </div>
                                 </div>
                               </div>
+                              <Card className="mt-1">
+                                <CardContent className="pt-3 pb-2 px-2">
+                                  <ResponsiveContainer width="100%" height={220}>
+                                    <LineChart data={chartData} margin={{ top: 5, right: 15, left: 5, bottom: 5 }}>
+                                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                                      <XAxis dataKey="freq" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                                      <YAxis
+                                        reversed
+                                        domain={[-10, 130]}
+                                        ticks={[-10, 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130]}
+                                        tick={{ fontSize: 9 }}
+                                        stroke="hsl(var(--muted-foreground))"
+                                        label={{ value: "dB HL", angle: -90, position: "insideLeft", style: { fontSize: 10 } }}
+                                      />
+                                      <Tooltip
+                                        contentStyle={{
+                                          backgroundColor: "hsl(var(--background))",
+                                          border: "1px solid hsl(var(--border))",
+                                          borderRadius: "8px",
+                                          fontSize: 11,
+                                        }}
+                                      />
+                                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                                      <ReferenceLine y={25} stroke="hsl(var(--muted-foreground))" strokeDasharray="6 3" label={{ value: "Normal ≤25dB", position: "right", fontSize: 9 }} />
+                                      <Line type="monotone" dataKey="Oído Derecho" stroke="#ef4444" strokeWidth={2} dot={{ r: 4, fill: "#ef4444" }} connectNulls={false} />
+                                      <Line type="monotone" dataKey="Oído Izquierdo" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4, fill: "#3b82f6" }} connectNulls={false} />
+                                    </LineChart>
+                                  </ResponsiveContainer>
+                                </CardContent>
+                              </Card>
                             </div>
                           );
                         }
