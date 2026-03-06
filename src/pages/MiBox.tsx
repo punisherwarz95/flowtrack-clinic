@@ -137,88 +137,141 @@ const MiBox = () => {
       const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(); endOfDay.setHours(23, 59, 59, 999);
 
-      const { data: boxData } = await supabase.from("boxes").select("*, box_examenes(examen_id)").eq("id", selectedBoxId).single();
-      const boxExamIds = boxData?.box_examenes?.map((be: { examen_id: string }) => be.examen_id) || [];
+      const boxExamIds = currentBox?.box_examenes?.map((be) => be.examen_id) || [];
 
-      // En atención en este box
-      const { data: enAtencionData, error: enAtencionError } = await supabase
-        .from("atenciones").select(PACIENTE_SELECT)
-        .eq("estado", "en_atencion").eq("box_id", selectedBoxId)
-        .gte("fecha_ingreso", startOfDay.toISOString()).lte("fecha_ingreso", endOfDay.toISOString())
-        .order("numero_ingreso", { ascending: true });
-      if (enAtencionError) throw enAtencionError;
-      setPacientesEnAtencion(enAtencionData || []);
-
-      // En espera con exámenes pendientes para este box
-      if (boxExamIds.length > 0) {
-        const { data: esperaData, error: esperaError } = await supabase
-          .from("atenciones").select(PACIENTE_SELECT)
-          .eq("estado", "en_espera")
+      // Fetch all today's atenciones in ONE query
+      const [enAtencionRes, esperaRes, todasRes] = await Promise.all([
+        supabase.from("atenciones").select(PACIENTE_SELECT)
+          .eq("estado", "en_atencion").eq("box_id", selectedBoxId)
           .gte("fecha_ingreso", startOfDay.toISOString()).lte("fecha_ingreso", endOfDay.toISOString())
-          .order("numero_ingreso", { ascending: true });
-        if (esperaError) throw esperaError;
+          .order("numero_ingreso", { ascending: true }),
+        boxExamIds.length > 0
+          ? supabase.from("atenciones").select(PACIENTE_SELECT)
+              .eq("estado", "en_espera")
+              .gte("fecha_ingreso", startOfDay.toISOString()).lte("fecha_ingreso", endOfDay.toISOString())
+              .order("numero_ingreso", { ascending: true })
+          : Promise.resolve({ data: [], error: null }),
+        boxExamIds.length > 0
+          ? supabase.from("atenciones").select("*, pacientes(id, nombre, rut, tipo_servicio)")
+              .gte("fecha_ingreso", startOfDay.toISOString()).lte("fecha_ingreso", endOfDay.toISOString())
+              .order("numero_ingreso", { ascending: true })
+          : Promise.resolve({ data: [], error: null }),
+      ]);
 
-        const pacientesConExamenesBox: AtencionConExamenes[] = [];
-        for (const atencion of esperaData || []) {
-          const { data: examenes } = await supabase
-            .from("atencion_examenes").select("id, examenes(nombre)")
-            .eq("atencion_id", atencion.id).in("estado", ["pendiente", "incompleto"]).in("examen_id", boxExamIds);
-          if (examenes && examenes.length > 0) {
-            pacientesConExamenesBox.push({
-              ...atencion,
-              examenesPendientes: examenes.map((e: any) => e.examenes?.nombre || ""),
-            });
-          }
-        }
-        setPacientesEnEspera(pacientesConExamenesBox);
+      if (enAtencionRes.error) throw enAtencionRes.error;
+      const enAtencionData = enAtencionRes.data || [];
+      setPacientesEnAtencion(enAtencionData);
 
-        // Contar en otros boxes
-        const { data: enOtrosBoxesData } = await supabase
-          .from("atenciones").select("id")
-          .eq("estado", "en_atencion").neq("box_id", selectedBoxId).not("box_id", "is", null)
-          .gte("fecha_ingreso", startOfDay.toISOString()).lte("fecha_ingreso", endOfDay.toISOString());
-        let countEnOtrosBoxes = 0;
-        for (const atencion of enOtrosBoxesData || []) {
-          const { data: examenes } = await supabase
-            .from("atencion_examenes").select("id")
-            .eq("atencion_id", atencion.id).in("estado", ["pendiente", "incompleto"]).in("examen_id", boxExamIds);
-          if (examenes && examenes.length > 0) countEnOtrosBoxes++;
-        }
-        setPacientesEnOtrosBoxes(countEnOtrosBoxes);
-      } else {
+      if (boxExamIds.length === 0) {
         setPacientesEnEspera([]);
         setPacientesEnOtrosBoxes(0);
+        setPacientesCompletados([]);
+        return;
       }
 
-      // Completados hoy
-      if (boxExamIds.length > 0) {
-        const { data: todasAtenciones } = await supabase
-          .from("atenciones").select("*, pacientes(id, nombre, rut, tipo_servicio)")
-          .gte("fecha_ingreso", startOfDay.toISOString()).lte("fecha_ingreso", endOfDay.toISOString())
-          .order("numero_ingreso", { ascending: true });
-        const pacientesAtendidosBox: AtencionConExamenes[] = [];
-        for (const atencion of todasAtenciones || []) {
-          const { data: examenesCompletados } = await supabase
-            .from("atencion_examenes").select("id, examenes(nombre)")
-            .eq("atencion_id", atencion.id).eq("estado", "completado").in("examen_id", boxExamIds);
-          if (examenesCompletados && examenesCompletados.length > 0) {
-            pacientesAtendidosBox.push({
-              ...atencion,
-              examenesRealizados: examenesCompletados.map((e: any) => e.examenes?.nombre || ""),
-            });
+      // Collect ALL atencion IDs from espera + todas + en_atencion
+      const esperaData = esperaRes.data || [];
+      const todasData = todasRes.data || [];
+      const allAtencionIds = [
+        ...esperaData.map(a => a.id),
+        ...todasData.map(a => a.id),
+        ...enAtencionData.map(a => a.id),
+      ];
+      const uniqueIds = [...new Set(allAtencionIds)];
+
+      // ONE batch query for ALL atencion_examenes
+      let allExamenes: any[] = [];
+      if (uniqueIds.length > 0) {
+        // Batch in chunks of 100 to avoid URL length limits
+        for (let i = 0; i < uniqueIds.length; i += 100) {
+          const chunk = uniqueIds.slice(i, i + 100);
+          const { data } = await supabase
+            .from("atencion_examenes").select("id, atencion_id, examen_id, estado, examenes(nombre)")
+            .in("atencion_id", chunk)
+            .in("examen_id", boxExamIds);
+          if (data) allExamenes = allExamenes.concat(data);
+        }
+      }
+
+      // Index by atencion_id for fast lookup
+      const examenesByAtencion: Record<string, any[]> = {};
+      for (const ex of allExamenes) {
+        if (!examenesByAtencion[ex.atencion_id]) examenesByAtencion[ex.atencion_id] = [];
+        examenesByAtencion[ex.atencion_id].push(ex);
+      }
+
+      // En espera: filter those with pending exams for this box
+      const pacientesConExamenesBox: AtencionConExamenes[] = [];
+      for (const atencion of esperaData) {
+        const exams = (examenesByAtencion[atencion.id] || []).filter(
+          (e: any) => e.estado === "pendiente" || e.estado === "incompleto"
+        );
+        if (exams.length > 0) {
+          pacientesConExamenesBox.push({
+            ...atencion,
+            examenesPendientes: exams.map((e: any) => e.examenes?.nombre || ""),
+          });
+        }
+      }
+      setPacientesEnEspera(pacientesConExamenesBox);
+
+      // Otros boxes count - fetch in parallel
+      const { data: enOtrosBoxesData } = await supabase
+        .from("atenciones").select("id")
+        .eq("estado", "en_atencion").neq("box_id", selectedBoxId).not("box_id", "is", null)
+        .gte("fecha_ingreso", startOfDay.toISOString()).lte("fecha_ingreso", endOfDay.toISOString());
+
+      let countEnOtrosBoxes = 0;
+      if (enOtrosBoxesData) {
+        // We already have exams data, but these atenciones may not be in our batch
+        const otrosIds = enOtrosBoxesData.map(a => a.id).filter(id => !examenesByAtencion[id]);
+        let otrosExamenes: any[] = [];
+        for (let i = 0; i < otrosIds.length; i += 100) {
+          const chunk = otrosIds.slice(i, i + 100);
+          const { data } = await supabase
+            .from("atencion_examenes").select("id, atencion_id")
+            .in("atencion_id", chunk)
+            .in("examen_id", boxExamIds)
+            .in("estado", ["pendiente", "incompleto"]);
+          if (data) otrosExamenes = otrosExamenes.concat(data);
+        }
+        const otrosSet = new Set(otrosExamenes.map(e => e.atencion_id));
+        // Also check already-fetched data
+        for (const a of enOtrosBoxesData) {
+          if (otrosSet.has(a.id)) { countEnOtrosBoxes++; continue; }
+          const cached = examenesByAtencion[a.id];
+          if (cached && cached.some((e: any) => e.estado === "pendiente" || e.estado === "incompleto")) {
+            countEnOtrosBoxes++;
           }
         }
-        setPacientesCompletados(pacientesAtendidosBox);
-      } else {
-        setPacientesCompletados([]);
       }
+      setPacientesEnOtrosBoxes(countEnOtrosBoxes);
 
-      // Cargar exámenes para pacientes en atención
-      if (enAtencionData && enAtencionData.length > 0) {
-        for (const atencion of enAtencionData) {
-          await loadAtencionExamenes(atencion.id, boxExamIds);
+      // Completados hoy
+      const pacientesAtendidosBox: AtencionConExamenes[] = [];
+      for (const atencion of todasData) {
+        const exams = (examenesByAtencion[atencion.id] || []).filter((e: any) => e.estado === "completado");
+        if (exams.length > 0) {
+          pacientesAtendidosBox.push({
+            ...atencion,
+            examenesRealizados: exams.map((e: any) => e.examenes?.nombre || ""),
+          });
         }
       }
+      setPacientesCompletados(pacientesAtendidosBox);
+
+      // Exámenes para pacientes en atención (already in examenesByAtencion)
+      const newAtencionExamenes: Record<string, AtencionExamen[]> = {};
+      for (const atencion of enAtencionData) {
+        newAtencionExamenes[atencion.id] = (examenesByAtencion[atencion.id] || []).map((e: any) => ({
+          id: e.id,
+          examen_id: e.examen_id,
+          estado: e.estado,
+          examenes: e.examenes,
+        }));
+      }
+      setAtencionExamenes(prev => ({ ...prev, ...newAtencionExamenes }));
+
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al cargar datos");
