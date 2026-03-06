@@ -223,6 +223,23 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
     }
   };
 
+  const handleMuestraTomada = async (atencionExamenId: string) => {
+    try {
+      const { error } = await supabase
+        .from("atencion_examenes")
+        .update({ estado: "muestra_tomada" as any, fecha_realizacion: new Date().toISOString() })
+        .eq("id", atencionExamenId);
+
+      if (error) throw error;
+      toast.success("Muestra tomada registrada");
+      onComplete?.();
+      await loadPrestadorData();
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al registrar muestra tomada");
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
