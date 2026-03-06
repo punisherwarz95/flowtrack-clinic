@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Upload, FileText, Loader2, Building2, Stethoscope } from "lucide-react";
+import { ChevronDown, ChevronRight, Upload, FileText, Loader2, Building2, Stethoscope, FlaskConical } from "lucide-react";
 import ExamenFormulario from "@/components/ExamenFormulario";
 
 interface AtencionExamen {
