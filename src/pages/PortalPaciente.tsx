@@ -330,6 +330,78 @@ export default function PortalPaciente() {
     }
   };
 
+  // Helper para vincular agenda diferida: crea baterías, resuelve exámenes de paquetes, genera documentos
+  const vincularAgendaDiferida = async (agendaDiferida: any, atencionId: string) => {
+    try {
+      // 1. Actualizar estado de agenda diferida
+      const { error: updateError } = await supabase.from("agenda_diferida").update({
+        estado: "vinculado",
+        atencion_id: atencionId,
+        vinculado_at: new Date().toISOString()
+      }).eq("id", agendaDiferida.id);
+
+      if (updateError) {
+        console.error("[Portal] Error actualizando agenda diferida:", updateError);
+      }
+
+      // 2. Crear atencion_baterias
+      if (agendaDiferida.paquetes_ids?.length > 0) {
+        const baterias = agendaDiferida.paquetes_ids.map((pId: string) => ({
+          atencion_id: atencionId,
+          paquete_id: pId
+        }));
+        await supabase.from("atencion_baterias").insert(baterias);
+      }
+
+      // 3. Resolver exámenes desde los paquetes (paquete_examen_items)
+      const allExamenIds = new Set<string>(agendaDiferida.examenes_ids || []);
+
+      if (agendaDiferida.paquetes_ids?.length > 0) {
+        const { data: paqueteItems } = await supabase
+          .from("paquete_examen_items")
+          .select("examen_id")
+          .in("paquete_id", agendaDiferida.paquetes_ids);
+
+        if (paqueteItems) {
+          paqueteItems.forEach((item: any) => allExamenIds.add(item.examen_id));
+        }
+      }
+
+      // 4. Crear atencion_examenes con todos los exámenes resueltos
+      if (allExamenIds.size > 0) {
+        const examenes = Array.from(allExamenIds).map((eId: string) => ({
+          atencion_id: atencionId,
+          examen_id: eId,
+          estado: "pendiente" as const
+        }));
+        await supabase.from("atencion_examenes").insert(examenes);
+      }
+
+      // 5. Generar documentos desde las baterías (bateria_documentos)
+      if (agendaDiferida.paquetes_ids?.length > 0) {
+        const { data: bateriaDocumentos } = await supabase
+          .from("bateria_documentos")
+          .select("documento_id")
+          .in("paquete_id", agendaDiferida.paquetes_ids);
+
+        if (bateriaDocumentos && bateriaDocumentos.length > 0) {
+          const uniqueDocIds = [...new Set(bateriaDocumentos.map((bd: any) => bd.documento_id))];
+          const documentos = uniqueDocIds.map((docId: string) => ({
+            atencion_id: atencionId,
+            documento_id: docId,
+            estado: "pendiente",
+            respuestas: {}
+          }));
+          await supabase.from("atencion_documentos").insert(documentos);
+        }
+      }
+
+      console.log("[Portal] Agenda diferida vinculada:", agendaDiferida.id, "- Exámenes:", allExamenIds.size);
+    } catch (err) {
+      console.error("[Portal] Error vinculando agenda diferida:", err);
+    }
+  };
+
   const buscarPaciente = async () => {
     if (!rut.trim()) {
       toast({
@@ -495,32 +567,7 @@ export default function PortalPaciente() {
 
           // Vincular agenda diferida si existe
           if (agendaDiferida) {
-            await supabase.from("agenda_diferida").update({
-              estado: "vinculado",
-              atencion_id: newAtencion.id,
-              vinculado_at: new Date().toISOString()
-            }).eq("id", agendaDiferida.id);
-
-            // Crear atencion_baterias desde los paquetes de la agenda diferida
-            if (agendaDiferida.paquetes_ids?.length > 0) {
-              const baterias = agendaDiferida.paquetes_ids.map((pId: string) => ({
-                atencion_id: newAtencion.id,
-                paquete_id: pId
-              }));
-              await supabase.from("atencion_baterias").insert(baterias);
-            }
-
-            // Crear atencion_examenes desde los examenes de la agenda diferida
-            if (agendaDiferida.examenes_ids?.length > 0) {
-              const examenes = agendaDiferida.examenes_ids.map((eId: string) => ({
-                atencion_id: newAtencion.id,
-                examen_id: eId,
-                estado: "pendiente" as const
-              }));
-              await supabase.from("atencion_examenes").insert(examenes);
-            }
-
-            console.log("[Portal] Agenda diferida vinculada:", agendaDiferida.id);
+            await vincularAgendaDiferida(agendaDiferida, newAtencion.id);
           }
 
           setAtencion({
@@ -603,28 +650,7 @@ export default function PortalPaciente() {
 
         // Vincular agenda diferida si existe
         if (agendaDiferida) {
-          await supabase.from("agenda_diferida").update({
-            estado: "vinculado",
-            atencion_id: newAtencion.id,
-            vinculado_at: new Date().toISOString()
-          }).eq("id", agendaDiferida.id);
-
-          if (agendaDiferida.paquetes_ids?.length > 0) {
-            const baterias = agendaDiferida.paquetes_ids.map((pId: string) => ({
-              atencion_id: newAtencion.id,
-              paquete_id: pId
-            }));
-            await supabase.from("atencion_baterias").insert(baterias);
-          }
-
-          if (agendaDiferida.examenes_ids?.length > 0) {
-            const examenes = agendaDiferida.examenes_ids.map((eId: string) => ({
-              atencion_id: newAtencion.id,
-              examen_id: eId,
-              estado: "pendiente" as const
-            }));
-            await supabase.from("atencion_examenes").insert(examenes);
-          }
+          await vincularAgendaDiferida(agendaDiferida, newAtencion.id);
         }
 
         // Pre-llenar formulario con datos de agenda diferida si existen
