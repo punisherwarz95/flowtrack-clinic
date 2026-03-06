@@ -24,7 +24,7 @@ interface AntropometriaData {
   pa_alerta: boolean;
   pa_timer_inicio: string | null;
   saturacion_o2: string;
-  grasa_corporal: string;
+  
   hemoglucotest: string;
   // Framingham fields
   sexo: string;
@@ -42,12 +42,11 @@ const DEFAULT_DATA: AntropometriaData = {
   peso: "", talla: "", imc: "", imc_clasificacion: "", pgc: "", pgc_clasificacion: "",
   pulso: "", pa_sistolica_1: "", pa_diastolica_1: "", pa_sistolica_2: "", pa_diastolica_2: "",
   pa_sistolica_3: "", pa_diastolica_3: "", pa_alerta: false, pa_timer_inicio: null,
-  saturacion_o2: "", grasa_corporal: "", hemoglucotest: "",
-  sexo: "", edad: "", diabetes: "", fumador: "",
+  saturacion_o2: "", hemoglucotest: "",
+  sexo: "", edad: "", diabetes: "no", fumador: "no",
   colesterol_total: "", colesterol_hdl: "",
   framingham_puntos: "", framingham_riesgo: "", framingham_clasificacion: "",
 };
-
 interface Props {
   value: string | null;
   onChange: (value: string) => void;
