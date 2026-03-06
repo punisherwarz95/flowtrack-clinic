@@ -180,10 +180,10 @@ const AudiometriaForm = ({ value, onChange, readonly = false, fechaNacimiento }:
       {/* PTA Results */}
       <div className="flex flex-wrap gap-3">
         <Badge variant="outline" className="gap-1 text-sm py-1 px-3 border-red-300">
-          PTA Derecho: {ptaDerecho !== null ? `${ptaDerecho} dB` : "—"}
+          PTP OD: {ptaDerecho !== null ? `${ptaDerecho} dB` : "—"}
         </Badge>
         <Badge variant="outline" className="gap-1 text-sm py-1 px-3 border-blue-300">
-          PTA Izquierdo: {ptaIzquierdo !== null ? `${ptaIzquierdo} dB` : "—"}
+          PTP OI: {ptaIzquierdo !== null ? `${ptaIzquierdo} dB` : "—"}
         </Badge>
         <span className="text-xs text-muted-foreground self-center">
           Promedio: {ptaFreqLabel}
@@ -231,7 +231,11 @@ const AudiometriaForm = ({ value, onChange, readonly = false, fechaNacimiento }:
                     dataKey="Oído Derecho"
                     stroke="#ef4444"
                     strokeWidth={2}
-                    dot={{ r: 5, fill: "#ef4444" }}
+                    dot={(props: any) => {
+                      const { cx, cy } = props;
+                      if (cx == null || cy == null) return <></>;
+                      return <circle cx={cx} cy={cy} r={5} fill="#ef4444" stroke="#ef4444" />;
+                    }}
                     connectNulls={false}
                   />
                   <Line
@@ -239,7 +243,16 @@ const AudiometriaForm = ({ value, onChange, readonly = false, fechaNacimiento }:
                     dataKey="Oído Izquierdo"
                     stroke="#3b82f6"
                     strokeWidth={2}
-                    dot={{ r: 5, fill: "#3b82f6" }}
+                    dot={(props: any) => {
+                      const { cx, cy } = props;
+                      if (cx == null || cy == null) return <></>;
+                      return (
+                        <g>
+                          <line x1={cx - 5} y1={cy - 5} x2={cx + 5} y2={cy + 5} stroke="#3b82f6" strokeWidth={2} />
+                          <line x1={cx + 5} y1={cy - 5} x2={cx - 5} y2={cy + 5} stroke="#3b82f6" strokeWidth={2} />
+                        </g>
+                      );
+                    }}
                     connectNulls={false}
                   />
                 </LineChart>
