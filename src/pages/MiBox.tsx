@@ -137,8 +137,15 @@ const MiBox = () => {
       const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(); endOfDay.setHours(23, 59, 59, 999);
 
-      const currentBoxData = boxes.find(b => b.id === selectedBoxId);
-      const boxExamIds = currentBoxData?.box_examenes?.map((be) => be.examen_id) || [];
+      // Get box exam IDs - use cached or fetch
+      let boxExamIds: string[] = [];
+      const cachedBox = boxes.find(b => b.id === selectedBoxId);
+      if (cachedBox) {
+        boxExamIds = cachedBox.box_examenes?.map((be) => be.examen_id) || [];
+      } else {
+        const { data: boxData } = await supabase.from("boxes").select("*, box_examenes(examen_id)").eq("id", selectedBoxId).single();
+        boxExamIds = boxData?.box_examenes?.map((be: { examen_id: string }) => be.examen_id) || [];
+      }
 
       // Fetch all today's atenciones in ONE query
       const [enAtencionRes, esperaRes, todasRes] = await Promise.all([
