@@ -24,7 +24,7 @@ interface AntropometriaData {
   pa_alerta: boolean;
   pa_timer_inicio: string | null;
   saturacion_o2: string;
-  grasa_corporal: string;
+  
   hemoglucotest: string;
   // Framingham fields
   sexo: string;
