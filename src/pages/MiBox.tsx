@@ -696,6 +696,7 @@ const MiBox = () => {
                           <ExamenPrestadorGroup
                             atencionId={selectedAtencion.id}
                             atencionExamenes={atencionExamenes[selectedAtencion.id] || []}
+                            fechaNacimiento={selectedAtencion.pacientes.fecha_nacimiento}
                             onComplete={() => {
                               loadData();
                               const boxExamIds = currentBox?.box_examenes.map(be => be.examen_id) || [];
