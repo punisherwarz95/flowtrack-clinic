@@ -687,56 +687,21 @@ const MiBox = () => {
                         </CardContent>
                       </Card>
 
-                      {/* Exams list with expandable forms */}
+                      {/* Exams grouped by prestador */}
                       <Card>
                         <CardHeader className="pb-3">
                           <CardTitle className="text-lg">Exámenes de este Box</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-2">
-                          {(atencionExamenes[selectedAtencion.id] || []).length === 0 ? (
-                            <p className="text-sm text-muted-foreground text-center py-4">
-                              Todos los exámenes de este box ya fueron completados
-                            </p>
-                          ) : (
-                            (atencionExamenes[selectedAtencion.id] || []).map((examen) => (
-                              <Collapsible
-                                key={examen.id}
-                                open={expandedExamen === examen.id}
-                                onOpenChange={(open) => setExpandedExamen(open ? examen.id : null)}
-                              >
-                                <CollapsibleTrigger className="w-full">
-                                  <div className="flex items-center justify-between border rounded-lg p-3 hover:bg-accent/30 transition-colors">
-                                    <div className="flex items-center gap-2">
-                                      {expandedExamen === examen.id ? (
-                                        <ChevronDown className="h-4 w-4" />
-                                      ) : (
-                                        <ChevronRight className="h-4 w-4" />
-                                      )}
-                                      <span className="font-medium text-sm">{examen.examenes.nombre}</span>
-                                    </div>
-                                    <Badge
-                                      variant={examen.estado === "completado" ? "default" : examen.estado === "incompleto" ? "secondary" : "outline"}
-                                      className="text-xs"
-                                    >
-                                      {examen.estado}
-                                    </Badge>
-                                  </div>
-                                </CollapsibleTrigger>
-                                <CollapsibleContent className="border border-t-0 rounded-b-lg p-4">
-                                  <ExamenFormulario
-                                    atencionExamenId={examen.id}
-                                    examenId={examen.examen_id}
-                                    examenNombre={examen.examenes.nombre}
-                                    onComplete={() => {
-                                      loadData();
-                                      const boxExamIds = currentBox?.box_examenes.map(be => be.examen_id) || [];
-                                      loadAtencionExamenes(selectedAtencion.id, boxExamIds);
-                                    }}
-                                  />
-                                </CollapsibleContent>
-                              </Collapsible>
-                            ))
-                          )}
+                        <CardContent>
+                          <ExamenPrestadorGroup
+                            atencionId={selectedAtencion.id}
+                            atencionExamenes={atencionExamenes[selectedAtencion.id] || []}
+                            onComplete={() => {
+                              loadData();
+                              const boxExamIds = currentBox?.box_examenes.map(be => be.examen_id) || [];
+                              loadAtencionExamenes(selectedAtencion.id, boxExamIds);
+                            }}
+                          />
                         </CardContent>
                       </Card>
 
