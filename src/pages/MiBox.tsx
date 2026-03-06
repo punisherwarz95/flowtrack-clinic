@@ -414,6 +414,21 @@ const MiBox = () => {
                 )}
               </div>
             )}
+            <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5">
+              <UsersRound className={`h-4 w-4 ${callMode === "multi" ? "text-primary" : "text-muted-foreground"}`} />
+              <Switch
+                checked={callMode === "single"}
+                onCheckedChange={(checked) => {
+                  const mode = checked ? "single" : "multi";
+                  setCallMode(mode);
+                  localStorage.setItem(CALL_MODE_KEY, mode);
+                }}
+              />
+              <UserCheck className={`h-4 w-4 ${callMode === "single" ? "text-primary" : "text-muted-foreground"}`} />
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                {callMode === "single" ? "1 paciente" : "Múltiples"}
+              </span>
+            </div>
             {isAdmin && selectedBoxId && (
               <Button variant="outline" size="sm" onClick={() => { setTempSelectedBox(selectedBoxId); setShowBoxSelector(true); }}>
                 <Settings className="h-4 w-4 mr-2" /> Cambiar Box
