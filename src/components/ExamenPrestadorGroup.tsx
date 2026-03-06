@@ -193,10 +193,18 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
 
       if (archivoError) throw archivoError;
 
-      // Link to all exams in this group
-      const vinculos = group.examenes.map(ae => ({
+      // Link to all exams in this group + trazabilidad-linked exams
+      const linkedExamenIds = new Set(group.examenes.map(ae => ae.examen_id));
+      
+      // Add trazabilidad-linked exams
+      group.examenes.forEach(ae => {
+        const trazLinks = trazabilidadMap[ae.examen_id] || [];
+        trazLinks.forEach(linkedId => linkedExamenIds.add(linkedId));
+      });
+
+      const vinculos = Array.from(linkedExamenIds).map(examenId => ({
         archivo_compartido_id: archivoData.id,
-        examen_id: ae.examen_id,
+        examen_id: examenId,
       }));
 
       const { error: vincError } = await supabase
