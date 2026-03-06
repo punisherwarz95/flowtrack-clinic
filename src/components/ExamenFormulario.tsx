@@ -450,7 +450,8 @@ const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete
             })}
           </div>
         </div>
-      ))}
+        );
+      })}
 
       {!readonly && (
         <div className="flex justify-end pt-2">
