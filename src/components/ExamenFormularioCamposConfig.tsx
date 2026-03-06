@@ -35,6 +35,7 @@ const TIPOS_CAMPO = [
   { value: "numero", label: "Número" },
   { value: "textarea", label: "Texto largo" },
   { value: "select", label: "Selección" },
+  { value: "multi_select", label: "Selección múltiple" },
   { value: "checkbox", label: "Sí/No" },
   { value: "fecha", label: "Fecha" },
   { value: "archivo_pdf", label: "Archivo PDF" },
@@ -111,7 +112,7 @@ const ExamenFormularioCamposConfig = ({ examenId, examenNombre, open, onOpenChan
           examen_id: examenId,
           etiqueta: c.etiqueta,
           tipo_campo: c.tipo_campo,
-          opciones: c.tipo_campo === "select" && c.opciones
+          opciones: (c.tipo_campo === "select" || c.tipo_campo === "multi_select") && c.opciones
             ? (Array.isArray(c.opciones) ? c.opciones.filter((o: string) => o.trim()) : c.opciones)
             : null,
           requerido: c.requerido,
@@ -221,7 +222,7 @@ const ExamenFormularioCamposConfig = ({ examenId, examenNombre, open, onOpenChan
                       </Badge>
                     </div>
 
-                    {campo.tipo_campo === "select" && (
+                    {(campo.tipo_campo === "select" || campo.tipo_campo === "multi_select") && (
                       <div className="ml-8">
                         <Label className="text-xs">Opciones (una por línea)</Label>
                         <Textarea
@@ -233,8 +234,8 @@ const ExamenFormularioCamposConfig = ({ examenId, examenNombre, open, onOpenChan
                               e.target.value.split("\n")
                             )
                           }
-                          placeholder={"Normal\nAnormal\nNo realizado"}
-                          rows={3}
+                          placeholder={campo.tipo_campo === "multi_select" ? "COCAINA\nMARIHUANA\nANFETAMINA\nBENZODIACEPINA\nOPIACEOS" : "Normal\nAnormal\nNo realizado"}
+                          rows={4}
                         />
                       </div>
                     )}
