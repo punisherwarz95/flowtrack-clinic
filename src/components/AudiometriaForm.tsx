@@ -115,9 +115,9 @@ const AudiometriaForm = ({ value, onChange, readonly = false, fechaNacimiento }:
   const ptaFreqLabel = incluir4000 ? "500, 1000, 2000, 4000 Hz" : "500, 1000, 2000 Hz";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 w-full">
       {/* Inputs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4">
         {/* Oído Derecho */}
         <Card className="border-red-200">
           <CardContent className="pt-4 space-y-2">
@@ -125,7 +125,7 @@ const AudiometriaForm = ({ value, onChange, readonly = false, fechaNacimiento }:
               <div className="w-3 h-3 rounded-full bg-red-500" />
               <Label className="font-semibold text-sm">Oído Derecho (dB)</Label>
             </div>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-8 gap-2">
               {FREQUENCIES.map((freq) => (
                 <div key={freq}>
                   <Label className="text-[10px] text-muted-foreground">{FREQ_LABELS[freq]}</Label>
@@ -153,7 +153,7 @@ const AudiometriaForm = ({ value, onChange, readonly = false, fechaNacimiento }:
               <div className="w-3 h-3 rounded-full bg-blue-500" />
               <Label className="font-semibold text-sm">Oído Izquierdo (dB)</Label>
             </div>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-8 gap-2">
               {FREQUENCIES.map((freq) => (
                 <div key={freq}>
                   <Label className="text-[10px] text-muted-foreground">{FREQ_LABELS[freq]}</Label>
