@@ -171,10 +171,10 @@ const ExamenResultadosOtrosBoxes = ({ atencionId, currentBoxId }: Props) => {
                                 <div className="border border-destructive/30 rounded p-2 bg-destructive/5">
                                   <div className="flex items-center gap-1 mb-1">
                                     <div className="w-2 h-2 rounded-full bg-destructive" />
-                                    <span className="font-semibold">Oído Derecho</span>
+                                    <span className="font-semibold">OD (Oído Derecho)</span>
                                     {audioData.pta_derecho !== null && (
                                       <Badge variant="outline" className="ml-auto text-[10px] h-4 border-destructive/30">
-                                        PTA: {audioData.pta_derecho} dB
+                                        PTP OD: {audioData.pta_derecho} dB
                                       </Badge>
                                     )}
                                   </div>
@@ -189,10 +189,10 @@ const ExamenResultadosOtrosBoxes = ({ atencionId, currentBoxId }: Props) => {
                                 <div className="border border-primary/30 rounded p-2 bg-primary/5">
                                   <div className="flex items-center gap-1 mb-1">
                                     <div className="w-2 h-2 rounded-full bg-primary" />
-                                    <span className="font-semibold">Oído Izquierdo</span>
+                                    <span className="font-semibold">OI (Oído Izquierdo)</span>
                                     {audioData.pta_izquierdo !== null && (
                                       <Badge variant="outline" className="ml-auto text-[10px] h-4 border-primary/30">
-                                        PTA: {audioData.pta_izquierdo} dB
+                                        PTP OI: {audioData.pta_izquierdo} dB
                                       </Badge>
                                     )}
                                   </div>
@@ -229,8 +229,8 @@ const ExamenResultadosOtrosBoxes = ({ atencionId, currentBoxId }: Props) => {
                                       />
                                       <Legend wrapperStyle={{ fontSize: 11 }} />
                                       <ReferenceLine y={25} stroke="hsl(var(--muted-foreground))" strokeDasharray="6 3" label={{ value: "Normal ≤25dB", position: "right", fontSize: 9 }} />
-                                      <Line type="monotone" dataKey="Oído Derecho" stroke="#ef4444" strokeWidth={2} dot={{ r: 4, fill: "#ef4444" }} connectNulls={false} />
-                                      <Line type="monotone" dataKey="Oído Izquierdo" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4, fill: "#3b82f6" }} connectNulls={false} />
+                                      <Line type="monotone" dataKey="Oído Derecho" stroke="#ef4444" strokeWidth={2} dot={(props: any) => { const {cx,cy}=props; if(cx==null||cy==null) return <></>; return <circle cx={cx} cy={cy} r={4} fill="#ef4444" stroke="#ef4444"/>; }} connectNulls={false} />
+                                      <Line type="monotone" dataKey="Oído Izquierdo" stroke="#3b82f6" strokeWidth={2} dot={(props: any) => { const {cx,cy}=props; if(cx==null||cy==null) return <></>; return <g><line x1={cx-4} y1={cy-4} x2={cx+4} y2={cy+4} stroke="#3b82f6" strokeWidth={2}/><line x1={cx+4} y1={cy-4} x2={cx-4} y2={cy+4} stroke="#3b82f6" strokeWidth={2}/></g>; }} connectNulls={false} />
                                     </LineChart>
                                   </ResponsiveContainer>
                                 </CardContent>
