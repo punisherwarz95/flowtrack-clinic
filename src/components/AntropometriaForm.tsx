@@ -532,7 +532,7 @@ const AntropometriaForm = ({ value, onChange, readonly = false, fechaNacimiento 
           </div>
 
           {/* Framingham result */}
-          {data.framingham_riesgo && (
+          {data.framingham_riesgo !== "" && (
             <div className={`p-3 rounded-lg border-2 ${
               data.framingham_clasificacion === "Alto" ? "border-destructive bg-destructive/5" :
               data.framingham_clasificacion === "Moderado" ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20" :
