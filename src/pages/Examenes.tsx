@@ -233,6 +233,7 @@ const Examenes = () => {
   const [paqueteDialogTab, setPaqueteDialogTab] = useState("examenes");
   const [paqueteExamenFilter, setPaqueteExamenFilter] = useState("");
   const [camposConfigExamen, setCamposConfigExamen] = useState<{id: string, nombre: string} | null>(null);
+  const [trazabilidadExamen, setTrazabilidadExamen] = useState<{id: string, nombre: string} | null>(null);
   // Estado para filtro de búsqueda de paquetes en la lista principal
   const [paqueteSearchFilter, setPaqueteSearchFilter] = useState("");
   const [paqueteFaenaFilter, setPaqueteFaenaFilter] = useState<string>("");
