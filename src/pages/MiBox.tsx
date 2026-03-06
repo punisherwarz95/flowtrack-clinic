@@ -137,7 +137,8 @@ const MiBox = () => {
       const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(); endOfDay.setHours(23, 59, 59, 999);
 
-      const boxExamIds = currentBox?.box_examenes?.map((be) => be.examen_id) || [];
+      const currentBoxData = boxes.find(b => b.id === selectedBoxId);
+      const boxExamIds = currentBoxData?.box_examenes?.map((be) => be.examen_id) || [];
 
       // Fetch all today's atenciones in ONE query
       const [enAtencionRes, esperaRes, todasRes] = await Promise.all([
