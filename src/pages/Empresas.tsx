@@ -77,8 +77,7 @@ const Empresas = () => {
   );
 
   useEffect(() => {
-    loadEmpresas();
-    loadPaquetes();
+    Promise.all([loadEmpresas(), loadPaquetes()]);
   }, []);
 
   const loadEmpresas = async () => {

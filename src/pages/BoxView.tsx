@@ -52,8 +52,7 @@ const BoxView = () => {
 
   useEffect(() => {
     if (boxId) {
-      loadBox();
-      loadAtenciones();
+      Promise.all([loadBox(), loadAtenciones()]);
       subscribeToChanges();
     }
   }, [boxId]);
