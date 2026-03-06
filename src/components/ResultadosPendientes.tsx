@@ -265,13 +265,36 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
                           <Upload className="h-4 w-4" />
                         )}
                         Subir PDF del Lab
-                            </Button>
-                            <span className="text-xs text-muted-foreground">
-                              Sube el informe PDF del laboratorio externo
-                            </span>
-                          </div>
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        Se vinculará a los {rows.length} examen(es) pendientes de este paciente
+                      </span>
+                    </div>
 
-                          {/* Exam form for filling values */}
+                    {/* Individual exam forms */}
+                    {rows.map((row) => (
+                      <Collapsible
+                        key={row.atencionExamenId}
+                        open={expandedExamen === row.atencionExamenId}
+                        onOpenChange={(open) => setExpandedExamen(open ? row.atencionExamenId : null)}
+                      >
+                        <CollapsibleTrigger className="w-full">
+                          <div className="flex items-center justify-between border rounded-lg p-3 hover:bg-accent/30 transition-colors">
+                            <div className="flex items-center gap-2">
+                              {expandedExamen === row.atencionExamenId ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                              <FlaskConical className="h-4 w-4 text-amber-600" />
+                              <span className="font-medium text-sm">{row.examenNombre}</span>
+                            </div>
+                            <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs">
+                              Muestra tomada
+                            </Badge>
+                          </div>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="border border-t-0 rounded-b-lg p-4 space-y-4">
                           <ExamenFormulario
                             atencionExamenId={row.atencionExamenId}
                             examenId={row.examenId}
@@ -279,8 +302,6 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
                             onComplete={loadPendientes}
                             fechaNacimiento={row.fechaNacimiento}
                           />
-
-                          {/* Mark as completed */}
                           <div className="flex justify-end pt-2 border-t">
                             <Button
                               className="gap-2"
