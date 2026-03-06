@@ -42,6 +42,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
   const [archivosCompartidos, setArchivosCompartidos] = useState<ArchivoCompartido[]>([]);
   const [archivoVinculos, setArchivoVinculos] = useState<Record<string, string[]>>({});
   const [expandedExamen, setExpandedExamen] = useState<string | null>(null);
+  const [trazabilidadMap, setTrazabilidadMap] = useState<Record<string, string[]>>({});
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,8 +68,8 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
       const examenIds = atencionExamenes.map(ae => ae.examen_id);
       if (examenIds.length === 0) { setLoading(false); return; }
 
-      // Fetch prestador_examenes + prestadores + shared files in parallel
-      const [peRes, archRes, vincRes] = await Promise.all([
+      // Fetch prestador_examenes + shared files + vinculos + trazabilidad in parallel
+      const [peRes, archRes, vincRes, trazRes] = await Promise.all([
         supabase.from("prestador_examenes")
           .select("examen_id, prestador_id, prestadores(nombre)")
           .in("examen_id", examenIds),
@@ -79,6 +80,10 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
         supabase.from("examen_archivo_vinculos")
           .select("archivo_compartido_id, examen_id")
           .in("examen_id", examenIds),
+        // Load trazabilidad links for all exams in this atencion
+        supabase.from("examen_trazabilidad")
+          .select("*")
+          .or(examenIds.map(id => `examen_id_a.eq.${id},examen_id_b.eq.${id}`).join(",")),
       ]);
 
       // Map examen_id -> prestador_id
@@ -102,6 +107,16 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
         vincMap[v.archivo_compartido_id].push(v.examen_id);
       });
       setArchivoVinculos(vincMap);
+
+      // Build trazabilidad map: examen_id -> [linked_examen_ids]
+      const trazMap: Record<string, string[]> = {};
+      (trazRes.data || []).forEach((t: any) => {
+        if (!trazMap[t.examen_id_a]) trazMap[t.examen_id_a] = [];
+        if (!trazMap[t.examen_id_b]) trazMap[t.examen_id_b] = [];
+        if (!trazMap[t.examen_id_a].includes(t.examen_id_b)) trazMap[t.examen_id_a].push(t.examen_id_b);
+        if (!trazMap[t.examen_id_b].includes(t.examen_id_a)) trazMap[t.examen_id_b].push(t.examen_id_a);
+      });
+      setTrazabilidadMap(trazMap);
     } catch (error) {
       console.error("Error loading prestador data:", error);
     } finally {
@@ -178,10 +193,18 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
 
       if (archivoError) throw archivoError;
 
-      // Link to all exams in this group
-      const vinculos = group.examenes.map(ae => ({
+      // Link to all exams in this group + trazabilidad-linked exams
+      const linkedExamenIds = new Set(group.examenes.map(ae => ae.examen_id));
+      
+      // Add trazabilidad-linked exams
+      group.examenes.forEach(ae => {
+        const trazLinks = trazabilidadMap[ae.examen_id] || [];
+        trazLinks.forEach(linkedId => linkedExamenIds.add(linkedId));
+      });
+
+      const vinculos = Array.from(linkedExamenIds).map(examenId => ({
         archivo_compartido_id: archivoData.id,
-        examen_id: ae.examen_id,
+        examen_id: examenId,
       }));
 
       const { error: vincError } = await supabase

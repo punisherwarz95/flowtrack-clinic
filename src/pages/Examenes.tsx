@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, ClipboardList, Package, Trash2, Pencil, FileText, DollarSign, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Search, MapPin, Settings2 } from "lucide-react";
+import { Plus, ClipboardList, Package, Trash2, Pencil, FileText, DollarSign, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Search, MapPin, Settings2, Link2 } from "lucide-react";
 import ExamenFormularioCamposConfig from "@/components/ExamenFormularioCamposConfig";
+import ExamenTrazabilidadConfig from "@/components/ExamenTrazabilidadConfig";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -232,6 +233,7 @@ const Examenes = () => {
   const [paqueteDialogTab, setPaqueteDialogTab] = useState("examenes");
   const [paqueteExamenFilter, setPaqueteExamenFilter] = useState("");
   const [camposConfigExamen, setCamposConfigExamen] = useState<{id: string, nombre: string} | null>(null);
+  const [trazabilidadExamen, setTrazabilidadExamen] = useState<{id: string, nombre: string} | null>(null);
   // Estado para filtro de búsqueda de paquetes en la lista principal
   const [paqueteSearchFilter, setPaqueteSearchFilter] = useState("");
   const [paqueteFaenaFilter, setPaqueteFaenaFilter] = useState<string>("");
@@ -1397,6 +1399,14 @@ const Examenes = () => {
                             <Button
                               variant="ghost"
                               size="icon"
+                              title="Configurar trazabilidad"
+                              onClick={() => setTrazabilidadExamen({ id: examen.id, nombre: examen.nombre })}
+                            >
+                              <Link2 className="h-4 w-4 text-primary" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               onClick={() => setExamenToDelete(examen.id)}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
@@ -1504,6 +1514,14 @@ const Examenes = () => {
             examenNombre={camposConfigExamen.nombre}
             open={!!camposConfigExamen}
             onOpenChange={(open) => { if (!open) setCamposConfigExamen(null); }}
+          />
+        )}
+        {trazabilidadExamen && (
+          <ExamenTrazabilidadConfig
+            examenId={trazabilidadExamen.id}
+            examenNombre={trazabilidadExamen.nombre}
+            open={!!trazabilidadExamen}
+            onOpenChange={(open) => { if (!open) setTrazabilidadExamen(null); }}
           />
         )}
       </main>
