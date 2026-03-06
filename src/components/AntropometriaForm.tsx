@@ -46,7 +46,7 @@ const DEFAULT_DATA: AntropometriaData = {
   sexo: "", edad: "", diabetes: "no", fumador: "no",
   colesterol_total: "", colesterol_hdl: "",
   framingham_puntos: "", framingham_riesgo: "", framingham_clasificacion: "",
-
+};
 interface Props {
   value: string | null;
   onChange: (value: string) => void;
