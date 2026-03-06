@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { logActivity } from "@/lib/activityLog";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -171,6 +172,7 @@ const PreReservasManagement = () => {
       }
 
       toast.success("Pre-reserva eliminada");
+      await logActivity("eliminar_prereserva", { prereserva_id: deleteId }, "/pacientes");
       setDeleteId(null);
       loadData();
     } catch (error) {

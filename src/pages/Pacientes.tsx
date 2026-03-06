@@ -35,6 +35,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn, formatRutStandard } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import AgendaDiferida from "@/components/AgendaDiferida";
+import { logActivity } from "@/lib/activityLog";
 
 interface Patient {
   id: string;
@@ -701,12 +702,15 @@ const Pacientes = () => {
 
               if (updateError) throw updateError;
               toast.success("Paciente devuelto a lista de espera con nuevos exámenes");
+              await logActivity("editar_paciente", { nombre: formData.nombre, rut: formData.rut, devuelto_espera: true }, "/pacientes");
             } else {
               toast.success("Paciente actualizado con nuevos exámenes");
+              await logActivity("editar_paciente", { nombre: formData.nombre, rut: formData.rut }, "/pacientes");
             }
           } else {
             // Solo se modificaron datos del paciente, no tocar exámenes ni estado
             toast.success("Datos del paciente actualizados");
+            await logActivity("editar_paciente", { nombre: formData.nombre, rut: formData.rut }, "/pacientes");
           }
         }
       } else {
@@ -782,6 +786,7 @@ const Pacientes = () => {
         }
 
         toast.success("Paciente agregado exitosamente");
+        await logActivity("crear_paciente", { nombre: formData.nombre, rut: formData.rut, paquetes: selectedPaquetes.length }, "/pacientes");
       }
 
       setActiveMainTab("pacientes");
@@ -839,6 +844,7 @@ const Pacientes = () => {
       if (deleteError) throw deleteError;
 
       toast.success(`Atención #${atencionData.numero_ingreso ?? "--"} eliminada`);
+      await logActivity("eliminar_paciente", { paciente_id: pacienteToDelete, numero_ingreso: atencionData.numero_ingreso }, "/pacientes");
       setPacienteToDelete(null);
       loadPatients();
     } catch (error: any) {
@@ -932,6 +938,7 @@ const Pacientes = () => {
       }
 
       toast.success("Examen devuelto a pendiente");
+      await logActivity("cambiar_estado_examen", { atencion_examen_id: atencionExamenId, nuevo_estado: "pendiente", revertido: true }, "/pacientes");
       loadPatients();
     } catch (error) {
       console.error("Error:", error);

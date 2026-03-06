@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { Button } from "@/components/ui/button";
 import ChangeOwnPassword from "@/components/ChangeOwnPassword";
+import { logActivity } from "@/lib/activityLog";
 
 const Navigation = () => {
   const location = useLocation();
@@ -78,7 +79,7 @@ const Navigation = () => {
           </div>
           
           <ChangeOwnPassword />
-          <Button variant="outline" size="sm" onClick={signOut} className="shrink-0">
+          <Button variant="outline" size="sm" onClick={async () => { await logActivity("logout", {}, location.pathname); signOut(); }} className="shrink-0">
             <LogOut className="h-4 w-4 mr-2" />
             Cerrar Sesión
           </Button>

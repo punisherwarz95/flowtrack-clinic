@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import { CheckCircle, XCircle, Clock } from "lucide-react";
+import { logActivity } from "@/lib/activityLog";
 
 interface Atencion {
   id: string;
@@ -166,6 +167,7 @@ const BoxView = () => {
 
       if (error) throw error;
       toast.success("Estado actualizado");
+      await logActivity("cambiar_estado_examen", { atencion_examen_id: atencionExamenId, estado, box: box?.nombre }, "/box-view");
       loadAtenciones();
     } catch (error) {
       console.error("Error:", error);

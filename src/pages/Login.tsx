@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { logActivity } from "@/lib/activityLog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,6 +53,7 @@ const Login = () => {
 
       if (data.session) {
         toast.success("Inicio de sesión exitoso");
+        await logActivity("login", { username }, "/login");
         // Redirección manejada por el useEffect cuando AuthContext actualice
       }
     } catch (error) {
