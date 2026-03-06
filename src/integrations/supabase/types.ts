@@ -2276,7 +2276,11 @@ export type Database = {
     Enums: {
       app_role: "admin" | "user"
       estado_atencion: "en_espera" | "en_atencion" | "completado" | "incompleto"
-      estado_examen: "pendiente" | "completado" | "incompleto"
+      estado_examen:
+        | "pendiente"
+        | "completado"
+        | "incompleto"
+        | "muestra_tomada"
       estado_ficha: "pendiente" | "en_mano_paciente" | "completada"
       tipo_servicio: "workmed" | "jenner"
     }
@@ -2408,7 +2412,12 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "user"],
       estado_atencion: ["en_espera", "en_atencion", "completado", "incompleto"],
-      estado_examen: ["pendiente", "completado", "incompleto"],
+      estado_examen: [
+        "pendiente",
+        "completado",
+        "incompleto",
+        "muestra_tomada",
+      ],
       estado_ficha: ["pendiente", "en_mano_paciente", "completada"],
       tipo_servicio: ["workmed", "jenner"],
     },
