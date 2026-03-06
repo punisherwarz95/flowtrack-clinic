@@ -243,6 +243,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
                 examenId={examen.examen_id}
                 examenNombre={examen.examenes.nombre}
                 onComplete={onComplete}
+                fechaNacimiento={fechaNacimiento}
               />
             </CollapsibleContent>
           </Collapsible>
@@ -358,6 +359,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
                         atencionExamenId={examen.id}
                         examenId={examen.examen_id}
                         examenNombre={examen.examenes.nombre}
+                        fechaNacimiento={fechaNacimiento}
                         onComplete={() => {
                           onComplete?.();
                           loadPrestadorData();
