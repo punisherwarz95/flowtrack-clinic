@@ -266,15 +266,31 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
             open={expandedExamen === examen.id}
             onOpenChange={(open) => setExpandedExamen(open ? examen.id : null)}
           >
-            <CollapsibleTrigger className="w-full">
+             <CollapsibleTrigger className="w-full">
               <div className="flex items-center justify-between border rounded-lg p-3 hover:bg-accent/30 transition-colors">
                 <div className="flex items-center gap-2">
                   {expandedExamen === examen.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   <span className="font-medium text-sm">{examen.examenes.nombre}</span>
                 </div>
-                <Badge variant={examen.estado === "completado" ? "default" : examen.estado === "incompleto" ? "secondary" : "outline"} className="text-xs">
-                  {examen.estado}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  {(examen.estado === "pendiente" || examen.estado === "incompleto") && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1 h-6 text-xs"
+                      onClick={(e) => { e.stopPropagation(); handleMuestraTomada(examen.id); }}
+                    >
+                      <FlaskConical className="h-3 w-3" />
+                      Muestra Tomada
+                    </Button>
+                  )}
+                  <Badge 
+                    variant={examen.estado === "completado" ? "default" : examen.estado === "muestra_tomada" ? "secondary" : examen.estado === "incompleto" ? "secondary" : "outline"} 
+                    className={`text-xs ${examen.estado === "muestra_tomada" ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" : ""}`}
+                  >
+                    {examen.estado === "muestra_tomada" ? "Muestra tomada" : examen.estado}
+                  </Badge>
+                </div>
               </div>
             </CollapsibleTrigger>
             <CollapsibleContent className="border border-t-0 rounded-b-lg p-4">
@@ -388,12 +404,25 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
                     <div key={examen.id} className="border rounded-lg p-4 space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-sm">{examen.examenes.nombre}</span>
-                        <Badge
-                          variant={examen.estado === "completado" ? "default" : examen.estado === "incompleto" ? "secondary" : "outline"}
-                          className="text-xs"
-                        >
-                          {examen.estado}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          {(examen.estado === "pendiente" || examen.estado === "incompleto") && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1 h-6 text-xs"
+                              onClick={() => handleMuestraTomada(examen.id)}
+                            >
+                              <FlaskConical className="h-3 w-3" />
+                              Muestra Tomada
+                            </Button>
+                          )}
+                          <Badge
+                            variant={examen.estado === "completado" ? "default" : examen.estado === "muestra_tomada" ? "secondary" : examen.estado === "incompleto" ? "secondary" : "outline"}
+                            className={`text-xs ${examen.estado === "muestra_tomada" ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" : ""}`}
+                          >
+                            {examen.estado === "muestra_tomada" ? "Muestra tomada" : examen.estado}
+                          </Badge>
+                        </div>
                       </div>
                       <ExamenFormulario
                         atencionExamenId={examen.id}
