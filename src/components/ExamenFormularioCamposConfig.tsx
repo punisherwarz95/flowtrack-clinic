@@ -107,11 +107,13 @@ const ExamenFormularioCamposConfig = ({ examenId, examenNombre, open, onOpenChan
 
       // Insert new campos
       if (campos.length > 0) {
-        const camposToInsert = campos.map((c, idx) => ({
+          const camposToInsert = campos.map((c, idx) => ({
           examen_id: examenId,
           etiqueta: c.etiqueta,
           tipo_campo: c.tipo_campo,
-          opciones: c.tipo_campo === "select" && c.opciones ? c.opciones : null,
+          opciones: c.tipo_campo === "select" && c.opciones
+            ? (Array.isArray(c.opciones) ? c.opciones.filter((o: string) => o.trim()) : c.opciones)
+            : null,
           requerido: c.requerido,
           orden: idx,
           grupo: c.grupo || null,
@@ -223,12 +225,12 @@ const ExamenFormularioCamposConfig = ({ examenId, examenNombre, open, onOpenChan
                       <div className="ml-8">
                         <Label className="text-xs">Opciones (una por línea)</Label>
                         <Textarea
-                          value={Array.isArray(campo.opciones) ? campo.opciones.join("\n") : ""}
+                          value={Array.isArray(campo.opciones) ? campo.opciones.join("\n") : (campo.opciones || "")}
                           onChange={(e) =>
                             updateCampo(
                               index,
                               "opciones",
-                              e.target.value.split("\n").filter((o) => o.trim())
+                              e.target.value.split("\n")
                             )
                           }
                           placeholder={"Normal\nAnormal\nNo realizado"}

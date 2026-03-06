@@ -107,11 +107,12 @@ const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete
 
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage
+      const { data: urlData } = await supabase.storage
         .from("examen-resultados")
-        .getPublicUrl(fileName);
+        .createSignedUrl(fileName, 60 * 60 * 24 * 365 * 10); // 10 year signed URL
 
-      updateResultado(campoId, file.name, urlData.publicUrl);
+      if (!urlData?.signedUrl) throw new Error("No se pudo generar URL del archivo");
+      updateResultado(campoId, file.name, urlData.signedUrl);
       toast.success("Archivo subido correctamente");
     } catch (error: any) {
       console.error("Error:", error);
