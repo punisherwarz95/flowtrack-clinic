@@ -3,8 +3,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -191,76 +189,68 @@ const AudiometriaForm = ({ value, onChange, readonly = false, fechaNacimiento }:
         </span>
       </div>
 
-      {/* Chart - Collapsible */}
-      <Collapsible>
-        <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full justify-between border rounded-lg px-4 py-2">
-          <span>Ver Audiograma</span>
-          <ChevronDown className="h-4 w-4 transition-transform duration-200 [&[data-state=open]>svg]:rotate-180" />
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <Card className="mt-2">
-            <CardContent className="pt-4">
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis
-                    dataKey="freq"
-                    tick={{ fontSize: 11 }}
-                    stroke="hsl(var(--muted-foreground))"
-                  />
-                  <YAxis
-                    reversed
-                    domain={[-10, 130]}
-                    ticks={[-10, 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130]}
-                    tick={{ fontSize: 10 }}
-                    stroke="hsl(var(--muted-foreground))"
-                    label={{ value: "dB HL", angle: -90, position: "insideLeft", style: { fontSize: 11 } }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--background))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                      fontSize: 12,
-                    }}
-                  />
-                  <Legend />
-                  <ReferenceLine y={25} stroke="hsl(var(--muted-foreground))" strokeDasharray="6 3" label={{ value: "Normal ≤25dB", position: "right", fontSize: 10 }} />
-                  <Line
-                    type="monotone"
-                    dataKey="Oído Derecho"
-                    stroke="#ef4444"
-                    strokeWidth={2}
-                    dot={(props: any) => {
-                      const { cx, cy } = props;
-                      if (cx == null || cy == null) return <></>;
-                      return <circle cx={cx} cy={cy} r={5} fill="#ef4444" stroke="#ef4444" />;
-                    }}
-                    connectNulls={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="Oído Izquierdo"
-                    stroke="#3b82f6"
-                    strokeWidth={2}
-                    dot={(props: any) => {
-                      const { cx, cy } = props;
-                      if (cx == null || cy == null) return <></>;
-                      return (
-                        <g>
-                          <line x1={cx - 5} y1={cy - 5} x2={cx + 5} y2={cy + 5} stroke="#3b82f6" strokeWidth={2} />
-                          <line x1={cx + 5} y1={cy - 5} x2={cx - 5} y2={cy + 5} stroke="#3b82f6" strokeWidth={2} />
-                        </g>
-                      );
-                    }}
-                    connectNulls={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </CollapsibleContent>
-      </Collapsible>
+      {/* Chart - Always visible */}
+      <Card>
+        <CardContent className="pt-4">
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis
+                dataKey="freq"
+                tick={{ fontSize: 11 }}
+                stroke="hsl(var(--muted-foreground))"
+              />
+              <YAxis
+                reversed
+                domain={[-10, 130]}
+                ticks={[-10, 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130]}
+                tick={{ fontSize: 10 }}
+                stroke="hsl(var(--muted-foreground))"
+                label={{ value: "dB HL", angle: -90, position: "insideLeft", style: { fontSize: 11 } }}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "hsl(var(--background))",
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: "8px",
+                  fontSize: 12,
+                }}
+              />
+              <Legend />
+              <ReferenceLine y={25} stroke="hsl(var(--muted-foreground))" strokeDasharray="6 3" label={{ value: "Normal ≤25dB", position: "right", fontSize: 10 }} />
+              <Line
+                type="monotone"
+                dataKey="Oído Derecho"
+                stroke="#ef4444"
+                strokeWidth={2}
+                dot={(props: any) => {
+                  const { cx, cy } = props;
+                  if (cx == null || cy == null) return <></>;
+                  return <circle cx={cx} cy={cy} r={5} fill="#ef4444" stroke="#ef4444" />;
+                }}
+                connectNulls={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="Oído Izquierdo"
+                stroke="#3b82f6"
+                strokeWidth={2}
+                dot={(props: any) => {
+                  const { cx, cy } = props;
+                  if (cx == null || cy == null) return <></>;
+                  return (
+                    <g>
+                      <line x1={cx - 5} y1={cy - 5} x2={cx + 5} y2={cy + 5} stroke="#3b82f6" strokeWidth={2} />
+                      <line x1={cx + 5} y1={cy - 5} x2={cx - 5} y2={cy + 5} stroke="#3b82f6" strokeWidth={2} />
+                    </g>
+                  );
+                }}
+                connectNulls={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
     </div>
   );
 };
