@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
-import { CheckCircle, Calendar as CalendarIcon, RotateCcw, BarChart3 } from "lucide-react";
+import { CheckCircle, Calendar as CalendarIcon, RotateCcw, BarChart3, FlaskConical } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -16,6 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import MetricasCompletados from "@/components/MetricasCompletados";
+import ResultadosPendientes from "@/components/ResultadosPendientes";
 
 interface AtencionCompletada {
   id: string;
