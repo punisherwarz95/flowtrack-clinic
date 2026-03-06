@@ -1,0 +1,323 @@
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { ChevronDown, ChevronRight, FlaskConical, Upload, Search, CheckCircle, FileText, Loader2 } from "lucide-react";
+import ExamenFormulario from "@/components/ExamenFormulario";
+
+interface PendienteRow {
+  atencionId: string;
+  atencionExamenId: string;
+  examenId: string;
+  examenNombre: string;
+  pacienteNombre: string;
+  pacienteRut: string;
+  empresaNombre: string;
+  fechaIngreso: string;
+  numeroIngreso: number;
+  fechaNacimiento: string | null;
+}
+
+interface Props {
+  selectedDate: Date | undefined;
+}
+
+const ResultadosPendientes = ({ selectedDate }: Props) => {
+  const [pendientes, setPendientes] = useState<PendienteRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchFilter, setSearchFilter] = useState("");
+  const [expandedExamen, setExpandedExamen] = useState<string | null>(null);
+  const [uploadingPdf, setUploadingPdf] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadPendientes();
+  }, [selectedDate]);
+
+  const loadPendientes = async () => {
+    setLoading(true);
+    try {
+      const startOfDay = selectedDate
+        ? new Date(new Date(selectedDate).setHours(0, 0, 0, 0)).toISOString()
+        : null;
+      const endOfDay = selectedDate
+        ? new Date(new Date(selectedDate).setHours(23, 59, 59, 999)).toISOString()
+        : null;
+
+      // Get all atencion_examenes with estado = muestra_tomada
+      let query = supabase
+        .from("atencion_examenes")
+        .select(`
+          id,
+          examen_id,
+          estado,
+          atenciones!inner(
+            id,
+            fecha_ingreso,
+            numero_ingreso,
+            pacientes(id, nombre, rut, fecha_nacimiento, empresas(nombre))
+          ),
+          examenes(nombre)
+        `)
+        .eq("estado", "muestra_tomada")
+        .order("created_at", { ascending: false });
+
+      if (startOfDay && endOfDay) {
+        query = query
+          .gte("atenciones.fecha_ingreso", startOfDay)
+          .lte("atenciones.fecha_ingreso", endOfDay);
+      }
+
+      const { data, error } = await query.limit(500);
+      if (error) throw error;
+
+      const rows: PendienteRow[] = (data || []).map((ae: any) => ({
+        atencionId: ae.atenciones.id,
+        atencionExamenId: ae.id,
+        examenId: ae.examen_id,
+        examenNombre: ae.examenes?.nombre || "Examen",
+        pacienteNombre: ae.atenciones.pacientes?.nombre || "",
+        pacienteRut: ae.atenciones.pacientes?.rut || "-",
+        empresaNombre: ae.atenciones.pacientes?.empresas?.nombre || "Sin empresa",
+        fechaIngreso: ae.atenciones.fecha_ingreso,
+        numeroIngreso: ae.atenciones.numero_ingreso,
+        fechaNacimiento: ae.atenciones.pacientes?.fecha_nacimiento || null,
+      }));
+
+      setPendientes(rows);
+    } catch (error) {
+      console.error("Error cargando pendientes:", error);
+      toast.error("Error al cargar resultados pendientes");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Group by patient (atencionId)
+  const grouped = pendientes.reduce<Record<string, PendienteRow[]>>((acc, row) => {
+    if (!acc[row.atencionId]) acc[row.atencionId] = [];
+    acc[row.atencionId].push(row);
+    return acc;
+  }, {});
+
+  const filteredGroups = Object.entries(grouped).filter(([, rows]) => {
+    if (!searchFilter) return true;
+    const s = searchFilter.toLowerCase();
+    const first = rows[0];
+    return (
+      first.pacienteNombre.toLowerCase().includes(s) ||
+      first.pacienteRut.toLowerCase().includes(s) ||
+      first.empresaNombre.toLowerCase().includes(s)
+    );
+  });
+
+  const handleUploadPdf = async (atencionExamenId: string, examenId: string, atencionId: string, file: File) => {
+    setUploadingPdf(atencionExamenId);
+    try {
+      const fileName = `lab-externo/${atencionId}/${atencionExamenId}/${Date.now()}_${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("examen-resultados")
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = await supabase.storage
+        .from("examen-resultados")
+        .createSignedUrl(fileName, 60 * 60 * 24 * 365 * 10);
+
+      if (!urlData?.signedUrl) throw new Error("No se pudo generar URL");
+
+      // Create shared file record and link
+      const { data: archivoData, error: archivoError } = await supabase
+        .from("examen_archivos_compartidos")
+        .insert({
+          atencion_id: atencionId,
+          archivo_url: urlData.signedUrl,
+          nombre_archivo: file.name,
+        })
+        .select("id")
+        .single();
+
+      if (archivoError) throw archivoError;
+
+      await supabase.from("examen_archivo_vinculos").insert({
+        archivo_compartido_id: archivoData.id,
+        examen_id: examenId,
+      });
+
+      toast.success(`PDF "${file.name}" subido correctamente`);
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al subir PDF");
+    } finally {
+      setUploadingPdf(null);
+    }
+  };
+
+  const handleMarcarCompletado = async (atencionExamenId: string) => {
+    try {
+      const { error } = await supabase
+        .from("atencion_examenes")
+        .update({ estado: "completado", fecha_realizacion: new Date().toISOString() })
+        .eq("id", atencionExamenId);
+
+      if (error) throw error;
+      toast.success("Examen marcado como completado");
+      await loadPendientes();
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al completar examen");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <FlaskConical className="h-5 w-5 text-amber-600" />
+              Resultados Pendientes de Lab Externo
+              <Badge variant="secondary">{pendientes.length} exámenes</Badge>
+            </CardTitle>
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar paciente..."
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {filteredGroups.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No hay resultados pendientes para esta fecha
+            </div>
+          ) : (
+            filteredGroups.map(([atencionId, rows]) => {
+              const first = rows[0];
+              return (
+                <Card key={atencionId} className="border-amber-200 dark:border-amber-800">
+                  <CardHeader className="py-3 px-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="font-bold">#{first.numeroIngreso}</Badge>
+                          <span className="font-medium">{first.pacienteNombre}</span>
+                          <span className="text-xs text-muted-foreground font-mono">{first.pacienteRut}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {first.empresaNombre} · Ingreso: {first.fechaIngreso
+                            ? format(new Date(first.fechaIngreso), "dd/MM/yyyy HH:mm", { locale: es })
+                            : "-"}
+                        </div>
+                      </div>
+                      <Badge className="bg-amber-600 text-white">
+                        {rows.length} pendiente{rows.length > 1 ? "s" : ""}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0 space-y-2">
+                    {rows.map((row) => (
+                      <Collapsible
+                        key={row.atencionExamenId}
+                        open={expandedExamen === row.atencionExamenId}
+                        onOpenChange={(open) => setExpandedExamen(open ? row.atencionExamenId : null)}
+                      >
+                        <CollapsibleTrigger className="w-full">
+                          <div className="flex items-center justify-between border rounded-lg p-3 hover:bg-accent/30 transition-colors">
+                            <div className="flex items-center gap-2">
+                              {expandedExamen === row.atencionExamenId ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                              <FlaskConical className="h-4 w-4 text-amber-600" />
+                              <span className="font-medium text-sm">{row.examenNombre}</span>
+                            </div>
+                            <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs">
+                              Muestra tomada
+                            </Badge>
+                          </div>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="border border-t-0 rounded-b-lg p-4 space-y-4">
+                          {/* Upload PDF */}
+                          <div className="flex items-center gap-3">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-2"
+                              disabled={uploadingPdf === row.atencionExamenId}
+                              onClick={() => {
+                                const input = document.createElement("input");
+                                input.type = "file";
+                                input.accept = ".pdf";
+                                input.onchange = (e) => {
+                                  const file = (e.target as HTMLInputElement).files?.[0];
+                                  if (file) handleUploadPdf(row.atencionExamenId, row.examenId, row.atencionId, file);
+                                };
+                                input.click();
+                              }}
+                            >
+                              {uploadingPdf === row.atencionExamenId ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Upload className="h-4 w-4" />
+                              )}
+                              Subir PDF del Lab
+                            </Button>
+                            <span className="text-xs text-muted-foreground">
+                              Sube el informe PDF del laboratorio externo
+                            </span>
+                          </div>
+
+                          {/* Exam form for filling values */}
+                          <ExamenFormulario
+                            atencionExamenId={row.atencionExamenId}
+                            examenId={row.examenId}
+                            examenNombre={row.examenNombre}
+                            onComplete={loadPendientes}
+                            fechaNacimiento={row.fechaNacimiento}
+                          />
+
+                          {/* Mark as completed */}
+                          <div className="flex justify-end pt-2 border-t">
+                            <Button
+                              className="gap-2"
+                              onClick={() => handleMarcarCompletado(row.atencionExamenId)}
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                              Marcar como Completado
+                            </Button>
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    ))}
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default ResultadosPendientes;

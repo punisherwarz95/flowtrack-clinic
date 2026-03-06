@@ -1,0 +1,1 @@
+ALTER TYPE public.estado_examen ADD VALUE IF NOT EXISTS 'muestra_tomada';
