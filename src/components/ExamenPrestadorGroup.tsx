@@ -1,0 +1,379 @@
+import { useState, useEffect, useMemo } from "react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { ChevronDown, ChevronRight, Upload, FileText, Loader2, Building2, Stethoscope } from "lucide-react";
+import ExamenFormulario from "@/components/ExamenFormulario";
+
+interface AtencionExamen {
+  id: string;
+  examen_id: string;
+  estado: string;
+  examenes: { nombre: string };
+}
+
+interface PrestadorGroup {
+  prestadorId: string | null;
+  prestadorNombre: string;
+  examenes: AtencionExamen[];
+  archivosCompartidos: ArchivoCompartido[];
+}
+
+interface ArchivoCompartido {
+  id: string;
+  nombre_archivo: string;
+  archivo_url: string;
+  created_at: string;
+}
+
+interface Props {
+  atencionId: string;
+  atencionExamenes: AtencionExamen[];
+  onComplete?: () => void;
+}
+
+const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete }: Props) => {
+  const [prestadorExamenes, setPrestadorExamenes] = useState<Record<string, string>>({});
+  const [prestadores, setPrestadores] = useState<Record<string, string>>({});
+  const [archivosCompartidos, setArchivosCompartidos] = useState<ArchivoCompartido[]>([]);
+  const [archivoVinculos, setArchivoVinculos] = useState<Record<string, string[]>>({});
+  const [expandedExamen, setExpandedExamen] = useState<string | null>(null);
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+  const [uploading, setUploading] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadPrestadorData();
+  }, [atencionId, atencionExamenes]);
+
+  const loadPrestadorData = async () => {
+    setLoading(true);
+    try {
+      const examenIds = atencionExamenes.map(ae => ae.examen_id);
+      if (examenIds.length === 0) { setLoading(false); return; }
+
+      // Fetch prestador_examenes + prestadores + shared files in parallel
+      const [peRes, archRes, vincRes] = await Promise.all([
+        supabase.from("prestador_examenes")
+          .select("examen_id, prestador_id, prestadores(nombre)")
+          .in("examen_id", examenIds),
+        supabase.from("examen_archivos_compartidos")
+          .select("*")
+          .eq("atencion_id", atencionId)
+          .order("created_at", { ascending: false }),
+        supabase.from("examen_archivo_vinculos")
+          .select("archivo_compartido_id, examen_id")
+          .in("examen_id", examenIds),
+      ]);
+
+      // Map examen_id -> prestador_id
+      const peMap: Record<string, string> = {};
+      const pNames: Record<string, string> = {};
+      (peRes.data || []).forEach((pe: any) => {
+        peMap[pe.examen_id] = pe.prestador_id;
+        if (pe.prestadores?.nombre) {
+          pNames[pe.prestador_id] = pe.prestadores.nombre;
+        }
+      });
+      setPrestadorExamenes(peMap);
+      setPrestadores(pNames);
+
+      setArchivosCompartidos(archRes.data || []);
+
+      // Map archivo_compartido_id -> [examen_id]
+      const vincMap: Record<string, string[]> = {};
+      (vincRes.data || []).forEach((v: any) => {
+        if (!vincMap[v.archivo_compartido_id]) vincMap[v.archivo_compartido_id] = [];
+        vincMap[v.archivo_compartido_id].push(v.examen_id);
+      });
+      setArchivoVinculos(vincMap);
+    } catch (error) {
+      console.error("Error loading prestador data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Group exams by prestador
+  const groups: PrestadorGroup[] = useMemo(() => {
+    const groupMap: Record<string, PrestadorGroup> = {};
+
+    atencionExamenes.forEach(ae => {
+      const prestadorId = prestadorExamenes[ae.examen_id] || null;
+      const key = prestadorId || "__sin_prestador__";
+      
+      if (!groupMap[key]) {
+        groupMap[key] = {
+          prestadorId,
+          prestadorNombre: prestadorId ? (prestadores[prestadorId] || "Prestador") : "Sin prestador",
+          examenes: [],
+          archivosCompartidos: [],
+        };
+      }
+      groupMap[key].examenes.push(ae);
+    });
+
+    // Assign shared files to groups by checking vinculos
+    archivosCompartidos.forEach(archivo => {
+      const linkedExamenIds = archivoVinculos[archivo.id] || [];
+      // Find which group this file belongs to
+      for (const [key, group] of Object.entries(groupMap)) {
+        const groupExamenIds = group.examenes.map(e => e.examen_id);
+        if (linkedExamenIds.some(id => groupExamenIds.includes(id))) {
+          group.archivosCompartidos.push(archivo);
+          break;
+        }
+      }
+    });
+
+    // Sort: groups with prestador first, then sin prestador
+    return Object.values(groupMap).sort((a, b) => {
+      if (a.prestadorId && !b.prestadorId) return -1;
+      if (!a.prestadorId && b.prestadorId) return 1;
+      return a.prestadorNombre.localeCompare(b.prestadorNombre);
+    });
+  }, [atencionExamenes, prestadorExamenes, prestadores, archivosCompartidos, archivoVinculos]);
+
+  const handleUploadSharedFile = async (groupKey: string, group: PrestadorGroup, file: File) => {
+    setUploading(groupKey);
+    try {
+      const fileName = `compartidos/${atencionId}/${groupKey}/${Date.now()}_${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("examen-resultados")
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = await supabase.storage
+        .from("examen-resultados")
+        .createSignedUrl(fileName, 60 * 60 * 24 * 365 * 10);
+
+      if (!urlData?.signedUrl) throw new Error("No se pudo generar URL");
+
+      // Create shared file record
+      const { data: archivoData, error: archivoError } = await supabase
+        .from("examen_archivos_compartidos")
+        .insert({
+          atencion_id: atencionId,
+          archivo_url: urlData.signedUrl,
+          nombre_archivo: file.name,
+        })
+        .select("id")
+        .single();
+
+      if (archivoError) throw archivoError;
+
+      // Link to all exams in this group
+      const vinculos = group.examenes.map(ae => ({
+        archivo_compartido_id: archivoData.id,
+        examen_id: ae.examen_id,
+      }));
+
+      const { error: vincError } = await supabase
+        .from("examen_archivo_vinculos")
+        .insert(vinculos);
+
+      if (vincError) throw vincError;
+
+      toast.success(`PDF compartido subido para ${group.prestadorNombre}`);
+      await loadPrestadorData();
+    } catch (error: any) {
+      console.error("Error:", error);
+      toast.error("Error al subir archivo compartido");
+    } finally {
+      setUploading(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (atencionExamenes.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground text-center py-4">
+        Todos los exámenes de este box ya fueron completados
+      </p>
+    );
+  }
+
+  // If only one group and it's "sin prestador", render flat list
+  if (groups.length === 1 && !groups[0].prestadorId) {
+    return (
+      <div className="space-y-2">
+        {groups[0].examenes.map((examen) => (
+          <Collapsible
+            key={examen.id}
+            open={expandedExamen === examen.id}
+            onOpenChange={(open) => setExpandedExamen(open ? examen.id : null)}
+          >
+            <CollapsibleTrigger className="w-full">
+              <div className="flex items-center justify-between border rounded-lg p-3 hover:bg-accent/30 transition-colors">
+                <div className="flex items-center gap-2">
+                  {expandedExamen === examen.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  <span className="font-medium text-sm">{examen.examenes.nombre}</span>
+                </div>
+                <Badge variant={examen.estado === "completado" ? "default" : examen.estado === "incompleto" ? "secondary" : "outline"} className="text-xs">
+                  {examen.estado}
+                </Badge>
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="border border-t-0 rounded-b-lg p-4">
+              <ExamenFormulario
+                atencionExamenId={examen.id}
+                examenId={examen.examen_id}
+                examenNombre={examen.examenes.nombre}
+                onComplete={onComplete}
+              />
+            </CollapsibleContent>
+          </Collapsible>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {groups.map((group) => {
+        const groupKey = group.prestadorId || "__sin_prestador__";
+        const completedCount = group.examenes.filter(e => e.estado === "completado").length;
+        const totalCount = group.examenes.length;
+        const allCompleted = completedCount === totalCount;
+
+        return (
+          <Card key={groupKey} className="overflow-hidden">
+            <Collapsible
+              open={expandedGroup === groupKey}
+              onOpenChange={(open) => setExpandedGroup(open ? groupKey : null)}
+            >
+              <CollapsibleTrigger className="w-full">
+                <CardHeader className="py-3 px-4 hover:bg-accent/30 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {expandedGroup === groupKey ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      {group.prestadorId ? (
+                        <Building2 className="h-4 w-4 text-primary" />
+                      ) : (
+                        <Stethoscope className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <span className="font-semibold text-sm">{group.prestadorNombre}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {completedCount}/{totalCount}
+                      </Badge>
+                    </div>
+                    <Badge variant={allCompleted ? "default" : "secondary"} className="text-xs">
+                      {allCompleted ? "Completo" : "Pendiente"}
+                    </Badge>
+                  </div>
+                </CardHeader>
+              </CollapsibleTrigger>
+
+              <CollapsibleContent>
+                <CardContent className="pt-0 space-y-3">
+                  {/* Shared PDF section for prestador groups */}
+                  {group.prestadorId && (
+                    <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          PDF compartido ({group.prestadorNombre})
+                        </span>
+                        <div>
+                          <input
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            className="hidden"
+                            id={`shared-file-${groupKey}`}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleUploadSharedFile(groupKey, group, file);
+                            }}
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1 text-xs h-7"
+                            onClick={() => document.getElementById(`shared-file-${groupKey}`)?.click()}
+                            disabled={uploading === groupKey}
+                          >
+                            {uploading === groupKey ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Upload className="h-3 w-3" />
+                            )}
+                            Subir PDF
+                          </Button>
+                        </div>
+                      </div>
+                      {group.archivosCompartidos.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {group.archivosCompartidos.map((archivo) => (
+                            <a
+                              key={archivo.id}
+                              href={archivo.archivo_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-xs text-primary hover:underline bg-background rounded px-2 py-1 border"
+                            >
+                              <FileText className="h-3 w-3" />
+                              {archivo.nombre_archivo}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Individual exams */}
+                  <div className="space-y-2">
+                    {group.examenes.map((examen) => (
+                      <Collapsible
+                        key={examen.id}
+                        open={expandedExamen === examen.id}
+                        onOpenChange={(open) => setExpandedExamen(open ? examen.id : null)}
+                      >
+                        <CollapsibleTrigger className="w-full">
+                          <div className="flex items-center justify-between border rounded-lg p-2.5 hover:bg-accent/30 transition-colors">
+                            <div className="flex items-center gap-2">
+                              {expandedExamen === examen.id ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                              <span className="font-medium text-sm">{examen.examenes.nombre}</span>
+                            </div>
+                            <Badge
+                              variant={examen.estado === "completado" ? "default" : examen.estado === "incompleto" ? "secondary" : "outline"}
+                              className="text-xs"
+                            >
+                              {examen.estado}
+                            </Badge>
+                          </div>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="border border-t-0 rounded-b-lg p-4">
+                          <ExamenFormulario
+                            atencionExamenId={examen.id}
+                            examenId={examen.examen_id}
+                            examenNombre={examen.examenes.nombre}
+                            onComplete={() => {
+                              onComplete?.();
+                              loadPrestadorData();
+                            }}
+                          />
+                        </CollapsibleContent>
+                      </Collapsible>
+                    ))}
+                  </div>
+                </CardContent>
+              </CollapsibleContent>
+            </Collapsible>
+          </Card>
+        );
+      })}
+    </div>
+  );
+};
+
+export default ExamenPrestadorGroup;
