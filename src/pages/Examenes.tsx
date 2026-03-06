@@ -1399,6 +1399,14 @@ const Examenes = () => {
                             <Button
                               variant="ghost"
                               size="icon"
+                              title="Configurar trazabilidad"
+                              onClick={() => setTrazabilidadExamen({ id: examen.id, nombre: examen.nombre })}
+                            >
+                              <Link2 className="h-4 w-4 text-primary" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               onClick={() => setExamenToDelete(examen.id)}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
@@ -1506,6 +1514,14 @@ const Examenes = () => {
             examenNombre={camposConfigExamen.nombre}
             open={!!camposConfigExamen}
             onOpenChange={(open) => { if (!open) setCamposConfigExamen(null); }}
+          />
+        )}
+        {trazabilidadExamen && (
+          <ExamenTrazabilidadConfig
+            examenId={trazabilidadExamen.id}
+            examenNombre={trazabilidadExamen.nombre}
+            open={!!trazabilidadExamen}
+            onOpenChange={(open) => { if (!open) setTrazabilidadExamen(null); }}
           />
         )}
       </main>
