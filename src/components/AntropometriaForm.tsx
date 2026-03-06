@@ -422,11 +422,6 @@ const AntropometriaForm = ({ value, onChange, readonly = false, fechaNacimiento 
                 onChange={(e) => updateField("edad", e.target.value)} placeholder="30" />
             </div>
             <div>
-              <Label className="text-xs">Grasa corporal (%)</Label>
-              <Input type="number" step="0.1" value={data.grasa_corporal} disabled={readonly}
-                onChange={(e) => updateField("grasa_corporal", e.target.value)} placeholder="%" />
-            </div>
-            <div>
               <Label className="text-xs">Hemoglucotest (mg/dL)</Label>
               <Input type="number" value={data.hemoglucotest} disabled={readonly}
                 onChange={(e) => updateField("hemoglucotest", e.target.value)} placeholder="mg/dL" />
