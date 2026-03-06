@@ -1586,6 +1586,42 @@ export type Database = {
           },
         ]
       }
+      examen_trazabilidad: {
+        Row: {
+          created_at: string
+          examen_id_a: string
+          examen_id_b: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          examen_id_a: string
+          examen_id_b: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          examen_id_a?: string
+          examen_id_b?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "examen_trazabilidad_examen_id_a_fkey"
+            columns: ["examen_id_a"]
+            isOneToOne: false
+            referencedRelation: "examenes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "examen_trazabilidad_examen_id_b_fkey"
+            columns: ["examen_id_b"]
+            isOneToOne: false
+            referencedRelation: "examenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       examenes: {
         Row: {
           codigo: string | null
