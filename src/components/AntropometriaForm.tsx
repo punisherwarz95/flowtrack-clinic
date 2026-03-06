@@ -579,7 +579,7 @@ const AntropometriaForm = ({ value, onChange, readonly = false, fechaNacimiento 
           </div>
 
           {/* Framingham result */}
-          {data.framingham_riesgo !== "" && (
+          {(
             <div className={`p-3 rounded-lg border-2 ${
               data.framingham_clasificacion === "Alto" ? "border-destructive bg-destructive/5" :
               data.framingham_clasificacion === "Moderado" ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20" :
@@ -589,7 +589,7 @@ const AntropometriaForm = ({ value, onChange, readonly = false, fechaNacimiento 
                 <div>
                   <p className="text-xs text-muted-foreground">Riesgo cardiovascular a 10 años</p>
                   <p className="text-2xl font-bold">
-                    {data.framingham_riesgo}%
+                    {data.framingham_riesgo !== "" ? `${data.framingham_riesgo}%` : "—"}
                   </p>
                 </div>
                 <div className="text-right">
@@ -597,7 +597,7 @@ const AntropometriaForm = ({ value, onChange, readonly = false, fechaNacimiento 
                     data.framingham_clasificacion === "Alto" ? "destructive" :
                     data.framingham_clasificacion === "Moderado" ? "secondary" : "default"
                   } className="text-sm">
-                    Riesgo {data.framingham_clasificacion}
+                    {data.framingham_clasificacion ? `Riesgo ${data.framingham_clasificacion}` : "Sin cálculo"}
                   </Badge>
                   <p className="text-xs text-muted-foreground mt-1">
                     Puntos: {data.framingham_puntos}
