@@ -6,13 +6,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import CodigoDelDia from "@/components/CodigoDelDia";
-import { Clock, Play, CheckCircle, XCircle, RefreshCw, Box as BoxIcon, Settings, ClipboardList, Users, ChevronDown, ChevronRight } from "lucide-react";
+import { Clock, Play, CheckCircle, XCircle, RefreshCw, Box as BoxIcon, Settings, ClipboardList, Users, ChevronDown, ChevronRight, UserCheck, UsersRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { GlobalChat } from "@/components/GlobalChat";
@@ -64,7 +65,7 @@ interface Box {
 }
 
 const STORAGE_KEY = "mediflow_selected_box";
-
+const CALL_MODE_KEY = "mediflow_call_mode"; // "single" or "multi"
 const MiBox = () => {
   const { user } = useAuth();
   const { isAdmin } = usePermissions(user);
@@ -73,7 +74,9 @@ const MiBox = () => {
   const [showBoxSelector, setShowBoxSelector] = useState(false);
   const [tempSelectedBox, setTempSelectedBox] = useState<string>("");
   const [activeTab, setActiveTab] = useState("cola");
-
+  const [callMode, setCallMode] = useState<"single" | "multi">(() => {
+    return (localStorage.getItem(CALL_MODE_KEY) as "single" | "multi") || "single";
+  });
   const [pacientesEnEspera, setPacientesEnEspera] = useState<AtencionConExamenes[]>([]);
   const [pacientesEnAtencion, setPacientesEnAtencion] = useState<Atencion[]>([]);
   const [pacientesCompletados, setPacientesCompletados] = useState<AtencionConExamenes[]>([]);
@@ -255,12 +258,12 @@ const MiBox = () => {
       await supabase.from("atencion_box_visitas").insert({ atencion_id: atencionId, box_id: selectedBoxId! });
       const paciente = pacientesEnEspera.find((p) => p.id === atencionId);
       
-      // Switch to atencion tab and select this patient
-      const atencionData = pacientesEnEspera.find(p => p.id === atencionId);
       await loadData();
       
-      // After loadData, find the atencion in pacientesEnAtencion
-      setActiveTab("atencion");
+      // In single mode, auto-navigate to attention tab
+      if (callMode === "single") {
+        setActiveTab("atencion");
+      }
       
       toast.success(`🔔 Paciente ${paciente?.pacientes.nombre} entró al box`, {
         duration: 5000,
@@ -411,6 +414,21 @@ const MiBox = () => {
                 )}
               </div>
             )}
+            <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5">
+              <UsersRound className={`h-4 w-4 ${callMode === "multi" ? "text-primary" : "text-muted-foreground"}`} />
+              <Switch
+                checked={callMode === "single"}
+                onCheckedChange={(checked) => {
+                  const mode = checked ? "single" : "multi";
+                  setCallMode(mode);
+                  localStorage.setItem(CALL_MODE_KEY, mode);
+                }}
+              />
+              <UserCheck className={`h-4 w-4 ${callMode === "single" ? "text-primary" : "text-muted-foreground"}`} />
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                {callMode === "single" ? "1 paciente" : "Múltiples"}
+              </span>
+            </div>
             {isAdmin && selectedBoxId && (
               <Button variant="outline" size="sm" onClick={() => { setTempSelectedBox(selectedBoxId); setShowBoxSelector(true); }}>
                 <Settings className="h-4 w-4 mr-2" /> Cambiar Box
