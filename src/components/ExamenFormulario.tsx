@@ -225,12 +225,41 @@ const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete
         </div>
       </div>
 
-      {Object.entries(groups).map(([groupName, groupCampos]) => (
+      {Object.entries(groups).map(([groupName, groupCampos]) => {
+        // Find common options across all select fields in this group for bulk-fill
+        const selectCamposInGroup = groupCampos.filter(c => c.tipo_campo === "select" && Array.isArray(c.opciones));
+        const commonOptions: string[] = selectCamposInGroup.length >= 2
+          ? selectCamposInGroup[0].opciones.filter((opt: string) =>
+              selectCamposInGroup.every(c => c.opciones.includes(opt))
+            )
+          : [];
+
+        return (
         <div key={groupName}>
           {groupName !== "__sin_grupo__" && (
-            <h4 className="text-sm font-semibold text-muted-foreground mb-2 border-b pb-1">
-              {groupName}
-            </h4>
+            <div className="flex items-center justify-between mb-2 border-b pb-1">
+              <h4 className="text-sm font-semibold text-muted-foreground">
+                {groupName}
+              </h4>
+              {!readonly && commonOptions.length > 0 && (
+                <div className="flex gap-1 flex-wrap">
+                  {commonOptions.map((opt: string) => (
+                    <Button
+                      key={opt}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-6 px-2"
+                      onClick={() => {
+                        selectCamposInGroup.forEach(c => updateResultado(c.id, opt));
+                      }}
+                    >
+                      Todo "{opt}"
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {groupCampos.map((campo) => {
