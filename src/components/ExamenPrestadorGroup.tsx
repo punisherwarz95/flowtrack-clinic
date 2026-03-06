@@ -60,8 +60,8 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete }: Prop
     }
   }, [atencionId, atencionExamenes]);
 
-  const loadPrestadorData = async () => {
-    setLoading(true);
+  const loadPrestadorData = async (showLoader = false) => {
+    if (showLoader) setLoading(true);
     try {
       const examenIds = atencionExamenes.map(ae => ae.examen_id);
       if (examenIds.length === 0) { setLoading(false); return; }
