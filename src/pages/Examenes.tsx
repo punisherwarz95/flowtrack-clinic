@@ -260,12 +260,14 @@ const Examenes = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    loadExamenes();
-    loadBoxes();
-    loadPaquetes();
-    loadDocumentos();
-    loadEmpresas();
-    loadFaenas();
+    Promise.all([
+      loadExamenes(),
+      loadBoxes(),
+      loadPaquetes(),
+      loadDocumentos(),
+      loadEmpresas(),
+      loadFaenas(),
+    ]);
   }, []);
 
   const loadDocumentos = async () => {

@@ -184,18 +184,25 @@ const Pacientes = () => {
   });
 
   useEffect(() => {
-    loadPatients();
-    loadEmpresas();
-    loadExamenes();
-    loadPaquetes();
-    loadAllFaenasAndBateriaFaenas();
+    // Load all reference data in parallel on mount
+    Promise.all([
+      loadEmpresas(),
+      loadExamenes(),
+      loadPaquetes(),
+      loadAllFaenasAndBateriaFaenas(),
+    ]);
 
-    // Auto-refresh every 5 seconds
+    // Auto-refresh patients every 15 seconds
     const interval = setInterval(() => {
       loadPatients();
-    }, 5000);
+    }, 15000);
 
     return () => clearInterval(interval);
+  }, [selectedDate]);
+
+  // Load patients separately since it depends on selectedDate
+  useEffect(() => {
+    loadPatients();
   }, [selectedDate]);
 
   // Cargar todas las faenas y mapeo bateria-faena

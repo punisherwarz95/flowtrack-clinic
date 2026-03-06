@@ -112,13 +112,13 @@ const Dashboard = () => {
     loadTableData();
   }, [selectedDateTable]);
 
-  // Auto-refresh cada 5 segundos
+  // Auto-refresh every 30 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       loadDailyStats();
       loadMonthlyStats();
       loadTableData();
-    }, 5000);
+    }, 30000);
     
     return () => clearInterval(interval);
   }, [selectedDateDaily, selectedMonth, selectedDateTable]);
