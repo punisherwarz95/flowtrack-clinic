@@ -258,12 +258,12 @@ const MiBox = () => {
       await supabase.from("atencion_box_visitas").insert({ atencion_id: atencionId, box_id: selectedBoxId! });
       const paciente = pacientesEnEspera.find((p) => p.id === atencionId);
       
-      // Switch to atencion tab and select this patient
-      const atencionData = pacientesEnEspera.find(p => p.id === atencionId);
       await loadData();
       
-      // After loadData, find the atencion in pacientesEnAtencion
-      setActiveTab("atencion");
+      // In single mode, auto-navigate to attention tab
+      if (callMode === "single") {
+        setActiveTab("atencion");
+      }
       
       toast.success(`🔔 Paciente ${paciente?.pacientes.nombre} entró al box`, {
         duration: 5000,
