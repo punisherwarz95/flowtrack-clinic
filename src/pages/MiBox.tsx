@@ -295,6 +295,18 @@ const MiBox = () => {
   };
 
   const handleLlamarPaciente = async (atencionId: string) => {
+    const paciente = pacientesEnEspera.find((p) => p.id === atencionId);
+    
+    // Optimistic UI: move patient from espera to atencion immediately
+    if (paciente) {
+      setPacientesEnEspera(prev => prev.filter(p => p.id !== atencionId));
+      setPacientesEnAtencion(prev => [...prev, { ...paciente, estado: "en_atencion", box_id: selectedBoxId }]);
+      setSelectedAtencion({ ...paciente, estado: "en_atencion", box_id: selectedBoxId });
+      if (callMode === "single") {
+        setActiveTab("atencion");
+      }
+    }
+
     try {
       const { data: updated, error } = await supabase
         .from("atenciones")
@@ -305,31 +317,35 @@ const MiBox = () => {
       if (!updated) {
         setShowErrorOverlay(true);
         setTimeout(() => setShowErrorOverlay(false), 1000);
-        await loadData();
         toast.error("Este paciente ya fue llamado por otro box");
+        // Revert optimistic update
+        await loadData();
         return;
       }
       await supabase.from("atencion_box_visitas").insert({ atencion_id: atencionId, box_id: selectedBoxId! });
-      const paciente = pacientesEnEspera.find((p) => p.id === atencionId);
-      
-      await loadData();
-      
-      // In single mode, auto-navigate to attention tab
-      if (callMode === "single") {
-        setActiveTab("atencion");
-      }
       
       toast.success(`🔔 Paciente ${paciente?.pacientes.nombre} entró al box`, {
         duration: 5000,
         style: { fontSize: "18px", padding: "20px", fontWeight: "bold" },
       });
+
+      // Background refresh to sync all data
+      loadData();
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al llamar paciente");
+      loadData(); // Revert on error
     }
   };
 
   const handleCompletarAtencion = async (atencionId: string, estado: "completado" | "incompleto") => {
+    // Optimistic UI: remove from atencion immediately
+    setPacientesEnAtencion(prev => prev.filter(p => p.id !== atencionId));
+    setSelectedAtencion(null);
+    setExpandedExamen(null);
+    setConfirmCompletarDialog({ open: false, atencionId: null });
+    setActiveTab("cola");
+
     try {
       const currentBox = boxes.find((b) => b.id === selectedBoxId);
       const boxExamIds = currentBox?.box_examenes.map((be) => be.examen_id) || [];
@@ -360,14 +376,12 @@ const MiBox = () => {
         toast.success("Exámenes completados - paciente listo para finalizar en Flujo");
       }
 
-      setSelectedAtencion(null);
-      setExpandedExamen(null);
-      setConfirmCompletarDialog({ open: false, atencionId: null });
-      setActiveTab("cola");
-      await loadData();
+      // Background refresh
+      loadData();
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al completar atención");
+      loadData(); // Revert
     }
   };
 
