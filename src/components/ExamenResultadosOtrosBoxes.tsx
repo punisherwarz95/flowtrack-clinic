@@ -4,6 +4,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, Eye, FileText } from "lucide-react";
 
+const AUDIO_FREQUENCIES = [250, 500, 1000, 2000, 3000, 4000, 6000, 8000];
+
+function tryParseAudiometria(valor: string | null): any | null {
+  if (!valor) return null;
+  try {
+    const parsed = JSON.parse(valor);
+    if (parsed && typeof parsed === "object" && "oido_derecho" in parsed && "oido_izquierdo" in parsed) {
+      return parsed;
+    }
+  } catch {}
+  return null;
+}
+
 interface Props {
   atencionId: string;
   currentBoxId: string;
@@ -134,18 +147,66 @@ const ExamenResultadosOtrosBoxes = ({ atencionId, currentBoxId }: Props) => {
                   </div>
                   {examen.resultados.length > 0 && (
                     <div className="grid grid-cols-2 gap-1 ml-2">
-                      {examen.resultados.map((r, ridx) => (
-                        <div key={ridx} className="text-xs">
-                          <span className="text-muted-foreground">{r.etiqueta}:</span>{" "}
-                          {r.archivo_url ? (
-                            <a href={r.archivo_url} target="_blank" rel="noopener noreferrer" className="text-primary underline inline-flex items-center gap-1">
-                              <FileText className="h-3 w-3" /> Ver
-                            </a>
-                          ) : (
-                            <span className="font-medium">{r.valor || "-"}</span>
-                          )}
-                        </div>
-                      ))}
+                      {examen.resultados.map((r, ridx) => {
+                        const audioData = tryParseAudiometria(r.valor);
+                        if (audioData) {
+                          return (
+                            <div key={ridx} className="col-span-2 text-xs space-y-1">
+                              <span className="text-muted-foreground font-medium">{r.etiqueta}:</span>
+                              <div className="grid grid-cols-2 gap-2 mt-1">
+                                <div className="border border-destructive/30 rounded p-2 bg-destructive/5">
+                                  <div className="flex items-center gap-1 mb-1">
+                                    <div className="w-2 h-2 rounded-full bg-destructive" />
+                                    <span className="font-semibold">Oído Derecho</span>
+                                    {audioData.pta_derecho !== null && (
+                                      <Badge variant="outline" className="ml-auto text-[10px] h-4 border-destructive/30">
+                                        PTA: {audioData.pta_derecho} dB
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                                    {AUDIO_FREQUENCIES.map(f => (
+                                      <span key={f} className="text-muted-foreground">
+                                        {f}Hz: <span className="font-medium text-foreground">{audioData.oido_derecho?.[f] ?? "-"}</span>
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="border border-primary/30 rounded p-2 bg-primary/5">
+                                  <div className="flex items-center gap-1 mb-1">
+                                    <div className="w-2 h-2 rounded-full bg-primary" />
+                                    <span className="font-semibold">Oído Izquierdo</span>
+                                    {audioData.pta_izquierdo !== null && (
+                                      <Badge variant="outline" className="ml-auto text-[10px] h-4 border-primary/30">
+                                        PTA: {audioData.pta_izquierdo} dB
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                                    {AUDIO_FREQUENCIES.map(f => (
+                                      <span key={f} className="text-muted-foreground">
+                                        {f}Hz: <span className="font-medium text-foreground">{audioData.oido_izquierdo?.[f] ?? "-"}</span>
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div key={ridx} className="text-xs">
+                            <span className="text-muted-foreground">{r.etiqueta}:</span>{" "}
+                            {r.archivo_url ? (
+                              <a href={r.archivo_url} target="_blank" rel="noopener noreferrer" className="text-primary underline inline-flex items-center gap-1">
+                                <FileText className="h-3 w-3" /> Ver
+                              </a>
+                            ) : (
+                              <span className="font-medium">{r.valor || "-"}</span>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
