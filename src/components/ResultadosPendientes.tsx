@@ -116,10 +116,10 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
     );
   });
 
-  const handleUploadPdf = async (atencionExamenId: string, examenId: string, atencionId: string, file: File) => {
-    setUploadingPdf(atencionExamenId);
+  const handleUploadPdfMasivo = async (atencionId: string, rows: PendienteRow[], file: File) => {
+    setUploadingPdf(atencionId);
     try {
-      const fileName = `lab-externo/${atencionId}/${atencionExamenId}/${Date.now()}_${file.name}`;
+      const fileName = `lab-externo/${atencionId}/${Date.now()}_${file.name}`;
       const { error: uploadError } = await supabase.storage
         .from("examen-resultados")
         .upload(fileName, file);
@@ -132,7 +132,7 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
 
       if (!urlData?.signedUrl) throw new Error("No se pudo generar URL");
 
-      // Create shared file record and link
+      // Create shared file record
       const { data: archivoData, error: archivoError } = await supabase
         .from("examen_archivos_compartidos")
         .insert({
@@ -145,12 +145,19 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
 
       if (archivoError) throw archivoError;
 
-      await supabase.from("examen_archivo_vinculos").insert({
+      // Link to ALL pending exams for this patient
+      const vinculos = rows.map((row) => ({
         archivo_compartido_id: archivoData.id,
-        examen_id: examenId,
-      });
+        examen_id: row.examenId,
+      }));
 
-      toast.success(`PDF "${file.name}" subido correctamente`);
+      const { error: vinculoError } = await supabase
+        .from("examen_archivo_vinculos")
+        .insert(vinculos);
+
+      if (vinculoError) throw vinculoError;
+
+      toast.success(`PDF "${file.name}" vinculado a ${rows.length} examen(es)`);
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al subir PDF");
@@ -233,7 +240,38 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
                       </Badge>
                     </div>
                   </CardHeader>
-                  <CardContent className="pt-0 space-y-2">
+                  <CardContent className="pt-0 space-y-3">
+                    {/* Upload PDF masivo para todos los exámenes del paciente */}
+                    <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        disabled={uploadingPdf === atencionId}
+                        onClick={() => {
+                          const input = document.createElement("input");
+                          input.type = "file";
+                          input.accept = ".pdf";
+                          input.onchange = (e) => {
+                            const file = (e.target as HTMLInputElement).files?.[0];
+                            if (file) handleUploadPdfMasivo(atencionId, rows, file);
+                          };
+                          input.click();
+                        }}
+                      >
+                        {uploadingPdf === atencionId ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Upload className="h-4 w-4" />
+                        )}
+                        Subir PDF del Lab
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        Se vinculará a los {rows.length} examen(es) pendientes de este paciente
+                      </span>
+                    </div>
+
+                    {/* Individual exam forms */}
                     {rows.map((row) => (
                       <Collapsible
                         key={row.atencionExamenId}
@@ -257,37 +295,6 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
                           </div>
                         </CollapsibleTrigger>
                         <CollapsibleContent className="border border-t-0 rounded-b-lg p-4 space-y-4">
-                          {/* Upload PDF */}
-                          <div className="flex items-center gap-3">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-2"
-                              disabled={uploadingPdf === row.atencionExamenId}
-                              onClick={() => {
-                                const input = document.createElement("input");
-                                input.type = "file";
-                                input.accept = ".pdf";
-                                input.onchange = (e) => {
-                                  const file = (e.target as HTMLInputElement).files?.[0];
-                                  if (file) handleUploadPdf(row.atencionExamenId, row.examenId, row.atencionId, file);
-                                };
-                                input.click();
-                              }}
-                            >
-                              {uploadingPdf === row.atencionExamenId ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Upload className="h-4 w-4" />
-                              )}
-                              Subir PDF del Lab
-                            </Button>
-                            <span className="text-xs text-muted-foreground">
-                              Sube el informe PDF del laboratorio externo
-                            </span>
-                          </div>
-
-                          {/* Exam form for filling values */}
                           <ExamenFormulario
                             atencionExamenId={row.atencionExamenId}
                             examenId={row.examenId}
@@ -295,8 +302,6 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
                             onComplete={loadPendientes}
                             fechaNacimiento={row.fechaNacimiento}
                           />
-
-                          {/* Mark as completed */}
                           <div className="flex justify-end pt-2 border-t">
                             <Button
                               className="gap-2"
