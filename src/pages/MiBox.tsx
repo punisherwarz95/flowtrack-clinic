@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import CodigoDelDia from "@/components/CodigoDelDia";
-import { Clock, Play, CheckCircle, XCircle, RefreshCw, Box as BoxIcon, Settings, ClipboardList, Users, ChevronDown, ChevronRight, UserCheck, UsersRound } from "lucide-react";
+import { Clock, Play, CheckCircle, XCircle, RefreshCw, Box as BoxIcon, Settings, ClipboardList, Users, UserCheck, UsersRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
