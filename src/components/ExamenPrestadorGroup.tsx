@@ -341,42 +341,29 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete }: Prop
                     </div>
                   )}
 
-                  {/* Individual exams */}
-                  <div className="space-y-2">
-                    {group.examenes.map((examen) => (
-                      <Collapsible
-                        key={examen.id}
-                        open={expandedExamen === examen.id}
-                        onOpenChange={(open) => setExpandedExamen(open ? examen.id : null)}
-                      >
-                        <CollapsibleTrigger className="w-full">
-                          <div className="flex items-center justify-between border rounded-lg p-2.5 hover:bg-accent/30 transition-colors">
-                            <div className="flex items-center gap-2">
-                              {expandedExamen === examen.id ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                              <span className="font-medium text-sm">{examen.examenes.nombre}</span>
-                            </div>
-                            <Badge
-                              variant={examen.estado === "completado" ? "default" : examen.estado === "incompleto" ? "secondary" : "outline"}
-                              className="text-xs"
-                            >
-                              {examen.estado}
-                            </Badge>
-                          </div>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent className="border border-t-0 rounded-b-lg p-4">
-                          <ExamenFormulario
-                            atencionExamenId={examen.id}
-                            examenId={examen.examen_id}
-                            examenNombre={examen.examenes.nombre}
-                            onComplete={() => {
-                              onComplete?.();
-                              loadPrestadorData();
-                            }}
-                          />
-                        </CollapsibleContent>
-                      </Collapsible>
-                    ))}
-                  </div>
+                  {/* All exams rendered inline - no extra collapsibles */}
+                  {group.examenes.map((examen) => (
+                    <div key={examen.id} className="border rounded-lg p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-sm">{examen.examenes.nombre}</span>
+                        <Badge
+                          variant={examen.estado === "completado" ? "default" : examen.estado === "incompleto" ? "secondary" : "outline"}
+                          className="text-xs"
+                        >
+                          {examen.estado}
+                        </Badge>
+                      </div>
+                      <ExamenFormulario
+                        atencionExamenId={examen.id}
+                        examenId={examen.examen_id}
+                        examenNombre={examen.examenes.nombre}
+                        onComplete={() => {
+                          onComplete?.();
+                          loadPrestadorData();
+                        }}
+                      />
+                    </div>
+                  ))}
                 </CardContent>
               </CollapsibleContent>
             </Collapsible>
