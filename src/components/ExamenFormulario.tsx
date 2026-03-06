@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Save, Upload, FileText, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import AudiometriaForm from "@/components/AudiometriaForm";
 
 interface CampoFormulario {
   id: string;
@@ -34,9 +35,10 @@ interface Props {
   examenNombre: string;
   onComplete?: () => void;
   readonly?: boolean;
+  fechaNacimiento?: string | null;
 }
 
-const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete, readonly = false }: Props) => {
+const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete, readonly = false, fechaNacimiento }: Props) => {
   const [campos, setCampos] = useState<CampoFormulario[]>([]);
   const [resultados, setResultados] = useState<Record<string, ResultadoCampo>>({});
   const [loading, setLoading] = useState(true);
@@ -441,9 +443,14 @@ const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete
                   )}
 
                   {campo.tipo_campo === "audiometria" && (
-                    <p className="text-xs text-muted-foreground italic">
-                      Componente de audiometría (próximamente)
-                    </p>
+                    <div className="col-span-full">
+                      <AudiometriaForm
+                        value={resultado?.valor || null}
+                        onChange={(v) => updateResultado(campo.id, v)}
+                        readonly={readonly}
+                        fechaNacimiento={fechaNacimiento}
+                      />
+                    </div>
                   )}
                 </div>
               );

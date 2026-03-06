@@ -33,9 +33,10 @@ interface Props {
   atencionId: string;
   atencionExamenes: AtencionExamen[];
   onComplete?: () => void;
+  fechaNacimiento?: string | null;
 }
 
-const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete }: Props) => {
+const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaNacimiento }: Props) => {
   const [prestadorExamenes, setPrestadorExamenes] = useState<Record<string, string>>({});
   const [prestadores, setPrestadores] = useState<Record<string, string>>({});
   const [archivosCompartidos, setArchivosCompartidos] = useState<ArchivoCompartido[]>([]);
@@ -242,6 +243,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete }: Prop
                 examenId={examen.examen_id}
                 examenNombre={examen.examenes.nombre}
                 onComplete={onComplete}
+                fechaNacimiento={fechaNacimiento}
               />
             </CollapsibleContent>
           </Collapsible>
@@ -357,6 +359,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete }: Prop
                         atencionExamenId={examen.id}
                         examenId={examen.examen_id}
                         examenNombre={examen.examenes.nombre}
+                        fechaNacimiento={fechaNacimiento}
                         onComplete={() => {
                           onComplete?.();
                           loadPrestadorData();
