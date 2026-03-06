@@ -248,6 +248,33 @@ const AntropometriaForm = ({ value, onChange, readonly = false, fechaNacimiento 
     }
   }, [data.pa_timer_inicio]);
 
+  const getFraminghamResult = (source: AntropometriaData) => {
+    const edadF = parseFloat(source.edad);
+    const colTotal = parseFloat(source.colesterol_total);
+    const hdl = parseFloat(source.colesterol_hdl);
+    const pasSist1 = parseFloat(source.pa_sistolica_1);
+
+    if (
+      source.sexo &&
+      !isNaN(edadF) && edadF >= 30 && edadF <= 74 &&
+      !isNaN(colTotal) &&
+      !isNaN(hdl) &&
+      !isNaN(pasSist1)
+    ) {
+      return calcularFramingham(
+        edadF,
+        source.sexo,
+        colTotal,
+        hdl,
+        pasSist1,
+        source.diabetes === "si",
+        source.fumador === "si"
+      );
+    }
+
+    return null;
+  };
+
   const updateField = useCallback((field: keyof AntropometriaData, val: string | boolean | null) => {
     setData(prev => {
       const updated = { ...prev, [field]: val };
@@ -301,22 +328,42 @@ const AntropometriaForm = ({ value, onChange, readonly = false, fechaNacimiento 
       }
 
       // Framingham calculation
-      const edadF = parseFloat(updated.edad);
-      const colTotal = parseFloat(updated.colesterol_total);
-      const hdl = parseFloat(updated.colesterol_hdl);
-      const pasSist1 = parseFloat(updated.pa_sistolica_1);
-      if (updated.sexo && !isNaN(edadF) && edadF >= 30 && edadF <= 74 &&
-          !isNaN(colTotal) && !isNaN(hdl) && !isNaN(pasSist1)) {
-        const result = calcularFramingham(
-          edadF, updated.sexo, colTotal, hdl, pasSist1,
-          updated.diabetes === "si", updated.fumador === "si"
-        );
-        updated.framingham_puntos = String(result.puntos);
-        updated.framingham_riesgo = String(result.riesgo);
-        updated.framingham_clasificacion = result.clasificacion;
+      const framingham = getFraminghamResult(updated);
+      if (framingham) {
+        updated.framingham_puntos = String(framingham.puntos);
+        updated.framingham_riesgo = String(framingham.riesgo);
+        updated.framingham_clasificacion = framingham.clasificacion;
+      } else {
+        updated.framingham_puntos = "";
+        updated.framingham_riesgo = "";
+        updated.framingham_clasificacion = "";
       }
 
       return updated;
+    });
+  }, []);
+
+  useEffect(() => {
+    setData((prev) => {
+      const framingham = getFraminghamResult(prev);
+      if (!framingham) return prev;
+
+      const next = {
+        ...prev,
+        framingham_puntos: String(framingham.puntos),
+        framingham_riesgo: String(framingham.riesgo),
+        framingham_clasificacion: framingham.clasificacion,
+      };
+
+      if (
+        next.framingham_puntos === prev.framingham_puntos &&
+        next.framingham_riesgo === prev.framingham_riesgo &&
+        next.framingham_clasificacion === prev.framingham_clasificacion
+      ) {
+        return prev;
+      }
+
+      return next;
     });
   }, []);
 
@@ -532,17 +579,17 @@ const AntropometriaForm = ({ value, onChange, readonly = false, fechaNacimiento 
           </div>
 
           {/* Framingham result */}
-          {data.framingham_riesgo !== "" && (
+          {(
             <div className={`p-3 rounded-lg border-2 ${
               data.framingham_clasificacion === "Alto" ? "border-destructive bg-destructive/5" :
               data.framingham_clasificacion === "Moderado" ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20" :
-              "border-green-500 bg-green-50 dark:bg-green-950/20"
+              "border-border bg-muted/30"
             }`}>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Riesgo cardiovascular a 10 años</p>
                   <p className="text-2xl font-bold">
-                    {data.framingham_riesgo}%
+                    {data.framingham_riesgo !== "" ? `${data.framingham_riesgo}%` : "—"}
                   </p>
                 </div>
                 <div className="text-right">
@@ -550,10 +597,10 @@ const AntropometriaForm = ({ value, onChange, readonly = false, fechaNacimiento 
                     data.framingham_clasificacion === "Alto" ? "destructive" :
                     data.framingham_clasificacion === "Moderado" ? "secondary" : "default"
                   } className="text-sm">
-                    Riesgo {data.framingham_clasificacion}
+                    {data.framingham_clasificacion ? `Riesgo ${data.framingham_clasificacion}` : "Sin cálculo"}
                   </Badge>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Puntos: {data.framingham_puntos}
+                    Puntos: {data.framingham_puntos || "—"}
                   </p>
                 </div>
               </div>
