@@ -19,9 +19,8 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { GlobalChat } from "@/components/GlobalChat";
 import { useAtencionDocumentos } from "@/hooks/useAtencionDocumentos";
 import { DocumentoFormViewer, DocumentoContextData } from "@/components/DocumentoFormViewer";
-import ExamenFormulario from "@/components/ExamenFormulario";
 import ExamenResultadosOtrosBoxes from "@/components/ExamenResultadosOtrosBoxes";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import ExamenPrestadorGroup from "@/components/ExamenPrestadorGroup";
 
 interface Atencion {
   id: string;
