@@ -123,7 +123,7 @@ const MiBox = () => {
         clearInterval(interval);
       };
     }
-  }, [selectedBoxId, boxes]);
+  }, [selectedBoxId]);
 
   const loadBoxes = async () => {
     const { data, error } = await supabase.from("boxes").select("*, box_examenes(examen_id)").eq("activo", true);
