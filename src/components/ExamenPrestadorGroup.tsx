@@ -67,8 +67,8 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
       const examenIds = atencionExamenes.map(ae => ae.examen_id);
       if (examenIds.length === 0) { setLoading(false); return; }
 
-      // Fetch prestador_examenes + prestadores + shared files in parallel
-      const [peRes, archRes, vincRes] = await Promise.all([
+      // Fetch prestador_examenes + shared files + vinculos + trazabilidad in parallel
+      const [peRes, archRes, vincRes, trazRes] = await Promise.all([
         supabase.from("prestador_examenes")
           .select("examen_id, prestador_id, prestadores(nombre)")
           .in("examen_id", examenIds),
@@ -79,6 +79,10 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
         supabase.from("examen_archivo_vinculos")
           .select("archivo_compartido_id, examen_id")
           .in("examen_id", examenIds),
+        // Load trazabilidad links for all exams in this atencion
+        supabase.from("examen_trazabilidad")
+          .select("*")
+          .or(examenIds.map(id => `examen_id_a.eq.${id},examen_id_b.eq.${id}`).join(",")),
       ]);
 
       // Map examen_id -> prestador_id
@@ -102,6 +106,16 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
         vincMap[v.archivo_compartido_id].push(v.examen_id);
       });
       setArchivoVinculos(vincMap);
+
+      // Build trazabilidad map: examen_id -> [linked_examen_ids]
+      const trazMap: Record<string, string[]> = {};
+      (trazRes.data || []).forEach((t: any) => {
+        if (!trazMap[t.examen_id_a]) trazMap[t.examen_id_a] = [];
+        if (!trazMap[t.examen_id_b]) trazMap[t.examen_id_b] = [];
+        if (!trazMap[t.examen_id_a].includes(t.examen_id_b)) trazMap[t.examen_id_a].push(t.examen_id_b);
+        if (!trazMap[t.examen_id_b].includes(t.examen_id_a)) trazMap[t.examen_id_b].push(t.examen_id_a);
+      });
+      setTrazabilidadMap(trazMap);
     } catch (error) {
       console.error("Error loading prestador data:", error);
     } finally {
