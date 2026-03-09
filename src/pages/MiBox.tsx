@@ -8,6 +8,7 @@ import Navigation from "@/components/Navigation";
 import CodigoDelDia from "@/components/CodigoDelDia";
 import { Clock, Play, CheckCircle, XCircle, RefreshCw, Box as BoxIcon, Settings, ClipboardList, Users, UserCheck, UsersRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import EstadoFichaCheckboxes from "@/components/EstadoFichaCheckboxes";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -565,18 +566,7 @@ const MiBox = () => {
                             <Badge variant={atencion.pacientes.tipo_servicio === "workmed" ? "default" : "secondary"} className="text-xs">
                               {atencion.pacientes.tipo_servicio}
                             </Badge>
-                            <Badge
-                              variant="outline"
-                              className={`text-xs ${
-                                atencion.estado_ficha === "completada"
-                                  ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                  : atencion.estado_ficha === "en_mano_paciente"
-                                  ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-                                  : "bg-muted text-muted-foreground"
-                              }`}
-                            >
-                              {atencion.estado_ficha === "completada" ? "Ficha ✓" : atencion.estado_ficha === "en_mano_paciente" ? "Ficha en mano" : "Ficha pendiente"}
-                            </Badge>
+                            <EstadoFichaCheckboxes atencionId={atencion.id} estadoFicha={atencion.estado_ficha} onUpdate={loadData} prefix="cola-" />
                             <PresionTimerBadge timer={timerByAtencion[atencion.id]} />
                           </div>
                           {atencion.examenesPendientes && atencion.examenesPendientes.length > 0 && (
@@ -613,18 +603,7 @@ const MiBox = () => {
                         <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant="outline" className="text-xs">#{atencion.numero_ingreso}</Badge>
                             <span className="font-medium text-xs">{atencion.pacientes.nombre}</span>
-                            <Badge
-                              variant="outline"
-                              className={`text-xs ${
-                                atencion.estado_ficha === "completada"
-                                  ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                  : atencion.estado_ficha === "en_mano_paciente"
-                                  ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-                                  : "bg-muted text-muted-foreground"
-                              }`}
-                            >
-                              {atencion.estado_ficha === "completada" ? "Ficha ✓" : atencion.estado_ficha === "en_mano_paciente" ? "Ficha en mano" : "Ficha pendiente"}
-                            </Badge>
+                            <EstadoFichaCheckboxes atencionId={atencion.id} estadoFicha={atencion.estado_ficha} onUpdate={loadData} prefix="done-" />
                             <PresionTimerBadge timer={timerByAtencion[atencion.id]} />
                         </div>
                         {atencion.examenesRealizados && (
@@ -694,18 +673,7 @@ const MiBox = () => {
                                 <Badge variant={selectedAtencion.pacientes.tipo_servicio === "workmed" ? "default" : "secondary"}>
                                   {selectedAtencion.pacientes.tipo_servicio}
                                 </Badge>
-                                <Badge
-                                  variant="outline"
-                                  className={`text-xs ${
-                                    selectedAtencion.estado_ficha === "completada"
-                                      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                      : selectedAtencion.estado_ficha === "en_mano_paciente"
-                                      ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-                                      : "bg-muted text-muted-foreground"
-                                  }`}
-                                >
-                                  {selectedAtencion.estado_ficha === "completada" ? "Ficha ✓" : selectedAtencion.estado_ficha === "en_mano_paciente" ? "Ficha en mano" : "Ficha pendiente"}
-                                </Badge>
+                                <EstadoFichaCheckboxes atencionId={selectedAtencion.id} estadoFicha={selectedAtencion.estado_ficha} onUpdate={loadData} prefix="aten-" />
                               </div>
                             <div className="flex gap-2">
                               <Button
