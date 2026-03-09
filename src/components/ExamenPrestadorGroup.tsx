@@ -245,6 +245,61 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
     }
   };
 
+  const handleSelectAllGroup = (groupKey: string, examenes: AtencionExamen[]) => {
+    const pendientes = examenes.filter(e => e.estado === "pendiente" || e.estado === "incompleto");
+    setBulkSelections(prev => ({
+      ...prev,
+      [groupKey]: new Set(pendientes.map(e => e.id)),
+    }));
+  };
+
+  const handleToggleBulkExamen = (groupKey: string, atencionExamenId: string) => {
+    setBulkSelections(prev => {
+      const current = new Set(prev[groupKey] || []);
+      if (current.has(atencionExamenId)) {
+        current.delete(atencionExamenId);
+      } else {
+        current.add(atencionExamenId);
+      }
+      return { ...prev, [groupKey]: current };
+    });
+  };
+
+  const handleClearBulkSelection = (groupKey: string) => {
+    setBulkSelections(prev => {
+      const next = { ...prev };
+      delete next[groupKey];
+      return next;
+    });
+  };
+
+  const handleSaveBulkMuestraTomada = async (groupKey: string) => {
+    const selected = bulkSelections[groupKey];
+    if (!selected || selected.size === 0) {
+      toast.error("No hay exámenes seleccionados");
+      return;
+    }
+    setSavingBulk(groupKey);
+    try {
+      const ids = Array.from(selected);
+      const { error } = await supabase
+        .from("atencion_examenes")
+        .update({ estado: "muestra_tomada" as any, fecha_realizacion: new Date().toISOString() })
+        .in("id", ids);
+
+      if (error) throw error;
+      toast.success(`${ids.length} muestra(s) tomada(s) registrada(s)`);
+      handleClearBulkSelection(groupKey);
+      onComplete?.();
+      await loadPrestadorData();
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al registrar muestras tomadas");
+    } finally {
+      setSavingBulk(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
