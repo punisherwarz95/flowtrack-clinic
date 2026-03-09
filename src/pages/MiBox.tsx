@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -18,9 +18,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { GlobalChat } from "@/components/GlobalChat";
 import { useAtencionDocumentos } from "@/hooks/useAtencionDocumentos";
+import { usePresionTimers } from "@/hooks/usePresionTimers";
 import { DocumentoFormViewer, DocumentoContextData } from "@/components/DocumentoFormViewer";
 import ExamenResultadosOtrosBoxes from "@/components/ExamenResultadosOtrosBoxes";
 import ExamenPrestadorGroup from "@/components/ExamenPrestadorGroup";
+import PresionTimerBadge from "@/components/PresionTimerBadge";
 
 interface Atencion {
   id: string;
@@ -94,6 +96,13 @@ const MiBox = () => {
   const [documentosDialogOpen, setDocumentosDialogOpen] = useState(false);
   const [selectedAtencionForDocs, setSelectedAtencionForDocs] = useState<string | null>(null);
   const [selectedPacienteContext, setSelectedPacienteContext] = useState<DocumentoContextData | undefined>(undefined);
+
+  const atencionesConTemporizador = useMemo(
+    () => [...pacientesEnEspera, ...pacientesEnAtencion, ...pacientesCompletados].map((a) => a.id),
+    [pacientesEnEspera, pacientesEnAtencion, pacientesCompletados]
+  );
+  const { timerByAtencion } = usePresionTimers(atencionesConTemporizador);
+
   const {
     documentos: atencionDocumentos,
     campos: documentoCampos,
@@ -556,6 +565,7 @@ const MiBox = () => {
                             <Badge variant={atencion.pacientes.tipo_servicio === "workmed" ? "default" : "secondary"} className="text-xs">
                               {atencion.pacientes.tipo_servicio}
                             </Badge>
+                            <PresionTimerBadge timer={timerByAtencion[atencion.id]} />
                           </div>
                           {atencion.examenesPendientes && atencion.examenesPendientes.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1">
@@ -588,9 +598,10 @@ const MiBox = () => {
                   ) : (
                     pacientesCompletados.map((atencion) => (
                       <div key={atencion.id} className="border rounded-lg p-2 space-y-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant="outline" className="text-xs">#{atencion.numero_ingreso}</Badge>
                           <span className="font-medium text-xs">{atencion.pacientes.nombre}</span>
+                          <PresionTimerBadge timer={timerByAtencion[atencion.id]} />
                         </div>
                         {atencion.examenesRealizados && (
                           <div className="flex flex-wrap gap-1">
@@ -641,24 +652,25 @@ const MiBox = () => {
                       <Card>
                         <CardContent className="pt-4">
                           <div className="flex items-start justify-between">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-3">
-                                <Badge variant="outline">#{selectedAtencion.numero_ingreso}</Badge>
-                                <h2 className="text-xl font-bold">{selectedAtencion.pacientes.nombre}</h2>
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-3 flex-wrap">
+                                  <Badge variant="outline">#{selectedAtencion.numero_ingreso}</Badge>
+                                  <h2 className="text-xl font-bold">{selectedAtencion.pacientes.nombre}</h2>
+                                  <PresionTimerBadge timer={timerByAtencion[selectedAtencion.id]} />
+                                </div>
+                                <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+                                  {selectedAtencion.pacientes.rut && <span>RUT: {selectedAtencion.pacientes.rut}</span>}
+                                  {selectedAtencion.pacientes.fecha_nacimiento && (
+                                    <span>Edad: {calcularEdad(selectedAtencion.pacientes.fecha_nacimiento)} años</span>
+                                  )}
+                                  {selectedAtencion.pacientes.empresas?.nombre && (
+                                    <span>Empresa: {selectedAtencion.pacientes.empresas.nombre}</span>
+                                  )}
+                                </div>
+                                <Badge variant={selectedAtencion.pacientes.tipo_servicio === "workmed" ? "default" : "secondary"}>
+                                  {selectedAtencion.pacientes.tipo_servicio}
+                                </Badge>
                               </div>
-                              <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                                {selectedAtencion.pacientes.rut && <span>RUT: {selectedAtencion.pacientes.rut}</span>}
-                                {selectedAtencion.pacientes.fecha_nacimiento && (
-                                  <span>Edad: {calcularEdad(selectedAtencion.pacientes.fecha_nacimiento)} años</span>
-                                )}
-                                {selectedAtencion.pacientes.empresas?.nombre && (
-                                  <span>Empresa: {selectedAtencion.pacientes.empresas.nombre}</span>
-                                )}
-                              </div>
-                              <Badge variant={selectedAtencion.pacientes.tipo_servicio === "workmed" ? "default" : "secondary"}>
-                                {selectedAtencion.pacientes.tipo_servicio}
-                              </Badge>
-                            </div>
                             <div className="flex gap-2">
                               <Button
                                 variant="outline"
