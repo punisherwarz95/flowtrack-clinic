@@ -648,6 +648,7 @@ const Examenes = () => {
       if (error) throw error;
       
       toast.success("Examen eliminado exitosamente");
+      logActivity("eliminar_examen", { examen_id: examenToDelete }, "/examenes");
       setExamenToDelete(null);
       loadExamenes();
     } catch (error: any) {
