@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Calendar as CalendarIcon, Stethoscope, CheckCircle, AlertTriangle, FileText, RefreshCw, ChevronRight, ClipboardCheck } from "lucide-react";
+import { logActivity } from "@/lib/activityLog";
 import Navigation from "@/components/Navigation";
 import { useAuth } from "@/hooks/useAuth";
 
