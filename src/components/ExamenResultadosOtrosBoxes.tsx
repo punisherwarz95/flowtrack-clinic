@@ -26,6 +26,35 @@ function tryParseAudiometria(valor: string | null): any | null {
   return null;
 }
 
+function tryParseJson(valor: string | null): Record<string, any> | null {
+  if (!valor) return null;
+  try {
+    const parsed = JSON.parse(valor);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch {}
+  return null;
+}
+
+const ANTRO_LABELS: Record<string, string> = {
+  peso: "Peso (kg)",
+  talla: "Talla (cm)",
+  imc: "IMC",
+  circunferencia_cintura: "Cintura (cm)",
+  pgc: "PGC (%)",
+  riesgo_cardiovascular: "Riesgo CV (%)",
+  pa_sistolica_1: "PA Sist. 1ª",
+  pa_diastolica_1: "PA Diast. 1ª",
+  pa_sistolica_2: "PA Sist. 2ª",
+  pa_diastolica_2: "PA Diast. 2ª",
+  pa_sistolica_3: "PA Sist. 3ª",
+  pa_diastolica_3: "PA Diast. 3ª",
+  fc: "FC (lpm)",
+  saturacion: "SpO₂ (%)",
+  temperatura: "Temp (°C)",
+};
+
 interface Props {
   atencionId: string;
   currentBoxId: string;
@@ -235,6 +264,36 @@ const ExamenResultadosOtrosBoxes = ({ atencionId, currentBoxId }: Props) => {
                                   </ResponsiveContainer>
                                 </CardContent>
                               </Card>
+                            </div>
+                          );
+                        }
+                        // Try parsing as generic JSON (e.g. anthropometry)
+                        const jsonData = tryParseJson(r.valor);
+                        if (jsonData) {
+                          const entries = Object.entries(jsonData).filter(
+                            ([k, v]) => v !== null && v !== "" && !k.startsWith("pa_timer")
+                          );
+                          if (entries.length === 0) {
+                            return (
+                              <div key={ridx} className="text-xs col-span-2">
+                                <span className="text-muted-foreground">{r.etiqueta}:</span>{" "}
+                                <span className="font-medium">-</span>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div key={ridx} className="col-span-2 text-xs space-y-1">
+                              <span className="text-muted-foreground font-medium">{r.etiqueta}:</span>
+                              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 mt-1 border rounded-md p-2 bg-muted/20">
+                                {entries.map(([key, val]) => (
+                                  <div key={key} className="flex flex-col">
+                                    <span className="text-muted-foreground text-[10px] truncate">
+                                      {ANTRO_LABELS[key] || key.replace(/_/g, " ")}
+                                    </span>
+                                    <span className="font-semibold text-sm">{String(val)}</span>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           );
                         }
