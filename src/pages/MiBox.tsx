@@ -694,6 +694,19 @@ const MiBox = () => {
                                 >
                                   {selectedAtencion.estado_ficha === "completada" ? "Ficha ✓" : selectedAtencion.estado_ficha === "en_mano_paciente" ? "Ficha en mano" : "Ficha pendiente"}
                                 </Badge>
+                              </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedAtencionForDocs(selectedAtencion.id);
+                                  setSelectedPacienteContext({
+                                    paciente: {
+                                      nombre: selectedAtencion.pacientes.nombre,
+                                      rut: selectedAtencion.pacientes.rut || undefined,
+                                      fecha_nacimiento: selectedAtencion.pacientes.fecha_nacimiento || undefined,
+                                      email: selectedAtencion.pacientes.email || undefined,
                                       telefono: selectedAtencion.pacientes.telefono || undefined,
                                       direccion: selectedAtencion.pacientes.direccion || undefined,
                                     },
