@@ -50,6 +50,10 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
   const prevAtencionIdRef = useRef<string | null>(null);
   const prevExamenIdsRef = useRef<string>("");
 
+  // Bulk muestra tomada state: groupKey -> Set of selected atencion_examen IDs
+  const [bulkSelections, setBulkSelections] = useState<Record<string, Set<string>>>({});
+  const [savingBulk, setSavingBulk] = useState<string | null>(null);
+
   // Only reload prestador data when atencionId changes or examen IDs actually change
   useEffect(() => {
     const examenIdsKey = atencionExamenes.map(ae => ae.id).sort().join(",");
