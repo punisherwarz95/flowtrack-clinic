@@ -619,6 +619,7 @@ const Examenes = () => {
       }
       
       toast.success(editingPaquete ? "Paquete actualizado exitosamente" : "Paquete de exámenes creado exitosamente");
+      logActivity(editingPaquete ? "editar_paquete" : "crear_paquete", { nombre: paqueteFormData.nombre }, "/examenes");
       
       setOpenPaqueteDialog(false);
       setEditingPaquete(null);
