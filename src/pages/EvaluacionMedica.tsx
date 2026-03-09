@@ -9,13 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar as CalendarIcon, Stethoscope, CheckCircle, AlertTriangle, FileText, RefreshCw, ChevronRight, ClipboardCheck } from "lucide-react";
+import { Calendar as CalendarIcon, Stethoscope, AlertTriangle, FileText, RefreshCw, ChevronRight, ClipboardCheck, Clock, FlaskConical, CheckCircle, XCircle } from "lucide-react";
 import { logActivity } from "@/lib/activityLog";
 import Navigation from "@/components/Navigation";
 import { useAuth } from "@/hooks/useAuth";
@@ -64,10 +63,16 @@ interface BateriaConEstado {
   paqueteId: string;
   paqueteNombre: string;
   examenesTotal: number;
-  examenesCompletos: number;
-  listaParaEvaluar: boolean;
+  examenesCompletos: number; // solo 'completado'
+  examenesMuestraTomada: number; // 'muestra_tomada' - esperando resultados
+  examenesPendientes: number; // 'pendiente' o 'incompleto'
+  listaParaEvaluar: boolean; // true solo si TODOS son 'completado'
+  esperandoResultados: boolean; // tiene al menos un muestra_tomada
   evaluacion: EvaluacionClinica | null;
 }
+
+// Status for list view per battery
+type BateriaListStatus = "evaluado_apto" | "evaluado_no_apto" | "evaluado_restricciones" | "lista" | "esperando_resultados" | "pendiente";
 
 const EvaluacionMedica = () => {
   const { user } = useAuth();
@@ -79,6 +84,10 @@ const EvaluacionMedica = () => {
   const [bateriasConEstado, setBateriasConEstado] = useState<BateriaConEstado[]>([]);
   const [evaluaciones, setEvaluaciones] = useState<EvaluacionClinica[]>([]);
   const [paqueteExamenItems, setPaqueteExamenItems] = useState<Record<string, string[]>>({});
+
+  // Pre-computed list status per atencion
+  const [listEvaluaciones, setListEvaluaciones] = useState<Record<string, EvaluacionClinica[]>>({});
+  const [listPaqueteExamItems, setListPaqueteExamItems] = useState<Record<string, string[]>>({});
 
   // Evaluation form state
   const [evaluandoPaquete, setEvaluandoPaquete] = useState<string | null>(null);
@@ -121,7 +130,36 @@ const EvaluacionMedica = () => {
         .order("numero_ingreso", { ascending: true });
 
       if (error) throw error;
-      setAtenciones((data as unknown as PacienteAtencion[]) || []);
+      const atencionesData = (data as unknown as PacienteAtencion[]) || [];
+      setAtenciones(atencionesData);
+
+      // Pre-load paquete_examen_items and evaluaciones for ALL atenciones in the list
+      const allPaqueteIds = Array.from(new Set(atencionesData.flatMap(a => a.atencion_baterias.map(ab => ab.paquete_id))));
+      const allAtencionIds = atencionesData.map(a => a.id);
+
+      if (allPaqueteIds.length > 0 && allAtencionIds.length > 0) {
+        const [peiRes, evalRes] = await Promise.all([
+          supabase.from("paquete_examen_items").select("paquete_id, examen_id").in("paquete_id", allPaqueteIds),
+          supabase.from("evaluaciones_clinicas").select("*, paquetes_examenes(nombre)").in("atencion_id", allAtencionIds),
+        ]);
+
+        const peiMap: Record<string, string[]> = {};
+        (peiRes.data || []).forEach((item: { paquete_id: string; examen_id: string }) => {
+          if (!peiMap[item.paquete_id]) peiMap[item.paquete_id] = [];
+          peiMap[item.paquete_id].push(item.examen_id);
+        });
+        setListPaqueteExamItems(peiMap);
+
+        const evalMap: Record<string, EvaluacionClinica[]> = {};
+        ((evalRes.data || []) as unknown as EvaluacionClinica[]).forEach(ev => {
+          if (!evalMap[ev.atencion_id]) evalMap[ev.atencion_id] = [];
+          evalMap[ev.atencion_id].push(ev);
+        });
+        setListEvaluaciones(evalMap);
+      } else {
+        setListPaqueteExamItems({});
+        setListEvaluaciones({});
+      }
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al cargar atenciones");
@@ -134,10 +172,53 @@ const EvaluacionMedica = () => {
     loadAtenciones();
   }, [loadAtenciones]);
 
+  // Compute battery status for a given atencion using list-level data
+  const computeBateriaStatus = useCallback((atencion: PacienteAtencion, paqueteId: string): BateriaListStatus => {
+    const evals = listEvaluaciones[atencion.id] || [];
+    const evaluacion = evals.find(e => e.paquete_id === paqueteId);
+    if (evaluacion) {
+      if (evaluacion.resultado === "apto") return "evaluado_apto";
+      if (evaluacion.resultado === "no_apto") return "evaluado_no_apto";
+      if (evaluacion.resultado === "apto_con_restricciones") return "evaluado_restricciones";
+    }
+
+    const examenIds = listPaqueteExamItems[paqueteId] || [];
+    const related = atencion.atencion_examenes.filter(ae => examenIds.includes(ae.examen_id));
+    if (related.length === 0) return "pendiente";
+
+    const allCompleted = related.every(ae => ae.estado === "completado");
+    if (allCompleted) return "lista";
+
+    const hasMuestra = related.some(ae => ae.estado === "muestra_tomada");
+    if (hasMuestra) return "esperando_resultados";
+
+    return "pendiente";
+  }, [listEvaluaciones, listPaqueteExamItems]);
+
+  // Compute overall patient status for sorting/display
+  const getPatientOverallStatus = useCallback((atencion: PacienteAtencion): number => {
+    // Priority: lista (ready) first, then esperando, then evaluado, then pendiente
+    const baterias = atencion.atencion_baterias;
+    if (baterias.length === 0) return 99;
+
+    const statuses = baterias.map(ab => computeBateriaStatus(atencion, ab.paquete_id));
+    
+    // All evaluated = lowest priority (already done)
+    const allEvaluated = statuses.every(s => s.startsWith("evaluado"));
+    if (allEvaluated) return 3;
+    
+    // Has any ready to evaluate = highest priority
+    if (statuses.includes("lista")) return 0;
+    
+    // Has waiting results
+    if (statuses.includes("esperando_resultados")) return 1;
+    
+    return 2; // pending
+  }, [computeBateriaStatus]);
+
   const handleSelectPaciente = async (atencion: PacienteAtencion) => {
     setSelectedPaciente(atencion);
 
-    // Load paquete_examen_items for all batteries
     const paqueteIds = atencion.atencion_baterias.map(ab => ab.paquete_id);
     if (paqueteIds.length === 0) {
       setBateriasConEstado([]);
@@ -145,29 +226,37 @@ const EvaluacionMedica = () => {
       return;
     }
 
-    const [peiRes, evalRes] = await Promise.all([
-      supabase.from("paquete_examen_items").select("paquete_id, examen_id").in("paquete_id", paqueteIds),
-      supabase.from("evaluaciones_clinicas").select("*, paquetes_examenes(nombre)").eq("atencion_id", atencion.id),
-    ]);
+    // Use list-level data if available, otherwise load
+    let peiMap = listPaqueteExamItems;
+    let evals = listEvaluaciones[atencion.id] || [];
 
-    const peiMap: Record<string, string[]> = {};
-    (peiRes.data || []).forEach((item: { paquete_id: string; examen_id: string }) => {
-      if (!peiMap[item.paquete_id]) peiMap[item.paquete_id] = [];
-      peiMap[item.paquete_id].push(item.examen_id);
-    });
+    if (Object.keys(peiMap).length === 0) {
+      const [peiRes, evalRes] = await Promise.all([
+        supabase.from("paquete_examen_items").select("paquete_id, examen_id").in("paquete_id", paqueteIds),
+        supabase.from("evaluaciones_clinicas").select("*, paquetes_examenes(nombre)").eq("atencion_id", atencion.id),
+      ]);
+
+      peiMap = {};
+      (peiRes.data || []).forEach((item: { paquete_id: string; examen_id: string }) => {
+        if (!peiMap[item.paquete_id]) peiMap[item.paquete_id] = [];
+        peiMap[item.paquete_id].push(item.examen_id);
+      });
+      evals = (evalRes.data || []) as unknown as EvaluacionClinica[];
+    }
+
     setPaqueteExamenItems(peiMap);
-
-    const evals = (evalRes.data || []) as unknown as EvaluacionClinica[];
     setEvaluaciones(evals);
 
-    // Build battery status
+    // Build battery status - ONLY 'completado' counts as ready
     const baterias: BateriaConEstado[] = atencion.atencion_baterias.map(ab => {
       const examenIdsBateria = peiMap[ab.paquete_id] || [];
       const atencionExamenesRelacionados = atencion.atencion_examenes.filter(
         ae => examenIdsBateria.includes(ae.examen_id)
       );
       const total = atencionExamenesRelacionados.length;
-      const completos = atencionExamenesRelacionados.filter(ae => ae.estado === "completado" || ae.estado === "muestra_tomada").length;
+      const completos = atencionExamenesRelacionados.filter(ae => ae.estado === "completado").length;
+      const muestraTomada = atencionExamenesRelacionados.filter(ae => ae.estado === "muestra_tomada").length;
+      const pendientes = total - completos - muestraTomada;
       const evaluacion = evals.find(e => e.paquete_id === ab.paquete_id) || null;
 
       return {
@@ -175,7 +264,10 @@ const EvaluacionMedica = () => {
         paqueteNombre: ab.paquetes_examenes.nombre,
         examenesTotal: total,
         examenesCompletos: completos,
-        listaParaEvaluar: total > 0 && completos >= total,
+        examenesMuestraTomada: muestraTomada,
+        examenesPendientes: pendientes,
+        listaParaEvaluar: total > 0 && completos === total, // ALL must be 'completado'
+        esperandoResultados: muestraTomada > 0,
         evaluacion,
       };
     });
@@ -207,7 +299,6 @@ const EvaluacionMedica = () => {
     try {
       const bat = bateriasConEstado.find(b => b.paqueteId === evaluandoPaquete);
       if (bat?.evaluacion) {
-        // Update existing
         const { error } = await supabase.from("evaluaciones_clinicas").update({
           resultado,
           observaciones: observaciones || null,
@@ -217,7 +308,6 @@ const EvaluacionMedica = () => {
         }).eq("id", bat.evaluacion.id);
         if (error) throw error;
       } else {
-        // Create new with folio
         const { data: folioData } = await supabase.rpc("get_next_informe_number");
         const { error } = await supabase.from("evaluaciones_clinicas").insert({
           atencion_id: selectedPaciente.id,
@@ -235,14 +325,34 @@ const EvaluacionMedica = () => {
       toast.success("Evaluación guardada exitosamente");
       const batNombre = bateriasConEstado.find(b => b.paqueteId === evaluandoPaquete)?.paqueteNombre;
       logActivity("evaluar_bateria", { paciente: selectedPaciente.pacientes.nombre, bateria: batNombre, resultado }, "/evaluacion-medica");
-      // Refresh
-      await handleSelectPaciente(selectedPaciente);
+      setEvaluandoPaquete(null);
+      // Refresh both list and detail data
+      await loadAtenciones();
+      // Re-select the same patient to refresh detail
+      const refreshedAtencion = await refreshSingleAtencion(selectedPaciente.id);
+      if (refreshedAtencion) {
+        await handleSelectPaciente(refreshedAtencion);
+      }
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al guardar evaluación");
     } finally {
       setSavingEval(false);
     }
+  };
+
+  const refreshSingleAtencion = async (atencionId: string): Promise<PacienteAtencion | null> => {
+    const { data } = await supabase
+      .from("atenciones")
+      .select(`
+        id, numero_ingreso, fecha_ingreso, estado,
+        pacientes!inner(id, nombre, rut, empresa_id, tipo_servicio, empresas(nombre)),
+        atencion_baterias(id, paquete_id, paquetes_examenes(id, nombre)),
+        atencion_examenes(id, examen_id, estado, examenes(nombre))
+      `)
+      .eq("id", atencionId)
+      .maybeSingle();
+    return (data as unknown as PacienteAtencion) || null;
   };
 
   // Load no aptos
@@ -325,6 +435,7 @@ const EvaluacionMedica = () => {
     }
   };
 
+  // Badge for battery status in Tab 2 (detail)
   const getBateriaStatusBadge = (bat: BateriaConEstado) => {
     if (bat.evaluacion) {
       const r = bat.evaluacion.resultado;
@@ -334,26 +445,39 @@ const EvaluacionMedica = () => {
       return <Badge variant="outline">Pendiente</Badge>;
     }
     if (bat.listaParaEvaluar) {
-      return <Badge className="bg-green-500/20 text-green-700 border-green-500">Lista ({bat.examenesCompletos}/{bat.examenesTotal})</Badge>;
+      return <Badge className="bg-green-500/20 text-green-700 border-green-500">✓ Lista para evaluar</Badge>;
+    }
+    if (bat.esperandoResultados) {
+      return (
+        <Badge className="bg-amber-500/20 text-amber-700 border-amber-500">
+          <FlaskConical className="h-3 w-3 mr-1" />
+          Esperando resultados ({bat.examenesCompletos}/{bat.examenesTotal})
+        </Badge>
+      );
     }
     return <Badge className="bg-blue-500/20 text-blue-700 border-blue-500">Pendiente ({bat.examenesCompletos}/{bat.examenesTotal})</Badge>;
   };
 
-  const getAtencionBateriasResumen = (atencion: PacienteAtencion) => {
-    const baterias = atencion.atencion_baterias;
-    if (baterias.length === 0) return <span className="text-xs text-muted-foreground">Sin baterías</span>;
-
-    return baterias.map(ab => {
-      const examenIds = paqueteExamenItems[ab.paquete_id] || [];
-      // Check without loading paquete_examen_items for the list view
-      // We'll do a simple heuristic: all atencion_examenes with matching examen_ids
-      return (
-        <Badge key={ab.id} variant="outline" className="text-xs mr-1">
-          {ab.paquetes_examenes.nombre}
-        </Badge>
-      );
-    });
+  // Badge for battery in the list view (Tab 1)
+  const getListBateriaBadge = (status: BateriaListStatus, nombre: string) => {
+    switch (status) {
+      case "evaluado_apto":
+        return <Badge key={nombre} className="text-xs mr-1 mb-1 bg-green-600 text-white"><CheckCircle className="h-3 w-3 mr-1" />APTO</Badge>;
+      case "evaluado_no_apto":
+        return <Badge key={nombre} variant="destructive" className="text-xs mr-1 mb-1"><XCircle className="h-3 w-3 mr-1" />NO APTO</Badge>;
+      case "evaluado_restricciones":
+        return <Badge key={nombre} className="text-xs mr-1 mb-1 bg-amber-500 text-white">APTO C/R</Badge>;
+      case "lista":
+        return <Badge key={nombre} className="text-xs mr-1 mb-1 bg-green-500/20 text-green-700 border-green-500">{nombre}</Badge>;
+      case "esperando_resultados":
+        return <Badge key={nombre} className="text-xs mr-1 mb-1 bg-amber-500/20 text-amber-700 border-amber-500"><FlaskConical className="h-3 w-3 mr-1" />{nombre}</Badge>;
+      default:
+        return <Badge key={nombre} className="text-xs mr-1 mb-1 bg-blue-500/20 text-blue-700 border-blue-500"><Clock className="h-3 w-3 mr-1" />{nombre}</Badge>;
+    }
   };
+
+  // Sort atenciones: ready first, then waiting, then evaluated
+  const sortedAtenciones = [...atenciones].sort((a, b) => getPatientOverallStatus(a) - getPatientOverallStatus(b));
 
   return (
     <div className="min-h-screen bg-background">
@@ -385,7 +509,14 @@ const EvaluacionMedica = () => {
             <Card>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">Pacientes Atendidos</CardTitle>
+                  <div>
+                    <CardTitle className="text-lg">Pacientes del Día</CardTitle>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      <span className="inline-flex items-center gap-1 mr-3"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> Lista para evaluar</span>
+                      <span className="inline-flex items-center gap-1 mr-3"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block" /> Esperando resultados</span>
+                      <span className="inline-flex items-center gap-1 mr-3"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> Exámenes pendientes</span>
+                    </p>
+                  </div>
                   <div className="flex items-center gap-2">
                     <Popover>
                       <PopoverTrigger asChild>
@@ -423,16 +554,20 @@ const EvaluacionMedica = () => {
                         <TableHead>RUT</TableHead>
                         <TableHead>Empresa</TableHead>
                         <TableHead>Baterías</TableHead>
-                        <TableHead className="w-20"></TableHead>
+                        <TableHead className="w-24">Estado</TableHead>
+                        <TableHead className="w-10"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {atenciones.map((at) => {
+                      {sortedAtenciones.map((at) => {
                         const hasBaterias = at.atencion_baterias.length > 0;
+                        const overallStatus = getPatientOverallStatus(at);
+                        const allEvaluated = overallStatus === 3;
+
                         return (
                           <TableRow
                             key={at.id}
-                            className={`cursor-pointer hover:bg-muted/50 ${selectedPaciente?.id === at.id ? "bg-accent/50" : ""}`}
+                            className={`cursor-pointer hover:bg-muted/50 ${selectedPaciente?.id === at.id ? "bg-accent/50" : ""} ${allEvaluated ? "opacity-60" : ""}`}
                             onClick={() => handleSelectPaciente(at)}
                           >
                             <TableCell className="font-mono font-bold">{at.numero_ingreso}</TableCell>
@@ -440,11 +575,16 @@ const EvaluacionMedica = () => {
                             <TableCell className="text-muted-foreground">{at.pacientes.rut}</TableCell>
                             <TableCell className="text-muted-foreground text-sm">{at.pacientes.empresas?.nombre || "-"}</TableCell>
                             <TableCell>
-                              {hasBaterias ? at.atencion_baterias.map(ab => (
-                                <Badge key={ab.id} variant="outline" className="text-xs mr-1 mb-1">
-                                  {ab.paquetes_examenes.nombre}
-                                </Badge>
-                              )) : <span className="text-xs text-muted-foreground">Sin baterías</span>}
+                              {hasBaterias ? at.atencion_baterias.map(ab => {
+                                const status = computeBateriaStatus(at, ab.paquete_id);
+                                return getListBateriaBadge(status, ab.paquetes_examenes.nombre);
+                              }) : <span className="text-xs text-muted-foreground">Sin baterías</span>}
+                            </TableCell>
+                            <TableCell>
+                              {allEvaluated && <Badge variant="outline" className="text-xs">Evaluado</Badge>}
+                              {overallStatus === 0 && <Badge className="text-xs bg-green-500/20 text-green-700 border-green-500">Listo</Badge>}
+                              {overallStatus === 1 && <Badge className="text-xs bg-amber-500/20 text-amber-700 border-amber-500">Esperando</Badge>}
+                              {overallStatus === 2 && <Badge className="text-xs bg-blue-500/20 text-blue-700 border-blue-500">Pendiente</Badge>}
                             </TableCell>
                             <TableCell>
                               <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -484,50 +624,63 @@ const EvaluacionMedica = () => {
                   <Card><CardContent className="py-8 text-center text-muted-foreground">Este paciente no tiene baterías asignadas</CardContent></Card>
                 ) : (
                   <div className="grid gap-4">
-                    {bateriasConEstado.map((bat) => (
-                      <Card key={bat.paqueteId} className={bat.listaParaEvaluar || bat.evaluacion ? "border-green-200" : "border-blue-200"}>
-                        <CardHeader className="pb-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <CardTitle className="text-base">{bat.paqueteNombre}</CardTitle>
-                              {getBateriaStatusBadge(bat)}
+                    {bateriasConEstado.map((bat) => {
+                      const borderClass = bat.evaluacion
+                        ? bat.evaluacion.resultado === "apto" ? "border-green-300" : bat.evaluacion.resultado === "no_apto" ? "border-red-300" : "border-amber-300"
+                        : bat.listaParaEvaluar ? "border-green-200" : bat.esperandoResultados ? "border-amber-200" : "border-blue-200";
+
+                      return (
+                        <Card key={bat.paqueteId} className={borderClass}>
+                          <CardHeader className="pb-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <CardTitle className="text-base">{bat.paqueteNombre}</CardTitle>
+                                {getBateriaStatusBadge(bat)}
+                              </div>
+                              {(bat.listaParaEvaluar || bat.evaluacion) && (
+                                <Button size="sm" onClick={() => handleEvaluar(bat.paqueteId)}>
+                                  {bat.evaluacion ? "Editar Evaluación" : "Evaluar"}
+                                </Button>
+                              )}
                             </div>
-                            {(bat.listaParaEvaluar || bat.evaluacion) && (
-                              <Button size="sm" onClick={() => handleEvaluar(bat.paqueteId)}>
-                                {bat.evaluacion ? "Editar Evaluación" : "Evaluar"}
-                              </Button>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="flex flex-wrap gap-2">
+                              {selectedPaciente.atencion_examenes
+                                .filter(ae => (paqueteExamenItems[bat.paqueteId] || []).includes(ae.examen_id))
+                                .map(ae => (
+                                  <Badge
+                                    key={ae.id}
+                                    variant="outline"
+                                    className={`text-xs ${
+                                      ae.estado === "completado"
+                                        ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                                        : ae.estado === "muestra_tomada"
+                                        ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+                                        : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+                                    }`}
+                                  >
+                                    {ae.examenes.nombre}: {
+                                      ae.estado === "completado" ? "✓ Resultado cargado" 
+                                      : ae.estado === "muestra_tomada" ? "⏳ Esperando resultado" 
+                                      : "Pendiente"
+                                    }
+                                  </Badge>
+                                ))
+                              }
+                            </div>
+                            {bat.evaluacion && (
+                              <div className="mt-3 p-3 bg-muted rounded-md text-sm space-y-1">
+                                <p><strong>Folio:</strong> #{bat.evaluacion.numero_informe}</p>
+                                <p><strong>Resultado:</strong> {bat.evaluacion.resultado === "apto" ? "APTO" : bat.evaluacion.resultado === "no_apto" ? "NO APTO" : "APTO CON RESTRICCIONES"}</p>
+                                {bat.evaluacion.observaciones && <p><strong>Observaciones:</strong> {bat.evaluacion.observaciones}</p>}
+                                {bat.evaluacion.restricciones && <p><strong>Restricciones:</strong> {bat.evaluacion.restricciones}</p>}
+                              </div>
                             )}
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="flex flex-wrap gap-2">
-                            {selectedPaciente.atencion_examenes
-                              .filter(ae => (paqueteExamenItems[bat.paqueteId] || []).includes(ae.examen_id))
-                              .map(ae => (
-                                <Badge
-                                  key={ae.id}
-                                  variant="outline"
-                                  className={`text-xs ${
-                                    ae.estado === "completado" || ae.estado === "muestra_tomada"
-                                      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                                      : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
-                                  }`}
-                                >
-                                  {ae.examenes.nombre}: {ae.estado === "completado" ? "✓" : ae.estado === "muestra_tomada" ? "Muestra" : "Pendiente"}
-                                </Badge>
-                              ))
-                            }
-                          </div>
-                          {bat.evaluacion && (
-                            <div className="mt-3 p-3 bg-muted rounded-md text-sm space-y-1">
-                              <p><strong>Folio:</strong> #{bat.evaluacion.numero_informe}</p>
-                              {bat.evaluacion.observaciones && <p><strong>Observaciones:</strong> {bat.evaluacion.observaciones}</p>}
-                              {bat.evaluacion.restricciones && <p><strong>Restricciones:</strong> {bat.evaluacion.restricciones}</p>}
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    ))}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                   </div>
                 )}
 
