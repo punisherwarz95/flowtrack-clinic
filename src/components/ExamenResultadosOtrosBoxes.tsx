@@ -26,6 +26,35 @@ function tryParseAudiometria(valor: string | null): any | null {
   return null;
 }
 
+function tryParseJson(valor: string | null): Record<string, any> | null {
+  if (!valor) return null;
+  try {
+    const parsed = JSON.parse(valor);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch {}
+  return null;
+}
+
+const ANTRO_LABELS: Record<string, string> = {
+  peso: "Peso (kg)",
+  talla: "Talla (cm)",
+  imc: "IMC",
+  circunferencia_cintura: "Cintura (cm)",
+  pgc: "PGC (%)",
+  riesgo_cardiovascular: "Riesgo CV (%)",
+  pa_sistolica_1: "PA Sist. 1ª",
+  pa_diastolica_1: "PA Diast. 1ª",
+  pa_sistolica_2: "PA Sist. 2ª",
+  pa_diastolica_2: "PA Diast. 2ª",
+  pa_sistolica_3: "PA Sist. 3ª",
+  pa_diastolica_3: "PA Diast. 3ª",
+  fc: "FC (lpm)",
+  saturacion: "SpO₂ (%)",
+  temperatura: "Temp (°C)",
+};
+
 interface Props {
   atencionId: string;
   currentBoxId: string;
