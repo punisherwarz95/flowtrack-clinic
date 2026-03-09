@@ -100,6 +100,7 @@ const Configuracion = () => {
 
         if (error) throw error;
         toast.success("Bloque actualizado");
+        logActivity("editar_bloque", { bloque_id: editingBloque.id, nombre: formData.nombre }, "/configuracion");
       } else {
         const maxOrden = bloques.length > 0 ? Math.max(...bloques.map(b => b.orden)) : 0;
         const { error } = await supabase.from("agenda_bloques").insert([
