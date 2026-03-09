@@ -603,18 +603,7 @@ const MiBox = () => {
                         <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant="outline" className="text-xs">#{atencion.numero_ingreso}</Badge>
                             <span className="font-medium text-xs">{atencion.pacientes.nombre}</span>
-                            <Badge
-                              variant="outline"
-                              className={`text-xs ${
-                                atencion.estado_ficha === "completada"
-                                  ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                  : atencion.estado_ficha === "en_mano_paciente"
-                                  ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-                                  : "bg-muted text-muted-foreground"
-                              }`}
-                            >
-                              {atencion.estado_ficha === "completada" ? "Ficha ✓" : atencion.estado_ficha === "en_mano_paciente" ? "Ficha en mano" : "Ficha pendiente"}
-                            </Badge>
+                            <EstadoFichaCheckboxes atencionId={atencion.id} estadoFicha={atencion.estado_ficha} onUpdate={loadData} prefix="done-" />
                             <PresionTimerBadge timer={timerByAtencion[atencion.id]} />
                         </div>
                         {atencion.examenesRealizados && (
