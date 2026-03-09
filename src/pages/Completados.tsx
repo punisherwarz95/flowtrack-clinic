@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import { CheckCircle, Calendar as CalendarIcon, RotateCcw, BarChart3, FlaskConical } from "lucide-react";
+import { logActivity } from "@/lib/activityLog";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
