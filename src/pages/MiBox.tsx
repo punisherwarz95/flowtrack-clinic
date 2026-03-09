@@ -96,6 +96,13 @@ const MiBox = () => {
   const [documentosDialogOpen, setDocumentosDialogOpen] = useState(false);
   const [selectedAtencionForDocs, setSelectedAtencionForDocs] = useState<string | null>(null);
   const [selectedPacienteContext, setSelectedPacienteContext] = useState<DocumentoContextData | undefined>(undefined);
+
+  const atencionesConTemporizador = useMemo(
+    () => [...pacientesEnEspera, ...pacientesEnAtencion, ...pacientesCompletados].map((a) => a.id),
+    [pacientesEnEspera, pacientesEnAtencion, pacientesCompletados]
+  );
+  const { timerByAtencion } = usePresionTimers(atencionesConTemporizador);
+
   const {
     documentos: atencionDocumentos,
     campos: documentoCampos,
