@@ -81,6 +81,9 @@ const Flujo = () => {
   const [docsPendientes, setDocsPendientes] = useState<{[atencionId: string]: number}>({});
   const [docsTotal, setDocsTotal] = useState<{[atencionId: string]: number}>({});
 
+  const atencionIdsConTemporizador = useMemo(() => atenciones.map((a) => a.id), [atenciones]);
+  const { timerByAtencion } = usePresionTimers(atencionIdsConTemporizador);
+
   // OPTIMIZACIÓN v0.0.2: Realtime inteligente - actualiza solo lo necesario
   const handleRealtimeAtencionChange = async (payload: any) => {
     const { eventType, new: newRecord, old: oldRecord } = payload;
@@ -746,12 +749,13 @@ const Flujo = () => {
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant="outline" className="font-bold">#{atencion.numero_ingreso}</Badge>
                           <span className="font-medium text-foreground">{atencion.pacientes.nombre}</span>
                           <Badge variant="outline" className="text-xs">
                             {atencion.pacientes.tipo_servicio === "workmed" ? "WM" : "J"}
                           </Badge>
+                          <PresionTimerBadge timer={timerByAtencion[atencion.id]} />
                           {/* FASE 7: Document status indicator */}
                           {docsTotal[atencion.id] > 0 ? (
                             docsPendientes[atencion.id] > 0 ? (
@@ -906,11 +910,12 @@ const Flujo = () => {
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant="outline" className="font-bold">#{atencion.numero_ingreso}</Badge>
                           <div className="font-medium text-foreground">
                             {atencion.pacientes.nombre}
                           </div>
+                          <PresionTimerBadge timer={timerByAtencion[atencion.id]} />
                         </div>
                         {examenesPendientes[atencion.id] && examenesPendientes[atencion.id].length > 0 && atencionExamenes[atencion.id] && (
                           <Collapsible className="mt-2">
@@ -1088,11 +1093,12 @@ const Flujo = () => {
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <Badge variant="outline" className="font-bold">#{atencion.numero_ingreso}</Badge>
                         <div className="font-medium text-foreground">
                           {atencion.pacientes.nombre}
                         </div>
+                        <PresionTimerBadge timer={timerByAtencion[atencion.id]} />
                       </div>
                       {examenesPendientes[atencion.id] && examenesPendientes[atencion.id].length > 0 && atencionExamenes[atencion.id] && (
                         <Collapsible className="mt-2">
