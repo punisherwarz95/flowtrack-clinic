@@ -29,6 +29,7 @@ import PantallaTv from "./pages/PantallaTv";
 import { InitAdmin } from "./components/InitAdmin";
 import VersionChecker from "./components/VersionChecker";
 import ActividadLog from "./pages/ActividadLog";
+import EvaluacionMedica from "./pages/EvaluacionMedica";
 import ProtectedRoute from "./components/ProtectedRoute";
 import EmpresaProtectedRoute from "./components/empresa/EmpresaProtectedRoute";
 import EmpresaLogin from "./pages/empresa/EmpresaLogin";
