@@ -673,18 +673,7 @@ const MiBox = () => {
                                 <Badge variant={selectedAtencion.pacientes.tipo_servicio === "workmed" ? "default" : "secondary"}>
                                   {selectedAtencion.pacientes.tipo_servicio}
                                 </Badge>
-                                <Badge
-                                  variant="outline"
-                                  className={`text-xs ${
-                                    selectedAtencion.estado_ficha === "completada"
-                                      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                      : selectedAtencion.estado_ficha === "en_mano_paciente"
-                                      ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-                                      : "bg-muted text-muted-foreground"
-                                  }`}
-                                >
-                                  {selectedAtencion.estado_ficha === "completada" ? "Ficha ✓" : selectedAtencion.estado_ficha === "en_mano_paciente" ? "Ficha en mano" : "Ficha pendiente"}
-                                </Badge>
+                                <EstadoFichaCheckboxes atencionId={selectedAtencion.id} estadoFicha={selectedAtencion.estado_ficha} onUpdate={loadData} prefix="aten-" />
                               </div>
                             <div className="flex gap-2">
                               <Button
