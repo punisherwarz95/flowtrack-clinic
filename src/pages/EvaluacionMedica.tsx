@@ -109,11 +109,11 @@ const EvaluacionMedica = () => {
         .from("atenciones")
         .select(`
           id, numero_ingreso, fecha_ingreso, estado,
-          pacientes(id, nombre, rut, empresa_id, empresas(nombre)),
+          pacientes!inner(id, nombre, rut, empresa_id, tipo_servicio, empresas(nombre)),
           atencion_baterias(id, paquete_id, paquetes_examenes(id, nombre)),
           atencion_examenes(id, examen_id, estado, examenes(nombre))
         `)
-        .eq("estado", "completado")
+        .neq("pacientes.tipo_servicio", "workmed")
         .gte("fecha_ingreso", startOfDay.toISOString())
         .lte("fecha_ingreso", endOfDay.toISOString())
         .order("numero_ingreso", { ascending: true });
