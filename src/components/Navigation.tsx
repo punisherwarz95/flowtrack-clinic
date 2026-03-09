@@ -29,6 +29,7 @@ const Navigation = () => {
     { to: "/usuarios", icon: UserCog, label: "Usuarios" },
     { to: "/configuracion", icon: Settings, label: "Configuración" },
     { to: "/actividad", icon: ScrollText, label: "Actividad" },
+    { to: "/evaluacion-medica", icon: Stethoscope, label: "Evaluación Médica" },
     { to: "/pantalla", icon: Monitor, label: "Pantalla TV" },
   ];
 
