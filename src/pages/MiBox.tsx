@@ -346,6 +346,7 @@ const MiBox = () => {
         duration: 5000,
         style: { fontSize: "18px", padding: "20px", fontWeight: "bold" },
       });
+      logActivity("llamar_paciente", { paciente: paciente?.pacientes.nombre, atencion_id: atencionId, box: currentBox?.nombre }, "/mi-box");
 
       // Background refresh to sync all data
       loadData();
