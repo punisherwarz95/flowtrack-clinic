@@ -451,6 +451,7 @@ const Examenes = () => {
         if (boxExamenesError) throw boxExamenesError;
         
         toast.success("Examen actualizado exitosamente");
+        logActivity("editar_examen", { examen_id: editingExamen.id, nombre: formData.nombre }, "/examenes");
       } else {
         const { data: examenData, error: examenError } = await supabase
           .from("examenes")
