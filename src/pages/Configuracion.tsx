@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Settings, Clock, Plus, Pencil, Trash2, Calendar, MapPin } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { logActivity } from "@/lib/activityLog";
 import Navigation from "@/components/Navigation";
 import {
   Dialog,
