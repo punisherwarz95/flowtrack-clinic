@@ -233,7 +233,8 @@ const EvaluacionMedica = () => {
       }
 
       toast.success("Evaluación guardada exitosamente");
-      setEvaluandoPaquete(null);
+      const batNombre = bateriasConEstado.find(b => b.paqueteId === evaluandoPaquete)?.paqueteNombre;
+      logActivity("evaluar_bateria", { paciente: selectedPaciente.pacientes.nombre, bateria: batNombre, resultado }, "/evaluacion-medica");
       // Refresh
       await handleSelectPaciente(selectedPaciente);
     } catch (error) {
