@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Upload, FileText, Loader2, Building2, Stethoscope, FlaskConical } from "lucide-react";
+import { ChevronDown, ChevronRight, Upload, FileText, Loader2, Building2, Stethoscope, FlaskConical, CheckSquare, Save } from "lucide-react";
 import ExamenFormulario from "@/components/ExamenFormulario";
 
 interface AtencionExamen {
@@ -48,6 +49,10 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
   const [loading, setLoading] = useState(true);
   const prevAtencionIdRef = useRef<string | null>(null);
   const prevExamenIdsRef = useRef<string>("");
+
+  // Bulk muestra tomada state: groupKey -> Set of selected atencion_examen IDs
+  const [bulkSelections, setBulkSelections] = useState<Record<string, Set<string>>>({});
+  const [savingBulk, setSavingBulk] = useState<string | null>(null);
 
   // Only reload prestador data when atencionId changes or examen IDs actually change
   useEffect(() => {
@@ -240,6 +245,61 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
     }
   };
 
+  const handleSelectAllGroup = (groupKey: string, examenes: AtencionExamen[]) => {
+    const pendientes = examenes.filter(e => e.estado === "pendiente" || e.estado === "incompleto");
+    setBulkSelections(prev => ({
+      ...prev,
+      [groupKey]: new Set(pendientes.map(e => e.id)),
+    }));
+  };
+
+  const handleToggleBulkExamen = (groupKey: string, atencionExamenId: string) => {
+    setBulkSelections(prev => {
+      const current = new Set(prev[groupKey] || []);
+      if (current.has(atencionExamenId)) {
+        current.delete(atencionExamenId);
+      } else {
+        current.add(atencionExamenId);
+      }
+      return { ...prev, [groupKey]: current };
+    });
+  };
+
+  const handleClearBulkSelection = (groupKey: string) => {
+    setBulkSelections(prev => {
+      const next = { ...prev };
+      delete next[groupKey];
+      return next;
+    });
+  };
+
+  const handleSaveBulkMuestraTomada = async (groupKey: string) => {
+    const selected = bulkSelections[groupKey];
+    if (!selected || selected.size === 0) {
+      toast.error("No hay exámenes seleccionados");
+      return;
+    }
+    setSavingBulk(groupKey);
+    try {
+      const ids = Array.from(selected);
+      const { error } = await supabase
+        .from("atencion_examenes")
+        .update({ estado: "muestra_tomada" as any, fecha_realizacion: new Date().toISOString() })
+        .in("id", ids);
+
+      if (error) throw error;
+      toast.success(`${ids.length} muestra(s) tomada(s) registrada(s)`);
+      handleClearBulkSelection(groupKey);
+      onComplete?.();
+      await loadPrestadorData();
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al registrar muestras tomadas");
+    } finally {
+      setSavingBulk(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -399,43 +459,111 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
                     </div>
                   )}
 
-                  {/* All exams rendered inline - no extra collapsibles */}
-                  {group.examenes.map((examen) => (
-                    <div key={examen.id} className="border rounded-lg p-4 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-sm">{examen.examenes.nombre}</span>
-                        <div className="flex items-center gap-2">
-                          {(examen.estado === "pendiente" || examen.estado === "incompleto") && (
+                  {/* Bulk muestra tomada controls for prestador groups */}
+                  {(() => {
+                    const pendientes = group.examenes.filter(e => e.estado === "pendiente" || e.estado === "incompleto");
+                    const bulkActive = !!bulkSelections[groupKey];
+                    const selectedCount = bulkSelections[groupKey]?.size || 0;
+
+                    if (pendientes.length > 0) {
+                      return (
+                        <div className="flex items-center gap-2 flex-wrap bg-accent/20 rounded-lg p-2">
+                          {!bulkActive ? (
                             <Button
                               variant="outline"
                               size="sm"
-                              className="gap-1 h-6 text-xs"
-                              onClick={() => handleMuestraTomada(examen.id)}
+                              className="gap-1 text-xs h-7"
+                              onClick={(e) => { e.stopPropagation(); handleSelectAllGroup(groupKey, group.examenes); }}
                             >
-                              <FlaskConical className="h-3 w-3" />
-                              Muestra Tomada
+                              <CheckSquare className="h-3 w-3" />
+                              Seleccionar todas las muestras ({pendientes.length})
                             </Button>
+                          ) : (
+                            <>
+                              <span className="text-xs text-muted-foreground">
+                                {selectedCount} de {pendientes.length} seleccionados
+                              </span>
+                              <Button
+                                variant="default"
+                                size="sm"
+                                className="gap-1 text-xs h-7"
+                                onClick={(e) => { e.stopPropagation(); handleSaveBulkMuestraTomada(groupKey); }}
+                                disabled={savingBulk === groupKey || selectedCount === 0}
+                              >
+                                {savingBulk === groupKey ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Save className="h-3 w-3" />
+                                )}
+                                Guardar Muestras Tomadas
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-xs h-7"
+                                onClick={(e) => { e.stopPropagation(); handleClearBulkSelection(groupKey); }}
+                              >
+                                Cancelar
+                              </Button>
+                            </>
                           )}
-                          <Badge
-                            variant={examen.estado === "completado" ? "default" : examen.estado === "muestra_tomada" ? "secondary" : examen.estado === "incompleto" ? "secondary" : "outline"}
-                            className={`text-xs ${examen.estado === "muestra_tomada" ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" : ""}`}
-                          >
-                            {examen.estado === "muestra_tomada" ? "Muestra tomada" : examen.estado}
-                          </Badge>
                         </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  {/* All exams rendered inline - no extra collapsibles */}
+                  {group.examenes.map((examen) => {
+                    const bulkActive = !!bulkSelections[groupKey];
+                    const isPendiente = examen.estado === "pendiente" || examen.estado === "incompleto";
+                    const isSelected = bulkSelections[groupKey]?.has(examen.id) || false;
+
+                    return (
+                      <div key={examen.id} className={`border rounded-lg p-4 space-y-2 ${bulkActive && isSelected ? "border-primary bg-primary/5" : ""}`}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {bulkActive && isPendiente && (
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => handleToggleBulkExamen(groupKey, examen.id)}
+                              />
+                            )}
+                            <span className="font-medium text-sm">{examen.examenes.nombre}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {!bulkActive && isPendiente && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1 h-6 text-xs"
+                                onClick={() => handleMuestraTomada(examen.id)}
+                              >
+                                <FlaskConical className="h-3 w-3" />
+                                Muestra Tomada
+                              </Button>
+                            )}
+                            <Badge
+                              variant={examen.estado === "completado" ? "default" : examen.estado === "muestra_tomada" ? "secondary" : examen.estado === "incompleto" ? "secondary" : "outline"}
+                              className={`text-xs ${examen.estado === "muestra_tomada" ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" : ""}`}
+                            >
+                              {examen.estado === "muestra_tomada" ? "Muestra tomada" : examen.estado}
+                            </Badge>
+                          </div>
+                        </div>
+                        <ExamenFormulario
+                          atencionExamenId={examen.id}
+                          examenId={examen.examen_id}
+                          examenNombre={examen.examenes.nombre}
+                          fechaNacimiento={fechaNacimiento}
+                          onComplete={() => {
+                            onComplete?.();
+                            loadPrestadorData();
+                          }}
+                        />
                       </div>
-                      <ExamenFormulario
-                        atencionExamenId={examen.id}
-                        examenId={examen.examen_id}
-                        examenNombre={examen.examenes.nombre}
-                        fechaNacimiento={fechaNacimiento}
-                        onComplete={() => {
-                          onComplete?.();
-                          loadPrestadorData();
-                        }}
-                      />
-                    </div>
-                  ))}
+                    );
+                  })}
                 </CardContent>
               </CollapsibleContent>
             </Collapsible>
