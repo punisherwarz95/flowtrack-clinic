@@ -85,6 +85,7 @@ const Boxes = () => {
 
         if (error) throw error;
         toast.success("Box agregado exitosamente");
+        logActivity("crear_box", { nombre: formData.nombre }, "/boxes");
       }
       
       setOpenDialog(false);
