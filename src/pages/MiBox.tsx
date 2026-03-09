@@ -390,9 +390,11 @@ const MiBox = () => {
       if (examenesPendientesData && examenesPendientesData.length > 0) {
         await supabase.from("atenciones").update({ estado: "en_espera", box_id: null }).eq("id", atencionId);
         toast.success("Paciente devuelto a espera - tiene exámenes pendientes");
+        logActivity("devolver_espera_box", { atencion_id: atencionId }, "/mi-box");
       } else {
         await supabase.from("atenciones").update({ box_id: null }).eq("id", atencionId);
         toast.success("Exámenes completados - paciente listo para finalizar en Flujo");
+        logActivity("completar_box", { atencion_id: atencionId }, "/mi-box");
       }
 
       // Background refresh

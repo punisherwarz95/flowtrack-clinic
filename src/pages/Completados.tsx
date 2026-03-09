@@ -131,6 +131,7 @@ const Completados = () => {
       if (atencionError) throw atencionError;
 
       toast.success(`Paciente devuelto a espera con ${selectedExamenesRevert.length} examen(es) pendiente(s)`);
+      logActivity("revertir_atencion", { atencion_id: revertDialog.atencion.id, paciente: revertDialog.atencion.pacientes.nombre, examenes_revertidos: selectedExamenesRevert.length }, "/completados");
       setRevertDialog({ open: false, atencion: null });
       setSelectedExamenesRevert([]);
       await loadAtenciones();

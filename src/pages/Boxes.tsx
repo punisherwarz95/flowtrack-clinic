@@ -128,6 +128,7 @@ const Boxes = () => {
       if (error) throw error;
       
       toast.success("Box eliminado exitosamente");
+      logActivity("eliminar_box", { box_id: boxToDelete }, "/boxes");
       setBoxToDelete(null);
       loadBoxes();
     } catch (error: any) {

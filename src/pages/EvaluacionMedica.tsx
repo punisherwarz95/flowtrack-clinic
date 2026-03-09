@@ -314,6 +314,7 @@ const EvaluacionMedica = () => {
       if (error) throw error;
 
       toast.success("Re-evaluación guardada");
+      logActivity("re_evaluar_bateria", { paciente: reEvalDialog.atencion.pacientes.nombre, bateria: reEvalDialog.evaluacion.paquetes_examenes.nombre, resultado: reEvalResultado }, "/evaluacion-medica");
       setReEvalDialog({ open: false, evaluacion: null, atencion: null });
       loadNoAptos();
     } catch (error) {

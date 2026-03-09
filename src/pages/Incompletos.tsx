@@ -234,6 +234,7 @@ const Incompletos = () => {
       }
 
       toast.success(`Paciente reactivado con nuevo número de atención #${nuevaAtencion.numero_ingreso}`);
+      logActivity("reactivar_paciente", { paciente: reactivateDialog.atencion?.pacientes.nombre, nuevo_numero: nuevaAtencion.numero_ingreso }, "/incompletos");
       setReactivateDialog({ open: false, atencion: null });
       await loadAtenciones();
     } catch (error) {

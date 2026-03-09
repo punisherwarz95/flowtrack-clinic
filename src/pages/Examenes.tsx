@@ -715,6 +715,7 @@ const Examenes = () => {
       
       if (result.errores.length === 0) {
         toast.success("Importación completada exitosamente");
+        logActivity("importar_examenes", { total: importData.length }, "/examenes");
       } else {
         toast.warning(`Importación completada con ${result.errores.length} errores`);
       }

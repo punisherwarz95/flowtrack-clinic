@@ -156,6 +156,7 @@ const Configuracion = () => {
 
       if (error) throw error;
       toast.success("Bloque eliminado");
+      logActivity("eliminar_bloque", { bloque_id: bloqueToDelete }, "/configuracion");
       setBloqueToDelete(null);
       loadBloques();
     } catch (error: any) {
