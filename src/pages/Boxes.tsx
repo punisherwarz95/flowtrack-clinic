@@ -74,6 +74,7 @@ const Boxes = () => {
 
         if (error) throw error;
         toast.success("Box actualizado exitosamente");
+        logActivity("editar_box", { box_id: editingBox.id, nombre: formData.nombre }, "/boxes");
       } else {
         const { error } = await supabase.from("boxes").insert([
           {
