@@ -565,6 +565,18 @@ const MiBox = () => {
                             <Badge variant={atencion.pacientes.tipo_servicio === "workmed" ? "default" : "secondary"} className="text-xs">
                               {atencion.pacientes.tipo_servicio}
                             </Badge>
+                            <Badge
+                              variant="outline"
+                              className={`text-xs ${
+                                atencion.estado_ficha === "completada"
+                                  ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                                  : atencion.estado_ficha === "en_mano_paciente"
+                                  ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                                  : "bg-muted text-muted-foreground"
+                              }`}
+                            >
+                              {atencion.estado_ficha === "completada" ? "Ficha ✓" : atencion.estado_ficha === "en_mano_paciente" ? "Ficha en mano" : "Ficha pendiente"}
+                            </Badge>
                             <PresionTimerBadge timer={timerByAtencion[atencion.id]} />
                           </div>
                           {atencion.examenesPendientes && atencion.examenesPendientes.length > 0 && (
