@@ -1107,17 +1107,18 @@ const Dashboard = () => {
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-20">Orden</TableHead>
-                        <TableHead>Paciente</TableHead>
-                        <TableHead>Empresa</TableHead>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Estado</TableHead>
-                        <TableHead>Box</TableHead>
-                        <TableHead>Exámenes</TableHead>
-                      </TableRow>
-                    </TableHeader>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-20">Orden</TableHead>
+                          <TableHead>Paciente</TableHead>
+                          <TableHead>Empresa</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Estado</TableHead>
+                          <TableHead>Re-Toma PA</TableHead>
+                          <TableHead>Box</TableHead>
+                          <TableHead>Exámenes</TableHead>
+                        </TableRow>
+                      </TableHeader>
                     <TableBody>
                       {filteredAtenciones.map((atencion) => (
                         <TableRow key={atencion.id}>
@@ -1151,6 +1152,9 @@ const Dashboard = () => {
                                 ? "En Atención"
                                 : "Completado"}
                             </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <PresionTimerBadge timer={timerByAtencion[atencion.id]} />
                           </TableCell>
                           <TableCell>
                             {atencion.boxes?.nombre || "-"}
