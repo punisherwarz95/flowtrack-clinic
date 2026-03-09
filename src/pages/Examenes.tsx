@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, ClipboardList, Package, Trash2, Pencil, FileText, DollarSign, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Search, MapPin, Settings2, Link2 } from "lucide-react";
 import ExamenFormularioCamposConfig from "@/components/ExamenFormularioCamposConfig";
+import { logActivity } from "@/lib/activityLog";
 import ExamenTrazabilidadConfig from "@/components/ExamenTrazabilidadConfig";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
