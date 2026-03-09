@@ -309,6 +309,7 @@ const MiBox = () => {
     setSelectedBoxId(tempSelectedBox);
     setShowBoxSelector(false);
     toast.success(`Registrado en ${boxes.find((b) => b.id === tempSelectedBox)?.nombre}`);
+    logActivity("seleccionar_box", { box: boxes.find((b) => b.id === tempSelectedBox)?.nombre }, "/mi-box");
   };
 
   const handleLlamarPaciente = async (atencionId: string) => {
