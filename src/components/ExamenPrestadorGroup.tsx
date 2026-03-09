@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Upload, FileText, Loader2, Building2, Stethoscope, FlaskConical } from "lucide-react";
+import { ChevronDown, ChevronRight, Upload, FileText, Loader2, Building2, Stethoscope, FlaskConical, CheckSquare, Save } from "lucide-react";
 import ExamenFormulario from "@/components/ExamenFormulario";
 
 interface AtencionExamen {
