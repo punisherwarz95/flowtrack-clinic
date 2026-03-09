@@ -115,6 +115,7 @@ const Configuracion = () => {
 
         if (error) throw error;
         toast.success("Bloque creado");
+        logActivity("crear_bloque", { nombre: formData.nombre }, "/configuracion");
       }
 
       setOpenDialog(false);
