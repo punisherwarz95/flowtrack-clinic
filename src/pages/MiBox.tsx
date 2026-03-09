@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import CodigoDelDia from "@/components/CodigoDelDia";
 import { Clock, Play, CheckCircle, XCircle, RefreshCw, Box as BoxIcon, Settings, ClipboardList, Users, UserCheck, UsersRound } from "lucide-react";
+import { logActivity } from "@/lib/activityLog";
 import { Badge } from "@/components/ui/badge";
 import EstadoFichaCheckboxes from "@/components/EstadoFichaCheckboxes";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -308,6 +309,7 @@ const MiBox = () => {
     setSelectedBoxId(tempSelectedBox);
     setShowBoxSelector(false);
     toast.success(`Registrado en ${boxes.find((b) => b.id === tempSelectedBox)?.nombre}`);
+    logActivity("seleccionar_box", { box: boxes.find((b) => b.id === tempSelectedBox)?.nombre }, "/mi-box");
   };
 
   const handleLlamarPaciente = async (atencionId: string) => {
@@ -344,6 +346,7 @@ const MiBox = () => {
         duration: 5000,
         style: { fontSize: "18px", padding: "20px", fontWeight: "bold" },
       });
+      logActivity("llamar_paciente", { paciente: paciente?.pacientes.nombre, atencion_id: atencionId, box: currentBox?.nombre }, "/mi-box");
 
       // Background refresh to sync all data
       loadData();
@@ -387,9 +390,11 @@ const MiBox = () => {
       if (examenesPendientesData && examenesPendientesData.length > 0) {
         await supabase.from("atenciones").update({ estado: "en_espera", box_id: null }).eq("id", atencionId);
         toast.success("Paciente devuelto a espera - tiene exámenes pendientes");
+        logActivity("devolver_espera_box", { atencion_id: atencionId }, "/mi-box");
       } else {
         await supabase.from("atenciones").update({ box_id: null }).eq("id", atencionId);
         toast.success("Exámenes completados - paciente listo para finalizar en Flujo");
+        logActivity("completar_box", { atencion_id: atencionId }, "/mi-box");
       }
 
       // Background refresh

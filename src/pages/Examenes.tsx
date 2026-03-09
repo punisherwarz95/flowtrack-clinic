@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, ClipboardList, Package, Trash2, Pencil, FileText, DollarSign, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Search, MapPin, Settings2, Link2 } from "lucide-react";
 import ExamenFormularioCamposConfig from "@/components/ExamenFormularioCamposConfig";
+import { logActivity } from "@/lib/activityLog";
 import ExamenTrazabilidadConfig from "@/components/ExamenTrazabilidadConfig";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
@@ -450,6 +451,7 @@ const Examenes = () => {
         if (boxExamenesError) throw boxExamenesError;
         
         toast.success("Examen actualizado exitosamente");
+        logActivity("editar_examen", { examen_id: editingExamen.id, nombre: formData.nombre }, "/examenes");
       } else {
         const { data: examenData, error: examenError } = await supabase
           .from("examenes")
@@ -480,6 +482,7 @@ const Examenes = () => {
         if (boxExamenesError) throw boxExamenesError;
         
         toast.success("Examen agregado y asociado a boxes exitosamente");
+        logActivity("crear_examen", { nombre: formData.nombre }, "/examenes");
       }
       
       setOpenExamenDialog(false);
@@ -616,6 +619,7 @@ const Examenes = () => {
       }
       
       toast.success(editingPaquete ? "Paquete actualizado exitosamente" : "Paquete de exámenes creado exitosamente");
+      logActivity(editingPaquete ? "editar_paquete" : "crear_paquete", { nombre: paqueteFormData.nombre }, "/examenes");
       
       setOpenPaqueteDialog(false);
       setEditingPaquete(null);
@@ -644,6 +648,7 @@ const Examenes = () => {
       if (error) throw error;
       
       toast.success("Examen eliminado exitosamente");
+      logActivity("eliminar_examen", { examen_id: examenToDelete }, "/examenes");
       setExamenToDelete(null);
       loadExamenes();
     } catch (error: any) {
@@ -664,6 +669,7 @@ const Examenes = () => {
       if (error) throw error;
       
       toast.success("Paquete eliminado exitosamente");
+      logActivity("eliminar_paquete", { paquete_id: paqueteToDelete }, "/examenes");
       setPaqueteToDelete(null);
       loadPaquetes();
     } catch (error: any) {
@@ -709,6 +715,7 @@ const Examenes = () => {
       
       if (result.errores.length === 0) {
         toast.success("Importación completada exitosamente");
+        logActivity("importar_examenes", { total: importData.length }, "/examenes");
       } else {
         toast.warning(`Importación completada con ${result.errores.length} errores`);
       }

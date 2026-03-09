@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import { AlertCircle, Calendar as CalendarIcon, RotateCcw, X } from "lucide-react";
+import { logActivity } from "@/lib/activityLog";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -233,6 +234,7 @@ const Incompletos = () => {
       }
 
       toast.success(`Paciente reactivado con nuevo número de atención #${nuevaAtencion.numero_ingreso}`);
+      logActivity("reactivar_paciente", { paciente: reactivateDialog.atencion?.pacientes.nombre, nuevo_numero: nuevaAtencion.numero_ingreso }, "/incompletos");
       setReactivateDialog({ open: false, atencion: null });
       await loadAtenciones();
     } catch (error) {

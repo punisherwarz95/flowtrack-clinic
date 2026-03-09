@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Calendar as CalendarIcon, Stethoscope, CheckCircle, AlertTriangle, FileText, RefreshCw, ChevronRight, ClipboardCheck } from "lucide-react";
+import { logActivity } from "@/lib/activityLog";
 import Navigation from "@/components/Navigation";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -232,7 +233,8 @@ const EvaluacionMedica = () => {
       }
 
       toast.success("Evaluación guardada exitosamente");
-      setEvaluandoPaquete(null);
+      const batNombre = bateriasConEstado.find(b => b.paqueteId === evaluandoPaquete)?.paqueteNombre;
+      logActivity("evaluar_bateria", { paciente: selectedPaciente.pacientes.nombre, bateria: batNombre, resultado }, "/evaluacion-medica");
       // Refresh
       await handleSelectPaciente(selectedPaciente);
     } catch (error) {
@@ -312,6 +314,7 @@ const EvaluacionMedica = () => {
       if (error) throw error;
 
       toast.success("Re-evaluación guardada");
+      logActivity("re_evaluar_bateria", { paciente: reEvalDialog.atencion.pacientes.nombre, bateria: reEvalDialog.evaluacion.paquetes_examenes.nombre, resultado: reEvalResultado }, "/evaluacion-medica");
       setReEvalDialog({ open: false, evaluacion: null, atencion: null });
       loadNoAptos();
     } catch (error) {

@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Settings, Clock, Plus, Pencil, Trash2, Calendar, MapPin } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { logActivity } from "@/lib/activityLog";
 import Navigation from "@/components/Navigation";
 import {
   Dialog,
@@ -99,6 +100,7 @@ const Configuracion = () => {
 
         if (error) throw error;
         toast.success("Bloque actualizado");
+        logActivity("editar_bloque", { bloque_id: editingBloque.id, nombre: formData.nombre }, "/configuracion");
       } else {
         const maxOrden = bloques.length > 0 ? Math.max(...bloques.map(b => b.orden)) : 0;
         const { error } = await supabase.from("agenda_bloques").insert([
@@ -113,6 +115,7 @@ const Configuracion = () => {
 
         if (error) throw error;
         toast.success("Bloque creado");
+        logActivity("crear_bloque", { nombre: formData.nombre }, "/configuracion");
       }
 
       setOpenDialog(false);
@@ -134,6 +137,7 @@ const Configuracion = () => {
 
       if (error) throw error;
       toast.success(bloque.activo ? "Bloque desactivado" : "Bloque activado");
+      logActivity("toggle_bloque", { bloque_id: bloque.id, activo: !bloque.activo }, "/configuracion");
       loadBloques();
     } catch (error: any) {
       console.error("Error:", error);
@@ -152,6 +156,7 @@ const Configuracion = () => {
 
       if (error) throw error;
       toast.success("Bloque eliminado");
+      logActivity("eliminar_bloque", { bloque_id: bloqueToDelete }, "/configuracion");
       setBloqueToDelete(null);
       loadBloques();
     } catch (error: any) {

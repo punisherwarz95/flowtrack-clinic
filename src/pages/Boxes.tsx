@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Plus, Trash2, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { logActivity } from "@/lib/activityLog";
 import Navigation from "@/components/Navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
@@ -73,6 +74,7 @@ const Boxes = () => {
 
         if (error) throw error;
         toast.success("Box actualizado exitosamente");
+        logActivity("editar_box", { box_id: editingBox.id, nombre: formData.nombre }, "/boxes");
       } else {
         const { error } = await supabase.from("boxes").insert([
           {
@@ -83,6 +85,7 @@ const Boxes = () => {
 
         if (error) throw error;
         toast.success("Box agregado exitosamente");
+        logActivity("crear_box", { nombre: formData.nombre }, "/boxes");
       }
       
       setOpenDialog(false);
@@ -105,6 +108,7 @@ const Boxes = () => {
       if (error) throw error;
       
       toast.success(currentState ? "Box desactivado" : "Box activado");
+      logActivity("toggle_box", { box_id: boxId, activo: !currentState }, "/boxes");
       loadBoxes();
     } catch (error: any) {
       console.error("Error:", error);
@@ -124,6 +128,7 @@ const Boxes = () => {
       if (error) throw error;
       
       toast.success("Box eliminado exitosamente");
+      logActivity("eliminar_box", { box_id: boxToDelete }, "/boxes");
       setBoxToDelete(null);
       loadBoxes();
     } catch (error: any) {
