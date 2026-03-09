@@ -267,6 +267,36 @@ const ExamenResultadosOtrosBoxes = ({ atencionId, currentBoxId }: Props) => {
                             </div>
                           );
                         }
+                        // Try parsing as generic JSON (e.g. anthropometry)
+                        const jsonData = tryParseJson(r.valor);
+                        if (jsonData) {
+                          const entries = Object.entries(jsonData).filter(
+                            ([k, v]) => v !== null && v !== "" && !k.startsWith("pa_timer")
+                          );
+                          if (entries.length === 0) {
+                            return (
+                              <div key={ridx} className="text-xs col-span-2">
+                                <span className="text-muted-foreground">{r.etiqueta}:</span>{" "}
+                                <span className="font-medium">-</span>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div key={ridx} className="col-span-2 text-xs space-y-1">
+                              <span className="text-muted-foreground font-medium">{r.etiqueta}:</span>
+                              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 mt-1 border rounded-md p-2 bg-muted/20">
+                                {entries.map(([key, val]) => (
+                                  <div key={key} className="flex flex-col">
+                                    <span className="text-muted-foreground text-[10px] truncate">
+                                      {ANTRO_LABELS[key] || key.replace(/_/g, " ")}
+                                    </span>
+                                    <span className="font-semibold text-sm">{String(val)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        }
                         return (
                           <div key={ridx} className="text-xs">
                             <span className="text-muted-foreground">{r.etiqueta}:</span>{" "}
