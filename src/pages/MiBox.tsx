@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import CodigoDelDia from "@/components/CodigoDelDia";
 import { Clock, Play, CheckCircle, XCircle, RefreshCw, Box as BoxIcon, Settings, ClipboardList, Users, UserCheck, UsersRound } from "lucide-react";
+import { logActivity } from "@/lib/activityLog";
 import { Badge } from "@/components/ui/badge";
 import EstadoFichaCheckboxes from "@/components/EstadoFichaCheckboxes";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
