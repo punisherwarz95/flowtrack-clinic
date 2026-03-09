@@ -346,21 +346,20 @@ const AntropometriaForm = ({ value, onChange, readonly = false, fechaNacimiento 
         }
       }
 
-      // Blood pressure alert check
-      const checkBP = (sField: string, dField: string) => {
-        const s = parseFloat(updated[sField as keyof AntropometriaData] as string);
-        const d = parseFloat(updated[dField as keyof AntropometriaData] as string);
-        return !isNaN(s) && !isNaN(d) && (s > 139 || d > 89);
-      };
+      const prevRetoma = getRetomaStatus(prev);
+      const nextRetoma = getRetomaStatus(updated);
 
-      const bpHigh = checkBP("pa_sistolica_1", "pa_diastolica_1") ||
-                      checkBP("pa_sistolica_2", "pa_diastolica_2") ||
-                      checkBP("pa_sistolica_3", "pa_diastolica_3");
-      updated.pa_alerta = bpHigh;
+      updated.pa_alerta = nextRetoma.requiereRetoma;
 
-      // Auto-start timer on first high BP reading
-      if (field.startsWith("pa_") && bpHigh && !updated.pa_timer_inicio) {
-        updated.pa_timer_inicio = new Date().toISOString();
+      if (field.startsWith("pa_")) {
+        if (!nextRetoma.requiereRetoma) {
+          updated.pa_timer_inicio = null;
+        } else {
+          const retomaCambio = prevRetoma.proximaToma !== nextRetoma.proximaToma;
+          if (!updated.pa_timer_inicio || retomaCambio) {
+            updated.pa_timer_inicio = new Date().toISOString();
+          }
+        }
       }
 
       // Framingham calculation
