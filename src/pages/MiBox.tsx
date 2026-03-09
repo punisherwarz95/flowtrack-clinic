@@ -682,19 +682,18 @@ const MiBox = () => {
                                 <Badge variant={selectedAtencion.pacientes.tipo_servicio === "workmed" ? "default" : "secondary"}>
                                   {selectedAtencion.pacientes.tipo_servicio}
                                 </Badge>
-                              </div>
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedAtencionForDocs(selectedAtencion.id);
-                                  setSelectedPacienteContext({
-                                    paciente: {
-                                      nombre: selectedAtencion.pacientes.nombre,
-                                      rut: selectedAtencion.pacientes.rut || undefined,
-                                      fecha_nacimiento: selectedAtencion.pacientes.fecha_nacimiento || undefined,
-                                      email: selectedAtencion.pacientes.email || undefined,
+                                <Badge
+                                  variant="outline"
+                                  className={`text-xs ${
+                                    selectedAtencion.estado_ficha === "completada"
+                                      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                                      : selectedAtencion.estado_ficha === "en_mano_paciente"
+                                      ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                                      : "bg-muted text-muted-foreground"
+                                  }`}
+                                >
+                                  {selectedAtencion.estado_ficha === "completada" ? "Ficha ✓" : selectedAtencion.estado_ficha === "en_mano_paciente" ? "Ficha en mano" : "Ficha pendiente"}
+                                </Badge>
                                       telefono: selectedAtencion.pacientes.telefono || undefined,
                                       direccion: selectedAtencion.pacientes.direccion || undefined,
                                     },
