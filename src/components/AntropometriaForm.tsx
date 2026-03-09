@@ -47,6 +47,42 @@ const DEFAULT_DATA: AntropometriaData = {
   colesterol_total: "", colesterol_hdl: "",
   framingham_puntos: "", framingham_riesgo: "", framingham_clasificacion: "",
 };
+
+const parsePA = (value: string) => {
+  const parsed = parseFloat(value);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+const getRetomaStatus = (source: AntropometriaData): { requiereRetoma: boolean; proximaToma: 2 | 3 | null } => {
+  const t1s = parsePA(source.pa_sistolica_1);
+  const t1d = parsePA(source.pa_diastolica_1);
+  const t2s = parsePA(source.pa_sistolica_2);
+  const t2d = parsePA(source.pa_diastolica_2);
+  const t3s = parsePA(source.pa_sistolica_3);
+  const t3d = parsePA(source.pa_diastolica_3);
+
+  const t1Completa = t1s !== null && t1d !== null;
+  const t2Completa = t2s !== null && t2d !== null;
+  const t3Completa = t3s !== null && t3d !== null;
+
+  if (t3Completa) {
+    return { requiereRetoma: false, proximaToma: null };
+  }
+
+  const t1Alta = t1Completa && (t1s > 139 || t1d > 89);
+  const t2Alta = t2Completa && (t2s > 139 || t2d > 89);
+
+  if (t2Completa) {
+    return { requiereRetoma: t2Alta, proximaToma: t2Alta ? 3 : null };
+  }
+
+  if (t1Completa) {
+    return { requiereRetoma: t1Alta, proximaToma: t1Alta ? 2 : null };
+  }
+
+  return { requiereRetoma: false, proximaToma: null };
+};
+
 interface Props {
   value: string | null;
   onChange: (value: string) => void;
