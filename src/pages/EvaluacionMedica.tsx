@@ -410,7 +410,7 @@ const EvaluacionMedica = () => {
                 {loading ? (
                   <p className="text-muted-foreground text-center py-8">Cargando...</p>
                 ) : atenciones.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">No hay pacientes completados en esta fecha</p>
+                  <p className="text-muted-foreground text-center py-8">No hay pacientes en esta fecha (excluye Workmed)</p>
                 ) : (
                   <Table>
                     <TableHeader>
