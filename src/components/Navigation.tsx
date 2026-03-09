@@ -79,11 +79,16 @@ const Navigation = () => {
             })}
           </div>
           
-          <ChangeOwnPassword />
-          <Button variant="outline" size="sm" onClick={async () => { await logActivity("logout", {}, location.pathname); signOut(); }} className="shrink-0">
-            <LogOut className="h-4 w-4 mr-2" />
-            Cerrar Sesión
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-sm font-medium text-foreground bg-muted px-2.5 py-1 rounded-md">
+              {user?.email?.replace("@mediflow.local", "") ?? ""}
+            </span>
+            <ChangeOwnPassword />
+            <Button variant="outline" size="sm" onClick={async () => { await logActivity("logout", {}, location.pathname); signOut(); }}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Cerrar Sesión
+            </Button>
+          </div>
         </div>
       </div>
     </nav>
