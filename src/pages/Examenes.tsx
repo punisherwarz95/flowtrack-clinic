@@ -669,6 +669,7 @@ const Examenes = () => {
       if (error) throw error;
       
       toast.success("Paquete eliminado exitosamente");
+      logActivity("eliminar_paquete", { paquete_id: paqueteToDelete }, "/examenes");
       setPaqueteToDelete(null);
       loadPaquetes();
     } catch (error: any) {
