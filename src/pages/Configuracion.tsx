@@ -137,6 +137,7 @@ const Configuracion = () => {
 
       if (error) throw error;
       toast.success(bloque.activo ? "Bloque desactivado" : "Bloque activado");
+      logActivity("toggle_bloque", { bloque_id: bloque.id, activo: !bloque.activo }, "/configuracion");
       loadBloques();
     } catch (error: any) {
       console.error("Error:", error);
