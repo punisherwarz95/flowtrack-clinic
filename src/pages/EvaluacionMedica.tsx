@@ -29,6 +29,7 @@ interface PacienteAtencion {
     nombre: string;
     rut: string;
     empresa_id: string | null;
+    tipo_servicio: string | null;
     empresas: { nombre: string } | null;
   };
   atencion_baterias: Array<{
