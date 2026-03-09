@@ -102,6 +102,9 @@ const Dashboard = () => {
     examenesRealizadosMes: 0,
   });
 
+  const atencionesConTemporizador = atencionesIngresadas.map((a) => a.id);
+  const { timerByAtencion } = usePresionTimers(atencionesConTemporizador);
+
   useEffect(() => {
     loadDailyStats();
   }, [selectedDateDaily]);
