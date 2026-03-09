@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -18,9 +18,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { GlobalChat } from "@/components/GlobalChat";
 import { useAtencionDocumentos } from "@/hooks/useAtencionDocumentos";
+import { usePresionTimers } from "@/hooks/usePresionTimers";
 import { DocumentoFormViewer, DocumentoContextData } from "@/components/DocumentoFormViewer";
 import ExamenResultadosOtrosBoxes from "@/components/ExamenResultadosOtrosBoxes";
 import ExamenPrestadorGroup from "@/components/ExamenPrestadorGroup";
+import PresionTimerBadge from "@/components/PresionTimerBadge";
 
 interface Atencion {
   id: string;

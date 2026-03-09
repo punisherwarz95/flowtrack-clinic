@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -17,6 +17,8 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useAuth } from "@/hooks/useAuth";
 import { GlobalChat } from "@/components/GlobalChat";
+import { usePresionTimers } from "@/hooks/usePresionTimers";
+import PresionTimerBadge from "@/components/PresionTimerBadge";
 import { logActivity } from "@/lib/activityLog";
 
 interface Atencion {
