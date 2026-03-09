@@ -482,6 +482,7 @@ const Examenes = () => {
         if (boxExamenesError) throw boxExamenesError;
         
         toast.success("Examen agregado y asociado a boxes exitosamente");
+        logActivity("crear_examen", { nombre: formData.nombre }, "/examenes");
       }
       
       setOpenExamenDialog(false);
