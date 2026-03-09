@@ -29,6 +29,7 @@ interface PacienteAtencion {
     nombre: string;
     rut: string;
     empresa_id: string | null;
+    tipo_servicio: string | null;
     empresas: { nombre: string } | null;
   };
   atencion_baterias: Array<{
@@ -109,11 +110,11 @@ const EvaluacionMedica = () => {
         .from("atenciones")
         .select(`
           id, numero_ingreso, fecha_ingreso, estado,
-          pacientes(id, nombre, rut, empresa_id, empresas(nombre)),
+          pacientes!inner(id, nombre, rut, empresa_id, tipo_servicio, empresas(nombre)),
           atencion_baterias(id, paquete_id, paquetes_examenes(id, nombre)),
           atencion_examenes(id, examen_id, estado, examenes(nombre))
         `)
-        .eq("estado", "completado")
+        .neq("pacientes.tipo_servicio", "workmed")
         .gte("fecha_ingreso", startOfDay.toISOString())
         .lte("fecha_ingreso", endOfDay.toISOString())
         .order("numero_ingreso", { ascending: true });
@@ -409,7 +410,7 @@ const EvaluacionMedica = () => {
                 {loading ? (
                   <p className="text-muted-foreground text-center py-8">Cargando...</p>
                 ) : atenciones.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">No hay pacientes completados en esta fecha</p>
+                  <p className="text-muted-foreground text-center py-8">No hay pacientes en esta fecha (excluye Workmed)</p>
                 ) : (
                   <Table>
                     <TableHeader>
