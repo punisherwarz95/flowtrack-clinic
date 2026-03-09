@@ -108,6 +108,7 @@ const Boxes = () => {
       if (error) throw error;
       
       toast.success(currentState ? "Box desactivado" : "Box activado");
+      logActivity("toggle_box", { box_id: boxId, activo: !currentState }, "/boxes");
       loadBoxes();
     } catch (error: any) {
       console.error("Error:", error);
