@@ -563,6 +563,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
                           examenId={examen.examen_id}
                           examenNombre={examen.examenes.nombre}
                           fechaNacimiento={fechaNacimiento}
+                          esExterno={group.prestadorTipo === "externo"}
                           onComplete={() => {
                             onComplete?.();
                             loadPrestadorData();
