@@ -1120,8 +1120,23 @@ const Dashboard = () => {
                         </TableRow>
                       </TableHeader>
                     <TableBody>
-                      {filteredAtenciones.map((atencion) => (
-                        <TableRow key={atencion.id}>
+                      {filteredAtenciones.map((atencion) => {
+                        const todosCompletados = atencion.atencion_examenes.length > 0 && atencion.atencion_examenes.every(ae => ae.estado === "completado");
+                        const esCompletado = atencion.estado === "completado";
+                        // Azul: en espera o en atención (hay que atenderlos)
+                        // Amarillo: completado pero con exámenes pendientes (esperando carga de resultados)
+                        // Verde: completado y todos los exámenes completados
+                        let rowColorClass = "";
+                        if (!esCompletado) {
+                          rowColorClass = "bg-blue-50 dark:bg-blue-950/30 border-l-4 border-l-blue-500";
+                        } else if (esCompletado && !todosCompletados) {
+                          rowColorClass = "bg-yellow-50 dark:bg-yellow-950/30 border-l-4 border-l-yellow-500";
+                        } else if (esCompletado && todosCompletados) {
+                          rowColorClass = "bg-green-50 dark:bg-green-950/30 border-l-4 border-l-green-500";
+                        }
+
+                        return (
+                        <TableRow key={atencion.id} className={rowColorClass}>
                           <TableCell className="font-medium">
                             #{atencion.numero_ingreso.toString().padStart(3, "0")}
                           </TableCell>
@@ -1138,19 +1153,21 @@ const Dashboard = () => {
                           </TableCell>
                           <TableCell>
                             <Badge 
-                              variant={
-                                atencion.estado === "completado" 
-                                  ? "default" 
-                                  : atencion.estado === "en_atencion"
-                                  ? "secondary"
-                                  : "outline"
+                              className={
+                                !esCompletado
+                                  ? "bg-blue-500 text-white hover:bg-blue-600"
+                                  : esCompletado && !todosCompletados
+                                  ? "bg-yellow-500 text-white hover:bg-yellow-600"
+                                  : "bg-green-500 text-white hover:bg-green-600"
                               }
                             >
                               {atencion.estado === "en_espera" 
                                 ? "En Espera" 
                                 : atencion.estado === "en_atencion"
                                 ? "En Atención"
-                                : "Completado"}
+                                : todosCompletados
+                                ? "Completado"
+                                : "Esperando Resultados"}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -1177,7 +1194,8 @@ const Dashboard = () => {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
