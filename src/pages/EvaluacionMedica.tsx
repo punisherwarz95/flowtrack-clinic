@@ -349,7 +349,7 @@ const EvaluacionMedica = () => {
     try {
       const datosClinicosPayload = {
         conclusion: conclusion || null,
-        duracion_anios: duracion,
+        duracion_anios: resultado === "no_apto" ? null : duracion,
         examen_evaluaciones: examenEvals,
       };
 
