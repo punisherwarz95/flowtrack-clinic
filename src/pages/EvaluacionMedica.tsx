@@ -94,6 +94,10 @@ const EvaluacionMedica = () => {
   const [activeTab, setActiveTab] = useState("listado");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [atenciones, setAtenciones] = useState<PacienteAtencion[]>([]);
+  const [filterStatusLista, setFilterStatusLista] = useState(true);
+  const [filterStatusEsperando, setFilterStatusEsperando] = useState(true);
+  const [filterStatusPendiente, setFilterStatusPendiente] = useState(true);
+  const [filterStatusEvaluado, setFilterStatusEvaluado] = useState(true);
   const [loading, setLoading] = useState(false);
   const [selectedPaciente, setSelectedPaciente] = useState<PacienteAtencion | null>(null);
   const [bateriasConEstado, setBateriasConEstado] = useState<BateriaConEstado[]>([]);
