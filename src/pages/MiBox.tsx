@@ -761,12 +761,6 @@ const MiBox = () => {
                         </CardHeader>
                         <CardContent className="space-y-3">
                           <Button
-                            className="w-full gap-2"
-                            onClick={() => setConfirmCompletarDialog({ open: true, atencionId: selectedAtencion.id })}
-                          >
-                            <CheckCircle className="h-4 w-4" /> Completar Todo
-                          </Button>
-                          <Button
                             variant="outline"
                             className="w-full gap-2"
                             onClick={() => handleCompletarAtencion(selectedAtencion.id, "incompleto")}

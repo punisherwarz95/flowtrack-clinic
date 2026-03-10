@@ -555,6 +555,9 @@ const Prestadores = () => {
                         )}
                       </div>
                       <div className="flex gap-1">
+                        <Badge variant={prestador.tipo === "externo" ? "destructive" : "default"} className="text-xs">
+                          {prestador.tipo === "externo" ? "Externo" : "Interno"}
+                        </Badge>
                         {!prestador.activo && (
                           <Badge variant="secondary">Inactivo</Badge>
                         )}

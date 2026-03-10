@@ -225,7 +225,7 @@ const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete
 
       toast.success(
         allRequiredFilled
-          ? "Examen completado y guardado"
+          ? (esExterno ? "Muestra tomada registrada y datos guardados" : "Examen completado y guardado")
           : "Datos guardados (parcial - faltan campos requeridos)"
       );
 
