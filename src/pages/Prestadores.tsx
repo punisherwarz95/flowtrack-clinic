@@ -201,6 +201,7 @@ const Prestadores = () => {
       setEmail(prestador.email || "");
       setSelectedUserId(prestador.user_id);
       setActivo(prestador.activo);
+      setTipo(prestador.tipo || "interno");
     } else {
       resetForm();
     }
