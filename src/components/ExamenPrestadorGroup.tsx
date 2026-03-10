@@ -19,6 +19,7 @@ interface AtencionExamen {
 interface PrestadorGroup {
   prestadorId: string | null;
   prestadorNombre: string;
+  prestadorTipo: string;
   examenes: AtencionExamen[];
   archivosCompartidos: ArchivoCompartido[];
 }
