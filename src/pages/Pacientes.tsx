@@ -593,22 +593,30 @@ const Pacientes = () => {
       if (atencionError) throw atencionError;
 
       if (atencionData) {
-        // Cargar exámenes pendientes (para agregar nuevos)
-        const { data: examenesData, error: examenesError } = await supabase
-          .from("atencion_examenes")
-          .select("examen_id")
-          .eq("atencion_id", atencionData.id)
-          .eq("estado", "pendiente");
+        // Cargar exámenes pendientes y documentos existentes en paralelo
+        const [examenesRes, docsRes] = await Promise.all([
+          supabase
+            .from("atencion_examenes")
+            .select("examen_id")
+            .eq("atencion_id", atencionData.id)
+            .eq("estado", "pendiente"),
+          supabase
+            .from("atencion_documentos")
+            .select("documento_id")
+            .eq("atencion_id", atencionData.id),
+        ]);
 
-        if (examenesError) throw examenesError;
-
-        setSelectedExamenes(examenesData?.map(e => e.examen_id) || []);
+        if (examenesRes.error) throw examenesRes.error;
+        setSelectedExamenes(examenesRes.data?.map(e => e.examen_id) || []);
+        setSelectedDocumentos(docsRes.data?.map(d => d.documento_id) || []);
       } else {
         setSelectedExamenes([]);
+        setSelectedDocumentos([]);
       }
     } catch (error) {
       console.error("Error loading exams:", error);
       setSelectedExamenes([]);
+      setSelectedDocumentos([]);
     }
 
     setActiveMainTab("nuevo");
