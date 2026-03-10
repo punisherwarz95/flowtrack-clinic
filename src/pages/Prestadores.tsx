@@ -187,6 +187,7 @@ const Prestadores = () => {
     setEmail("");
     setSelectedUserId(null);
     setActivo(true);
+    setTipo("interno");
     setEditingPrestador(null);
   };
 
