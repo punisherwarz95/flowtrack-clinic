@@ -1867,34 +1867,7 @@ export default function PortalPaciente() {
         </DialogContent>
       </Dialog>
 
-      {/* Documento Modal */}
-      <Dialog open={documentoDialogOpen} onOpenChange={setDocumentoDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          {selectedDocumentoIndex !== null && atencionDocumentos[selectedDocumentoIndex] && (
-            <DocumentoFormViewer
-              atencionDocumento={atencionDocumentos[selectedDocumentoIndex]}
-              campos={documentoCampos[atencionDocumentos[selectedDocumentoIndex].documento_id] || []}
-              onComplete={() => {
-                reloadDocumentos();
-                setDocumentoDialogOpen(false);
-                setSelectedDocumentoIndex(null);
-              }}
-              contextData={{
-                paciente: paciente ? {
-                  nombre: paciente.nombre,
-                  rut: paciente.rut || undefined,
-                  fecha_nacimiento: paciente.fecha_nacimiento || undefined,
-                  email: paciente.email || undefined,
-                  telefono: paciente.telefono || undefined,
-                  direccion: paciente.direccion || undefined,
-                } : undefined,
-                empresa: empresa?.nombre,
-                numero_ingreso: atencion?.numero_ingreso || undefined,
-              }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Documento Modal removed - documents now expand inline */}
 
       {/* Indicador de versión */}
       <div className="fixed bottom-2 left-2 text-xs text-muted-foreground/50 select-none pointer-events-none">
