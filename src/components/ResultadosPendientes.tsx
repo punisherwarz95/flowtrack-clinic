@@ -341,48 +341,36 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
                             </div>
                           </div>
 
-                          {/* Individual exams within this prestador */}
-                          <div className="p-2 space-y-2">
+                          {/* Individual exams within this prestador - inline, no collapsible */}
+                          <div className="p-3 space-y-4">
                             {prestadorRows.map((row) => (
-                              <Collapsible
-                                key={row.atencionExamenId}
-                                open={expandedExamen === row.atencionExamenId}
-                                onOpenChange={(open) => setExpandedExamen(open ? row.atencionExamenId : null)}
-                              >
-                                <CollapsibleTrigger className="w-full">
-                                  <div className="flex items-center justify-between border rounded-lg p-3 hover:bg-accent/30 transition-colors">
-                                    <div className="flex items-center gap-2">
-                                      {expandedExamen === row.atencionExamenId ? (
-                                        <ChevronDown className="h-4 w-4" />
-                                      ) : (
-                                        <ChevronRight className="h-4 w-4" />
-                                      )}
-                                      <span className="font-medium text-sm">{row.examenNombre}</span>
-                                    </div>
-                                    <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs">
-                                      Muestra tomada
-                                    </Badge>
+                              <div key={row.atencionExamenId} className="border rounded-lg p-4 space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <FlaskConical className="h-4 w-4 text-amber-600" />
+                                    <span className="font-semibold text-sm">{row.examenNombre}</span>
                                   </div>
-                                </CollapsibleTrigger>
-                                <CollapsibleContent className="border border-t-0 rounded-b-lg p-4 space-y-4">
-                                  <ExamenFormulario
-                                    atencionExamenId={row.atencionExamenId}
-                                    examenId={row.examenId}
-                                    examenNombre={row.examenNombre}
-                                    onComplete={loadPendientes}
-                                    fechaNacimiento={row.fechaNacimiento}
-                                  />
-                                  <div className="flex justify-end pt-2 border-t">
-                                    <Button
-                                      className="gap-2"
-                                      onClick={() => handleMarcarCompletado(row.atencionExamenId)}
-                                    >
-                                      <CheckCircle className="h-4 w-4" />
-                                      Marcar como Completado
-                                    </Button>
-                                  </div>
-                                </CollapsibleContent>
-                              </Collapsible>
+                                  <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs">
+                                    Muestra tomada
+                                  </Badge>
+                                </div>
+                                <ExamenFormulario
+                                  atencionExamenId={row.atencionExamenId}
+                                  examenId={row.examenId}
+                                  examenNombre={row.examenNombre}
+                                  onComplete={loadPendientes}
+                                  fechaNacimiento={row.fechaNacimiento}
+                                />
+                                <div className="flex justify-end pt-2 border-t">
+                                  <Button
+                                    className="gap-2"
+                                    onClick={() => handleMarcarCompletado(row.atencionExamenId)}
+                                  >
+                                    <CheckCircle className="h-4 w-4" />
+                                    Marcar como Completado
+                                  </Button>
+                                </div>
+                              </div>
                             ))}
                           </div>
                         </div>
