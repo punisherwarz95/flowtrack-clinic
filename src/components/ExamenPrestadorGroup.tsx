@@ -172,7 +172,8 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
   const handleUploadSharedFile = async (groupKey: string, group: PrestadorGroup, file: File) => {
     setUploading(groupKey);
     try {
-      const fileName = `compartidos/${atencionId}/${groupKey}/${Date.now()}_${file.name}`;
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const fileName = `compartidos/${atencionId}/${groupKey}/${Date.now()}_${safeName}`;
       const { error: uploadError } = await supabase.storage
         .from("examen-resultados")
         .upload(fileName, file);

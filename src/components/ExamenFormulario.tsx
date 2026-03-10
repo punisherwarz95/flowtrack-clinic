@@ -144,7 +144,8 @@ const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete
       const fileSizeMB = (processedFile.size / (1024 * 1024)).toFixed(1);
       console.log(`Subiendo archivo: ${processedFile.name} (${fileSizeMB} MB)`);
 
-      const fileName = `${atencionExamenId}/${campoId}/${Date.now()}_${processedFile.name}`;
+      const safeName = processedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const fileName = `${atencionExamenId}/${campoId}/${Date.now()}_${safeName}`;
       const { error: uploadError } = await supabase.storage
         .from("examen-resultados")
         .upload(fileName, processedFile);
