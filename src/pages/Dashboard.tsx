@@ -520,65 +520,8 @@ const Dashboard = () => {
     listos: atencionesIngresadas.filter(a => a.estado === "en_espera" || a.estado === "en_atencion").length
   };
 
-  // Filter patients by selected filters
-  const filteredAtenciones = atencionesIngresadas.filter(a => {
-    // Filtro por nombre
-    if (filterNombre.trim() !== "") {
-      const nombrePaciente = a.pacientes.nombre.toLowerCase();
-      if (!nombrePaciente.includes(filterNombre.toLowerCase().trim())) return false;
-    }
-    
-    // Filtro por estado de atención (checkboxes principales)
-    if (a.estado === "completado" && !filterEstadoCompletado) return false;
-    if ((a.estado === "en_espera" || a.estado === "en_atencion") && !filterEstadoListo) return false;
-    
-    // Filter by empresa
-    if (selectedEmpresaFilter !== "all") {
-      if ((a.pacientes as any).empresas?.id !== selectedEmpresaFilter) return false;
-    }
-    
-    // Filter by tipo servicio
-    if (selectedTipoFilter !== "all") {
-      if (a.pacientes.tipo_servicio !== selectedTipoFilter) return false;
-    }
-    
-    // Filter by exam if selected
-    if (selectedExamenFilter !== "all") {
-      const hasExam = a.atencion_examenes.some(ae => ae.examenes.id === selectedExamenFilter);
-      if (!hasExam) return false;
-      
-      // Then filter by exam status checkboxes
-      const examStatus = a.atencion_examenes.find(ae => ae.examenes.id === selectedExamenFilter);
-      if (examStatus) {
-        const isCompleted = examStatus.estado === "completado";
-        if (isCompleted && !filterCompletado) return false;
-        if (!isCompleted && !filterIncompleto) return false;
-      }
-    }
-
-    // Filtro por box pendiente
-    if (selectedBoxPendienteFilter !== "all") {
-      const hasPendingInBox = a.atencion_examenes.some(ae => {
-        const boxInfo = boxExamenesMap.get(ae.examenes.id);
-        return boxInfo?.boxId === selectedBoxPendienteFilter && ae.estado !== "completado";
-      });
-      if (!hasPendingInBox) return false;
-    }
-
-    // Filtro por color/estado de examen
-    if (!filterExPendiente || !filterExMuestra || !filterExCompletado || !filterExIncompleto) {
-      const hasMatchingExam = a.atencion_examenes.some(ae => {
-        if (ae.estado === "pendiente" && filterExPendiente) return true;
-        if (ae.estado === "muestra_tomada" && filterExMuestra) return true;
-        if (ae.estado === "completado" && filterExCompletado) return true;
-        if (ae.estado === "incompleto" && filterExIncompleto) return true;
-        return false;
-      });
-      if (a.atencion_examenes.length > 0 && !hasMatchingExam) return false;
-    }
-
-    return true;
-  });
+  // Filter patients by all active filters
+  const filteredAtenciones = applyFilters();
 
   const renderExamenesGrid = (conteo: Record<string, { asignados: number; completados: number }>, totalExamenes: number) => {
     if (Object.keys(conteo).length === 0) {
