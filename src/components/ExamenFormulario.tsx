@@ -564,7 +564,7 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
         );
       })}
 
-      {!readonly && (
+      {!readonly && !hideSaveButton && (
         <div className="flex justify-end pt-2">
           <Button onClick={handleSave} disabled={saving} className="gap-2">
             <Save className="h-4 w-4" />
@@ -574,6 +574,8 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
       )}
     </div>
   );
-};
+});
+
+ExamenFormulario.displayName = "ExamenFormulario";
 
 export default ExamenFormulario;
