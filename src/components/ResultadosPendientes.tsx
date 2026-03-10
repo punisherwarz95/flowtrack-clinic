@@ -288,7 +288,22 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
                       const prestadorNombre = prestadorRows[0]?.prestadorNombre || "Sin prestador";
 
                       return (
-                        <div key={prestadorKey} className="border rounded-lg overflow-hidden">
+                        <div
+                          key={prestadorKey}
+                          className={`border rounded-lg overflow-hidden transition-colors ${dragOverKey === uploadKey ? "border-primary bg-primary/5" : ""}`}
+                          onDragOver={(e) => { e.preventDefault(); setDragOverKey(uploadKey); }}
+                          onDragLeave={() => setDragOverKey(null)}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            setDragOverKey(null);
+                            const file = e.dataTransfer.files?.[0];
+                            if (file && (file.type === "application/pdf" || file.name.endsWith(".pdf"))) {
+                              handleUploadPdfPrestador(atencionId, prestadorRows, file);
+                            } else {
+                              toast.error("Solo se permiten archivos PDF");
+                            }
+                          }}
+                        >
                           {/* Prestador header + PDF upload */}
                           <div className="flex items-center justify-between gap-3 p-3 bg-muted/40 border-b">
                             <div className="flex items-center gap-2">
@@ -298,29 +313,34 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
                                 {prestadorRows.length} examen{prestadorRows.length > 1 ? "es" : ""}
                               </Badge>
                             </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-2"
-                              disabled={uploadingPdf === uploadKey}
-                              onClick={() => {
-                                const input = document.createElement("input");
-                                input.type = "file";
-                                input.accept = ".pdf";
-                                input.onchange = (e) => {
-                                  const file = (e.target as HTMLInputElement).files?.[0];
-                                  if (file) handleUploadPdfPrestador(atencionId, prestadorRows, file);
-                                };
-                                input.click();
-                              }}
-                            >
-                              {uploadingPdf === uploadKey ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Upload className="h-4 w-4" />
+                            <div className="flex items-center gap-2">
+                              {dragOverKey === uploadKey && (
+                                <span className="text-xs text-primary font-medium animate-pulse">Soltar PDF aquí</span>
                               )}
-                              Subir PDF
-                            </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-2"
+                                disabled={uploadingPdf === uploadKey}
+                                onClick={() => {
+                                  const input = document.createElement("input");
+                                  input.type = "file";
+                                  input.accept = ".pdf";
+                                  input.onchange = (e) => {
+                                    const file = (e.target as HTMLInputElement).files?.[0];
+                                    if (file) handleUploadPdfPrestador(atencionId, prestadorRows, file);
+                                  };
+                                  input.click();
+                                }}
+                              >
+                                {uploadingPdf === uploadKey ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Upload className="h-4 w-4" />
+                                )}
+                                Subir PDF
+                              </Button>
+                            </div>
                           </div>
 
                           {/* Individual exams within this prestador */}
