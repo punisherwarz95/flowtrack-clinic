@@ -40,6 +40,7 @@ import EmpresaCotizaciones from "./pages/empresa/EmpresaCotizaciones";
 import EmpresaEstadosPago from "./pages/empresa/EmpresaEstadosPago";
 import EmpresaBaterias from "./pages/empresa/EmpresaBaterias";
 import EmpresaResultados from "./pages/empresa/EmpresaResultados";
+import GuiaUsuario from "./pages/GuiaUsuario";
 
 const queryClient = new QueryClient();
 
