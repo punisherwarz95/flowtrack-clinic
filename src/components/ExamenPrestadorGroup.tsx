@@ -634,18 +634,20 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
                     );
                   })}
 
-                  {/* Global save button per group */}
-                  <div className="flex justify-end pt-1">
-                    <Button
-                      size="sm"
-                      onClick={() => handleSaveGroup(groupKey, group.examenes)}
-                      disabled={savingGroup === groupKey}
-                      className="gap-2"
-                    >
-                      {savingGroup === groupKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                      Guardar Todo
-                    </Button>
-                  </div>
+                  {/* Global save button per group - hide for external providers (they use Toma de Muestra flow) */}
+                  {group.prestadorTipo !== "externo" && (
+                    <div className="flex justify-end pt-1">
+                      <Button
+                        size="sm"
+                        onClick={() => handleSaveGroup(groupKey, group.examenes)}
+                        disabled={savingGroup === groupKey}
+                        className="gap-2"
+                      >
+                        {savingGroup === groupKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                        Guardar Todo
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </CollapsibleContent>
             </Collapsible>
