@@ -36,6 +36,7 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
   const [searchFilter, setSearchFilter] = useState("");
   const [expandedExamen, setExpandedExamen] = useState<string | null>(null);
   const [uploadingPdf, setUploadingPdf] = useState<string | null>(null);
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
 
   useEffect(() => {
     loadPendientes();
