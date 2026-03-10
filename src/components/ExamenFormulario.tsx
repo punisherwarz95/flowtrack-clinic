@@ -46,6 +46,7 @@ const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
+  const [dragOverCampo, setDragOverCampo] = useState<string | null>(null);
 
   useEffect(() => {
     loadCamposYResultados();
