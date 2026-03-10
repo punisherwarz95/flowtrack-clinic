@@ -282,6 +282,16 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
     return !!resultado.valor;
   });
 
+  // Check if there are select fields with "Normal" option for the global button
+  const selectCamposWithNormal = campos.filter(
+    c => c.tipo_campo === "select" && Array.isArray(c.opciones) && c.opciones.includes("Normal")
+  );
+
+  const handleTodoNormal = () => {
+    selectCamposWithNormal.forEach(c => updateResultado(c.id, "Normal"));
+    toast.success("Todos los campos marcados como Normal");
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -294,6 +304,18 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
             )}
           </Badge>
         </div>
+        {!readonly && selectCamposWithNormal.length >= 2 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1 text-xs h-7"
+            onClick={handleTodoNormal}
+          >
+            <CheckCircle className="h-3 w-3" />
+            Todo Normal
+          </Button>
+        )}
       </div>
 
       {Object.entries(groups).map(([groupName, groupCampos]) => {

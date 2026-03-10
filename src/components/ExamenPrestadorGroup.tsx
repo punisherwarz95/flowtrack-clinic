@@ -594,7 +594,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
                             <span className="font-medium text-sm">{examen.examenes.nombre}</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            {!bulkActive && isPendiente && (
+                            {!bulkActive && isPendiente && group.prestadorTipo === "externo" && (
                               <Button
                                 variant="outline"
                                 size="sm"
