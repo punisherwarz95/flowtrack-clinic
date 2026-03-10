@@ -25,6 +25,7 @@ import { DocumentoFormViewer, DocumentoContextData } from "@/components/Document
 import ExamenResultadosOtrosBoxes from "@/components/ExamenResultadosOtrosBoxes";
 import ExamenPrestadorGroup from "@/components/ExamenPrestadorGroup";
 import PresionTimerBadge from "@/components/PresionTimerBadge";
+import PresionRetakeForm from "@/components/PresionRetakeForm";
 
 interface Atencion {
   id: string;
