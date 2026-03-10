@@ -53,6 +53,10 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
   const prevAtencionIdRef = useRef<string | null>(null);
   const prevExamenIdsRef = useRef<string>("");
 
+  // Refs for imperative save on each exam form
+  const formRefsMap = useRef<Record<string, React.RefObject<ExamenFormularioRef>>>({});
+  const [savingGroup, setSavingGroup] = useState<string | null>(null);
+
   // Bulk muestra tomada state: groupKey -> Set of selected atencion_examen IDs
   const [bulkSelections, setBulkSelections] = useState<Record<string, Set<string>>>({});
   const [savingBulk, setSavingBulk] = useState<string | null>(null);
