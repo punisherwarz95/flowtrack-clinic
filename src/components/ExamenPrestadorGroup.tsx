@@ -48,6 +48,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
   const [trazabilidadMap, setTrazabilidadMap] = useState<Record<string, string[]>>({});
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
+  const [dragOverGroup, setDragOverGroup] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const prevAtencionIdRef = useRef<string | null>(null);
   const prevExamenIdsRef = useRef<string>("");
@@ -418,12 +419,29 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
                 <CardContent className="pt-0 space-y-3">
                   {/* Shared PDF section for prestador groups */}
                   {group.prestadorId && (
-                    <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                    <div
+                      className={`rounded-lg p-3 space-y-2 transition-colors ${dragOverGroup === groupKey ? "bg-primary/10 border-2 border-dashed border-primary" : "bg-muted/50"}`}
+                      onDragOver={(e) => { e.preventDefault(); setDragOverGroup(groupKey); }}
+                      onDragLeave={() => setDragOverGroup(null)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setDragOverGroup(null);
+                        const file = e.dataTransfer.files?.[0];
+                        if (file && (file.type === "application/pdf" || file.type.startsWith("image/") || file.name.match(/\.(pdf|jpg|jpeg|png)$/i))) {
+                          handleUploadSharedFile(groupKey, group, file);
+                        } else {
+                          toast.error("Solo se permiten archivos PDF o imágenes");
+                        }
+                      }}
+                    >
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-medium text-muted-foreground">
                           PDF compartido ({group.prestadorNombre})
                         </span>
-                        <div>
+                        <div className="flex items-center gap-2">
+                          {dragOverGroup === groupKey && (
+                            <span className="text-xs text-primary font-medium animate-pulse">Soltar archivo aquí</span>
+                          )}
                           <input
                             type="file"
                             accept=".pdf,.jpg,.jpeg,.png"
