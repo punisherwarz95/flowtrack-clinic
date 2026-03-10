@@ -1733,7 +1733,7 @@ export default function PortalPaciente() {
           </CardContent>
         </Card>
 
-        {/* Documentos requeridos */}
+        {/* Documentos requeridos - expandibles inline */}
         {atencionDocumentos.length > 0 && (
           <Card>
             <CardHeader>
@@ -1747,19 +1747,40 @@ export default function PortalPaciente() {
                 )}
               </CardTitle>
               <CardDescription>
-                Complete los siguientes documentos requeridos para su atención
+                Toque un documento para expandirlo y completarlo
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               {atencionDocumentos.map((doc, index) => (
-                <DocumentoStatusCard
-                  key={doc.id}
-                  atencionDocumento={doc}
-                  onClick={() => {
-                    setSelectedDocumentoIndex(index);
-                    setDocumentoDialogOpen(true);
-                  }}
-                />
+                <Collapsible key={doc.id} open={selectedDocumentoIndex === index} onOpenChange={(open) => setSelectedDocumentoIndex(open ? index : null)}>
+                  <CollapsibleTrigger asChild>
+                    <DocumentoStatusCard
+                      atencionDocumento={doc}
+                    />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2 mb-3 border rounded-lg p-3 bg-background">
+                    <DocumentoFormViewer
+                      atencionDocumento={doc}
+                      campos={documentoCampos[doc.documento_id] || []}
+                      onComplete={() => {
+                        reloadDocumentos();
+                        setSelectedDocumentoIndex(null);
+                      }}
+                      contextData={{
+                        paciente: paciente ? {
+                          nombre: paciente.nombre,
+                          rut: paciente.rut || undefined,
+                          fecha_nacimiento: paciente.fecha_nacimiento || undefined,
+                          email: paciente.email || undefined,
+                          telefono: paciente.telefono || undefined,
+                          direccion: paciente.direccion || undefined,
+                        } : undefined,
+                        empresa: empresa?.nombre,
+                        numero_ingreso: atencion?.numero_ingreso || undefined,
+                      }}
+                    />
+                  </CollapsibleContent>
+                </Collapsible>
               ))}
             </CardContent>
           </Card>
