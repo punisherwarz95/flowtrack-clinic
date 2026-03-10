@@ -750,8 +750,18 @@ const EvaluacionMedica = () => {
                                     } catch { /* fallthrough */ }
                                   }
 
-                                  // Audiometria / Antropometria (JSON data)
-                                  if ((tipoCampo === "audiometria" || tipoCampo === "antropometria") && r.valor) {
+                                  // Audiometria - show chart
+                                  if (tipoCampo === "audiometria" && r.valor) {
+                                    return (
+                                      <div key={idx} className="border-b last:border-0 pb-2 last:pb-0">
+                                        <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Audiometría"}</span>
+                                        <AudiometriaChart value={r.valor} />
+                                      </div>
+                                    );
+                                  }
+
+                                  // Antropometria (JSON data - key/value display)
+                                  if (tipoCampo === "antropometria" && r.valor) {
                                     try {
                                       const parsed = JSON.parse(r.valor) as Record<string, unknown>;
                                       return (
@@ -760,7 +770,6 @@ const EvaluacionMedica = () => {
                                           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm bg-muted/40 rounded-md p-2">
                                             {Object.entries(parsed).map(([key, val]) => {
                                               if (val === null || val === undefined || val === "") return null;
-                                              // Skip timer fields
                                               if (key.includes("timer") || key.includes("_inicio")) return null;
                                               const label = key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
                                               const displayVal = typeof val === "object" ? JSON.stringify(val) : String(val);
