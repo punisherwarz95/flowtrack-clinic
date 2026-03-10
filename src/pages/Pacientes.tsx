@@ -1692,6 +1692,46 @@ const Pacientes = () => {
                         </div>
                       </div>
                     </TabsContent>
+
+                    <TabsContent value="documentos" tabIndex={-1} className="flex-1 overflow-hidden mt-2">
+                      <div className="h-full border rounded-md bg-muted/30 overflow-y-auto">
+                        <div className="p-2">
+                          <div className="flex-shrink-0 relative mb-2">
+                            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input placeholder="Buscar documento..." value={documentoFilter} onChange={(e) => setDocumentoFilter(e.target.value)} className="pl-8 pr-8 h-8 text-sm" />
+                            {documentoFilter && (
+                              <button type="button" tabIndex={-1} onClick={() => setDocumentoFilter("")} className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground hover:text-foreground">
+                                <X className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                          {documentosDisponibles.length === 0 ? (
+                            <div className="text-xs text-muted-foreground text-center py-4">
+                              No hay documentos configurados
+                            </div>
+                          ) : (
+                            <div className="space-y-0.5">
+                              {documentosDisponibles
+                                .filter(doc => !documentoFilter || doc.nombre.toLowerCase().includes(documentoFilter.toLowerCase()))
+                                .map((doc) => (
+                                  <label key={doc.id} className="flex items-center gap-2 cursor-pointer py-1.5 px-1 hover:bg-accent rounded text-sm">
+                                    <input type="checkbox" checked={selectedDocumentos.includes(doc.id)}
+                                      onChange={(e) => {
+                                        if (e.target.checked) setSelectedDocumentos(prev => [...prev, doc.id]);
+                                        else setSelectedDocumentos(prev => prev.filter(id => id !== doc.id));
+                                      }} className="w-3.5 h-3.5" />
+                                    <div className="flex-1 min-w-0">
+                                      <span className="break-words block">{doc.nombre}</span>
+                                      {doc.descripcion && <span className="text-xs text-muted-foreground block">{doc.descripcion}</span>}
+                                    </div>
+                                    <Badge variant="outline" className="text-xs shrink-0">{doc.tipo}</Badge>
+                                  </label>
+                                ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </TabsContent>
                   </Tabs>
                 </div>
               </div>
