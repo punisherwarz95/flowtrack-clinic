@@ -624,11 +624,13 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
                           </div>
                         </div>
                         <ExamenFormulario
+                          ref={getFormRef(examen.id)}
                           atencionExamenId={examen.id}
                           examenId={examen.examen_id}
                           examenNombre={examen.examenes.nombre}
                           fechaNacimiento={fechaNacimiento}
                           esExterno={group.prestadorTipo === "externo"}
+                          hideSaveButton
                           onComplete={() => {
                             onComplete?.();
                             loadPrestadorData();
@@ -637,6 +639,19 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
                       </div>
                     );
                   })}
+
+                  {/* Global save button per group */}
+                  <div className="flex justify-end pt-1">
+                    <Button
+                      size="sm"
+                      onClick={() => handleSaveGroup(groupKey, group.examenes)}
+                      disabled={savingGroup === groupKey}
+                      className="gap-2"
+                    >
+                      {savingGroup === groupKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      Guardar Todo
+                    </Button>
+                  </div>
                 </CardContent>
               </CollapsibleContent>
             </Collapsible>
