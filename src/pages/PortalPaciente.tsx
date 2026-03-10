@@ -111,6 +111,15 @@ export default function PortalPaciente() {
     totalCount: documentosTotal
   } = useAtencionDocumentos(atencion?.id || null);
   
+  // Polling para documentos (cada 5 segundos) para detectar nuevos documentos agregados por staff
+  useEffect(() => {
+    if (!atencion?.id || step !== "portal") return;
+    const interval = setInterval(() => {
+      reloadDocumentos();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [atencion?.id, step, reloadDocumentos]);
+
   // Lista de ciudades de Chile para validación
   const ciudadesChile = [
     "Arica", "Iquique", "Alto Hospicio", "Antofagasta", "Calama", "Tocopilla",
