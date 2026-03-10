@@ -1020,7 +1020,7 @@ const EvaluacionMedica = () => {
                                   <p><strong>Resultado:</strong> {bat.evaluacion.resultado === "apto" ? "APTO" : bat.evaluacion.resultado === "no_apto" ? "NO APTO" : "APTO CON RESTRICCIONES"}</p>
                                   {bat.evaluacion.observaciones && <p><strong>Observaciones:</strong> {bat.evaluacion.observaciones}</p>}
                                   {bat.evaluacion.restricciones && <p><strong>Restricciones:</strong> {bat.evaluacion.restricciones}</p>}
-                                  {(bat.evaluacion.datos_clinicos as Record<string, unknown>)?.duracion_anios && (
+                                  {(bat.evaluacion.datos_clinicos as Record<string, unknown>)?.duracion_anios && String((bat.evaluacion.datos_clinicos as Record<string, unknown>).duracion_anios) !== "no_mostrar" && (
                                     <p><strong>Duración:</strong> {String((bat.evaluacion.datos_clinicos as Record<string, unknown>).duracion_anios)} año(s)</p>
                                   )}
                                   {(bat.evaluacion.datos_clinicos as Record<string, unknown>)?.conclusion && (
