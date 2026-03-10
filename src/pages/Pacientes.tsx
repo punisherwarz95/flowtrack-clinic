@@ -733,9 +733,35 @@ const Pacientes = () => {
               console.log("[Pacientes] Generando documentos para paquetes:", selectedPaquetes);
               const result = await generateDocuments(atencionData.id, selectedPaquetes);
               if (result.success && result.count > 0) {
-                toast.success(`${result.count} documento(s) generado(s)`);
+                toast.success(`${result.count} documento(s) generado(s) desde baterías`);
               } else if (!result.success) {
                 toast.error(`Error generando documentos: ${result.error}`);
+              }
+            }
+
+            // Agregar documentos seleccionados manualmente
+            if (selectedDocumentos.length > 0) {
+              // Verificar cuáles ya existen
+              const { data: existingDocs } = await supabase
+                .from("atencion_documentos")
+                .select("documento_id")
+                .eq("atencion_id", atencionData.id);
+
+              const existingDocIds = new Set((existingDocs || []).map(d => d.documento_id));
+              const newDocIds = selectedDocumentos.filter(id => !existingDocIds.has(id));
+
+              if (newDocIds.length > 0) {
+                const newDocs = newDocIds.map(documento_id => ({
+                  atencion_id: atencionData.id,
+                  documento_id,
+                  respuestas: {},
+                  estado: "pendiente",
+                }));
+                const { error: docError } = await supabase
+                  .from("atencion_documentos")
+                  .insert(newDocs);
+                if (docError) console.error("Error insertando documentos manuales:", docError);
+                else if (newDocIds.length > 0) toast.success(`${newDocIds.length} documento(s) agregado(s)`);
               }
             }
 
