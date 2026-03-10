@@ -95,14 +95,17 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
       // Map examen_id -> prestador_id
       const peMap: Record<string, string> = {};
       const pNames: Record<string, string> = {};
+      const pTipos: Record<string, string> = {};
       (peRes.data || []).forEach((pe: any) => {
         peMap[pe.examen_id] = pe.prestador_id;
         if (pe.prestadores?.nombre) {
           pNames[pe.prestador_id] = pe.prestadores.nombre;
+          pTipos[pe.prestador_id] = pe.prestadores.tipo || "interno";
         }
       });
       setPrestadorExamenes(peMap);
       setPrestadores(pNames);
+      setPrestadorTipos(pTipos);
 
       setArchivosCompartidos(archRes.data || []);
 
