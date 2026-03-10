@@ -37,6 +37,7 @@ interface Props {
   onComplete?: () => void;
   readonly?: boolean;
   fechaNacimiento?: string | null;
+  esExterno?: boolean;
 }
 
 const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete, readonly = false, fechaNacimiento }: Props) => {
