@@ -709,6 +709,18 @@ const MiBox = () => {
                         </CardContent>
                       </Card>
 
+                      {/* Pressure retake form if timer active */}
+                      {timerByAtencion[selectedAtencion.id] && (
+                        <PresionRetakeForm
+                          atencionId={selectedAtencion.id}
+                          timer={timerByAtencion[selectedAtencion.id]}
+                          onSaved={() => {
+                            reloadTimers();
+                            loadData();
+                          }}
+                        />
+                      )}
+
                       {/* Exams grouped by prestador */}
                       <Card>
                         <CardHeader className="pb-3">
