@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,6 +30,11 @@ interface ResultadoCampo {
   archivo_url: string | null;
 }
 
+export interface ExamenFormularioRef {
+  save: () => Promise<void>;
+  hasPendingChanges: () => boolean;
+}
+
 interface Props {
   atencionExamenId: string;
   examenId: string;
@@ -38,9 +43,10 @@ interface Props {
   readonly?: boolean;
   fechaNacimiento?: string | null;
   esExterno?: boolean;
+  hideSaveButton?: boolean;
 }
 
-const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete, readonly = false, fechaNacimiento, esExterno = false }: Props) => {
+const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExamenId, examenId, examenNombre, onComplete, readonly = false, fechaNacimiento, esExterno = false, hideSaveButton = false }, ref) => {
   const [campos, setCampos] = useState<CampoFormulario[]>([]);
   const [resultados, setResultados] = useState<Record<string, ResultadoCampo>>({});
   const [loading, setLoading] = useState(true);
@@ -89,6 +95,11 @@ const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete
       setLoading(false);
     }
   };
+
+  useImperativeHandle(ref, () => ({
+    save: handleSave,
+    hasPendingChanges: () => Object.keys(resultados).length > 0,
+  }));
 
   const updateResultado = (campoId: string, valor: string | null, archivo_url?: string | null) => {
     setResultados((prev) => ({
@@ -553,7 +564,7 @@ const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete
         );
       })}
 
-      {!readonly && (
+      {!readonly && !hideSaveButton && (
         <div className="flex justify-end pt-2">
           <Button onClick={handleSave} disabled={saving} className="gap-2">
             <Save className="h-4 w-4" />
@@ -563,6 +574,8 @@ const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete
       )}
     </div>
   );
-};
+});
+
+ExamenFormulario.displayName = "ExamenFormulario";
 
 export default ExamenFormulario;

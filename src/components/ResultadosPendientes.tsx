@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,8 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { FlaskConical, Upload, Search, CheckCircle, Loader2 } from "lucide-react";
-import ExamenFormulario from "@/components/ExamenFormulario";
+import { FlaskConical, Upload, Search, CheckCircle, Save, Loader2 } from "lucide-react";
+import ExamenFormulario, { ExamenFormularioRef } from "@/components/ExamenFormulario";
 
 interface PendienteRow {
   atencionId: string;
@@ -35,6 +35,14 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
   const [searchFilter, setSearchFilter] = useState("");
   const [uploadingPdf, setUploadingPdf] = useState<string | null>(null);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+  const [savingPatient, setSavingPatient] = useState<string | null>(null);
+
+  // Refs for all ExamenFormulario instances, keyed by atencionExamenId
+  const formRefs = useRef<Record<string, ExamenFormularioRef | null>>({});
+
+  const setFormRef = useCallback((atencionExamenId: string) => (el: ExamenFormularioRef | null) => {
+    formRefs.current[atencionExamenId] = el;
+  }, []);
 
   useEffect(() => {
     loadPendientes();
@@ -76,11 +84,9 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
       const { data, error } = await query.limit(500);
       if (error) throw error;
 
-      // Fetch prestador info for each examen
       const examenIds = [...new Set((data || []).map((ae: any) => ae.examen_id))];
-      
       let prestadorMap: Record<string, { prestadorId: string; prestadorNombre: string }> = {};
-      
+
       if (examenIds.length > 0) {
         const { data: peData } = await supabase
           .from("prestador_examenes")
@@ -121,7 +127,6 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
     }
   };
 
-  // Group by patient (atencionId)
   const grouped = pendientes.reduce<Record<string, PendienteRow[]>>((acc, row) => {
     if (!acc[row.atencionId]) acc[row.atencionId] = [];
     acc[row.atencionId].push(row);
@@ -132,7 +137,6 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
     if (!searchFilter) return true;
     const s = searchFilter.toLowerCase().trim();
     const first = rows[0];
-    // Search by numero_ingreso too
     const matchNumero = String(first.numeroIngreso) === s || String(first.numeroIngreso).includes(s);
     return (
       matchNumero ||
@@ -142,7 +146,6 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
     );
   });
 
-  // Sub-group rows by prestador within a patient
   const groupByPrestador = (rows: PendienteRow[]) => {
     const map: Record<string, PendienteRow[]> = {};
     for (const row of rows) {
@@ -183,7 +186,6 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
 
       if (archivoError) throw archivoError;
 
-      // Link ONLY to exams of this prestador
       const vinculos = prestadorRows.map((row) => ({
         archivo_compartido_id: archivoData.id,
         examen_id: row.examenId,
@@ -204,19 +206,41 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
     }
   };
 
-  const handleMarcarCompletado = async (atencionExamenId: string) => {
+  // Global save per patient: saves all exam forms + marks all as completado
+  const handleSaveAllForPatient = async (atencionId: string, rows: PendienteRow[]) => {
+    setSavingPatient(atencionId);
     try {
-      const { error } = await supabase
-        .from("atencion_examenes")
-        .update({ estado: "completado", fecha_realizacion: new Date().toISOString() })
-        .eq("id", atencionExamenId);
-
-      if (error) throw error;
-      toast.success("Examen marcado como completado");
+      // Save all form data
+      for (const row of rows) {
+        const formRef = formRefs.current[row.atencionExamenId];
+        if (formRef) {
+          await formRef.save();
+        }
+      }
+      toast.success(`Todos los resultados del paciente guardados`);
       await loadPendientes();
     } catch (error) {
       console.error("Error:", error);
-      toast.error("Error al completar examen");
+      toast.error("Error al guardar resultados");
+    } finally {
+      setSavingPatient(null);
+    }
+  };
+
+  const handleMarcarTodosCompletados = async (rows: PendienteRow[]) => {
+    try {
+      const ids = rows.map((r) => r.atencionExamenId);
+      const { error } = await supabase
+        .from("atencion_examenes")
+        .update({ estado: "completado", fecha_realizacion: new Date().toISOString() })
+        .in("id", ids);
+
+      if (error) throw error;
+      toast.success(`${rows.length} examen(es) marcados como completados`);
+      await loadPendientes();
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al completar exámenes");
     }
   };
 
@@ -235,8 +259,8 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-base">
               <FlaskConical className="h-5 w-5 text-amber-600" />
-              Resultados Pendientes de Lab Externo
-              <Badge variant="secondary">{pendientes.length} exámenes</Badge>
+              Resultados Pendientes
+              <Badge variant="secondary">{pendientes.length}</Badge>
             </CardTitle>
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -258,29 +282,24 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
             filteredGroups.map(([atencionId, rows]) => {
               const first = rows[0];
               const prestadorGroups = groupByPrestador(rows);
+              const isSaving = savingPatient === atencionId;
 
               return (
                 <Card key={atencionId} className="border-amber-200 dark:border-amber-800">
-                  <CardHeader className="py-3 px-4">
+                  <CardHeader className="py-2 px-4">
                     <div className="flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="font-bold">#{first.numeroIngreso}</Badge>
-                          <span className="font-medium">{first.pacienteNombre}</span>
-                          <span className="text-xs text-muted-foreground font-mono">{first.pacienteRut}</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {first.empresaNombre} · Ingreso: {first.fechaIngreso
-                            ? format(new Date(first.fechaIngreso), "dd/MM/yyyy HH:mm", { locale: es })
-                            : "-"}
-                        </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="outline" className="font-bold text-xs">#{first.numeroIngreso}</Badge>
+                        <span className="font-medium text-sm">{first.pacienteNombre}</span>
+                        <span className="text-xs text-muted-foreground font-mono">{first.pacienteRut}</span>
+                        <span className="text-xs text-muted-foreground">· {first.empresaNombre}</span>
                       </div>
-                      <Badge className="bg-amber-600 text-white">
-                        {rows.length} pendiente{rows.length > 1 ? "s" : ""}
+                      <Badge className="bg-amber-600 text-white text-xs">
+                        {rows.length} pend.
                       </Badge>
                     </div>
                   </CardHeader>
-                  <CardContent className="pt-0 space-y-4">
+                  <CardContent className="pt-0 pb-3 space-y-2">
                     {prestadorGroups.map(([prestadorKey, prestadorRows]) => {
                       const uploadKey = `${atencionId}-${prestadorKey}`;
                       const prestadorNombre = prestadorRows[0]?.prestadorNombre || "Sin prestador";
@@ -302,23 +321,23 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
                             }
                           }}
                         >
-                          {/* Prestador header + PDF upload */}
-                          <div className="flex items-center justify-between gap-3 p-3 bg-muted/40 border-b">
+                          {/* Prestador header */}
+                          <div className="flex items-center justify-between gap-2 px-3 py-2 bg-muted/40 border-b">
                             <div className="flex items-center gap-2">
-                              <FlaskConical className="h-4 w-4 text-primary" />
-                              <span className="font-medium text-sm">{prestadorNombre}</span>
-                              <Badge variant="secondary" className="text-xs">
-                                {prestadorRows.length} examen{prestadorRows.length > 1 ? "es" : ""}
+                              <FlaskConical className="h-3.5 w-3.5 text-primary" />
+                              <span className="font-medium text-xs">{prestadorNombre}</span>
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                {prestadorRows.length}
                               </Badge>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1">
                               {dragOverKey === uploadKey && (
-                                <span className="text-xs text-primary font-medium animate-pulse">Soltar PDF aquí</span>
+                                <span className="text-[10px] text-primary font-medium animate-pulse">Soltar PDF</span>
                               )}
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="gap-2"
+                                className="gap-1 h-7 text-xs"
                                 disabled={uploadingPdf === uploadKey}
                                 onClick={() => {
                                   const input = document.createElement("input");
@@ -332,50 +351,59 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
                                 }}
                               >
                                 {uploadingPdf === uploadKey ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  <Loader2 className="h-3 w-3 animate-spin" />
                                 ) : (
-                                  <Upload className="h-4 w-4" />
+                                  <Upload className="h-3 w-3" />
                                 )}
-                                Subir PDF
+                                PDF
                               </Button>
                             </div>
                           </div>
 
-                          {/* Individual exams within this prestador - inline, no collapsible */}
-                          <div className="p-3 space-y-4">
+                          {/* Compact exam forms */}
+                          <div className="p-2 space-y-2">
                             {prestadorRows.map((row) => (
-                              <div key={row.atencionExamenId} className="border rounded-lg p-4 space-y-3">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <FlaskConical className="h-4 w-4 text-amber-600" />
-                                    <span className="font-semibold text-sm">{row.examenNombre}</span>
-                                  </div>
-                                  <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs">
-                                    Muestra tomada
-                                  </Badge>
+                              <div key={row.atencionExamenId} className="border rounded p-2">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-semibold text-xs">{row.examenNombre}</span>
                                 </div>
                                 <ExamenFormulario
+                                  ref={setFormRef(row.atencionExamenId)}
                                   atencionExamenId={row.atencionExamenId}
                                   examenId={row.examenId}
                                   examenNombre={row.examenNombre}
-                                  onComplete={loadPendientes}
+                                  onComplete={() => {}}
                                   fechaNacimiento={row.fechaNacimiento}
+                                  hideSaveButton
                                 />
-                                <div className="flex justify-end pt-2 border-t">
-                                  <Button
-                                    className="gap-2"
-                                    onClick={() => handleMarcarCompletado(row.atencionExamenId)}
-                                  >
-                                    <CheckCircle className="h-4 w-4" />
-                                    Marcar como Completado
-                                  </Button>
-                                </div>
                               </div>
                             ))}
                           </div>
                         </div>
                       );
                     })}
+
+                    {/* Single action row per patient */}
+                    <div className="flex justify-end gap-2 pt-2 border-t">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        disabled={isSaving}
+                        onClick={() => handleSaveAllForPatient(atencionId, rows)}
+                      >
+                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                        Guardar Todo
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => handleMarcarTodosCompletados(rows)}
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                        Completar Todos
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               );
