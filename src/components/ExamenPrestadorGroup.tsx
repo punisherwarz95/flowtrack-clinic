@@ -400,6 +400,9 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
                         <Stethoscope className="h-4 w-4 text-muted-foreground" />
                       )}
                       <span className="font-semibold text-sm">{group.prestadorNombre}</span>
+                      {group.prestadorTipo === "externo" && (
+                        <Badge variant="destructive" className="text-xs">Externo</Badge>
+                      )}
                       <Badge variant="outline" className="text-xs">
                         {completedCount}/{totalCount}
                       </Badge>
