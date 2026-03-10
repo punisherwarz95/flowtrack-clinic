@@ -640,6 +640,7 @@ const EvaluacionMedica = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="no_mostrar">No mostrar</SelectItem>
                         <SelectItem value="1">1 Año</SelectItem>
                         <SelectItem value="2">2 Años</SelectItem>
                         <SelectItem value="3">3 Años</SelectItem>
