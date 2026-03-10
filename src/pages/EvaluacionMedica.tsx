@@ -94,6 +94,10 @@ const EvaluacionMedica = () => {
   const [activeTab, setActiveTab] = useState("listado");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [atenciones, setAtenciones] = useState<PacienteAtencion[]>([]);
+  const [filterStatusLista, setFilterStatusLista] = useState(true);
+  const [filterStatusEsperando, setFilterStatusEsperando] = useState(true);
+  const [filterStatusPendiente, setFilterStatusPendiente] = useState(true);
+  const [filterStatusEvaluado, setFilterStatusEvaluado] = useState(true);
   const [loading, setLoading] = useState(false);
   const [selectedPaciente, setSelectedPaciente] = useState<PacienteAtencion | null>(null);
   const [bateriasConEstado, setBateriasConEstado] = useState<BateriaConEstado[]>([]);
@@ -526,7 +530,16 @@ const EvaluacionMedica = () => {
     }
   };
 
-  const sortedAtenciones = [...atenciones].sort((a, b) => getPatientOverallStatus(a) - getPatientOverallStatus(b));
+  const sortedAtenciones = [...atenciones]
+    .filter(at => {
+      const status = getPatientOverallStatus(at);
+      if (status === 0 && !filterStatusLista) return false;
+      if (status === 1 && !filterStatusEsperando) return false;
+      if (status === 2 && !filterStatusPendiente) return false;
+      if (status === 3 && !filterStatusEvaluado) return false;
+      return true;
+    })
+    .sort((a, b) => getPatientOverallStatus(a) - getPatientOverallStatus(b));
 
   // Group exam results by atencion_examen_id
   const getResultadosByExamen = () => {
@@ -863,6 +876,52 @@ const EvaluacionMedica = () => {
                       <span className="inline-flex items-center gap-1 mr-3"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block" /> Esperando resultados</span>
                       <span className="inline-flex items-center gap-1 mr-3"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> Exámenes pendientes</span>
                     </p>
+                    <div className="flex items-center gap-4 mt-2 flex-wrap">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <div 
+                          onClick={() => setFilterStatusLista(!filterStatusLista)}
+                          className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
+                            filterStatusLista ? "bg-green-600 border-green-600 text-white" : "border-muted-foreground"
+                          }`}
+                        >
+                          {filterStatusLista && <CheckCircle className="h-3 w-3" />}
+                        </div>
+                        <span className="text-sm">Lista</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <div 
+                          onClick={() => setFilterStatusEsperando(!filterStatusEsperando)}
+                          className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
+                            filterStatusEsperando ? "bg-amber-600 border-amber-600 text-white" : "border-muted-foreground"
+                          }`}
+                        >
+                          {filterStatusEsperando && <Clock className="h-3 w-3" />}
+                        </div>
+                        <span className="text-sm">Esperando</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <div 
+                          onClick={() => setFilterStatusPendiente(!filterStatusPendiente)}
+                          className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
+                            filterStatusPendiente ? "bg-blue-600 border-blue-600 text-white" : "border-muted-foreground"
+                          }`}
+                        >
+                          {filterStatusPendiente && <FlaskConical className="h-3 w-3" />}
+                        </div>
+                        <span className="text-sm">Pendiente</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <div 
+                          onClick={() => setFilterStatusEvaluado(!filterStatusEvaluado)}
+                          className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
+                            filterStatusEvaluado ? "bg-gray-600 border-gray-600 text-white" : "border-muted-foreground"
+                          }`}
+                        >
+                          {filterStatusEvaluado && <CheckCircle className="h-3 w-3" />}
+                        </div>
+                        <span className="text-sm">Evaluado</span>
+                      </label>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Popover>
