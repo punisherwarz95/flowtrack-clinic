@@ -1069,6 +1069,55 @@ const Dashboard = () => {
                     <span className="text-sm">En Atención ({conteosEstado.listos})</span>
                   </label>
                 </div>
+
+                {/* Filtros por color de examen */}
+                <div className="flex items-center gap-4 flex-wrap">
+                  <span className="text-sm font-medium text-muted-foreground">Filtrar exámenes:</span>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <div 
+                      onClick={() => setFilterExPendiente(!filterExPendiente)}
+                      className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
+                        filterExPendiente ? "bg-blue-600 border-blue-600 text-white" : "border-muted-foreground"
+                      }`}
+                    >
+                      {filterExPendiente && <Check className="h-3 w-3" />}
+                    </div>
+                    <span className="text-sm">Pendiente</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <div 
+                      onClick={() => setFilterExMuestra(!filterExMuestra)}
+                      className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
+                        filterExMuestra ? "bg-yellow-600 border-yellow-600 text-white" : "border-muted-foreground"
+                      }`}
+                    >
+                      {filterExMuestra && <Check className="h-3 w-3" />}
+                    </div>
+                    <span className="text-sm">Muestra Tomada</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <div 
+                      onClick={() => setFilterExCompletado(!filterExCompletado)}
+                      className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
+                        filterExCompletado ? "bg-green-600 border-green-600 text-white" : "border-muted-foreground"
+                      }`}
+                    >
+                      {filterExCompletado && <Check className="h-3 w-3" />}
+                    </div>
+                    <span className="text-sm">Completado</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <div 
+                      onClick={() => setFilterExIncompleto(!filterExIncompleto)}
+                      className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
+                        filterExIncompleto ? "bg-red-600 border-red-600 text-white" : "border-muted-foreground"
+                      }`}
+                    >
+                      {filterExIncompleto && <Check className="h-3 w-3" />}
+                    </div>
+                    <span className="text-sm">Incompleto</span>
+                  </label>
+                </div>
                 
                 {selectedExamenFilter !== "all" && (
                     <div className="flex items-center gap-4">
