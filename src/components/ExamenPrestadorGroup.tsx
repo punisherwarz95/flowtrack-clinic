@@ -40,6 +40,7 @@ interface Props {
 const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaNacimiento }: Props) => {
   const [prestadorExamenes, setPrestadorExamenes] = useState<Record<string, string>>({});
   const [prestadores, setPrestadores] = useState<Record<string, string>>({});
+  const [prestadorTipos, setPrestadorTipos] = useState<Record<string, string>>({});
   const [archivosCompartidos, setArchivosCompartidos] = useState<ArchivoCompartido[]>([]);
   const [archivoVinculos, setArchivoVinculos] = useState<Record<string, string[]>>({});
   const [expandedExamen, setExpandedExamen] = useState<string | null>(null);
