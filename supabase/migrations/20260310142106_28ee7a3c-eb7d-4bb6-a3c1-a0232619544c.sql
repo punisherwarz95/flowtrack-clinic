@@ -1,0 +1,1 @@
+ALTER TABLE public.prestadores ADD COLUMN tipo text NOT NULL DEFAULT 'interno';

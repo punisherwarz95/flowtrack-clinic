@@ -37,9 +37,10 @@ interface Props {
   onComplete?: () => void;
   readonly?: boolean;
   fechaNacimiento?: string | null;
+  esExterno?: boolean;
 }
 
-const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete, readonly = false, fechaNacimiento }: Props) => {
+const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete, readonly = false, fechaNacimiento, esExterno = false }: Props) => {
   const [campos, setCampos] = useState<CampoFormulario[]>([]);
   const [resultados, setResultados] = useState<Record<string, ResultadoCampo>>({});
   const [loading, setLoading] = useState(true);
@@ -210,18 +211,21 @@ const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete
       });
 
       // Update atencion_examenes status
-      const nuevoEstado = allRequiredFilled ? "completado" : "incompleto";
+      // If prestador is external, mark as muestra_tomada instead of completado
+      const nuevoEstado = allRequiredFilled
+        ? (esExterno ? "muestra_tomada" : "completado")
+        : "incompleto";
       await supabase
         .from("atencion_examenes")
         .update({
-          estado: nuevoEstado,
+          estado: nuevoEstado as any,
           fecha_realizacion: allRequiredFilled ? new Date().toISOString() : null,
         })
         .eq("id", atencionExamenId);
 
       toast.success(
         allRequiredFilled
-          ? "Examen completado y guardado"
+          ? (esExterno ? "Muestra tomada registrada y datos guardados" : "Examen completado y guardado")
           : "Datos guardados (parcial - faltan campos requeridos)"
       );
 

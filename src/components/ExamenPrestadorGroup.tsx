@@ -19,6 +19,7 @@ interface AtencionExamen {
 interface PrestadorGroup {
   prestadorId: string | null;
   prestadorNombre: string;
+  prestadorTipo: string;
   examenes: AtencionExamen[];
   archivosCompartidos: ArchivoCompartido[];
 }
@@ -40,6 +41,7 @@ interface Props {
 const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaNacimiento }: Props) => {
   const [prestadorExamenes, setPrestadorExamenes] = useState<Record<string, string>>({});
   const [prestadores, setPrestadores] = useState<Record<string, string>>({});
+  const [prestadorTipos, setPrestadorTipos] = useState<Record<string, string>>({});
   const [archivosCompartidos, setArchivosCompartidos] = useState<ArchivoCompartido[]>([]);
   const [archivoVinculos, setArchivoVinculos] = useState<Record<string, string[]>>({});
   const [expandedExamen, setExpandedExamen] = useState<string | null>(null);
@@ -76,7 +78,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
       // Fetch prestador_examenes + shared files + vinculos + trazabilidad in parallel
       const [peRes, archRes, vincRes, trazRes] = await Promise.all([
         supabase.from("prestador_examenes")
-          .select("examen_id, prestador_id, prestadores(nombre)")
+          .select("examen_id, prestador_id, prestadores(nombre, tipo)")
           .in("examen_id", examenIds),
         supabase.from("examen_archivos_compartidos")
           .select("*")
@@ -94,14 +96,17 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
       // Map examen_id -> prestador_id
       const peMap: Record<string, string> = {};
       const pNames: Record<string, string> = {};
+      const pTipos: Record<string, string> = {};
       (peRes.data || []).forEach((pe: any) => {
         peMap[pe.examen_id] = pe.prestador_id;
         if (pe.prestadores?.nombre) {
           pNames[pe.prestador_id] = pe.prestadores.nombre;
+          pTipos[pe.prestador_id] = pe.prestadores.tipo || "interno";
         }
       });
       setPrestadorExamenes(peMap);
       setPrestadores(pNames);
+      setPrestadorTipos(pTipos);
 
       setArchivosCompartidos(archRes.data || []);
 
@@ -141,6 +146,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
         groupMap[key] = {
           prestadorId,
           prestadorNombre: prestadorId ? (prestadores[prestadorId] || "Prestador") : "Sin prestador",
+          prestadorTipo: prestadorId ? (prestadorTipos[prestadorId] || "interno") : "interno",
           examenes: [],
           archivosCompartidos: [],
         };
@@ -167,7 +173,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
       if (!a.prestadorId && b.prestadorId) return 1;
       return a.prestadorNombre.localeCompare(b.prestadorNombre);
     });
-  }, [atencionExamenes, prestadorExamenes, prestadores, archivosCompartidos, archivoVinculos]);
+  }, [atencionExamenes, prestadorExamenes, prestadores, prestadorTipos, archivosCompartidos, archivoVinculos]);
 
   const handleUploadSharedFile = async (groupKey: string, group: PrestadorGroup, file: File) => {
     setUploading(groupKey);
@@ -394,6 +400,9 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
                         <Stethoscope className="h-4 w-4 text-muted-foreground" />
                       )}
                       <span className="font-semibold text-sm">{group.prestadorNombre}</span>
+                      {group.prestadorTipo === "externo" && (
+                        <Badge variant="destructive" className="text-xs">Externo</Badge>
+                      )}
                       <Badge variant="outline" className="text-xs">
                         {completedCount}/{totalCount}
                       </Badge>
@@ -557,6 +566,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
                           examenId={examen.examen_id}
                           examenNombre={examen.examenes.nombre}
                           fechaNacimiento={fechaNacimiento}
+                          esExterno={group.prestadorTipo === "externo"}
                           onComplete={() => {
                             onComplete?.();
                             loadPrestadorData();

@@ -29,6 +29,7 @@ interface Prestador {
   email: string | null;
   user_id: string | null;
   activo: boolean;
+  tipo: string;
   created_at: string;
 }
 
@@ -84,6 +85,7 @@ const Prestadores = () => {
   const [email, setEmail] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [activo, setActivo] = useState(true);
+  const [tipo, setTipo] = useState("interno");
 
   // Tarifas form
   const [selectedExamenes, setSelectedExamenes] = useState<{ [key: string]: number }>({});
@@ -185,6 +187,7 @@ const Prestadores = () => {
     setEmail("");
     setSelectedUserId(null);
     setActivo(true);
+    setTipo("interno");
     setEditingPrestador(null);
   };
 
@@ -198,6 +201,7 @@ const Prestadores = () => {
       setEmail(prestador.email || "");
       setSelectedUserId(prestador.user_id);
       setActivo(prestador.activo);
+      setTipo(prestador.tipo || "interno");
     } else {
       resetForm();
     }
@@ -218,6 +222,7 @@ const Prestadores = () => {
       email: email.trim() || null,
       user_id: selectedUserId,
       activo,
+      tipo,
     };
 
     if (editingPrestador) {
@@ -505,6 +510,18 @@ const Prestadores = () => {
                         </SelectContent>
                       </Select>
                     </div>
+                    <div>
+                      <Label>Tipo de Prestador</Label>
+                      <Select value={tipo} onValueChange={setTipo}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="interno">Interno (resultado inmediato)</SelectItem>
+                          <SelectItem value="externo">Externo (toma de muestra / derivación)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div className="flex items-center gap-2">
                       <Checkbox
                         id="activo"
@@ -538,6 +555,9 @@ const Prestadores = () => {
                         )}
                       </div>
                       <div className="flex gap-1">
+                        <Badge variant={prestador.tipo === "externo" ? "destructive" : "default"} className="text-xs">
+                          {prestador.tipo === "externo" ? "Externo" : "Interno"}
+                        </Badge>
                         {!prestador.activo && (
                           <Badge variant="secondary">Inactivo</Badge>
                         )}
