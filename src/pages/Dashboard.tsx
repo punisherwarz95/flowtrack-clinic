@@ -1115,14 +1115,24 @@ const Dashboard = () => {
                   <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-20">Orden</TableHead>
+                         <TableHead className="w-20">Orden</TableHead>
                           <TableHead>Paciente</TableHead>
                           <TableHead>Empresa</TableHead>
                           <TableHead>Tipo</TableHead>
                           <TableHead>Estado</TableHead>
                           <TableHead>Re-Toma PA</TableHead>
                           <TableHead>Box</TableHead>
-                          <TableHead>Exámenes</TableHead>
+                          <TableHead>
+                            <div className="flex flex-col gap-1">
+                              <span>Exámenes</span>
+                              <div className="flex flex-wrap gap-2 font-normal">
+                                <span className="inline-flex items-center gap-1 text-[10px]"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />Pendiente</span>
+                                <span className="inline-flex items-center gap-1 text-[10px]"><span className="w-2 h-2 rounded-full bg-yellow-500 inline-block" />Muestra</span>
+                                <span className="inline-flex items-center gap-1 text-[10px]"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" />Completado</span>
+                                <span className="inline-flex items-center gap-1 text-[10px]"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" />Incompleto</span>
+                              </div>
+                            </div>
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                     <TableBody>
