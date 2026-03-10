@@ -201,7 +201,7 @@ const DashboardGuide = ({ role }: { role: string }) => (
             <CardContent className="pt-3 pb-3 px-3">
               <p className="text-xs text-muted-foreground">Exámenes Realizados Mes</p>
               <div className="text-2xl font-bold">1.847</div>
-              <p className="text-xs text-muted-foreground">Usa paginación interna (>1000)</p>
+              <p className="text-xs text-muted-foreground">Usa paginación interna (&gt;1000)</p>
             </CardContent>
           </Card>
         </div>
