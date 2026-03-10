@@ -215,8 +215,8 @@ const AudiometriaForm = ({ value, onChange, readonly = false, fechaNacimiento }:
               />
               <YAxis
                 reversed
-                domain={[-10, 130]}
-                ticks={[-10, 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130]}
+                domain={[0, 130]}
+                ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130]}
                 tick={{ fontSize: 10 }}
                 stroke="hsl(var(--muted-foreground))"
                 label={{ value: "dB HL", angle: -90, position: "insideLeft", style: { fontSize: 11 } }}
