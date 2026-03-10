@@ -70,6 +70,12 @@ const Dashboard = () => {
   const [filterIncompleto, setFilterIncompleto] = useState<boolean>(true);
   const [filterNombre, setFilterNombre] = useState<string>("");
   
+  // Filtros por color de examen
+  const [filterExPendiente, setFilterExPendiente] = useState<boolean>(true);
+  const [filterExMuestra, setFilterExMuestra] = useState<boolean>(true);
+  const [filterExCompletado, setFilterExCompletado] = useState<boolean>(true);
+  const [filterExIncompleto, setFilterExIncompleto] = useState<boolean>(true);
+  
   // Filtros por estado de atención
   const [filterEstadoCompletado, setFilterEstadoCompletado] = useState<boolean>(true);
   const [filterEstadoListo, setFilterEstadoListo] = useState<boolean>(true);
