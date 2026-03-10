@@ -173,7 +173,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
       if (!a.prestadorId && b.prestadorId) return 1;
       return a.prestadorNombre.localeCompare(b.prestadorNombre);
     });
-  }, [atencionExamenes, prestadorExamenes, prestadores, archivosCompartidos, archivoVinculos]);
+  }, [atencionExamenes, prestadorExamenes, prestadores, prestadorTipos, archivosCompartidos, archivoVinculos]);
 
   const handleUploadSharedFile = async (groupKey: string, group: PrestadorGroup, file: File) => {
     setUploading(groupKey);
