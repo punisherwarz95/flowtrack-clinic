@@ -530,7 +530,16 @@ const EvaluacionMedica = () => {
     }
   };
 
-  const sortedAtenciones = [...atenciones].sort((a, b) => getPatientOverallStatus(a) - getPatientOverallStatus(b));
+  const sortedAtenciones = [...atenciones]
+    .filter(at => {
+      const status = getPatientOverallStatus(at);
+      if (status === 0 && !filterStatusLista) return false;
+      if (status === 1 && !filterStatusEsperando) return false;
+      if (status === 2 && !filterStatusPendiente) return false;
+      if (status === 3 && !filterStatusEvaluado) return false;
+      return true;
+    })
+    .sort((a, b) => getPatientOverallStatus(a) - getPatientOverallStatus(b));
 
   // Group exam results by atencion_examen_id
   const getResultadosByExamen = () => {
