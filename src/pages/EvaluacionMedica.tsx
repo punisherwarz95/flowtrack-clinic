@@ -922,6 +922,9 @@ const EvaluacionMedica = () => {
                         <span className="text-sm">Evaluado</span>
                       </label>
                     </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Popover>
                       <PopoverTrigger asChild>
                         <Button variant="outline" size="sm" className="gap-2">
                           <CalendarIcon className="h-4 w-4" />
