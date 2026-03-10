@@ -242,7 +242,7 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar paciente..."
+                placeholder="Buscar paciente o N° atención..."
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
                 className="pl-10"
