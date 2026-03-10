@@ -104,7 +104,7 @@ const MiBox = () => {
     () => [...pacientesEnEspera, ...pacientesEnAtencion, ...pacientesCompletados].map((a) => a.id),
     [pacientesEnEspera, pacientesEnAtencion, pacientesCompletados]
   );
-  const { timerByAtencion } = usePresionTimers(atencionesConTemporizador);
+  const { timerByAtencion, reloadTimers } = usePresionTimers(atencionesConTemporizador);
 
   const {
     documentos: atencionDocumentos,
