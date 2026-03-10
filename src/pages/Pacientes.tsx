@@ -939,6 +939,17 @@ const Pacientes = () => {
         return;
       }
 
+      // Desvincular registros de agenda_diferida que apunten a esta atención
+      // Esto permite: 1) eliminar sin error de FK, 2) revertir el paciente a agenda diferida
+      const { error: unlinkError } = await supabase
+        .from("agenda_diferida")
+        .update({ atencion_id: null, estado: "pendiente", vinculado_at: null })
+        .eq("atencion_id", atencionData.id);
+
+      if (unlinkError) {
+        console.error("Error desvinculando agenda diferida:", unlinkError);
+      }
+
       const { error: deleteError } = await supabase
         .from("atenciones")
         .delete()
