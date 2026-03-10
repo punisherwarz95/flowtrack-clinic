@@ -48,6 +48,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
   const [trazabilidadMap, setTrazabilidadMap] = useState<Record<string, string[]>>({});
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
+  const [dragOverGroup, setDragOverGroup] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const prevAtencionIdRef = useRef<string | null>(null);
   const prevExamenIdsRef = useRef<string>("");
