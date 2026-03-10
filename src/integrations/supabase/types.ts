@@ -2182,6 +2182,7 @@ export type Database = {
           nombre: string
           rut: string | null
           telefono: string | null
+          tipo: string
           user_id: string | null
         }
         Insert: {
@@ -2193,6 +2194,7 @@ export type Database = {
           nombre: string
           rut?: string | null
           telefono?: string | null
+          tipo?: string
           user_id?: string | null
         }
         Update: {
@@ -2204,6 +2206,7 @@ export type Database = {
           nombre?: string
           rut?: string | null
           telefono?: string | null
+          tipo?: string
           user_id?: string | null
         }
         Relationships: []
