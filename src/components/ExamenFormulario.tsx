@@ -284,14 +284,22 @@ const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete
                   )}
 
                   {campo.tipo_campo === "numero" && (
-                    <Input
-                      type="number"
-                      step="any"
-                      value={resultado?.valor || ""}
-                      onChange={(e) => updateResultado(campo.id, e.target.value)}
-                      disabled={readonly}
-                      placeholder="0"
-                    />
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        step="any"
+                        value={resultado?.valor || ""}
+                        onChange={(e) => updateResultado(campo.id, e.target.value)}
+                        disabled={readonly}
+                        placeholder="0"
+                        className="flex-1"
+                      />
+                      {campo.opciones?.unidad && campo.opciones.unidad !== "none" && (
+                        <span className="text-sm font-medium text-muted-foreground whitespace-nowrap min-w-fit">
+                          {campo.opciones.unidad}
+                        </span>
+                      )}
+                    </div>
                   )}
 
                   {campo.tipo_campo === "textarea" && (

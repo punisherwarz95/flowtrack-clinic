@@ -43,6 +43,8 @@ const TIPOS_CAMPO = [
   { value: "antropometria", label: "Antropometría" },
 ];
 
+const UNIDADES_COMUNES = ["mg/dL", "g/dL", "mL/min", "U/L", "mmol/L", "ng/mL", "µg/dL", "mEq/L", "%", "mm/h", "pg/mL", "cel/µL"];
+
 const ExamenFormularioCamposConfig = ({ examenId, examenNombre, open, onOpenChange }: Props) => {
   const [campos, setCampos] = useState<CampoFormulario[]>([]);
   const [loading, setLoading] = useState(false);
@@ -115,6 +117,8 @@ const ExamenFormularioCamposConfig = ({ examenId, examenNombre, open, onOpenChan
           tipo_campo: c.tipo_campo,
           opciones: (c.tipo_campo === "select" || c.tipo_campo === "multi_select") && c.opciones
             ? (Array.isArray(c.opciones) ? c.opciones.filter((o: string) => o.trim()) : c.opciones)
+            : c.tipo_campo === "numero" && c.opciones && typeof c.opciones === "object" && !Array.isArray(c.opciones)
+            ? c.opciones
             : null,
           requerido: c.requerido,
           orden: idx,
@@ -222,6 +226,34 @@ const ExamenFormularioCamposConfig = ({ examenId, examenNombre, open, onOpenChan
                         #{index + 1}
                       </Badge>
                     </div>
+
+                    {campo.tipo_campo === "numero" && (
+                      <div className="ml-8">
+                        <Label className="text-xs">Unidad de medida (opcional)</Label>
+                        <div className="flex gap-2">
+                          <Select
+                            value={campo.opciones?.unidad || ""}
+                            onValueChange={(v) => updateCampo(index, "opciones", { unidad: v })}
+                          >
+                            <SelectTrigger className="w-40">
+                              <SelectValue placeholder="Sin unidad" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Sin unidad</SelectItem>
+                              {UNIDADES_COMUNES.map((u) => (
+                                <SelectItem key={u} value={u}>{u}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            value={campo.opciones?.unidad === "none" ? "" : (campo.opciones?.unidad || "")}
+                            onChange={(e) => updateCampo(index, "opciones", { unidad: e.target.value || null })}
+                            placeholder="O escribe una personalizada"
+                            className="flex-1"
+                          />
+                        </div>
+                      </div>
+                    )}
 
                     {(campo.tipo_campo === "select" || campo.tipo_campo === "multi_select") && (
                       <div className="ml-8">

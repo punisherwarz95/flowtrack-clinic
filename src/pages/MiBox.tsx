@@ -25,6 +25,7 @@ import { DocumentoFormViewer, DocumentoContextData } from "@/components/Document
 import ExamenResultadosOtrosBoxes from "@/components/ExamenResultadosOtrosBoxes";
 import ExamenPrestadorGroup from "@/components/ExamenPrestadorGroup";
 import PresionTimerBadge from "@/components/PresionTimerBadge";
+import PresionRetakeForm from "@/components/PresionRetakeForm";
 
 interface Atencion {
   id: string;
@@ -103,7 +104,7 @@ const MiBox = () => {
     () => [...pacientesEnEspera, ...pacientesEnAtencion, ...pacientesCompletados].map((a) => a.id),
     [pacientesEnEspera, pacientesEnAtencion, pacientesCompletados]
   );
-  const { timerByAtencion } = usePresionTimers(atencionesConTemporizador);
+  const { timerByAtencion, reloadTimers } = usePresionTimers(atencionesConTemporizador);
 
   const {
     documentos: atencionDocumentos,
@@ -707,6 +708,18 @@ const MiBox = () => {
                           </div>
                         </CardContent>
                       </Card>
+
+                      {/* Pressure retake form if timer active */}
+                      {timerByAtencion[selectedAtencion.id] && (
+                        <PresionRetakeForm
+                          atencionId={selectedAtencion.id}
+                          timer={timerByAtencion[selectedAtencion.id]}
+                          onSaved={() => {
+                            reloadTimers();
+                            loadData();
+                          }}
+                        />
+                      )}
 
                       {/* Exams grouped by prestador */}
                       <Card>
