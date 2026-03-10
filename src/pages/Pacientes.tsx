@@ -1135,7 +1135,9 @@ const Pacientes = () => {
             setBateriasDisponibles([]);
             setSelectedExamenes([]);
             setSelectedPaquetes([]);
+            setSelectedDocumentos([]);
             setExamenFilter("");
+            setDocumentoFilter("");
             setBateriaFilter("");
             setFiltroFaenaIdBateria("__all__");
             setTextoWorkmed("");
