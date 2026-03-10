@@ -211,11 +211,14 @@ const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete
       });
 
       // Update atencion_examenes status
-      const nuevoEstado = allRequiredFilled ? "completado" : "incompleto";
+      // If prestador is external, mark as muestra_tomada instead of completado
+      const nuevoEstado = allRequiredFilled
+        ? (esExterno ? "muestra_tomada" : "completado")
+        : "incompleto";
       await supabase
         .from("atencion_examenes")
         .update({
-          estado: nuevoEstado,
+          estado: nuevoEstado as any,
           fecha_realizacion: allRequiredFilled ? new Date().toISOString() : null,
         })
         .eq("id", atencionExamenId);
