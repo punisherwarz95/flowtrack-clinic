@@ -46,6 +46,7 @@ const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
+  const [dragOverCampo, setDragOverCampo] = useState<string | null>(null);
 
   useEffect(() => {
     loadCamposYResultados();
@@ -462,7 +463,20 @@ const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete
                   )}
 
                   {campo.tipo_campo === "archivo_pdf" && (
-                    <div className="space-y-2">
+                    <div
+                      className={`space-y-2 rounded-lg p-2 transition-colors ${dragOverCampo === campo.id ? "border-2 border-dashed border-primary bg-primary/5" : ""}`}
+                      onDragOver={(e) => { if (!readonly) { e.preventDefault(); setDragOverCampo(campo.id); } }}
+                      onDragLeave={() => setDragOverCampo(null)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setDragOverCampo(null);
+                        if (readonly) return;
+                        const file = e.dataTransfer.files?.[0];
+                        if (file) {
+                          handleFileUpload(campo.id, file);
+                        }
+                      }}
+                    >
                       {resultado?.archivo_url ? (
                         <div className="flex items-center gap-2 text-sm">
                           <FileText className="h-4 w-4 text-primary" />
@@ -502,6 +516,9 @@ const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete
                             )}
                             {resultado?.archivo_url ? "Cambiar archivo" : "Subir archivo"}
                           </Button>
+                          {dragOverCampo === campo.id && (
+                            <span className="text-xs text-primary font-medium ml-2 animate-pulse">Soltar archivo aquí</span>
+                          )}
                         </div>
                       )}
                     </div>
