@@ -43,6 +43,8 @@ const TIPOS_CAMPO = [
   { value: "antropometria", label: "Antropometría" },
 ];
 
+const UNIDADES_COMUNES = ["mg/dL", "g/dL", "mL/min", "U/L", "mmol/L", "ng/mL", "µg/dL", "mEq/L", "%", "mm/h", "pg/mL", "cel/µL"];
+
 const ExamenFormularioCamposConfig = ({ examenId, examenNombre, open, onOpenChange }: Props) => {
   const [campos, setCampos] = useState<CampoFormulario[]>([]);
   const [loading, setLoading] = useState(false);
