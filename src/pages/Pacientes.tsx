@@ -107,6 +107,14 @@ interface Paquete {
   }>;
 }
 
+interface DocumentoFormulario {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  tipo: string;
+  activo: boolean;
+}
+
 interface ExamenCompletado {
   id: string;
   examen_id: string;
