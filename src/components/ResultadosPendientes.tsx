@@ -3,12 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronDown, ChevronRight, FlaskConical, Upload, Search, CheckCircle, Loader2 } from "lucide-react";
+import { FlaskConical, Upload, Search, CheckCircle, Loader2 } from "lucide-react";
 import ExamenFormulario from "@/components/ExamenFormulario";
 
 interface PendienteRow {
