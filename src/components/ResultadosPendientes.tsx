@@ -33,7 +33,6 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
   const [pendientes, setPendientes] = useState<PendienteRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchFilter, setSearchFilter] = useState("");
-  const [expandedExamen, setExpandedExamen] = useState<string | null>(null);
   const [uploadingPdf, setUploadingPdf] = useState<string | null>(null);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
 
