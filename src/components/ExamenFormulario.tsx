@@ -282,13 +282,14 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
     return !!resultado.valor;
   });
 
-  // Check if there are select fields with "Normal" option for the global button
-  const selectCamposWithNormal = campos.filter(
-    c => c.tipo_campo === "select" && Array.isArray(c.opciones) && c.opciones.includes("Normal")
+  // Fields eligible for "Todo Normal": text and select fields (excluding special types)
+  const camposParaNormal = campos.filter(
+    c => c.tipo_campo === "texto" || c.tipo_campo === "textarea" || 
+         (c.tipo_campo === "select" && Array.isArray(c.opciones) && c.opciones.includes("Normal"))
   );
 
   const handleTodoNormal = () => {
-    selectCamposWithNormal.forEach(c => updateResultado(c.id, "Normal"));
+    camposParaNormal.forEach(c => updateResultado(c.id, "Normal"));
     toast.success("Todos los campos marcados como Normal");
   };
 
@@ -304,7 +305,7 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
             )}
           </Badge>
         </div>
-        {!readonly && selectCamposWithNormal.length >= 2 && (
+        {!readonly && camposParaNormal.length >= 2 && (
           <Button
             type="button"
             variant="outline"

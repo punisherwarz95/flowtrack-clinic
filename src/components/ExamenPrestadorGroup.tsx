@@ -451,8 +451,8 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
 
               <CollapsibleContent>
                 <CardContent className="pt-0 space-y-3">
-                  {/* Shared PDF section for prestador groups */}
-                  {group.prestadorId && (
+                  {/* Shared PDF section - only for external providers */}
+                  {group.prestadorId && group.prestadorTipo === "externo" && (
                     <div
                       className={`rounded-lg p-3 space-y-2 transition-colors ${dragOverGroup === groupKey ? "bg-primary/10 border-2 border-dashed border-primary" : "bg-muted/50"}`}
                       onDragOver={(e) => { e.preventDefault(); setDragOverGroup(groupKey); }}
