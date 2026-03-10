@@ -100,7 +100,7 @@ export default function PortalPaciente() {
   
   // Documentos del paciente
   const [selectedDocumentoIndex, setSelectedDocumentoIndex] = useState<number | null>(null);
-  const [documentoDialogOpen, setDocumentoDialogOpen] = useState(false);
+  const [selectedDocumentoIndex, setSelectedDocumentoIndex] = useState<number | null>(null);
   
   // Hook para documentos de la atención
   const { 
