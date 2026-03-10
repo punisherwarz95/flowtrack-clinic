@@ -1228,12 +1228,40 @@ const Dashboard = () => {
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-wrap gap-1">
-                              {atencion.atencion_examenes.length > 0 ? (
-                                atencion.atencion_examenes.map((ae, idx) => {
-                                  // Azul: pendiente (hay que atenderlo)
-                                  // Amarillo: muestra_tomada (esperando resultados)
-                                  // Verde: completado
-                                  let badgeColor = "bg-blue-100 text-blue-800 border-blue-300"; // pendiente
+                              {(() => {
+                                // Filter exams shown based on active box and exam color filters
+                                let visibleExams = atencion.atencion_examenes;
+                                
+                                // If box filter active, only show exams from that box
+                                if (selectedBoxPendienteFilter !== "all") {
+                                  visibleExams = visibleExams.filter(ae => {
+                                    const boxInfo = boxExamenesMap.get(ae.examenes.id);
+                                    return boxInfo?.boxId === selectedBoxPendienteFilter;
+                                  });
+                                }
+                                
+                                // If exam filter active, only show that exam
+                                if (selectedExamenFilter !== "all") {
+                                  visibleExams = visibleExams.filter(ae => ae.examenes.id === selectedExamenFilter);
+                                }
+
+                                // If exam color filters are not all active, filter by color
+                                if (!filterExPendiente || !filterExMuestra || !filterExCompletado || !filterExIncompleto) {
+                                  visibleExams = visibleExams.filter(ae => {
+                                    if (ae.estado === "pendiente" && filterExPendiente) return true;
+                                    if (ae.estado === "muestra_tomada" && filterExMuestra) return true;
+                                    if (ae.estado === "completado" && filterExCompletado) return true;
+                                    if (ae.estado === "incompleto" && filterExIncompleto) return true;
+                                    return false;
+                                  });
+                                }
+
+                                if (visibleExams.length === 0) {
+                                  return <span className="text-xs text-muted-foreground">Sin exámenes</span>;
+                                }
+
+                                return visibleExams.map((ae, idx) => {
+                                  let badgeColor = "bg-blue-100 text-blue-800 border-blue-300";
                                   if (ae.estado === "muestra_tomada") {
                                     badgeColor = "bg-yellow-100 text-yellow-800 border-yellow-300";
                                   } else if (ae.estado === "completado") {
@@ -1250,10 +1278,8 @@ const Dashboard = () => {
                                       {ae.estado === "completado" && "✓ "}{ae.examenes.nombre}
                                     </Badge>
                                   );
-                                })
-                              ) : (
-                                <span className="text-xs text-muted-foreground">Sin exámenes</span>
-                              )}
+                                });
+                              })()}
                             </div>
                           </TableCell>
                         </TableRow>
