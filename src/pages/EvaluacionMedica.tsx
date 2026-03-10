@@ -349,7 +349,7 @@ const EvaluacionMedica = () => {
     try {
       const datosClinicosPayload = {
         conclusion: conclusion || null,
-        duracion_anios: duracion,
+        duracion_anios: resultado === "no_apto" ? null : duracion,
         examen_evaluaciones: examenEvals,
       };
 
@@ -631,19 +631,21 @@ const EvaluacionMedica = () => {
                   </RadioGroup>
                 </div>
 
-                <div>
-                  <Label className="mb-2 block">Duración del Examen</Label>
-                  <Select value={duracion} onValueChange={setDuracion}>
-                    <SelectTrigger className="w-48">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1 Año</SelectItem>
-                      <SelectItem value="2">2 Años</SelectItem>
-                      <SelectItem value="3">3 Años</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {resultado !== "no_apto" && (
+                  <div>
+                    <Label className="mb-2 block">Duración del Examen</Label>
+                    <Select value={duracion} onValueChange={setDuracion}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">1 Año</SelectItem>
+                        <SelectItem value="2">2 Años</SelectItem>
+                        <SelectItem value="3">3 Años</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {(resultado === "no_apto" || resultado === "apto_con_restricciones") && (
                   <div>
@@ -708,7 +710,83 @@ const EvaluacionMedica = () => {
                               <div className="space-y-2">
                                 {sorted.map((r, idx) => {
                                   const campo = r.examen_formulario_campos;
+                                  const tipoCampo = campo?.tipo_campo;
                                   const unidad = (campo?.opciones as Record<string, string>)?.unidad;
+
+                                  // PDF / archivo
+                                  if (tipoCampo === "archivo_pdf" && r.archivo_url) {
+                                    return (
+                                      <div key={idx} className="border-b last:border-0 pb-2 last:pb-0">
+                                        <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Archivo"}</span>
+                                        <div className="space-y-2">
+                                          {r.archivo_url.toLowerCase().endsWith(".pdf") || r.archivo_url.includes("pdf") ? (
+                                            <iframe src={r.archivo_url} className="w-full h-48 border rounded-md" title={r.valor || "PDF"} />
+                                          ) : (
+                                            <img src={r.archivo_url} alt={r.valor || "Imagen"} className="max-h-48 rounded-md border object-contain" />
+                                          )}
+                                          <a href={r.archivo_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline flex items-center gap-1">
+                                            <FileText className="h-3 w-3" /> {r.valor || "Ver archivo completo"}
+                                          </a>
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+
+                                  // Multi-select
+                                  if (tipoCampo === "multi_select" && r.valor) {
+                                    try {
+                                      const items = JSON.parse(r.valor) as string[];
+                                      return (
+                                        <div key={idx} className="border-b last:border-0 pb-1 last:pb-0">
+                                          <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Campo"}</span>
+                                          <div className="flex flex-wrap gap-1">
+                                            {items.map((item, i) => (
+                                              <Badge key={i} variant="secondary" className="text-xs">{item}</Badge>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      );
+                                    } catch { /* fallthrough */ }
+                                  }
+
+                                  // Audiometria / Antropometria (JSON data)
+                                  if ((tipoCampo === "audiometria" || tipoCampo === "antropometria") && r.valor) {
+                                    try {
+                                      const parsed = JSON.parse(r.valor) as Record<string, unknown>;
+                                      return (
+                                        <div key={idx} className="border-b last:border-0 pb-2 last:pb-0">
+                                          <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Campo"}</span>
+                                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm bg-muted/40 rounded-md p-2">
+                                            {Object.entries(parsed).map(([key, val]) => {
+                                              if (val === null || val === undefined || val === "") return null;
+                                              // Skip timer fields
+                                              if (key.includes("timer") || key.includes("_inicio")) return null;
+                                              const label = key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+                                              const displayVal = typeof val === "object" ? JSON.stringify(val) : String(val);
+                                              return (
+                                                <div key={key} className="flex justify-between">
+                                                  <span className="text-muted-foreground text-xs">{label}</span>
+                                                  <span className="font-medium text-xs">{displayVal}</span>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+                                      );
+                                    } catch { /* fallthrough */ }
+                                  }
+
+                                  // Checkbox
+                                  if (tipoCampo === "checkbox") {
+                                    return (
+                                      <div key={idx} className="flex justify-between items-center text-sm border-b last:border-0 pb-1 last:pb-0">
+                                        <span className="text-muted-foreground">{campo?.etiqueta || "Campo"}</span>
+                                        <span className="font-medium">{r.valor === "true" ? "✓ Sí" : "✗ No"}</span>
+                                      </div>
+                                    );
+                                  }
+
+                                  // Default: texto, numero, select, fecha, textarea
                                   return (
                                     <div key={idx} className="flex justify-between items-center text-sm border-b last:border-0 pb-1 last:pb-0">
                                       <span className="text-muted-foreground">{campo?.etiqueta || "Campo"}</span>
@@ -889,10 +967,18 @@ const EvaluacionMedica = () => {
                                   <CardTitle className="text-base">{bat.paqueteNombre}</CardTitle>
                                   {getBateriaStatusBadge(bat)}
                                 </div>
-                                {(bat.listaParaEvaluar || bat.evaluacion) && (
+                                {bat.evaluacion ? (
                                   <Button size="sm" onClick={() => handleEvaluar(bat.paqueteId)}>
-                                    {bat.evaluacion ? "Editar Evaluación" : "Evaluar"}
+                                    Editar Evaluación
                                   </Button>
+                                ) : bat.listaParaEvaluar ? (
+                                  <Button size="sm" onClick={() => handleEvaluar(bat.paqueteId)}>
+                                    Evaluar
+                                  </Button>
+                                ) : (
+                                  <Badge variant="outline" className="text-xs text-muted-foreground">
+                                    Faltan exámenes por completar
+                                  </Badge>
                                 )}
                               </div>
                             </CardHeader>
