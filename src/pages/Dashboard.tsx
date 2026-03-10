@@ -1120,23 +1120,8 @@ const Dashboard = () => {
                         </TableRow>
                       </TableHeader>
                     <TableBody>
-                      {filteredAtenciones.map((atencion) => {
-                        const todosCompletados = atencion.atencion_examenes.length > 0 && atencion.atencion_examenes.every(ae => ae.estado === "completado");
-                        const esCompletado = atencion.estado === "completado";
-                        // Azul: en espera o en atención (hay que atenderlos)
-                        // Amarillo: completado pero con exámenes pendientes (esperando carga de resultados)
-                        // Verde: completado y todos los exámenes completados
-                        let rowColorClass = "";
-                        if (!esCompletado) {
-                          rowColorClass = "bg-blue-50 dark:bg-blue-950/30 border-l-4 border-l-blue-500";
-                        } else if (esCompletado && !todosCompletados) {
-                          rowColorClass = "bg-yellow-50 dark:bg-yellow-950/30 border-l-4 border-l-yellow-500";
-                        } else if (esCompletado && todosCompletados) {
-                          rowColorClass = "bg-green-50 dark:bg-green-950/30 border-l-4 border-l-green-500";
-                        }
-
-                        return (
-                        <TableRow key={atencion.id} className={rowColorClass}>
+                      {filteredAtenciones.map((atencion) => (
+                        <TableRow key={atencion.id}>
                           <TableCell className="font-medium">
                             #{atencion.numero_ingreso.toString().padStart(3, "0")}
                           </TableCell>
@@ -1153,21 +1138,19 @@ const Dashboard = () => {
                           </TableCell>
                           <TableCell>
                             <Badge 
-                              className={
-                                !esCompletado
-                                  ? "bg-blue-500 text-white hover:bg-blue-600"
-                                  : esCompletado && !todosCompletados
-                                  ? "bg-yellow-500 text-white hover:bg-yellow-600"
-                                  : "bg-green-500 text-white hover:bg-green-600"
+                              variant={
+                                atencion.estado === "completado" 
+                                  ? "default" 
+                                  : atencion.estado === "en_atencion"
+                                  ? "secondary"
+                                  : "outline"
                               }
                             >
                               {atencion.estado === "en_espera" 
                                 ? "En Espera" 
                                 : atencion.estado === "en_atencion"
                                 ? "En Atención"
-                                : todosCompletados
-                                ? "Completado"
-                                : "Esperando Resultados"}
+                                : "Completado"}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -1179,23 +1162,35 @@ const Dashboard = () => {
                           <TableCell>
                             <div className="flex flex-wrap gap-1">
                               {atencion.atencion_examenes.length > 0 ? (
-                                atencion.atencion_examenes.map((ae, idx) => (
-                                  <Badge 
-                                    key={idx} 
-                                    variant="outline" 
-                                    className={`text-xs ${ae.estado === "completado" ? "bg-green-100 text-green-800 border-green-300" : ""}`}
-                                  >
-                                    {ae.estado === "completado" && "✓ "}{ae.examenes.nombre}
-                                  </Badge>
-                                ))
+                                atencion.atencion_examenes.map((ae, idx) => {
+                                  // Azul: pendiente (hay que atenderlo)
+                                  // Amarillo: muestra_tomada (esperando resultados)
+                                  // Verde: completado
+                                  let badgeColor = "bg-blue-100 text-blue-800 border-blue-300"; // pendiente
+                                  if (ae.estado === "muestra_tomada") {
+                                    badgeColor = "bg-yellow-100 text-yellow-800 border-yellow-300";
+                                  } else if (ae.estado === "completado") {
+                                    badgeColor = "bg-green-100 text-green-800 border-green-300";
+                                  } else if (ae.estado === "incompleto") {
+                                    badgeColor = "bg-red-100 text-red-800 border-red-300";
+                                  }
+                                  return (
+                                    <Badge 
+                                      key={idx} 
+                                      variant="outline" 
+                                      className={`text-xs ${badgeColor}`}
+                                    >
+                                      {ae.estado === "completado" && "✓ "}{ae.examenes.nombre}
+                                    </Badge>
+                                  );
+                                })
                               ) : (
                                 <span className="text-xs text-muted-foreground">Sin exámenes</span>
                               )}
                             </div>
                           </TableCell>
                         </TableRow>
-                        );
-                      })}
+                      ))}
                     </TableBody>
                   </Table>
                 </div>
