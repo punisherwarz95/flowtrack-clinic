@@ -1594,6 +1594,12 @@ const Pacientes = () => {
                     <TabsList tabIndex={-1} className="flex-shrink-0 w-full">
                       <TabsTrigger value="baterias" tabIndex={-1} className="flex-1 text-xs">Baterías</TabsTrigger>
                       <TabsTrigger value="examenes" tabIndex={-1} className="flex-1 text-xs">Exámenes</TabsTrigger>
+                      <TabsTrigger value="documentos" tabIndex={-1} className="flex-1 text-xs">
+                        Documentos
+                        {selectedDocumentos.length > 0 && (
+                          <span className="ml-1 text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded-full">{selectedDocumentos.length}</span>
+                        )}
+                      </TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="baterias" tabIndex={-1} className="flex-1 overflow-hidden mt-2">
