@@ -100,10 +100,13 @@ const AudiometriaForm = ({ value, onChange, readonly = false, fechaNacimiento }:
 
   const updateFreq = (oido: "derecho" | "izquierdo", freq: number, val: string) => {
     const setter = oido === "derecho" ? setDerecho : setIzquierdo;
-    setter((prev) => ({
-      ...prev,
-      [freq]: val === "" ? null : Number(val),
-    }));
+    if (val === "") {
+      setter((prev) => ({ ...prev, [freq]: null }));
+      return;
+    }
+    let num = Math.round(Number(val) / 5) * 5;
+    num = Math.max(0, Math.min(130, num));
+    setter((prev) => ({ ...prev, [freq]: num }));
   };
 
   const chartData = FREQUENCIES.map((freq) => ({
@@ -132,10 +135,15 @@ const AudiometriaForm = ({ value, onChange, readonly = false, fechaNacimiento }:
                   <Input
                     type="number"
                     step="5"
-                    min="-10"
+                    min="0"
                     max="130"
                     value={derecho[freq] ?? ""}
-                    onChange={(e) => updateFreq("derecho", freq, e.target.value)}
+                    onBlur={(e) => updateFreq("derecho", freq, e.target.value)}
+                    onChange={(e) => {
+                      const setter = setDerecho;
+                      const v = e.target.value;
+                      setter((prev) => ({ ...prev, [freq]: v === "" ? null : Number(v) }));
+                    }}
                     disabled={readonly}
                     className="h-8 text-xs text-center"
                     placeholder="dB"
@@ -160,10 +168,15 @@ const AudiometriaForm = ({ value, onChange, readonly = false, fechaNacimiento }:
                   <Input
                     type="number"
                     step="5"
-                    min="-10"
+                    min="0"
                     max="130"
                     value={izquierdo[freq] ?? ""}
-                    onChange={(e) => updateFreq("izquierdo", freq, e.target.value)}
+                    onBlur={(e) => updateFreq("izquierdo", freq, e.target.value)}
+                    onChange={(e) => {
+                      const setter = setIzquierdo;
+                      const v = e.target.value;
+                      setter((prev) => ({ ...prev, [freq]: v === "" ? null : Number(v) }));
+                    }}
                     disabled={readonly}
                     className="h-8 text-xs text-center"
                     placeholder="dB"
@@ -202,8 +215,8 @@ const AudiometriaForm = ({ value, onChange, readonly = false, fechaNacimiento }:
               />
               <YAxis
                 reversed
-                domain={[-10, 130]}
-                ticks={[-10, 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130]}
+                domain={[0, 130]}
+                ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130]}
                 tick={{ fontSize: 10 }}
                 stroke="hsl(var(--muted-foreground))"
                 label={{ value: "dB HL", angle: -90, position: "insideLeft", style: { fontSize: 11 } }}
