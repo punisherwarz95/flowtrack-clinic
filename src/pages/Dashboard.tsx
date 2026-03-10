@@ -134,11 +134,58 @@ const Dashboard = () => {
     return () => clearInterval(interval);
   }, [selectedDateDaily, selectedMonth, selectedDateTable]);
 
-  // Extraer empresas únicas de las atenciones cargadas
-  // Extraer empresas únicas de las atenciones cargadas
+  // Shared filter function that can skip a specific filter for dropdown options
+  const applyFilters = (skipFilter?: string) => {
+    return atencionesIngresadas.filter(a => {
+      if (skipFilter !== "nombre" && filterNombre.trim() !== "") {
+        if (!a.pacientes.nombre.toLowerCase().includes(filterNombre.toLowerCase().trim())) return false;
+      }
+      if (skipFilter !== "estadoAtencion") {
+        if (a.estado === "completado" && !filterEstadoCompletado) return false;
+        if ((a.estado === "en_espera" || a.estado === "en_atencion") && !filterEstadoListo) return false;
+      }
+      if (skipFilter !== "empresa" && selectedEmpresaFilter !== "all") {
+        if ((a.pacientes as any).empresas?.id !== selectedEmpresaFilter) return false;
+      }
+      if (skipFilter !== "tipo" && selectedTipoFilter !== "all") {
+        if (a.pacientes.tipo_servicio !== selectedTipoFilter) return false;
+      }
+      if (skipFilter !== "examen" && selectedExamenFilter !== "all") {
+        const hasExam = a.atencion_examenes.some(ae => ae.examenes.id === selectedExamenFilter);
+        if (!hasExam) return false;
+        const examStatus = a.atencion_examenes.find(ae => ae.examenes.id === selectedExamenFilter);
+        if (examStatus) {
+          const isCompleted = examStatus.estado === "completado";
+          if (isCompleted && !filterCompletado) return false;
+          if (!isCompleted && !filterIncompleto) return false;
+        }
+      }
+      if (skipFilter !== "box" && selectedBoxPendienteFilter !== "all") {
+        const hasPendingInBox = a.atencion_examenes.some(ae => {
+          const boxInfo = boxExamenesMap.get(ae.examenes.id);
+          return boxInfo?.boxId === selectedBoxPendienteFilter && ae.estado !== "completado";
+        });
+        if (!hasPendingInBox) return false;
+      }
+      if (skipFilter !== "exColor" && (!filterExPendiente || !filterExMuestra || !filterExCompletado || !filterExIncompleto)) {
+        const hasMatchingExam = a.atencion_examenes.some(ae => {
+          if (ae.estado === "pendiente" && filterExPendiente) return true;
+          if (ae.estado === "muestra_tomada" && filterExMuestra) return true;
+          if (ae.estado === "completado" && filterExCompletado) return true;
+          if (ae.estado === "incompleto" && filterExIncompleto) return true;
+          return false;
+        });
+        if (a.atencion_examenes.length > 0 && !hasMatchingExam) return false;
+      }
+      return true;
+    });
+  };
+
+  // Opciones de dropdowns basadas en los demás filtros activos
   const empresasDelDia = (() => {
+    const source = applyFilters("empresa");
     const empresasMap = new Map<string, Empresa>();
-    atencionesIngresadas.forEach(a => {
+    source.forEach(a => {
       const empresa = (a.pacientes as any).empresas;
       if (empresa?.id && empresa?.nombre) {
         empresasMap.set(empresa.id, { id: empresa.id, nombre: empresa.nombre });
@@ -147,10 +194,10 @@ const Dashboard = () => {
     return Array.from(empresasMap.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
   })();
 
-  // Extraer exámenes únicos de las atenciones cargadas (solo los del día)
   const examenesDelDia = (() => {
+    const source = applyFilters("examen");
     const examenesMap = new Map<string, Examen>();
-    atencionesIngresadas.forEach(a => {
+    source.forEach(a => {
       a.atencion_examenes.forEach(ae => {
         if (ae.examenes?.id && ae.examenes?.nombre) {
           examenesMap.set(ae.examenes.id, { id: ae.examenes.id, nombre: ae.examenes.nombre });
@@ -160,10 +207,10 @@ const Dashboard = () => {
     return Array.from(examenesMap.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
   })();
 
-  // Extraer boxes únicos del mapeo box_examenes que tienen exámenes en las atenciones del día
   const boxesDelDia = (() => {
+    const source = applyFilters("box");
     const boxesMap = new Map<string, { id: string; nombre: string }>();
-    atencionesIngresadas.forEach(a => {
+    source.forEach(a => {
       a.atencion_examenes.forEach(ae => {
         const boxInfo = boxExamenesMap.get(ae.examenes.id);
         if (boxInfo) {
