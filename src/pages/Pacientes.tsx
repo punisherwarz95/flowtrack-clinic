@@ -130,6 +130,9 @@ const Pacientes = () => {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [examenes, setExamenes] = useState<Examen[]>([]);
   const [paquetes, setPaquetes] = useState<Paquete[]>([]);
+  const [documentosDisponibles, setDocumentosDisponibles] = useState<DocumentoFormulario[]>([]);
+  const [selectedDocumentos, setSelectedDocumentos] = useState<string[]>([]);
+  const [documentoFilter, setDocumentoFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [openDialog] = useState(false); // kept for compatibility
   const [editingPatient, setEditingPatient] = useState<string | null>(null);
