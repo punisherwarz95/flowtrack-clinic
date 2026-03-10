@@ -631,19 +631,21 @@ const EvaluacionMedica = () => {
                   </RadioGroup>
                 </div>
 
-                <div>
-                  <Label className="mb-2 block">Duración del Examen</Label>
-                  <Select value={duracion} onValueChange={setDuracion}>
-                    <SelectTrigger className="w-48">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1 Año</SelectItem>
-                      <SelectItem value="2">2 Años</SelectItem>
-                      <SelectItem value="3">3 Años</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {resultado !== "no_apto" && (
+                  <div>
+                    <Label className="mb-2 block">Duración del Examen</Label>
+                    <Select value={duracion} onValueChange={setDuracion}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">1 Año</SelectItem>
+                        <SelectItem value="2">2 Años</SelectItem>
+                        <SelectItem value="3">3 Años</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {(resultado === "no_apto" || resultado === "apto_con_restricciones") && (
                   <div>
