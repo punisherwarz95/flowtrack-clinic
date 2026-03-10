@@ -100,10 +100,13 @@ const AudiometriaForm = ({ value, onChange, readonly = false, fechaNacimiento }:
 
   const updateFreq = (oido: "derecho" | "izquierdo", freq: number, val: string) => {
     const setter = oido === "derecho" ? setDerecho : setIzquierdo;
-    setter((prev) => ({
-      ...prev,
-      [freq]: val === "" ? null : Number(val),
-    }));
+    if (val === "") {
+      setter((prev) => ({ ...prev, [freq]: null }));
+      return;
+    }
+    let num = Math.round(Number(val) / 5) * 5;
+    num = Math.max(0, Math.min(130, num));
+    setter((prev) => ({ ...prev, [freq]: num }));
   };
 
   const chartData = FREQUENCIES.map((freq) => ({
