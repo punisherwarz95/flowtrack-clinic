@@ -29,6 +29,7 @@ interface Prestador {
   email: string | null;
   user_id: string | null;
   activo: boolean;
+  tipo: string;
   created_at: string;
 }
 
