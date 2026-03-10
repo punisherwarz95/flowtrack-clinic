@@ -924,7 +924,7 @@ const EvaluacionMedica = () => {
                                   {bat.evaluacion.observaciones && <p><strong>Observaciones:</strong> {bat.evaluacion.observaciones}</p>}
                                   {bat.evaluacion.restricciones && <p><strong>Restricciones:</strong> {bat.evaluacion.restricciones}</p>}
                                   {(bat.evaluacion.datos_clinicos as Record<string, unknown>)?.duracion_anios && (
-                                    <p><strong>Duración:</strong> {(bat.evaluacion.datos_clinicos as Record<string, unknown>).duracion_anios} año(s)</p>
+                                    <p><strong>Duración:</strong> {String((bat.evaluacion.datos_clinicos as Record<string, unknown>).duracion_anios)} año(s)</p>
                                   )}
                                   {(bat.evaluacion.datos_clinicos as Record<string, unknown>)?.conclusion && (
                                     <p><strong>Conclusión:</strong> {(bat.evaluacion.datos_clinicos as Record<string, unknown>).conclusion as string}</p>
