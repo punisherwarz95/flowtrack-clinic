@@ -222,6 +222,7 @@ const Prestadores = () => {
       email: email.trim() || null,
       user_id: selectedUserId,
       activo,
+      tipo,
     };
 
     if (editingPrestador) {
