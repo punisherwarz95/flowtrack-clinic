@@ -77,7 +77,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
       // Fetch prestador_examenes + shared files + vinculos + trazabilidad in parallel
       const [peRes, archRes, vincRes, trazRes] = await Promise.all([
         supabase.from("prestador_examenes")
-          .select("examen_id, prestador_id, prestadores(nombre)")
+          .select("examen_id, prestador_id, prestadores(nombre, tipo)")
           .in("examen_id", examenIds),
         supabase.from("examen_archivos_compartidos")
           .select("*")
