@@ -107,6 +107,14 @@ interface Paquete {
   }>;
 }
 
+interface DocumentoFormulario {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  tipo: string;
+  activo: boolean;
+}
+
 interface ExamenCompletado {
   id: string;
   examen_id: string;
@@ -122,6 +130,9 @@ const Pacientes = () => {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [examenes, setExamenes] = useState<Examen[]>([]);
   const [paquetes, setPaquetes] = useState<Paquete[]>([]);
+  const [documentosDisponibles, setDocumentosDisponibles] = useState<DocumentoFormulario[]>([]);
+  const [selectedDocumentos, setSelectedDocumentos] = useState<string[]>([]);
+  const [documentoFilter, setDocumentoFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [openDialog] = useState(false); // kept for compatibility
   const [editingPatient, setEditingPatient] = useState<string | null>(null);
@@ -190,6 +201,7 @@ const Pacientes = () => {
       loadExamenes(),
       loadPaquetes(),
       loadAllFaenasAndBateriaFaenas(),
+      loadDocumentosDisponibles(),
     ]);
 
     // Auto-refresh patients every 15 seconds
@@ -420,6 +432,21 @@ const Pacientes = () => {
     }
   };
 
+  const loadDocumentosDisponibles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("documentos_formularios")
+        .select("id, nombre, descripcion, tipo, activo")
+        .eq("activo", true)
+        .order("nombre");
+
+      if (error) throw error;
+      setDocumentosDisponibles(data || []);
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
+
   // Cargar faenas disponibles para una empresa
   const loadFaenasDeEmpresa = async (empresaId: string) => {
     if (!empresaId) {
@@ -566,22 +593,30 @@ const Pacientes = () => {
       if (atencionError) throw atencionError;
 
       if (atencionData) {
-        // Cargar exámenes pendientes (para agregar nuevos)
-        const { data: examenesData, error: examenesError } = await supabase
-          .from("atencion_examenes")
-          .select("examen_id")
-          .eq("atencion_id", atencionData.id)
-          .eq("estado", "pendiente");
+        // Cargar exámenes pendientes y documentos existentes en paralelo
+        const [examenesRes, docsRes] = await Promise.all([
+          supabase
+            .from("atencion_examenes")
+            .select("examen_id")
+            .eq("atencion_id", atencionData.id)
+            .eq("estado", "pendiente"),
+          supabase
+            .from("atencion_documentos")
+            .select("documento_id")
+            .eq("atencion_id", atencionData.id),
+        ]);
 
-        if (examenesError) throw examenesError;
-
-        setSelectedExamenes(examenesData?.map(e => e.examen_id) || []);
+        if (examenesRes.error) throw examenesRes.error;
+        setSelectedExamenes(examenesRes.data?.map(e => e.examen_id) || []);
+        setSelectedDocumentos(docsRes.data?.map(d => d.documento_id) || []);
       } else {
         setSelectedExamenes([]);
+        setSelectedDocumentos([]);
       }
     } catch (error) {
       console.error("Error loading exams:", error);
       setSelectedExamenes([]);
+      setSelectedDocumentos([]);
     }
 
     setActiveMainTab("nuevo");
@@ -698,9 +733,35 @@ const Pacientes = () => {
               console.log("[Pacientes] Generando documentos para paquetes:", selectedPaquetes);
               const result = await generateDocuments(atencionData.id, selectedPaquetes);
               if (result.success && result.count > 0) {
-                toast.success(`${result.count} documento(s) generado(s)`);
+                toast.success(`${result.count} documento(s) generado(s) desde baterías`);
               } else if (!result.success) {
                 toast.error(`Error generando documentos: ${result.error}`);
+              }
+            }
+
+            // Agregar documentos seleccionados manualmente
+            if (selectedDocumentos.length > 0) {
+              // Verificar cuáles ya existen
+              const { data: existingDocs } = await supabase
+                .from("atencion_documentos")
+                .select("documento_id")
+                .eq("atencion_id", atencionData.id);
+
+              const existingDocIds = new Set((existingDocs || []).map(d => d.documento_id));
+              const newDocIds = selectedDocumentos.filter(id => !existingDocIds.has(id));
+
+              if (newDocIds.length > 0) {
+                const newDocs = newDocIds.map(documento_id => ({
+                  atencion_id: atencionData.id,
+                  documento_id,
+                  respuestas: {},
+                  estado: "pendiente",
+                }));
+                const { error: docError } = await supabase
+                  .from("atencion_documentos")
+                  .insert(newDocs);
+                if (docError) console.error("Error insertando documentos manuales:", docError);
+                else if (newDocIds.length > 0) toast.success(`${newDocIds.length} documento(s) agregado(s)`);
               }
             }
 
@@ -794,9 +855,34 @@ const Pacientes = () => {
           console.log("[Pacientes] Generando documentos para nuevo paciente, paquetes:", selectedPaquetes);
           const result = await generateDocuments(atencionData.id, selectedPaquetes);
           if (result.success && result.count > 0) {
-            toast.success(`${result.count} documento(s) generado(s)`);
+            toast.success(`${result.count} documento(s) generado(s) desde baterías`);
           } else if (!result.success) {
             toast.error(`Error generando documentos: ${result.error}`);
+          }
+        }
+
+        // Agregar documentos seleccionados manualmente
+        if (selectedDocumentos.length > 0) {
+          const { data: existingDocs } = await supabase
+            .from("atencion_documentos")
+            .select("documento_id")
+            .eq("atencion_id", atencionData.id);
+
+          const existingDocIds = new Set((existingDocs || []).map(d => d.documento_id));
+          const newDocIds = selectedDocumentos.filter(id => !existingDocIds.has(id));
+
+          if (newDocIds.length > 0) {
+            const newDocs = newDocIds.map(documento_id => ({
+              atencion_id: atencionData.id,
+              documento_id,
+              respuestas: {},
+              estado: "pendiente",
+            }));
+            const { error: docError } = await supabase
+              .from("atencion_documentos")
+              .insert(newDocs);
+            if (docError) console.error("Error insertando documentos:", docError);
+            else toast.success(`${newDocIds.length} documento(s) agregado(s)`);
           }
         }
 
@@ -812,6 +898,8 @@ const Pacientes = () => {
       setBateriasDisponibles([]);
       setSelectedExamenes([]);
       setSelectedPaquetes([]);
+      setSelectedDocumentos([]);
+      setDocumentoFilter("");
       setBateriaFilter("");
       setFiltroFaenaIdBateria("__all__");
       loadPatients();
@@ -1047,7 +1135,9 @@ const Pacientes = () => {
             setBateriasDisponibles([]);
             setSelectedExamenes([]);
             setSelectedPaquetes([]);
+            setSelectedDocumentos([]);
             setExamenFilter("");
+            setDocumentoFilter("");
             setBateriaFilter("");
             setFiltroFaenaIdBateria("__all__");
             setTextoWorkmed("");
@@ -1504,6 +1594,12 @@ const Pacientes = () => {
                     <TabsList tabIndex={-1} className="flex-shrink-0 w-full">
                       <TabsTrigger value="baterias" tabIndex={-1} className="flex-1 text-xs">Baterías</TabsTrigger>
                       <TabsTrigger value="examenes" tabIndex={-1} className="flex-1 text-xs">Exámenes</TabsTrigger>
+                      <TabsTrigger value="documentos" tabIndex={-1} className="flex-1 text-xs">
+                        Documentos
+                        {selectedDocumentos.length > 0 && (
+                          <span className="ml-1 text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded-full">{selectedDocumentos.length}</span>
+                        )}
+                      </TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="baterias" tabIndex={-1} className="flex-1 overflow-hidden mt-2">
@@ -1589,6 +1685,46 @@ const Pacientes = () => {
                                       }} className="w-3.5 h-3.5" />
                                     <span className="break-words flex-1">{examen.nombre}</span>
                                     {examen.codigo && <span className="text-xs text-muted-foreground shrink-0">{examen.codigo}</span>}
+                                  </label>
+                                ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="documentos" tabIndex={-1} className="flex-1 overflow-hidden mt-2">
+                      <div className="h-full border rounded-md bg-muted/30 overflow-y-auto">
+                        <div className="p-2">
+                          <div className="flex-shrink-0 relative mb-2">
+                            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input placeholder="Buscar documento..." value={documentoFilter} onChange={(e) => setDocumentoFilter(e.target.value)} className="pl-8 pr-8 h-8 text-sm" />
+                            {documentoFilter && (
+                              <button type="button" tabIndex={-1} onClick={() => setDocumentoFilter("")} className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground hover:text-foreground">
+                                <X className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                          {documentosDisponibles.length === 0 ? (
+                            <div className="text-xs text-muted-foreground text-center py-4">
+                              No hay documentos configurados
+                            </div>
+                          ) : (
+                            <div className="space-y-0.5">
+                              {documentosDisponibles
+                                .filter(doc => !documentoFilter || doc.nombre.toLowerCase().includes(documentoFilter.toLowerCase()))
+                                .map((doc) => (
+                                  <label key={doc.id} className="flex items-center gap-2 cursor-pointer py-1.5 px-1 hover:bg-accent rounded text-sm">
+                                    <input type="checkbox" checked={selectedDocumentos.includes(doc.id)}
+                                      onChange={(e) => {
+                                        if (e.target.checked) setSelectedDocumentos(prev => [...prev, doc.id]);
+                                        else setSelectedDocumentos(prev => prev.filter(id => id !== doc.id));
+                                      }} className="w-3.5 h-3.5" />
+                                    <div className="flex-1 min-w-0">
+                                      <span className="break-words block">{doc.nombre}</span>
+                                      {doc.descripcion && <span className="text-xs text-muted-foreground block">{doc.descripcion}</span>}
+                                    </div>
+                                    <Badge variant="outline" className="text-xs shrink-0">{doc.tipo}</Badge>
                                   </label>
                                 ))}
                             </div>
