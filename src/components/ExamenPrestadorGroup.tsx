@@ -328,11 +328,39 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
     );
   }
 
+  const getFormRef = (examenId: string) => {
+    if (!formRefsMap.current[examenId]) {
+      formRefsMap.current[examenId] = createRef<ExamenFormularioRef>();
+    }
+    return formRefsMap.current[examenId];
+  };
+
+  const handleSaveGroup = async (groupKey: string, examenes: AtencionExamen[]) => {
+    setSavingGroup(groupKey);
+    try {
+      for (const examen of examenes) {
+        const ref = formRefsMap.current[examen.id];
+        if (ref?.current) {
+          await ref.current.save();
+        }
+      }
+      toast.success("Todos los resultados del grupo guardados");
+      onComplete?.();
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al guardar resultados");
+    } finally {
+      setSavingGroup(null);
+    }
+  };
+
   // If only one group and it's "sin prestador", render flat list
   if (groups.length === 1 && !groups[0].prestadorId) {
+    const flatGroup = groups[0];
+    const flatGroupKey = "__sin_prestador__";
     return (
       <div className="space-y-2">
-        {groups[0].examenes.map((examen) => (
+        {flatGroup.examenes.map((examen) => (
           <Collapsible
             key={examen.id}
             open={expandedExamen === examen.id}
@@ -367,15 +395,27 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
             </CollapsibleTrigger>
             <CollapsibleContent className="border border-t-0 rounded-b-lg p-4">
               <ExamenFormulario
+                ref={getFormRef(examen.id)}
                 atencionExamenId={examen.id}
                 examenId={examen.examen_id}
                 examenNombre={examen.examenes.nombre}
                 onComplete={onComplete}
                 fechaNacimiento={fechaNacimiento}
+                hideSaveButton
               />
             </CollapsibleContent>
           </Collapsible>
         ))}
+        <div className="flex justify-end pt-2">
+          <Button
+            onClick={() => handleSaveGroup(flatGroupKey, flatGroup.examenes)}
+            disabled={savingGroup === flatGroupKey}
+            className="gap-2"
+          >
+            {savingGroup === flatGroupKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Guardar Todo
+          </Button>
+        </div>
       </div>
     );
   }
