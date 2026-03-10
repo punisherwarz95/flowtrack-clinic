@@ -432,6 +432,21 @@ const Pacientes = () => {
     }
   };
 
+  const loadDocumentosDisponibles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("documentos_formularios")
+        .select("id, nombre, descripcion, tipo, activo")
+        .eq("activo", true)
+        .order("nombre");
+
+      if (error) throw error;
+      setDocumentosDisponibles(data || []);
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
+
   // Cargar faenas disponibles para una empresa
   const loadFaenasDeEmpresa = async (empresaId: string) => {
     if (!empresaId) {
