@@ -119,7 +119,8 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
   const handleUploadPdfMasivo = async (atencionId: string, rows: PendienteRow[], file: File) => {
     setUploadingPdf(atencionId);
     try {
-      const fileName = `lab-externo/${atencionId}/${Date.now()}_${file.name}`;
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const fileName = `lab-externo/${atencionId}/${Date.now()}_${safeName}`;
       const { error: uploadError } = await supabase.storage
         .from("examen-resultados")
         .upload(fileName, file);
