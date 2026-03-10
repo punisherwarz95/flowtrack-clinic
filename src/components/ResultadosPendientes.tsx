@@ -131,9 +131,12 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
 
   const filteredGroups = Object.entries(grouped).filter(([, rows]) => {
     if (!searchFilter) return true;
-    const s = searchFilter.toLowerCase();
+    const s = searchFilter.toLowerCase().trim();
     const first = rows[0];
+    // Search by numero_ingreso too
+    const matchNumero = String(first.numeroIngreso) === s || String(first.numeroIngreso).includes(s);
     return (
+      matchNumero ||
       first.pacienteNombre.toLowerCase().includes(s) ||
       first.pacienteRut.toLowerCase().includes(s) ||
       first.empresaNombre.toLowerCase().includes(s)
