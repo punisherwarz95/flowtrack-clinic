@@ -201,6 +201,7 @@ const Pacientes = () => {
       loadExamenes(),
       loadPaquetes(),
       loadAllFaenasAndBateriaFaenas(),
+      loadDocumentosDisponibles(),
     ]);
 
     // Auto-refresh patients every 15 seconds
