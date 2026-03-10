@@ -96,6 +96,11 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
     }
   };
 
+  useImperativeHandle(ref, () => ({
+    save: handleSave,
+    hasPendingChanges: () => Object.keys(resultados).length > 0,
+  }));
+
   const updateResultado = (campoId: string, valor: string | null, archivo_url?: string | null) => {
     setResultados((prev) => ({
       ...prev,
