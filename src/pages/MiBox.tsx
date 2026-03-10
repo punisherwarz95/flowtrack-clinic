@@ -564,16 +564,21 @@ const MiBox = () => {
                       <div key={atencion.id} className="border rounded-lg p-3 flex items-center justify-between hover:bg-accent/30 transition-colors">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <Badge variant="outline" className="text-xs">#{atencion.numero_ingreso}</Badge>
+                            <Badge variant="outline" className="text-xs font-bold">#{atencion.numero_ingreso}</Badge>
                             <span className="font-medium text-sm">{atencion.pacientes.nombre}</span>
                             {atencion.pacientes.rut && (
-                              <span className="text-xs text-muted-foreground">RUT: {atencion.pacientes.rut}</span>
+                              <span className="text-xs text-muted-foreground font-mono">{atencion.pacientes.rut}</span>
                             )}
                             <Badge variant={atencion.pacientes.tipo_servicio === "workmed" ? "default" : "secondary"} className="text-xs">
                               {atencion.pacientes.tipo_servicio}
                             </Badge>
-                            <EstadoFichaCheckboxes atencionId={atencion.id} estadoFicha={atencion.estado_ficha} onUpdate={loadData} prefix="cola-" />
+                            {atencion.pacientes.empresas?.nombre && (
+                              <span className="text-xs text-muted-foreground">| {atencion.pacientes.empresas.nombre}</span>
+                            )}
                             <PresionTimerBadge timer={timerByAtencion[atencion.id]} />
+                          </div>
+                          <div className="mt-1">
+                            <EstadoFichaCheckboxes atencionId={atencion.id} estadoFicha={atencion.estado_ficha} onUpdate={loadData} prefix="cola-" />
                           </div>
                           {atencion.examenesPendientes && atencion.examenesPendientes.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1">
