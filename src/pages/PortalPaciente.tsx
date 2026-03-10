@@ -99,7 +99,7 @@ export default function PortalPaciente() {
   const [agendaDiferidaMatch, setAgendaDiferidaMatch] = useState<any>(null);
   
   // Documentos del paciente
-  const [selectedDocumentoIndex, setSelectedDocumentoIndex] = useState<number | null>(null);
+  // Documentos del paciente - expand inline
   const [selectedDocumentoIndex, setSelectedDocumentoIndex] = useState<number | null>(null);
   
   // Hook para documentos de la atención
