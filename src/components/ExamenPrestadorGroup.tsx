@@ -521,8 +521,8 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
                     </div>
                   )}
 
-                  {/* Bulk muestra tomada controls for prestador groups */}
-                  {(() => {
+                  {/* Bulk muestra tomada controls - only for external providers */}
+                  {group.prestadorTipo === "externo" && (() => {
                     const pendientes = group.examenes.filter(e => e.estado === "pendiente" || e.estado === "incompleto");
                     const bulkActive = !!bulkSelections[groupKey];
                     const selectedCount = bulkSelections[groupKey]?.size || 0;
