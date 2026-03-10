@@ -100,26 +100,77 @@ const ExamenFormulario = ({ atencionExamenId, examenId, examenNombre, onComplete
     }));
   };
 
+  const compressImage = async (file: File, maxSizeMB = 1): Promise<File> => {
+    if (!file.type.startsWith("image/") || file.size <= maxSizeMB * 1024 * 1024) return file;
+    
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let { width, height } = img;
+        const maxDim = 1920;
+        if (width > maxDim || height > maxDim) {
+          const ratio = Math.min(maxDim / width, maxDim / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(new File([blob], file.name, { type: "image/jpeg" }));
+            } else {
+              resolve(file);
+            }
+          },
+          "image/jpeg",
+          0.7
+        );
+      };
+      img.onerror = () => resolve(file);
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const handleFileUpload = async (campoId: string, file: File) => {
     setUploading(campoId);
     try {
-      const fileName = `${atencionExamenId}/${campoId}/${Date.now()}_${file.name}`;
+      // Compress images before upload
+      const processedFile = await compressImage(file);
+      
+      const fileSizeMB = (processedFile.size / (1024 * 1024)).toFixed(1);
+      console.log(`Subiendo archivo: ${processedFile.name} (${fileSizeMB} MB)`);
+
+      const fileName = `${atencionExamenId}/${campoId}/${Date.now()}_${processedFile.name}`;
       const { error: uploadError } = await supabase.storage
         .from("examen-resultados")
-        .upload(fileName, file);
+        .upload(fileName, processedFile);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("Error de upload:", uploadError);
+        if (uploadError.message?.includes("Payload too large") || uploadError.message?.includes("413")) {
+          toast.error(`Archivo muy grande (${fileSizeMB} MB). Máximo permitido: 50MB`);
+        } else if (uploadError.message?.includes("security") || uploadError.message?.includes("policy")) {
+          toast.error("Error de permisos en el almacenamiento. Contacte al administrador.");
+        } else {
+          toast.error(`Error al subir: ${uploadError.message}`);
+        }
+        return;
+      }
 
       const { data: urlData } = await supabase.storage
         .from("examen-resultados")
-        .createSignedUrl(fileName, 60 * 60 * 24 * 365 * 10); // 10 year signed URL
+        .createSignedUrl(fileName, 60 * 60 * 24 * 365 * 10);
 
       if (!urlData?.signedUrl) throw new Error("No se pudo generar URL del archivo");
-      updateResultado(campoId, file.name, urlData.signedUrl);
+      updateResultado(campoId, processedFile.name, urlData.signedUrl);
       toast.success("Archivo subido correctamente");
     } catch (error: any) {
-      console.error("Error:", error);
-      toast.error("Error al subir archivo");
+      console.error("Error completo:", error);
+      toast.error(`Error al subir archivo: ${error?.message || "desconocido"}`);
     } finally {
       setUploading(null);
     }
