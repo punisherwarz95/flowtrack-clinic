@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, createRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ChevronDown, ChevronRight, Upload, FileText, Loader2, Building2, Stethoscope, FlaskConical, CheckSquare, Save } from "lucide-react";
-import ExamenFormulario from "@/components/ExamenFormulario";
+import ExamenFormulario, { ExamenFormularioRef } from "@/components/ExamenFormulario";
 
 interface AtencionExamen {
   id: string;
@@ -52,6 +52,10 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
   const [loading, setLoading] = useState(true);
   const prevAtencionIdRef = useRef<string | null>(null);
   const prevExamenIdsRef = useRef<string>("");
+
+  // Refs for imperative save on each exam form
+  const formRefsMap = useRef<Record<string, React.RefObject<ExamenFormularioRef>>>({});
+  const [savingGroup, setSavingGroup] = useState<string | null>(null);
 
   // Bulk muestra tomada state: groupKey -> Set of selected atencion_examen IDs
   const [bulkSelections, setBulkSelections] = useState<Record<string, Set<string>>>({});
@@ -324,11 +328,39 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
     );
   }
 
+  const getFormRef = (examenId: string) => {
+    if (!formRefsMap.current[examenId]) {
+      formRefsMap.current[examenId] = createRef<ExamenFormularioRef>();
+    }
+    return formRefsMap.current[examenId];
+  };
+
+  const handleSaveGroup = async (groupKey: string, examenes: AtencionExamen[]) => {
+    setSavingGroup(groupKey);
+    try {
+      for (const examen of examenes) {
+        const ref = formRefsMap.current[examen.id];
+        if (ref?.current) {
+          await ref.current.save();
+        }
+      }
+      toast.success("Todos los resultados del grupo guardados");
+      onComplete?.();
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al guardar resultados");
+    } finally {
+      setSavingGroup(null);
+    }
+  };
+
   // If only one group and it's "sin prestador", render flat list
   if (groups.length === 1 && !groups[0].prestadorId) {
+    const flatGroup = groups[0];
+    const flatGroupKey = "__sin_prestador__";
     return (
       <div className="space-y-2">
-        {groups[0].examenes.map((examen) => (
+        {flatGroup.examenes.map((examen) => (
           <Collapsible
             key={examen.id}
             open={expandedExamen === examen.id}
@@ -363,15 +395,27 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
             </CollapsibleTrigger>
             <CollapsibleContent className="border border-t-0 rounded-b-lg p-4">
               <ExamenFormulario
+                ref={getFormRef(examen.id)}
                 atencionExamenId={examen.id}
                 examenId={examen.examen_id}
                 examenNombre={examen.examenes.nombre}
                 onComplete={onComplete}
                 fechaNacimiento={fechaNacimiento}
+                hideSaveButton
               />
             </CollapsibleContent>
           </Collapsible>
         ))}
+        <div className="flex justify-end pt-2">
+          <Button
+            onClick={() => handleSaveGroup(flatGroupKey, flatGroup.examenes)}
+            disabled={savingGroup === flatGroupKey}
+            className="gap-2"
+          >
+            {savingGroup === flatGroupKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Guardar Todo
+          </Button>
+        </div>
       </div>
     );
   }
@@ -580,11 +624,13 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
                           </div>
                         </div>
                         <ExamenFormulario
+                          ref={getFormRef(examen.id)}
                           atencionExamenId={examen.id}
                           examenId={examen.examen_id}
                           examenNombre={examen.examenes.nombre}
                           fechaNacimiento={fechaNacimiento}
                           esExterno={group.prestadorTipo === "externo"}
+                          hideSaveButton
                           onComplete={() => {
                             onComplete?.();
                             loadPrestadorData();
@@ -593,6 +639,19 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
                       </div>
                     );
                   })}
+
+                  {/* Global save button per group */}
+                  <div className="flex justify-end pt-1">
+                    <Button
+                      size="sm"
+                      onClick={() => handleSaveGroup(groupKey, group.examenes)}
+                      disabled={savingGroup === groupKey}
+                      className="gap-2"
+                    >
+                      {savingGroup === groupKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      Guardar Todo
+                    </Button>
+                  </div>
                 </CardContent>
               </CollapsibleContent>
             </Collapsible>
