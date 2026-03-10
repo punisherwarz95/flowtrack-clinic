@@ -1648,17 +1648,25 @@ export default function PortalPaciente() {
                               {examenes.map((examen, idx) => (
                                 <Badge 
                                   key={idx} 
-                                  variant={examen.estado === "completado" ? "default" : examen.estado === "incompleto" ? "outline" : "secondary"}
+                                  variant={
+                                    examen.estado === "completado" ? "default" 
+                                    : examen.estado === "muestra_tomada" ? "default"
+                                    : examen.estado === "incompleto" ? "outline" 
+                                    : "secondary"
+                                  }
                                   className={`text-xs py-0.5 px-2 ${
                                     examen.estado === "completado" 
                                       ? "bg-green-600" 
+                                      : examen.estado === "muestra_tomada"
+                                        ? "bg-blue-600 text-white"
                                       : examen.estado === "incompleto" 
                                         ? "border-amber-500 text-amber-600" 
                                         : ""
                                   }`}
                                 >
-                                  {examen.estado === "completado" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                                  {(examen.estado === "completado" || examen.estado === "muestra_tomada") && <CheckCircle2 className="h-3 w-3 mr-1" />}
                                   {examen.nombre}
+                                  {examen.estado === "muestra_tomada" ? " ✓" : ""}
                                   {examen.estado === "incompleto" ? " (I)" : ""}
                                 </Badge>
                               ))}
