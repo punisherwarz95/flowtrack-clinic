@@ -85,6 +85,7 @@ const Prestadores = () => {
   const [email, setEmail] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [activo, setActivo] = useState(true);
+  const [tipo, setTipo] = useState("interno");
 
   // Tarifas form
   const [selectedExamenes, setSelectedExamenes] = useState<{ [key: string]: number }>({});
