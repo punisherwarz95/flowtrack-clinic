@@ -510,6 +510,18 @@ const Prestadores = () => {
                         </SelectContent>
                       </Select>
                     </div>
+                    <div>
+                      <Label>Tipo de Prestador</Label>
+                      <Select value={tipo} onValueChange={setTipo}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="interno">Interno (resultado inmediato)</SelectItem>
+                          <SelectItem value="externo">Externo (toma de muestra / derivación)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div className="flex items-center gap-2">
                       <Checkbox
                         id="activo"
