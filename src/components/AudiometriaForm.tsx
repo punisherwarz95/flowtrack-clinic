@@ -135,10 +135,15 @@ const AudiometriaForm = ({ value, onChange, readonly = false, fechaNacimiento }:
                   <Input
                     type="number"
                     step="5"
-                    min="-10"
+                    min="0"
                     max="130"
                     value={derecho[freq] ?? ""}
-                    onChange={(e) => updateFreq("derecho", freq, e.target.value)}
+                    onBlur={(e) => updateFreq("derecho", freq, e.target.value)}
+                    onChange={(e) => {
+                      const setter = setDerecho;
+                      const v = e.target.value;
+                      setter((prev) => ({ ...prev, [freq]: v === "" ? null : Number(v) }));
+                    }}
                     disabled={readonly}
                     className="h-8 text-xs text-center"
                     placeholder="dB"
