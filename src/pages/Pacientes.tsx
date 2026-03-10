@@ -898,6 +898,8 @@ const Pacientes = () => {
       setBateriasDisponibles([]);
       setSelectedExamenes([]);
       setSelectedPaquetes([]);
+      setSelectedDocumentos([]);
+      setDocumentoFilter("");
       setBateriaFilter("");
       setFiltroFaenaIdBateria("__all__");
       loadPatients();
