@@ -146,6 +146,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
         groupMap[key] = {
           prestadorId,
           prestadorNombre: prestadorId ? (prestadores[prestadorId] || "Prestador") : "Sin prestador",
+          prestadorTipo: prestadorId ? (prestadorTipos[prestadorId] || "interno") : "interno",
           examenes: [],
           archivosCompartidos: [],
         };
