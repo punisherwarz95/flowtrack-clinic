@@ -170,8 +170,8 @@ const MiBox = () => {
               .gte("fecha_ingreso", startOfDay.toISOString()).lte("fecha_ingreso", endOfDay.toISOString())
               .order("numero_ingreso", { ascending: true })
           : Promise.resolve({ data: [], error: null }),
-        boxExamIds.length > 0
-          ? supabase.from("atenciones").select("*, pacientes(id, nombre, rut, tipo_servicio)")
+      boxExamIds.length > 0
+          ? supabase.from("atenciones").select(PACIENTE_SELECT)
               .gte("fecha_ingreso", startOfDay.toISOString()).lte("fecha_ingreso", endOfDay.toISOString())
               .order("numero_ingreso", { ascending: true })
           : Promise.resolve({ data: [], error: null }),
