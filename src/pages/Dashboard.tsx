@@ -518,6 +518,18 @@ const Dashboard = () => {
       if (!hasPendingInBox) return false;
     }
 
+    // Filtro por color/estado de examen
+    if (!filterExPendiente || !filterExMuestra || !filterExCompletado || !filterExIncompleto) {
+      const hasMatchingExam = a.atencion_examenes.some(ae => {
+        if (ae.estado === "pendiente" && filterExPendiente) return true;
+        if (ae.estado === "muestra_tomada" && filterExMuestra) return true;
+        if (ae.estado === "completado" && filterExCompletado) return true;
+        if (ae.estado === "incompleto" && filterExIncompleto) return true;
+        return false;
+      });
+      if (a.atencion_examenes.length > 0 && !hasMatchingExam) return false;
+    }
+
     return true;
   });
 
