@@ -18,6 +18,7 @@ import { es } from "date-fns/locale";
 import { Calendar as CalendarIcon, Stethoscope, AlertTriangle, FileText, RefreshCw, ChevronRight, ClipboardCheck, Clock, FlaskConical, CheckCircle, XCircle, ArrowLeft } from "lucide-react";
 import { logActivity } from "@/lib/activityLog";
 import Navigation from "@/components/Navigation";
+import AudiometriaChart from "@/components/AudiometriaChart";
 import { useAuth } from "@/hooks/useAuth";
 
 interface PacienteAtencion {
