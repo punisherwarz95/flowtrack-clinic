@@ -338,7 +338,11 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
   const handleSaveGroup = async (groupKey: string, examenes: AtencionExamen[]) => {
     setSavingGroup(groupKey);
     try {
-      for (const examen of examenes) {
+      // Only save exams that are NOT already in a final state (completado/muestra_tomada)
+      const examenesParaGuardar = examenes.filter(
+        e => e.estado !== "completado" && e.estado !== "muestra_tomada"
+      );
+      for (const examen of examenesParaGuardar) {
         const ref = formRefsMap.current[examen.id];
         if (ref?.current) {
           await ref.current.save();
