@@ -373,17 +373,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
                   <span className="font-medium text-sm">{examen.examenes.nombre}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {(examen.estado === "pendiente" || examen.estado === "incompleto") && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1 h-6 text-xs"
-                      onClick={(e) => { e.stopPropagation(); handleMuestraTomada(examen.id); }}
-                    >
-                      <FlaskConical className="h-3 w-3" />
-                      Muestra Tomada
-                    </Button>
-                  )}
+                  
                   <Badge 
                     variant={examen.estado === "completado" ? "default" : examen.estado === "muestra_tomada" ? "secondary" : examen.estado === "incompleto" ? "secondary" : "outline"} 
                     className={`text-xs ${examen.estado === "muestra_tomada" ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" : ""}`}
