@@ -612,11 +612,20 @@ const MiBox = () => {
                     pacientesCompletados.map((atencion) => (
                       <div key={atencion.id} className="border rounded-lg p-2 space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant="outline" className="text-xs">#{atencion.numero_ingreso}</Badge>
-                            <span className="font-medium text-xs">{atencion.pacientes.nombre}</span>
-                            <EstadoFichaCheckboxes atencionId={atencion.id} estadoFicha={atencion.estado_ficha} onUpdate={loadData} prefix="done-" />
-                            <PresionTimerBadge timer={timerByAtencion[atencion.id]} />
+                          <Badge variant="outline" className="text-xs font-bold">#{atencion.numero_ingreso}</Badge>
+                          <span className="font-medium text-xs">{atencion.pacientes.nombre}</span>
+                          {atencion.pacientes.rut && (
+                            <span className="text-xs text-muted-foreground font-mono">{atencion.pacientes.rut}</span>
+                          )}
+                          <Badge variant={atencion.pacientes.tipo_servicio === "workmed" ? "default" : "secondary"} className="text-xs">
+                            {atencion.pacientes.tipo_servicio}
+                          </Badge>
+                          {atencion.pacientes.empresas?.nombre && (
+                            <span className="text-xs text-muted-foreground">| {atencion.pacientes.empresas.nombre}</span>
+                          )}
+                          <PresionTimerBadge timer={timerByAtencion[atencion.id]} />
                         </div>
+                        <EstadoFichaCheckboxes atencionId={atencion.id} estadoFicha={atencion.estado_ficha} onUpdate={loadData} prefix="done-" />
                         {atencion.examenesRealizados && (
                           <div className="flex flex-wrap gap-1">
                             {atencion.examenesRealizados.map((examen, idx) => (
