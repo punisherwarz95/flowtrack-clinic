@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronDown, ChevronRight, FlaskConical, Upload, Search, CheckCircle, FileText, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronRight, FlaskConical, Upload, Search, CheckCircle, Loader2 } from "lucide-react";
 import ExamenFormulario from "@/components/ExamenFormulario";
 
 interface PendienteRow {
@@ -22,6 +22,8 @@ interface PendienteRow {
   fechaIngreso: string;
   numeroIngreso: number;
   fechaNacimiento: string | null;
+  prestadorId: string | null;
+  prestadorNombre: string | null;
 }
 
 interface Props {
@@ -49,7 +51,6 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
         ? new Date(new Date(selectedDate).setHours(23, 59, 59, 999)).toISOString()
         : null;
 
-      // Get all atencion_examenes with estado = muestra_tomada
       let query = supabase
         .from("atencion_examenes")
         .select(`
@@ -76,6 +77,27 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
       const { data, error } = await query.limit(500);
       if (error) throw error;
 
+      // Fetch prestador info for each examen
+      const examenIds = [...new Set((data || []).map((ae: any) => ae.examen_id))];
+      
+      let prestadorMap: Record<string, { prestadorId: string; prestadorNombre: string }> = {};
+      
+      if (examenIds.length > 0) {
+        const { data: peData } = await supabase
+          .from("prestador_examenes")
+          .select("examen_id, prestador_id, prestadores(id, nombre)")
+          .in("examen_id", examenIds);
+
+        if (peData) {
+          for (const pe of peData as any[]) {
+            prestadorMap[pe.examen_id] = {
+              prestadorId: pe.prestador_id,
+              prestadorNombre: pe.prestadores?.nombre || "Sin prestador",
+            };
+          }
+        }
+      }
+
       const rows: PendienteRow[] = (data || []).map((ae: any) => ({
         atencionId: ae.atenciones.id,
         atencionExamenId: ae.id,
@@ -87,6 +109,8 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
         fechaIngreso: ae.atenciones.fecha_ingreso,
         numeroIngreso: ae.atenciones.numero_ingreso,
         fechaNacimiento: ae.atenciones.pacientes?.fecha_nacimiento || null,
+        prestadorId: prestadorMap[ae.examen_id]?.prestadorId || null,
+        prestadorNombre: prestadorMap[ae.examen_id]?.prestadorNombre || "Sin prestador",
       }));
 
       setPendientes(rows);
@@ -116,8 +140,20 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
     );
   });
 
-  const handleUploadPdfMasivo = async (atencionId: string, rows: PendienteRow[], file: File) => {
-    setUploadingPdf(atencionId);
+  // Sub-group rows by prestador within a patient
+  const groupByPrestador = (rows: PendienteRow[]) => {
+    const map: Record<string, PendienteRow[]> = {};
+    for (const row of rows) {
+      const key = row.prestadorId || "sin-prestador";
+      if (!map[key]) map[key] = [];
+      map[key].push(row);
+    }
+    return Object.entries(map);
+  };
+
+  const handleUploadPdfPrestador = async (atencionId: string, prestadorRows: PendienteRow[], file: File) => {
+    const key = `${atencionId}-${prestadorRows[0]?.prestadorId || "sp"}`;
+    setUploadingPdf(key);
     try {
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
       const fileName = `lab-externo/${atencionId}/${Date.now()}_${safeName}`;
@@ -133,7 +169,6 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
 
       if (!urlData?.signedUrl) throw new Error("No se pudo generar URL");
 
-      // Create shared file record
       const { data: archivoData, error: archivoError } = await supabase
         .from("examen_archivos_compartidos")
         .insert({
@@ -146,8 +181,8 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
 
       if (archivoError) throw archivoError;
 
-      // Link to ALL pending exams for this patient
-      const vinculos = rows.map((row) => ({
+      // Link ONLY to exams of this prestador
+      const vinculos = prestadorRows.map((row) => ({
         archivo_compartido_id: archivoData.id,
         examen_id: row.examenId,
       }));
@@ -158,7 +193,7 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
 
       if (vinculoError) throw vinculoError;
 
-      toast.success(`PDF "${file.name}" vinculado a ${rows.length} examen(es)`);
+      toast.success(`PDF "${file.name}" vinculado a ${prestadorRows.length} examen(es) de ${prestadorRows[0]?.prestadorNombre}`);
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al subir PDF");
@@ -220,6 +255,8 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
           ) : (
             filteredGroups.map(([atencionId, rows]) => {
               const first = rows[0];
+              const prestadorGroups = groupByPrestador(rows);
+
               return (
                 <Card key={atencionId} className="border-amber-200 dark:border-amber-800">
                   <CardHeader className="py-3 px-4">
@@ -241,80 +278,94 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
                       </Badge>
                     </div>
                   </CardHeader>
-                  <CardContent className="pt-0 space-y-3">
-                    {/* Upload PDF masivo para todos los exámenes del paciente */}
-                    <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                        disabled={uploadingPdf === atencionId}
-                        onClick={() => {
-                          const input = document.createElement("input");
-                          input.type = "file";
-                          input.accept = ".pdf";
-                          input.onchange = (e) => {
-                            const file = (e.target as HTMLInputElement).files?.[0];
-                            if (file) handleUploadPdfMasivo(atencionId, rows, file);
-                          };
-                          input.click();
-                        }}
-                      >
-                        {uploadingPdf === atencionId ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Upload className="h-4 w-4" />
-                        )}
-                        Subir PDF del Lab
-                      </Button>
-                      <span className="text-xs text-muted-foreground">
-                        Se vinculará a los {rows.length} examen(es) pendientes de este paciente
-                      </span>
-                    </div>
+                  <CardContent className="pt-0 space-y-4">
+                    {prestadorGroups.map(([prestadorKey, prestadorRows]) => {
+                      const uploadKey = `${atencionId}-${prestadorKey}`;
+                      const prestadorNombre = prestadorRows[0]?.prestadorNombre || "Sin prestador";
 
-                    {/* Individual exam forms */}
-                    {rows.map((row) => (
-                      <Collapsible
-                        key={row.atencionExamenId}
-                        open={expandedExamen === row.atencionExamenId}
-                        onOpenChange={(open) => setExpandedExamen(open ? row.atencionExamenId : null)}
-                      >
-                        <CollapsibleTrigger className="w-full">
-                          <div className="flex items-center justify-between border rounded-lg p-3 hover:bg-accent/30 transition-colors">
+                      return (
+                        <div key={prestadorKey} className="border rounded-lg overflow-hidden">
+                          {/* Prestador header + PDF upload */}
+                          <div className="flex items-center justify-between gap-3 p-3 bg-muted/40 border-b">
                             <div className="flex items-center gap-2">
-                              {expandedExamen === row.atencionExamenId ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4" />
-                              )}
-                              <FlaskConical className="h-4 w-4 text-amber-600" />
-                              <span className="font-medium text-sm">{row.examenNombre}</span>
+                              <FlaskConical className="h-4 w-4 text-primary" />
+                              <span className="font-medium text-sm">{prestadorNombre}</span>
+                              <Badge variant="secondary" className="text-xs">
+                                {prestadorRows.length} examen{prestadorRows.length > 1 ? "es" : ""}
+                              </Badge>
                             </div>
-                            <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs">
-                              Muestra tomada
-                            </Badge>
-                          </div>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent className="border border-t-0 rounded-b-lg p-4 space-y-4">
-                          <ExamenFormulario
-                            atencionExamenId={row.atencionExamenId}
-                            examenId={row.examenId}
-                            examenNombre={row.examenNombre}
-                            onComplete={loadPendientes}
-                            fechaNacimiento={row.fechaNacimiento}
-                          />
-                          <div className="flex justify-end pt-2 border-t">
                             <Button
+                              variant="outline"
+                              size="sm"
                               className="gap-2"
-                              onClick={() => handleMarcarCompletado(row.atencionExamenId)}
+                              disabled={uploadingPdf === uploadKey}
+                              onClick={() => {
+                                const input = document.createElement("input");
+                                input.type = "file";
+                                input.accept = ".pdf";
+                                input.onchange = (e) => {
+                                  const file = (e.target as HTMLInputElement).files?.[0];
+                                  if (file) handleUploadPdfPrestador(atencionId, prestadorRows, file);
+                                };
+                                input.click();
+                              }}
                             >
-                              <CheckCircle className="h-4 w-4" />
-                              Marcar como Completado
+                              {uploadingPdf === uploadKey ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Upload className="h-4 w-4" />
+                              )}
+                              Subir PDF
                             </Button>
                           </div>
-                        </CollapsibleContent>
-                      </Collapsible>
-                    ))}
+
+                          {/* Individual exams within this prestador */}
+                          <div className="p-2 space-y-2">
+                            {prestadorRows.map((row) => (
+                              <Collapsible
+                                key={row.atencionExamenId}
+                                open={expandedExamen === row.atencionExamenId}
+                                onOpenChange={(open) => setExpandedExamen(open ? row.atencionExamenId : null)}
+                              >
+                                <CollapsibleTrigger className="w-full">
+                                  <div className="flex items-center justify-between border rounded-lg p-3 hover:bg-accent/30 transition-colors">
+                                    <div className="flex items-center gap-2">
+                                      {expandedExamen === row.atencionExamenId ? (
+                                        <ChevronDown className="h-4 w-4" />
+                                      ) : (
+                                        <ChevronRight className="h-4 w-4" />
+                                      )}
+                                      <span className="font-medium text-sm">{row.examenNombre}</span>
+                                    </div>
+                                    <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs">
+                                      Muestra tomada
+                                    </Badge>
+                                  </div>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent className="border border-t-0 rounded-b-lg p-4 space-y-4">
+                                  <ExamenFormulario
+                                    atencionExamenId={row.atencionExamenId}
+                                    examenId={row.examenId}
+                                    examenNombre={row.examenNombre}
+                                    onComplete={loadPendientes}
+                                    fechaNacimiento={row.fechaNacimiento}
+                                  />
+                                  <div className="flex justify-end pt-2 border-t">
+                                    <Button
+                                      className="gap-2"
+                                      onClick={() => handleMarcarCompletado(row.atencionExamenId)}
+                                    >
+                                      <CheckCircle className="h-4 w-4" />
+                                      Marcar como Completado
+                                    </Button>
+                                  </div>
+                                </CollapsibleContent>
+                              </Collapsible>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </CardContent>
                 </Card>
               );
