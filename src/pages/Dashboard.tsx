@@ -161,11 +161,11 @@ const Dashboard = () => {
         }
       }
       if (skipFilter !== "box" && selectedBoxPendienteFilter !== "all") {
-        const hasPendingInBox = a.atencion_examenes.some(ae => {
+        const hasExamInBox = a.atencion_examenes.some(ae => {
           const boxInfo = boxExamenesMap.get(ae.examenes.id);
-          return boxInfo?.boxId === selectedBoxPendienteFilter && ae.estado !== "completado";
+          return boxInfo?.boxId === selectedBoxPendienteFilter;
         });
-        if (!hasPendingInBox) return false;
+        if (!hasExamInBox) return false;
       }
       if (skipFilter !== "exColor" && (!filterExPendiente || !filterExMuestra || !filterExCompletado || !filterExIncompleto)) {
         const hasMatchingExam = a.atencion_examenes.some(ae => {
