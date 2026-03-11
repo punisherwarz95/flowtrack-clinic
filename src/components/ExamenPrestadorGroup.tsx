@@ -230,7 +230,42 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
 
       if (vincError) throw vincError;
 
+      // Update status of trazabilidad-linked exams in this atencion
+      // Find atencion_examenes that match trazabilidad-linked examen_ids but are NOT in this group
+      const groupExamenIds = new Set(group.examenes.map(ae => ae.examen_id));
+      const trazLinkedExamenIds = new Set<string>();
+      group.examenes.forEach(ae => {
+        const trazLinks = trazabilidadMap[ae.examen_id] || [];
+        trazLinks.forEach(linkedId => {
+          if (!groupExamenIds.has(linkedId)) {
+            trazLinkedExamenIds.add(linkedId);
+          }
+        });
+      });
+
+      if (trazLinkedExamenIds.size > 0) {
+        // Find atencion_examenes for linked exams that are pending/incomplete
+        const linkedAtencionExamenes = atencionExamenes.filter(
+          ae => trazLinkedExamenIds.has(ae.examen_id) && 
+                (ae.estado === "pendiente" || ae.estado === "incompleto")
+        );
+        
+        if (linkedAtencionExamenes.length > 0) {
+          const linkedIds = linkedAtencionExamenes.map(ae => ae.id);
+          await supabase
+            .from("atencion_examenes")
+            .update({ 
+              estado: "completado" as any, 
+              fecha_realizacion: new Date().toISOString() 
+            })
+            .in("id", linkedIds);
+          
+          toast.success(`${linkedAtencionExamenes.length} examen(es) vinculado(s) completado(s) por trazabilidad`);
+        }
+      }
+
       toast.success(`PDF compartido subido para ${group.prestadorNombre}`);
+      onComplete?.();
       await loadPrestadorData();
     } catch (error: any) {
       console.error("Error:", error);
