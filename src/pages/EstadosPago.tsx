@@ -915,6 +915,138 @@ const EstadosPago = () => {
               </Card>
             )}
           </TabsContent>
+
+          {/* === TAB: Prestadores === */}
+          <TabsContent value="prestadores" className="space-y-4">
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex flex-wrap items-end gap-4">
+                  <div className="flex-1 min-w-[200px] max-w-sm">
+                    <label className="text-sm font-medium mb-1 block">Prestador</label>
+                    <Select value={selectedPrestadorId} onValueChange={setSelectedPrestadorId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar prestador..." />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[300px]">
+                        <div className="p-2">
+                          <Input
+                            placeholder="Buscar prestador..."
+                            value={prestadorSearch}
+                            onChange={(e) => setPrestadorSearch(e.target.value)}
+                            className="h-8"
+                          />
+                        </div>
+                        {filteredPrestadores.map(p => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.nombre} {p.especialidad ? `(${p.especialidad})` : ""} {p.rut ? `- ${p.rut}` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">Desde</label>
+                    <Input type="date" value={prestadorFechaDesde} onChange={e => setPrestadorFechaDesde(e.target.value)} className="w-[160px]" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">Hasta</label>
+                    <Input type="date" value={prestadorFechaHasta} onChange={e => setPrestadorFechaHasta(e.target.value)} className="w-[160px]" />
+                  </div>
+                  <Button onClick={handleBuscarPrestadorExamenes} disabled={!selectedPrestadorId || prestadorLoading}>
+                    {prestadorLoading ? "Buscando..." : <><Search className="h-4 w-4 mr-2" />Buscar</>}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {prestadorExamenes.length > 0 && (
+              <>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Exámenes realizados - {prestadores.find(p => p.id === selectedPrestadorId)?.nombre}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="rounded-md border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Fecha</TableHead>
+                            <TableHead>Paciente</TableHead>
+                            <TableHead>RUT</TableHead>
+                            <TableHead>Empresa</TableHead>
+                            <TableHead>Examen</TableHead>
+                            <TableHead className="text-right">Valor Prestación</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {prestadorExamenes.map((pe, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell>{pe.fecha_realizacion ? format(new Date(pe.fecha_realizacion + "T12:00:00"), "dd/MM/yyyy") : "-"}</TableCell>
+                              <TableCell className="font-medium">{pe.paciente_nombre}</TableCell>
+                              <TableCell className="font-mono text-sm">{pe.paciente_rut || "-"}</TableCell>
+                              <TableCell>{pe.empresa_nombre || "-"}</TableCell>
+                              <TableCell>{pe.examen_nombre}</TableCell>
+                              <TableCell className="text-right">${pe.valor_prestacion.toLocaleString("es-CL")}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Resumen */}
+                <Card className="border-dashed">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Package className="h-4 w-4" /> Resumen por Examen
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="rounded-md border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Examen</TableHead>
+                            <TableHead className="text-center">Cantidad</TableHead>
+                            <TableHead className="text-right">Valor Unitario</TableHead>
+                            <TableHead className="text-right">Total</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {prestadorResumen.map(r => (
+                            <TableRow key={r.nombre}>
+                              <TableCell className="font-medium">{r.nombre}</TableCell>
+                              <TableCell className="text-center">{r.cantidad.toString().padStart(2, "0")}</TableCell>
+                              <TableCell className="text-right">${r.valorUnitario.toLocaleString("es-CL")}</TableCell>
+                              <TableCell className="text-right font-semibold">${(r.cantidad * r.valorUnitario).toLocaleString("es-CL")}</TableCell>
+                            </TableRow>
+                          ))}
+                          <TableRow className="bg-muted/50 font-bold">
+                            <TableCell>TOTAL A PAGAR</TableCell>
+                            <TableCell className="text-center">{prestadorExamenes.length}</TableCell>
+                            <TableCell />
+                            <TableCell className="text-right text-lg">${prestadorTotalPagar.toLocaleString("es-CL")}</TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+
+            {selectedPrestadorId && !prestadorLoading && prestadorExamenes.length === 0 && (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  No se encontraron exámenes realizados por este prestador en el período seleccionado
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
         </Tabs>
       </div>
 
