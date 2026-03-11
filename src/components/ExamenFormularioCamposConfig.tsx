@@ -42,6 +42,7 @@ const TIPOS_CAMPO = [
   { value: "archivo_pdf", label: "Archivo PDF" },
   { value: "audiometria", label: "Audiometría" },
   { value: "antropometria", label: "Antropometría" },
+  { value: "cuestionario", label: "Cuestionario (con puntaje)" },
 ];
 
 const UNIDADES_COMUNES = ["mg/dL", "g/dL", "mL/min", "U/L", "mmol/L", "ng/mL", "µg/dL", "mEq/L", "%", "mm/h", "pg/mL", "cel/µL"];
