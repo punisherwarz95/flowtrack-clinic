@@ -586,6 +586,9 @@ const EvaluacionMedica = () => {
     });
     return Object.values(groups);
   };
+
+  // Render inline evaluation view (replaces dialog)
+  const renderEvaluacionInline = () => {
     if (!selectedPaciente || !evaluandoPaquete) return null;
 
     const bat = bateriasConEstado.find(b => b.paqueteId === evaluandoPaquete);
