@@ -548,6 +548,9 @@ const EstadosPago = () => {
             <TabsTrigger value="precios">
               <DollarSign className="h-4 w-4 mr-1" /> Baterías y Precios
             </TabsTrigger>
+            <TabsTrigger value="prestadores">
+              <Users className="h-4 w-4 mr-1" /> Prestadores
+            </TabsTrigger>
           </TabsList>
 
           {/* === TAB: Estados de Pago === */}
