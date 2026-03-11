@@ -19,6 +19,7 @@ import { Calendar as CalendarIcon, Stethoscope, AlertTriangle, FileText, Refresh
 import { logActivity } from "@/lib/activityLog";
 import Navigation from "@/components/Navigation";
 import AudiometriaChart from "@/components/AudiometriaChart";
+import { CuestionarioScoreSummary } from "@/components/CuestionarioRenderer";
 import { useAuth } from "@/hooks/useAuth";
 
 interface PacienteAtencion {
