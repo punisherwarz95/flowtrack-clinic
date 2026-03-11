@@ -634,23 +634,28 @@ const EvaluacionMedica = () => {
                 <CardTitle className="text-base">Resultado de Aptitud</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {(() => {
+                  const currentBat = bateriasConEstado.find(b => b.paqueteId === evaluandoPaquete);
+                  const allExamsComplete = currentBat?.listaParaEvaluar || !!currentBat?.evaluacion;
+                  return (
                 <div>
                   <Label className="mb-2 block">Dictamen</Label>
+                  {!allExamsComplete && (
+                    <p className="text-xs text-amber-600 mb-2">⚠ No puedes asignar aptitud hasta que todos los exámenes estén completados</p>
+                  )}
                   <RadioGroup value={resultado} onValueChange={setResultado} className="flex flex-wrap gap-4">
-                    <div className="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-green-50 dark:hover:bg-green-950/20">
-                      <RadioGroupItem value="apto" id="eval-apto" />
-                      <Label htmlFor="eval-apto" className="cursor-pointer font-semibold text-green-700">APTO</Label>
+                    <div className={`flex items-center gap-2 p-2 border rounded-lg ${allExamsComplete ? "cursor-pointer hover:bg-green-50 dark:hover:bg-green-950/20" : "opacity-50 cursor-not-allowed"}`}>
+                      <RadioGroupItem value="apto" id="eval-apto" disabled={!allExamsComplete} />
+                      <Label htmlFor="eval-apto" className={`font-semibold text-green-700 ${allExamsComplete ? "cursor-pointer" : "cursor-not-allowed"}`}>APTO</Label>
                     </div>
-                    <div className="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-red-50 dark:hover:bg-red-950/20">
-                      <RadioGroupItem value="no_apto" id="eval-no-apto" />
-                      <Label htmlFor="eval-no-apto" className="cursor-pointer font-semibold text-red-700">NO APTO</Label>
-                    </div>
-                    <div className="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-950/20">
-                      <RadioGroupItem value="apto_con_restricciones" id="eval-apto-cr" />
-                      <Label htmlFor="eval-apto-cr" className="cursor-pointer font-semibold text-amber-700">APTO C/R</Label>
+                    <div className={`flex items-center gap-2 p-2 border rounded-lg ${allExamsComplete ? "cursor-pointer hover:bg-red-50 dark:hover:bg-red-950/20" : "opacity-50 cursor-not-allowed"}`}>
+                      <RadioGroupItem value="no_apto" id="eval-no-apto" disabled={!allExamsComplete} />
+                      <Label htmlFor="eval-no-apto" className={`font-semibold text-red-700 ${allExamsComplete ? "cursor-pointer" : "cursor-not-allowed"}`}>NO APTO</Label>
                     </div>
                   </RadioGroup>
                 </div>
+                  );
+                })()}
 
                 {resultado !== "no_apto" && (
                   <div>
