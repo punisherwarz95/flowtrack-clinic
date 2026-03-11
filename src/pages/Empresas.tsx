@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Upload, Building2, Trash2, Pencil, Package, DollarSign, Search } from "lucide-react";
+import { Plus, Upload, Building2, Trash2, Pencil, Package, DollarSign, Search, MapPin, ChevronRight } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -20,6 +20,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/hooks/useAuth";
 import EmpresaFaenas from "@/components/empresas/EmpresaFaenas";
 import { logActivity } from "@/lib/activityLog";
@@ -50,6 +53,19 @@ interface EmpresaBateria {
   paquete?: { nombre: string };
 }
 
+interface EmpresaFaenaRow {
+  id: string;
+  faena_id: string;
+  activo: boolean;
+  faena?: { id: string; nombre: string };
+}
+
+interface BateriaFaenaRow {
+  paquete_id: string;
+  activo: boolean | null;
+  paquete?: { id: string; nombre: string };
+}
+
 const emptyForm = {
   nombre: "",
   rut: "",
@@ -73,6 +89,10 @@ const Empresas = () => {
   const [bateriaPrecios, setBateriaPrecios] = useState<Record<string, string>>({});
   const [searchTerm, setSearchTerm] = useState("");
   const [formData, setFormData] = useState(emptyForm);
+  // Baterías tab state
+  const [empresaFaenasList, setEmpresaFaenasList] = useState<EmpresaFaenaRow[]>([]);
+  const [selectedFaenaId, setSelectedFaenaId] = useState<string | null>(null);
+  const [faenaBaterias, setFaenaBaterias] = useState<BateriaFaenaRow[]>([]);
 
   const filteredEmpresas = empresas.filter((empresa) =>
     empresa.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -106,7 +126,6 @@ const Empresas = () => {
 
   const loadEmpresaBaterias = async (empresaId: string) => {
     try {
-      // Load empresa_baterias
       const { data, error } = await supabase
         .from("empresa_baterias")
         .select("*, paquete:paquetes_examenes(nombre)")
@@ -122,7 +141,6 @@ const Empresas = () => {
 
       const faenaIds = (efData || []).map((ef: any) => ef.faena_id);
 
-      // Load which paquetes belong to those faenas
       let validPaqueteIds = new Set<string>();
       if (faenaIds.length > 0) {
         const { data: bfData } = await supabase
@@ -133,7 +151,6 @@ const Empresas = () => {
         (bfData || []).forEach((bf: any) => validPaqueteIds.add(bf.paquete_id));
       }
 
-      // Only keep empresa_baterias whose paquete belongs to an assigned faena
       const filtered = (data || []).filter((eb: any) => validPaqueteIds.has(eb.paquete_id));
       
       setEmpresaBaterias(filtered);
@@ -147,6 +164,85 @@ const Empresas = () => {
     }
   };
 
+  const loadEmpresaFaenasList = async (empresaId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("empresa_faenas")
+        .select("id, faena_id, activo, faena:faenas(id, nombre)")
+        .eq("empresa_id", empresaId)
+        .eq("activo", true);
+      if (error) throw error;
+      setEmpresaFaenasList((data || []) as any);
+      setSelectedFaenaId(null);
+      setFaenaBaterias([]);
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
+
+  const loadFaenaBaterias = async (faenaId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("bateria_faenas")
+        .select("paquete_id, activo, paquete:paquetes_examenes(id, nombre)")
+        .eq("faena_id", faenaId)
+        .neq("activo", false);
+      if (error) throw error;
+      setFaenaBaterias((data || []) as any);
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
+
+  const handleSelectFaena = async (faenaId: string) => {
+    setSelectedFaenaId(faenaId);
+    await loadFaenaBaterias(faenaId);
+  };
+
+  const handleAddBateria = async (paqueteId: string, paqueteNombre: string) => {
+    if (!editingEmpresa) return;
+    try {
+      // Check if already exists
+      const existing = empresaBaterias.find(eb => eb.paquete_id === paqueteId);
+      if (existing) {
+        toast.info(`${paqueteNombre} ya está agregada`);
+        return;
+      }
+      const { error } = await supabase
+        .from("empresa_baterias")
+        .insert([{ empresa_id: editingEmpresa.id, paquete_id: paqueteId, valor: 0, activo: true }]);
+      if (error) throw error;
+      toast.success(`${paqueteNombre} agregada`);
+      await loadEmpresaBaterias(editingEmpresa.id);
+    } catch (error: any) {
+      console.error("Error:", error);
+      toast.error("Error al agregar batería");
+    }
+  };
+
+  const handleRemoveBateria = async (paqueteId: string) => {
+    if (!editingEmpresa) return;
+    try {
+      const { error } = await supabase
+        .from("empresa_baterias")
+        .delete()
+        .eq("empresa_id", editingEmpresa.id)
+        .eq("paquete_id", paqueteId);
+      if (error) throw error;
+      toast.success("Batería eliminada");
+      await loadEmpresaBaterias(editingEmpresa.id);
+    } catch (error: any) {
+      console.error("Error:", error);
+      toast.error("Error al eliminar batería");
+    }
+  };
+
+  // Derived: paquete IDs already assigned to empresa
+  const assignedPaqueteIds = new Set(empresaBaterias.map(eb => eb.paquete_id));
+
+  // Available baterias from the selected faena that are NOT yet assigned
+  const availableBaterias = faenaBaterias.filter(fb => !assignedPaqueteIds.has(fb.paquete_id));
+
   const openEmpresaDialog = async (empresa: Empresa) => {
     setEditingEmpresa(empresa);
     setFormData({
@@ -159,7 +255,7 @@ const Empresas = () => {
       centro_costo: empresa.centro_costo || "",
       afecto_iva: empresa.afecto_iva !== false,
     });
-    await loadEmpresaBaterias(empresa.id);
+    await Promise.all([loadEmpresaBaterias(empresa.id), loadEmpresaFaenasList(empresa.id)]);
     setActiveTab("datos");
     setOpenDialog(true);
   };
@@ -268,8 +364,7 @@ const Empresas = () => {
     }
   };
 
-  const linkedPaqueteIds = new Set(empresaBaterias.map((eb) => eb.paquete_id));
-  const linkedPaquetes = paquetes.filter((p) => linkedPaqueteIds.has(p.id));
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -358,9 +453,12 @@ const Empresas = () => {
             setFormData(emptyForm);
             setEmpresaBaterias([]);
             setBateriaPrecios({});
+            setEmpresaFaenasList([]);
+            setSelectedFaenaId(null);
+            setFaenaBaterias([]);
           }
         }}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Building2 className="h-5 w-5" />
@@ -371,7 +469,7 @@ const Empresas = () => {
             <Tabs value={activeTab} onValueChange={(tab) => {
               setActiveTab(tab);
               if (tab === "baterias" && editingEmpresa) {
-                loadEmpresaBaterias(editingEmpresa.id);
+                Promise.all([loadEmpresaBaterias(editingEmpresa.id), loadEmpresaFaenasList(editingEmpresa.id)]);
               }
             }}>
               <TabsList className="w-full">
@@ -483,53 +581,138 @@ const Empresas = () => {
 
               {/* Tab: Baterías y Precios */}
               <TabsContent value="baterias" className="mt-4">
-                <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    Define los precios para las baterías vinculadas a esta empresa. Si una batería tiene precio $0, queda como pendiente de configurar.
-                  </p>
-
-                  <div className="border rounded-md divide-y max-h-96 overflow-y-auto">
-                    {linkedPaquetes.map((paquete) => (
-                      <div key={paquete.id} className="flex items-center justify-between p-3 gap-4">
-                        <span className="text-sm font-medium flex-1">{paquete.nombre}</span>
-                        <div className="flex items-center gap-1">
-                          <DollarSign className="h-4 w-4 text-muted-foreground" />
-                          <Input
-                            type="number"
-                            step="any"
-                            value={bateriaPrecios[paquete.id] ?? ""}
-                            onChange={(e) =>
-                              setBateriaPrecios({
-                                ...bateriaPrecios,
-                                [paquete.id]: e.target.value,
-                              })
-                            }
-                            placeholder="0"
-                            className="w-28 h-8"
-                          />
-                        </div>
+                <div className="grid grid-cols-2 gap-6 min-h-[400px]">
+                  {/* LEFT: Faena selector + available batteries */}
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-sm font-semibold flex items-center gap-2 mb-2">
+                        <MapPin className="h-4 w-4 text-primary" />
+                        Faenas de esta empresa
+                      </Label>
+                      <div className="border rounded-md divide-y max-h-40 overflow-y-auto">
+                        {empresaFaenasList.length === 0 ? (
+                          <p className="text-sm text-muted-foreground text-center py-4">
+                            No hay faenas asignadas. Ve a la pestaña "Faenas" primero.
+                          </p>
+                        ) : (
+                          empresaFaenasList.map((ef) => (
+                            <button
+                              key={ef.faena_id}
+                              type="button"
+                              onClick={() => handleSelectFaena(ef.faena_id)}
+                              className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors ${
+                                selectedFaenaId === ef.faena_id ? "bg-primary/10 font-medium" : ""
+                              }`}
+                            >
+                              <span>{(ef as any).faena?.nombre || ef.faena_id}</span>
+                              <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${selectedFaenaId === ef.faena_id ? "text-primary" : ""}`} />
+                            </button>
+                          ))
+                        )}
                       </div>
-                    ))}
-                    {linkedPaquetes.length === 0 && (
-                      <p className="text-sm text-muted-foreground text-center py-8">
-                        Esta empresa no tiene baterías vinculadas. Primero vincula una faena con baterías en la pestaña "Faenas".
-                      </p>
-                    )}
+                    </div>
+
+                    {/* Available batteries from selected faena */}
+                    <div>
+                      <Label className="text-sm font-semibold flex items-center gap-2 mb-2">
+                        <Package className="h-4 w-4 text-primary" />
+                        Baterías disponibles
+                      </Label>
+                      {!selectedFaenaId ? (
+                        <div className="border rounded-md p-4 text-center">
+                          <p className="text-sm text-muted-foreground">Selecciona una faena arriba para ver sus baterías disponibles</p>
+                        </div>
+                      ) : availableBaterias.length === 0 ? (
+                        <div className="border rounded-md p-4 text-center">
+                          <p className="text-sm text-muted-foreground">Todas las baterías de esta faena ya están agregadas</p>
+                        </div>
+                      ) : (
+                        <ScrollArea className="border rounded-md h-[220px]">
+                          <div className="divide-y">
+                            {availableBaterias.map((fb) => (
+                              <div key={fb.paquete_id} className="flex items-center justify-between px-3 py-2">
+                                <span className="text-sm">{(fb as any).paquete?.nombre || fb.paquete_id}</span>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs gap-1"
+                                  onClick={() => handleAddBateria(fb.paquete_id, (fb as any).paquete?.nombre || "")}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                  Agregar
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      )}
+                    </div>
                   </div>
 
-                  {linkedPaquetes.length > 0 && (
-                    <div className="flex justify-between items-center pt-2">
-                      <p className="text-xs text-muted-foreground">
-                        {linkedPaquetes.length} vinculadas · {linkedPaquetes.filter((p) => {
-                          const v = (bateriaPrecios[p.id] ?? "").trim();
-                          return v !== "" && Number(v) > 0;
-                        }).length} con precio &gt; 0
-                      </p>
-                      <Button onClick={handleSaveBaterias}>
-                        Guardar Precios
-                      </Button>
-                    </div>
-                  )}
+                  {/* RIGHT: Assigned batteries with prices */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-semibold flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-primary" />
+                      Baterías contratadas y precios
+                    </Label>
+                    {empresaBaterias.length === 0 ? (
+                      <div className="border rounded-md p-8 text-center">
+                        <Package className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
+                        <p className="text-sm text-muted-foreground">
+                          No hay baterías agregadas. Selecciona una faena y agrega baterías desde la izquierda.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <ScrollArea className="border rounded-md h-[320px]">
+                          <div className="divide-y">
+                            {empresaBaterias.map((eb) => (
+                              <div key={eb.paquete_id} className="flex items-center gap-2 px-3 py-2">
+                                <span className="text-sm font-medium flex-1 truncate">
+                                  {eb.paquete?.nombre || eb.paquete_id}
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                                  <Input
+                                    type="number"
+                                    step="any"
+                                    value={bateriaPrecios[eb.paquete_id] ?? ""}
+                                    onChange={(e) =>
+                                      setBateriaPrecios({
+                                        ...bateriaPrecios,
+                                        [eb.paquete_id]: e.target.value,
+                                      })
+                                    }
+                                    placeholder="0"
+                                    className="w-24 h-7 text-sm"
+                                  />
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 shrink-0"
+                                  onClick={() => handleRemoveBateria(eb.paquete_id)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                        <div className="flex justify-between items-center pt-1">
+                          <p className="text-xs text-muted-foreground">
+                            {empresaBaterias.length} baterías · {empresaBaterias.filter((eb) => {
+                              const v = (bateriaPrecios[eb.paquete_id] ?? "").trim();
+                              return v !== "" && Number(v) > 0;
+                            }).length} con precio &gt; 0
+                          </p>
+                          <Button size="sm" onClick={handleSaveBaterias}>
+                            Guardar Precios
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>
