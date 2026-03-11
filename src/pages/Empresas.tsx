@@ -364,8 +364,7 @@ const Empresas = () => {
     }
   };
 
-  const linkedPaqueteIds = new Set(empresaBaterias.map((eb) => eb.paquete_id));
-  const linkedPaquetes = paquetes.filter((p) => linkedPaqueteIds.has(p.id));
+
 
   return (
     <div className="min-h-screen bg-background">
