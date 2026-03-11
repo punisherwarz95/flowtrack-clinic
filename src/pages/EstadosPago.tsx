@@ -72,6 +72,24 @@ interface MonthlySale {
   cantidad_estados: number;
 }
 
+interface Prestador {
+  id: string;
+  nombre: string;
+  rut: string | null;
+  especialidad: string | null;
+  tipo: string;
+}
+
+interface PrestadorExamenDetail {
+  atencion_examen_id: string;
+  examen_nombre: string;
+  paciente_nombre: string;
+  paciente_rut: string | null;
+  empresa_nombre: string | null;
+  fecha_realizacion: string;
+  valor_prestacion: number;
+}
+
 const EstadosPago = () => {
   useAuth();
   const { toast } = useToast();
