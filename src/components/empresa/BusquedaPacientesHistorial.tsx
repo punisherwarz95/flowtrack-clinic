@@ -353,10 +353,7 @@ const BusquedaPacientesHistorial = ({
       }
     });
 
-    // Filter columns based on selection (empty = all)
-    const columnsToExport = selectedExportColumns.length > 0
-      ? selectedExportColumns
-      : ALL_EXPORT_COLUMNS.map(c => c.key);
+    // Filter columns based on selection (already computed above)
 
     const filteredRows = rows.map(row => {
       const filtered: any = {};
