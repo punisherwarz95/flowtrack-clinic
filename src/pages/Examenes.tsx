@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, ClipboardList, Package, Trash2, Pencil, FileText, DollarSign, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Search, MapPin, Settings2, Link2 } from "lucide-react";
+import { Plus, ClipboardList, Package, Trash2, Pencil, FileText, DollarSign, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Search, MapPin, Settings2, Link2, AlertTriangle } from "lucide-react";
 import ExamenFormularioCamposConfig from "@/components/ExamenFormularioCamposConfig";
 import { logActivity } from "@/lib/activityLog";
 import ExamenTrazabilidadConfig from "@/components/ExamenTrazabilidadConfig";
@@ -223,7 +223,10 @@ const Examenes = () => {
   const [selectedFaenas, setSelectedFaenas] = useState<string[]>([]);
   const [openExamenDialog, setOpenExamenDialog] = useState(false);
   const [openPaqueteDialog, setOpenPaqueteDialog] = useState(false);
-  const [examenToDelete, setExamenToDelete] = useState<string | null>(null);
+  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+  const [deleteSearch, setDeleteSearch] = useState("");
+  const [examenToDelete, setExamenToDelete] = useState<Examen | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [paqueteToDelete, setPaqueteToDelete] = useState<string | null>(null);
   const [editingExamen, setEditingExamen] = useState<Examen | null>(null);
   const [editingPaquete, setEditingPaquete] = useState<Paquete | null>(null);
@@ -636,24 +639,53 @@ const Examenes = () => {
     }
   };
 
-  const handleDeleteExamen = async () => {
+  const handleDeleteExamenCascade = async () => {
     if (!examenToDelete) return;
+    setIsDeleting(true);
 
     try {
-      const { error } = await supabase
-        .from("examenes")
-        .delete()
-        .eq("id", examenToDelete);
+      const examenId = examenToDelete.id;
 
+      // 1. Delete examen_resultados (via atencion_examenes)
+      const { data: aeIds } = await supabase
+        .from("atencion_examenes")
+        .select("id")
+        .eq("examen_id", examenId);
+      
+      if (aeIds && aeIds.length > 0) {
+        const ids = aeIds.map(ae => ae.id);
+        await supabase.from("examen_resultados").delete().in("atencion_examen_id", ids);
+      }
+
+      // 2. Delete from all referencing tables in parallel
+      await Promise.all([
+        supabase.from("atencion_examenes").delete().eq("examen_id", examenId),
+        supabase.from("box_examenes").delete().eq("examen_id", examenId),
+        supabase.from("paquete_examen_items").delete().eq("examen_id", examenId),
+        supabase.from("prestador_examenes").delete().eq("examen_id", examenId),
+        supabase.from("faena_examenes").delete().eq("examen_id", examenId),
+        supabase.from("examen_formulario_campos").delete().eq("examen_id", examenId),
+        supabase.from("examen_trazabilidad").delete().eq("examen_id_a", examenId),
+        supabase.from("examen_trazabilidad").delete().eq("examen_id_b", examenId),
+        supabase.from("examen_archivo_vinculos").delete().eq("examen_id", examenId),
+        supabase.from("cotizacion_items").delete().eq("examen_id", examenId),
+        supabase.from("cotizacion_solicitud_items").delete().eq("examen_id", examenId),
+      ]);
+
+      // 3. Finally delete the exam itself
+      const { error } = await supabase.from("examenes").delete().eq("id", examenId);
       if (error) throw error;
       
-      toast.success("Examen eliminado exitosamente");
-      logActivity("eliminar_examen", { examen_id: examenToDelete }, "/examenes");
+      toast.success(`Examen "${examenToDelete.nombre}" eliminado con todos sus registros asociados`);
+      logActivity("eliminar_examen", { examen_id: examenId, nombre: examenToDelete.nombre, cascada: true }, "/examenes");
       setExamenToDelete(null);
       loadExamenes();
+      loadPaquetes();
     } catch (error: any) {
       console.error("Error:", error);
       toast.error(error.message || "Error al eliminar examen");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -789,6 +821,11 @@ const Examenes = () => {
           </div>
           
           <div className="flex gap-3">
+            {/* Botón Eliminar Examen */}
+            <Button variant="destructive" className="gap-2" onClick={() => setOpenDeleteDialog(true)}>
+              <Trash2 className="h-4 w-4" />
+              Eliminar Examen
+            </Button>
             {/* Botón Importar Excel */}
             <Dialog open={openImportDialog} onOpenChange={(open) => {
               setOpenImportDialog(open);
@@ -1411,13 +1448,6 @@ const Examenes = () => {
                             >
                               <Link2 className="h-4 w-4 text-primary" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setExamenToDelete(examen.id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1485,20 +1515,91 @@ const Examenes = () => {
           </TabsContent>
         </Tabs>
 
-        <AlertDialog open={!!examenToDelete} onOpenChange={() => setExamenToDelete(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Esta acción no se puede deshacer. Se eliminará permanentemente el examen.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteExamen}>Eliminar</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {/* Dialog para eliminar examen en cascada */}
+        <Dialog open={openDeleteDialog} onOpenChange={(open) => {
+          setOpenDeleteDialog(open);
+          if (!open) {
+            setDeleteSearch("");
+            setExamenToDelete(null);
+          }
+        }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-destructive">
+                <Trash2 className="h-5 w-5" />
+                Eliminar Examen (Cascada)
+              </DialogTitle>
+              <DialogDescription>
+                Busca y selecciona el examen a eliminar. Se borrarán <strong>todos</strong> los registros asociados: resultados, baterías, boxes, prestadores, etc.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar examen por código o nombre..."
+                  value={deleteSearch}
+                  onChange={(e) => { setDeleteSearch(e.target.value); setExamenToDelete(null); }}
+                  className="pl-10"
+                />
+              </div>
+
+              {deleteSearch.trim() && (
+                <div className="border rounded-md max-h-60 overflow-y-auto">
+                  {examenes
+                    .filter(e => {
+                      const s = deleteSearch.toLowerCase().trim();
+                      return e.nombre.toLowerCase().includes(s) || (e.codigo?.toLowerCase().includes(s) ?? false);
+                    })
+                    .map(examen => (
+                      <button
+                        key={examen.id}
+                        type="button"
+                        className={`w-full text-left px-4 py-2 hover:bg-muted/50 flex items-center gap-3 border-b last:border-b-0 transition-colors ${examenToDelete?.id === examen.id ? 'bg-destructive/10 border-destructive/30' : ''}`}
+                        onClick={() => setExamenToDelete(examen)}
+                      >
+                        <span className="font-mono text-xs text-muted-foreground w-20 truncate">{examen.codigo || "-"}</span>
+                        <span className="text-sm flex-1">{examen.nombre}</span>
+                        {examenToDelete?.id === examen.id && <CheckCircle2 className="h-4 w-4 text-destructive" />}
+                      </button>
+                    ))}
+                  {examenes.filter(e => {
+                    const s = deleteSearch.toLowerCase().trim();
+                    return e.nombre.toLowerCase().includes(s) || (e.codigo?.toLowerCase().includes(s) ?? false);
+                  }).length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">No se encontraron exámenes</p>
+                  )}
+                </div>
+              )}
+
+              {examenToDelete && (
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2">
+                  <p className="font-medium flex items-center gap-2 text-destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    ¿Eliminar "{examenToDelete.nombre}"?
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Se eliminarán permanentemente: resultados de pacientes, asociaciones con baterías, boxes, prestadores, formularios, trazabilidad y cotizaciones vinculadas a este examen.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setOpenDeleteDialog(false)}>
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={!examenToDelete || isDeleting}
+                onClick={handleDeleteExamenCascade}
+              >
+                {isDeleting ? "Eliminando..." : "Eliminar definitivamente"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <AlertDialog open={!!paqueteToDelete} onOpenChange={() => setPaqueteToDelete(null)}>
           <AlertDialogContent>
@@ -1514,7 +1615,7 @@ const Examenes = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-        {/* Dialog para configurar campos de formulario de un examen */}
+
         {camposConfigExamen && (
           <ExamenFormularioCamposConfig
             examenId={camposConfigExamen.id}
