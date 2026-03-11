@@ -106,14 +106,39 @@ const Empresas = () => {
 
   const loadEmpresaBaterias = async (empresaId: string) => {
     try {
+      // Load empresa_baterias
       const { data, error } = await supabase
         .from("empresa_baterias")
         .select("*, paquete:paquetes_examenes(nombre)")
         .eq("empresa_id", empresaId);
       if (error) throw error;
-      setEmpresaBaterias(data || []);
+
+      // Load faenas assigned to this empresa to filter batteries
+      const { data: efData } = await supabase
+        .from("empresa_faenas")
+        .select("faena_id")
+        .eq("empresa_id", empresaId)
+        .eq("activo", true);
+
+      const faenaIds = (efData || []).map((ef: any) => ef.faena_id);
+
+      // Load which paquetes belong to those faenas
+      let validPaqueteIds = new Set<string>();
+      if (faenaIds.length > 0) {
+        const { data: bfData } = await supabase
+          .from("bateria_faenas")
+          .select("paquete_id")
+          .in("faena_id", faenaIds)
+          .neq("activo", false);
+        (bfData || []).forEach((bf: any) => validPaqueteIds.add(bf.paquete_id));
+      }
+
+      // Only keep empresa_baterias whose paquete belongs to an assigned faena
+      const filtered = (data || []).filter((eb: any) => validPaqueteIds.has(eb.paquete_id));
+      
+      setEmpresaBaterias(filtered);
       const precios: Record<string, string> = {};
-      data?.forEach(eb => {
+      filtered.forEach((eb: any) => {
         precios[eb.paquete_id] = eb.valor?.toString() || "";
       });
       setBateriaPrecios(precios);
