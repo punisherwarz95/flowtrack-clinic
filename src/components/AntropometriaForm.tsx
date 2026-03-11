@@ -239,7 +239,7 @@ function calcularFramingham(
   return { puntos: totalPuntos, riesgo, clasificacion };
 }
 
-const AntropometriaForm = ({ value, onChange, readonly = false, fechaNacimiento }: Props) => {
+const AntropometriaForm = ({ value, onChange, readonly = false, fechaNacimiento, atencionId }: Props) => {
   const [data, setData] = useState<AntropometriaData>(() => {
     if (value) {
       try { return { ...DEFAULT_DATA, ...JSON.parse(value) }; } catch { /* ignore */ }
