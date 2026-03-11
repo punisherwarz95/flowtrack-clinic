@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, ClipboardList, Package, Trash2, Pencil, FileText, DollarSign, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Search, MapPin, Settings2, Link2 } from "lucide-react";
+import { Plus, ClipboardList, Package, Trash2, Pencil, FileText, DollarSign, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Search, MapPin, Settings2, Link2, AlertTriangle } from "lucide-react";
 import ExamenFormularioCamposConfig from "@/components/ExamenFormularioCamposConfig";
 import { logActivity } from "@/lib/activityLog";
 import ExamenTrazabilidadConfig from "@/components/ExamenTrazabilidadConfig";
