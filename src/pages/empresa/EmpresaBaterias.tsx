@@ -51,6 +51,7 @@ const EmpresaBaterias = () => {
   const [examenesIndividuales, setExamenesIndividuales] = useState<FaenaExamenIndividual[]>([]);
   const [selectedFaenaId, setSelectedFaenaId] = useState<string>("");
   const [searchFilter, setSearchFilter] = useState("");
+  const [faenaBateriasMap, setFaenaBateriasMap] = useState<Record<string, { id: string; nombre: string; examenes: { nombre: string; codigo: string | null }[] }[]>>({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("faenas");
 
