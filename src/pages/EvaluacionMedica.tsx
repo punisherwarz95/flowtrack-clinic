@@ -674,7 +674,7 @@ const EvaluacionMedica = () => {
                   </div>
                 )}
 
-                {(resultado === "no_apto" || resultado === "apto_con_restricciones") && (
+                {resultado === "no_apto" && (
                   <div>
                     <Label className="mb-2 block">Restricciones / Contraindicaciones</Label>
                     <Textarea value={restricciones} onChange={(e) => setRestricciones(e.target.value)} placeholder="Detalle de restricciones..." rows={3} />
