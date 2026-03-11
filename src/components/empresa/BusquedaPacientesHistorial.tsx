@@ -443,12 +443,71 @@ const BusquedaPacientesHistorial = ({
         </div>
 
         {/* Botones */}
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2 flex-wrap items-center">
           {resultados.length > 0 && (
-            <Button variant="outline" onClick={exportarExcel}>
-              <Download className="h-4 w-4 mr-2" />
-              Exportar Excel
-            </Button>
+            <>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1">
+                    <ChevronDown className="h-4 w-4" />
+                    {selectedExportColumns.length === 0
+                      ? "Columnas: Todas"
+                      : `Columnas: ${selectedExportColumns.length} seleccionada${selectedExportColumns.length !== 1 ? "s" : ""}`}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-2" align="end">
+                  <div className="space-y-1">
+                    <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
+                      Columnas a exportar
+                    </div>
+                    <button
+                      className="w-full text-left px-2 py-1 text-xs text-primary hover:bg-muted rounded cursor-pointer"
+                      onClick={() => setSelectedExportColumns([])}
+                    >
+                      Seleccionar todas
+                    </button>
+                    {ALL_EXPORT_COLUMNS.map((col) => (
+                      <label
+                        key={col.key}
+                        className="flex items-center gap-2 px-2 py-1 hover:bg-muted rounded cursor-pointer"
+                      >
+                        <Checkbox
+                          checked={
+                            selectedExportColumns.length === 0 ||
+                            selectedExportColumns.includes(col.key)
+                          }
+                          onCheckedChange={(checked) => {
+                            if (selectedExportColumns.length === 0) {
+                              // Was "all" → now deselect this one
+                              setSelectedExportColumns(
+                                ALL_EXPORT_COLUMNS.map(c => c.key).filter(k => k !== col.key)
+                              );
+                            } else if (checked) {
+                              const next = [...selectedExportColumns, col.key];
+                              // If all selected, reset to empty (= all)
+                              if (next.length === ALL_EXPORT_COLUMNS.length) {
+                                setSelectedExportColumns([]);
+                              } else {
+                                setSelectedExportColumns(next);
+                              }
+                            } else {
+                              setSelectedExportColumns(
+                                selectedExportColumns.filter(k => k !== col.key)
+                              );
+                            }
+                          }}
+                        />
+                        <span className="text-sm">{col.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <Button variant="outline" onClick={exportarExcel}>
+                <Download className="h-4 w-4 mr-2" />
+                Exportar Excel
+              </Button>
+            </>
           )}
           <Button onClick={buscarHistorial} disabled={loading}>
             <Search className="h-4 w-4 mr-2" />
