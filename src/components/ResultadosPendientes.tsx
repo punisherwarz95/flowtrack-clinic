@@ -186,6 +186,8 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
       first.pacienteRut.toLowerCase().includes(s) ||
       first.empresaNombre.toLowerCase().includes(s)
     );
+  }).sort(([, aRows], [, bRows]) => {
+    return (aRows[0]?.numeroIngreso || 0) - (bRows[0]?.numeroIngreso || 0);
   });
 
   const groupByPrestador = (rows: PendienteRow[]) => {
