@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,10 +19,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Calendar, Building2, User, Download } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Search, Calendar, Building2, User, Download, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import * as XLSX from "xlsx";
+
+const ALL_EXPORT_COLUMNS = [
+  { key: "Fecha", label: "Fecha" },
+  { key: "RUT", label: "RUT" },
+  { key: "Nombre", label: "Nombre" },
+  { key: "Empresa", label: "Empresa" },
+  { key: "Batería", label: "Batería" },
+  { key: "Código Examen", label: "Código Examen" },
+  { key: "Nombre Examen", label: "Nombre Examen" },
+  { key: "Estado Examen", label: "Estado Examen" },
+] as const;
 
 interface Empresa {
   id: string;
@@ -72,6 +85,7 @@ const BusquedaPacientesHistorial = ({
   const [buscado, setBuscado] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
+  const [selectedExportColumns, setSelectedExportColumns] = useState<string[]>([]);
 
   useEffect(() => {
     if (isStaffAdmin || !empresaId) {
@@ -321,13 +335,26 @@ const BusquedaPacientesHistorial = ({
       }
     });
 
-    const ws = XLSX.utils.json_to_sheet(rows);
+    // Filter columns based on selection (empty = all)
+    const columnsToExport = selectedExportColumns.length > 0
+      ? selectedExportColumns
+      : ALL_EXPORT_COLUMNS.map(c => c.key);
+
+    const filteredRows = rows.map(row => {
+      const filtered: any = {};
+      columnsToExport.forEach(col => {
+        if (col in row) filtered[col] = row[col];
+      });
+      return filtered;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(filteredRows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Historial");
 
     // Auto-width columns
-    const colWidths = Object.keys(rows[0] || {}).map((key) => ({
-      wch: Math.max(key.length, ...rows.map((r) => String(r[key] || "").length)) + 2,
+    const colWidths = Object.keys(filteredRows[0] || {}).map((key) => ({
+      wch: Math.max(key.length, ...filteredRows.map((r) => String(r[key] || "").length)) + 2,
     }));
     ws["!cols"] = colWidths;
 
@@ -416,12 +443,71 @@ const BusquedaPacientesHistorial = ({
         </div>
 
         {/* Botones */}
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2 flex-wrap items-center">
           {resultados.length > 0 && (
-            <Button variant="outline" onClick={exportarExcel}>
-              <Download className="h-4 w-4 mr-2" />
-              Exportar Excel
-            </Button>
+            <>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1">
+                    <ChevronDown className="h-4 w-4" />
+                    {selectedExportColumns.length === 0
+                      ? "Columnas: Todas"
+                      : `Columnas: ${selectedExportColumns.length} seleccionada${selectedExportColumns.length !== 1 ? "s" : ""}`}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-2" align="end">
+                  <div className="space-y-1">
+                    <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
+                      Columnas a exportar
+                    </div>
+                    <button
+                      className="w-full text-left px-2 py-1 text-xs text-primary hover:bg-muted rounded cursor-pointer"
+                      onClick={() => setSelectedExportColumns([])}
+                    >
+                      Seleccionar todas
+                    </button>
+                    {ALL_EXPORT_COLUMNS.map((col) => (
+                      <label
+                        key={col.key}
+                        className="flex items-center gap-2 px-2 py-1 hover:bg-muted rounded cursor-pointer"
+                      >
+                        <Checkbox
+                          checked={
+                            selectedExportColumns.length === 0 ||
+                            selectedExportColumns.includes(col.key)
+                          }
+                          onCheckedChange={(checked) => {
+                            if (selectedExportColumns.length === 0) {
+                              // Was "all" → now deselect this one
+                              setSelectedExportColumns(
+                                ALL_EXPORT_COLUMNS.map(c => c.key).filter(k => k !== col.key)
+                              );
+                            } else if (checked) {
+                              const next = [...selectedExportColumns, col.key];
+                              // If all selected, reset to empty (= all)
+                              if (next.length === ALL_EXPORT_COLUMNS.length) {
+                                setSelectedExportColumns([]);
+                              } else {
+                                setSelectedExportColumns(next);
+                              }
+                            } else {
+                              setSelectedExportColumns(
+                                selectedExportColumns.filter(k => k !== col.key)
+                              );
+                            }
+                          }}
+                        />
+                        <span className="text-sm">{col.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <Button variant="outline" onClick={exportarExcel}>
+                <Download className="h-4 w-4 mr-2" />
+                Exportar Excel
+              </Button>
+            </>
           )}
           <Button onClick={buscarHistorial} disabled={loading}>
             <Search className="h-4 w-4 mr-2" />
