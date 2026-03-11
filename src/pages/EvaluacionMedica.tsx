@@ -1104,24 +1104,30 @@ const EvaluacionMedica = () => {
                             </CardHeader>
                             <CardContent>
                               <div className="flex flex-wrap gap-2">
-                                {selectedPaciente.atencion_examenes
-                                  .filter(ae => (paqueteExamenItems[bat.paqueteId] || []).includes(ae.examen_id))
-                                  .map(ae => (
-                                    <Badge
-                                      key={ae.id}
-                                      variant="outline"
-                                      className={`text-xs ${
-                                        ae.estado === "completado"
-                                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                                          : ae.estado === "muestra_tomada"
-                                          ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
-                                          : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
-                                      }`}
-                                    >
-                                      {ae.examenes.nombre}: {ae.estado === "completado" ? "✓ Resultado cargado" : ae.estado === "muestra_tomada" ? "⏳ Esperando resultado" : "Pendiente"}
-                                    </Badge>
-                                  ))
-                                }
+                                {(() => {
+                                  const filteredExams = selectedPaciente.atencion_examenes
+                                    .filter(ae => (paqueteExamenItems[bat.paqueteId] || []).includes(ae.examen_id));
+                                  const groups = groupExamsByPrestador(filteredExams);
+                                  return groups.map((group, groupIdx) => (
+                                    <div key={groupIdx} className={`flex flex-wrap gap-2 ${groupIdx > 0 ? "ml-2 pl-2 border-l border-border/50" : ""}`}>
+                                      {group.map(ae => (
+                                        <Badge
+                                          key={ae.id}
+                                          variant="outline"
+                                          className={`text-xs ${
+                                            ae.estado === "completado"
+                                              ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                                              : ae.estado === "muestra_tomada"
+                                              ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+                                              : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+                                          }`}
+                                        >
+                                          {ae.examenes.nombre}: {ae.estado === "completado" ? "✓ Resultado cargado" : ae.estado === "muestra_tomada" ? "⏳ Esperando resultado" : "Pendiente"}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  ));
+                                })()}
                               </div>
                               {bat.evaluacion && (
                                 <div className="mt-3 p-3 bg-muted rounded-md text-sm space-y-1">
