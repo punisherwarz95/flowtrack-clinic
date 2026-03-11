@@ -31,6 +31,11 @@ interface ResultadoCampo {
   archivo_url: string | null;
 }
 
+interface ArchivoVinculado {
+  nombre_archivo: string;
+  archivo_url: string;
+}
+
 export interface ExamenFormularioRef {
   save: () => Promise<void>;
   saveOnly: () => Promise<void>;
@@ -47,9 +52,10 @@ interface Props {
   fechaNacimiento?: string | null;
   esExterno?: boolean;
   hideSaveButton?: boolean;
+  archivosVinculados?: ArchivoVinculado[];
 }
 
-const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExamenId, examenId, examenNombre, onComplete, readonly = false, fechaNacimiento, esExterno = false, hideSaveButton = false }, ref) => {
+const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExamenId, examenId, examenNombre, onComplete, readonly = false, fechaNacimiento, esExterno = false, hideSaveButton = false, archivosVinculados = [] }, ref) => {
   const [campos, setCampos] = useState<CampoFormulario[]>([]);
   const [resultados, setResultados] = useState<Record<string, ResultadoCampo>>({});
   const [loading, setLoading] = useState(true);
