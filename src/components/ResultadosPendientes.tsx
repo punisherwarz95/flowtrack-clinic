@@ -81,6 +81,7 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
           examenes(nombre)
         `)
         .eq("estado", "muestra_tomada")
+        .eq("atenciones.pacientes.tipo_servicio", "jenner")
         .order("created_at", { ascending: false });
 
       if (startOfDay && endOfDay) {
