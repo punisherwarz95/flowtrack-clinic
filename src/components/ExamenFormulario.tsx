@@ -723,6 +723,7 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
                         onChange={(v) => updateResultado(campo.id, v)}
                         readonly={readonly}
                         fechaNacimiento={fechaNacimiento}
+                        atencionId={atencionId}
                       />
                     </div>
                   )}
