@@ -53,9 +53,10 @@ interface Props {
   esExterno?: boolean;
   hideSaveButton?: boolean;
   archivosVinculados?: ArchivoVinculado[];
+  atencionId?: string | null;
 }
 
-const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExamenId, examenId, examenNombre, onComplete, readonly = false, fechaNacimiento, esExterno = false, hideSaveButton = false, archivosVinculados = [] }, ref) => {
+const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExamenId, examenId, examenNombre, onComplete, readonly = false, fechaNacimiento, esExterno = false, hideSaveButton = false, archivosVinculados = [], atencionId = null }, ref) => {
   const [campos, setCampos] = useState<CampoFormulario[]>([]);
   const [resultados, setResultados] = useState<Record<string, ResultadoCampo>>({});
   const [loading, setLoading] = useState(true);
@@ -722,6 +723,7 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
                         onChange={(v) => updateResultado(campo.id, v)}
                         readonly={readonly}
                         fechaNacimiento={fechaNacimiento}
+                        atencionId={atencionId}
                       />
                     </div>
                   )}

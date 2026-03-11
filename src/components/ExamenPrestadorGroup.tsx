@@ -671,6 +671,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
                           fechaNacimiento={fechaNacimiento}
                           esExterno={group.prestadorTipo === "externo"}
                           hideSaveButton
+                          atencionId={atencionId}
                           onComplete={() => {
                             onComplete?.();
                             loadPrestadorData();
