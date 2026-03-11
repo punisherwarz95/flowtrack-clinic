@@ -53,6 +53,19 @@ interface EmpresaBateria {
   paquete?: { nombre: string };
 }
 
+interface EmpresaFaenaRow {
+  id: string;
+  faena_id: string;
+  activo: boolean;
+  faena?: { id: string; nombre: string };
+}
+
+interface BateriaFaenaRow {
+  paquete_id: string;
+  activo: boolean | null;
+  paquete?: { id: string; nombre: string };
+}
+
 const emptyForm = {
   nombre: "",
   rut: "",
