@@ -821,6 +821,11 @@ const Examenes = () => {
           </div>
           
           <div className="flex gap-3">
+            {/* Botón Eliminar Examen */}
+            <Button variant="destructive" className="gap-2" onClick={() => setOpenDeleteDialog(true)}>
+              <Trash2 className="h-4 w-4" />
+              Eliminar Examen
+            </Button>
             {/* Botón Importar Excel */}
             <Dialog open={openImportDialog} onOpenChange={(open) => {
               setOpenImportDialog(open);
