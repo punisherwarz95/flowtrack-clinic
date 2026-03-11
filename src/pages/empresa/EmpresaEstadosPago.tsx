@@ -99,6 +99,14 @@ const EmpresaEstadosPago = () => {
 
     setGenerando(true);
     try {
+      // 0. Verificar si la empresa es afecta a IVA
+      const { data: empresaData } = await supabase
+        .from("empresas")
+        .select("afecto_iva")
+        .eq("id", currentEmpresaId)
+        .single();
+      const esAfectaIva = empresaData?.afecto_iva !== false;
+
       // 1. Obtener IDs de pacientes de esta empresa
       const { data: pacientesEmpresa, error: pacError } = await supabase
         .from("pacientes")
@@ -217,7 +225,7 @@ const EmpresaEstadosPago = () => {
         return;
       }
 
-      const totalIva = Math.ceil(totalNeto * 0.19);
+      const totalIva = esAfectaIva ? Math.ceil(totalNeto * 0.19) : 0;
       const total = totalNeto + totalIva;
 
       // 5. Crear estado de pago
@@ -469,9 +477,14 @@ const EmpresaEstadosPago = () => {
                   <p className="text-sm">
                     Neto: <span className="font-medium">${selectedEstado.total_neto?.toLocaleString("es-CL")}</span>
                   </p>
-                  <p className="text-sm">
-                    IVA (19%): <span className="font-medium">${selectedEstado.total_iva?.toLocaleString("es-CL")}</span>
-                  </p>
+                  {(selectedEstado.total_iva ?? 0) > 0 && (
+                    <p className="text-sm">
+                      IVA (19%): <span className="font-medium">${selectedEstado.total_iva?.toLocaleString("es-CL")}</span>
+                    </p>
+                  )}
+                  {(selectedEstado.total_iva ?? 0) === 0 && (
+                    <p className="text-sm text-muted-foreground">Exento de IVA</p>
+                  )}
                   <p className="text-lg font-bold">
                     Total: ${selectedEstado.total?.toLocaleString("es-CL")}
                   </p>

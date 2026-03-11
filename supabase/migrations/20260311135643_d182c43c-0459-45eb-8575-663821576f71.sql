@@ -1,0 +1,1 @@
+ALTER TABLE public.empresas ADD COLUMN afecto_iva boolean NOT NULL DEFAULT true;

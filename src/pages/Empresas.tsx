@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Upload, Building2, Trash2, Pencil, Package, DollarSign, Search } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
@@ -32,6 +33,7 @@ interface Empresa {
   email?: string;
   telefono?: string;
   centro_costo?: string;
+  afecto_iva?: boolean;
   created_at: string;
 }
 
@@ -56,6 +58,7 @@ const emptyForm = {
   email: "",
   telefono: "",
   centro_costo: "",
+  afecto_iva: true,
 };
 
 const Empresas = () => {
@@ -103,14 +106,39 @@ const Empresas = () => {
 
   const loadEmpresaBaterias = async (empresaId: string) => {
     try {
+      // Load empresa_baterias
       const { data, error } = await supabase
         .from("empresa_baterias")
         .select("*, paquete:paquetes_examenes(nombre)")
         .eq("empresa_id", empresaId);
       if (error) throw error;
-      setEmpresaBaterias(data || []);
+
+      // Load faenas assigned to this empresa to filter batteries
+      const { data: efData } = await supabase
+        .from("empresa_faenas")
+        .select("faena_id")
+        .eq("empresa_id", empresaId)
+        .eq("activo", true);
+
+      const faenaIds = (efData || []).map((ef: any) => ef.faena_id);
+
+      // Load which paquetes belong to those faenas
+      let validPaqueteIds = new Set<string>();
+      if (faenaIds.length > 0) {
+        const { data: bfData } = await supabase
+          .from("bateria_faenas")
+          .select("paquete_id")
+          .in("faena_id", faenaIds)
+          .neq("activo", false);
+        (bfData || []).forEach((bf: any) => validPaqueteIds.add(bf.paquete_id));
+      }
+
+      // Only keep empresa_baterias whose paquete belongs to an assigned faena
+      const filtered = (data || []).filter((eb: any) => validPaqueteIds.has(eb.paquete_id));
+      
+      setEmpresaBaterias(filtered);
       const precios: Record<string, string> = {};
-      data?.forEach(eb => {
+      filtered.forEach((eb: any) => {
         precios[eb.paquete_id] = eb.valor?.toString() || "";
       });
       setBateriaPrecios(precios);
@@ -129,6 +157,7 @@ const Empresas = () => {
       email: empresa.email || "",
       telefono: empresa.telefono || "",
       centro_costo: empresa.centro_costo || "",
+      afecto_iva: empresa.afecto_iva !== false,
     });
     await loadEmpresaBaterias(empresa.id);
     setActiveTab("datos");
@@ -155,6 +184,7 @@ const Empresas = () => {
         email: formData.email || null,
         telefono: formData.telefono || null,
         centro_costo: formData.centro_costo || null,
+        afecto_iva: formData.afecto_iva,
       };
 
       if (editingEmpresa) {
@@ -421,6 +451,17 @@ const Empresas = () => {
                         value={formData.centro_costo}
                         onChange={(e) => setFormData({ ...formData, centro_costo: e.target.value })}
                         placeholder="Código centro costo"
+                      />
+                    </div>
+                    <div className="col-span-2 flex items-center justify-between rounded-lg border p-3">
+                      <div>
+                        <Label htmlFor="afecto_iva" className="font-medium">Afecto a IVA</Label>
+                        <p className="text-xs text-muted-foreground">Si está desactivado, los estados de pago se generarán sin IVA (exento)</p>
+                      </div>
+                      <Switch
+                        id="afecto_iva"
+                        checked={formData.afecto_iva}
+                        onCheckedChange={(checked) => setFormData({ ...formData, afecto_iva: checked })}
                       />
                     </div>
                   </div>
