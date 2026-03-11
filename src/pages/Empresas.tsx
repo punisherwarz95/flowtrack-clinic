@@ -657,8 +657,8 @@ const Empresas = () => {
                     </div>
                   </div>
 
-                  {/* RIGHT: Assigned batteries with prices */}
-                  <div className="space-y-3">
+                  {/* RIGHT: Assigned batteries with prices (2 cols) */}
+                  <div className="col-span-2 space-y-3">
                     <Label className="text-sm font-semibold flex items-center gap-2">
                       <DollarSign className="h-4 w-4 text-primary" />
                       Baterías contratadas y precios
@@ -667,7 +667,7 @@ const Empresas = () => {
                       <div className="border rounded-md p-8 text-center">
                         <Package className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
                         <p className="text-sm text-muted-foreground">
-                          No hay baterías agregadas. Selecciona una faena y agrega baterías desde la izquierda.
+                          No hay baterías agregadas. Despliega una faena y agrega baterías.
                         </p>
                       </div>
                     ) : (
@@ -676,11 +676,11 @@ const Empresas = () => {
                           <div className="divide-y">
                             {empresaBaterias.map((eb) => (
                               <div key={eb.paquete_id} className="flex items-center gap-2 px-3 py-2">
-                                <span className="text-sm font-medium flex-1 truncate">
+                                <span className="text-sm font-medium flex-1 min-w-0">
                                   {eb.paquete?.nombre || eb.paquete_id}
                                 </span>
-                                <div className="flex items-center gap-1">
-                                  <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <span className="text-xs text-muted-foreground">$</span>
                                   <Input
                                     type="number"
                                     step="any"
@@ -692,7 +692,7 @@ const Empresas = () => {
                                       })
                                     }
                                     placeholder="0"
-                                    className="w-24 h-7 text-sm"
+                                    className="w-28 h-7 text-sm"
                                   />
                                 </div>
                                 <Button
