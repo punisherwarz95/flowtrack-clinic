@@ -5,12 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
-import { FlaskConical, Upload, Search, CheckCircle, Save, Loader2, FileText as FileIcon, ExternalLink } from "lucide-react";
+import { FlaskConical, Upload, Search, Save, Loader2, FileText as FileIcon, ExternalLink, CheckCircle, Pencil } from "lucide-react";
 import ExamenFormulario, { ExamenFormularioRef } from "@/components/ExamenFormulario";
 
-interface PendienteRow {
+interface CompletadoRow {
   atencionId: string;
   atencionExamenId: string;
   examenId: string;
@@ -36,8 +34,8 @@ interface Props {
   selectedDate: Date | undefined;
 }
 
-const ResultadosPendientes = ({ selectedDate }: Props) => {
-  const [pendientes, setPendientes] = useState<PendienteRow[]>([]);
+const ResultadosCompletados = ({ selectedDate }: Props) => {
+  const [completados, setCompletados] = useState<CompletadoRow[]>([]);
   const [archivosMap, setArchivosMap] = useState<Record<string, ArchivoCompartido[]>>({});
   const [loading, setLoading] = useState(true);
   const [searchFilter, setSearchFilter] = useState("");
@@ -45,7 +43,6 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const [savingPatient, setSavingPatient] = useState<string | null>(null);
 
-  // Refs for all ExamenFormulario instances, keyed by atencionExamenId
   const formRefs = useRef<Record<string, ExamenFormularioRef | null>>({});
 
   const setFormRef = useCallback((atencionExamenId: string) => (el: ExamenFormularioRef | null) => {
@@ -53,10 +50,10 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
   }, []);
 
   useEffect(() => {
-    loadPendientes();
+    loadCompletados();
   }, [selectedDate]);
 
-  const loadPendientes = async () => {
+  const loadCompletados = async () => {
     setLoading(true);
     try {
       const startOfDay = selectedDate
@@ -80,7 +77,7 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
           ),
           examenes(nombre)
         `)
-        .in("estado", ["muestra_tomada", "incompleto"])
+        .eq("estado", "completado")
         .eq("atenciones.pacientes.tipo_servicio", "jenner")
         .order("created_at", { ascending: false });
 
@@ -112,7 +109,7 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
         }
       }
 
-      const rows: PendienteRow[] = (data || []).map((ae: any) => ({
+      const rows: CompletadoRow[] = (data || []).map((ae: any) => ({
         atencionId: ae.atenciones.id,
         atencionExamenId: ae.id,
         examenId: ae.examen_id,
@@ -127,13 +124,12 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
         prestadorNombre: prestadorMap[ae.examen_id]?.prestadorNombre || "Sin prestador",
       }));
 
-      setPendientes(rows);
+      setCompletados(rows);
 
-      // Load archivos compartidos AND examen_resultados files for all atenciones
+      // Load archivos compartidos
       const atencionIds = [...new Set(rows.map(r => r.atencionId))];
       const allAtencionExamenIds = rows.map(r => r.atencionExamenId);
       if (atencionIds.length > 0) {
-        // Fetch shared files
         const { data: archivosData } = await supabase
           .from("examen_archivos_compartidos")
           .select("id, atencion_id, nombre_archivo, archivo_url")
@@ -144,7 +140,6 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
           .select("archivo_compartido_id, examen_id")
           .in("archivo_compartido_id", (archivosData || []).map(a => a.id));
 
-        // Also fetch files from examen_resultados (uploaded during box exams)
         const { data: resultadosArchivos } = await supabase
           .from("examen_resultados")
           .select("atencion_examen_id, archivo_url, examen_formulario_campos(etiqueta)")
@@ -168,12 +163,10 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
           });
         });
 
-        // Add files from examen_resultados to the map
         (resultadosArchivos || []).forEach((r: any) => {
           const row = rows.find(ro => ro.atencionExamenId === r.atencion_examen_id);
           if (!row || !r.archivo_url) return;
           if (!map[row.atencionId]) map[row.atencionId] = [];
-          // Avoid duplicates
           const alreadyExists = map[row.atencionId].some(a => a.archivo_url === r.archivo_url);
           if (!alreadyExists) {
             map[row.atencionId].push({
@@ -190,14 +183,14 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
         setArchivosMap({});
       }
     } catch (error) {
-      console.error("Error cargando pendientes:", error);
-      toast.error("Error al cargar resultados pendientes");
+      console.error("Error cargando completados:", error);
+      toast.error("Error al cargar resultados completados");
     } finally {
       setLoading(false);
     }
   };
 
-  const grouped = pendientes.reduce<Record<string, PendienteRow[]>>((acc, row) => {
+  const grouped = completados.reduce<Record<string, CompletadoRow[]>>((acc, row) => {
     if (!acc[row.atencionId]) acc[row.atencionId] = [];
     acc[row.atencionId].push(row);
     return acc;
@@ -218,8 +211,8 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
     return (aRows[0]?.numeroIngreso || 0) - (bRows[0]?.numeroIngreso || 0);
   });
 
-  const groupByPrestador = (rows: PendienteRow[]) => {
-    const map: Record<string, PendienteRow[]> = {};
+  const groupByPrestador = (rows: CompletadoRow[]) => {
+    const map: Record<string, CompletadoRow[]> = {};
     for (const row of rows) {
       const key = row.prestadorId || "sin-prestador";
       if (!map[key]) map[key] = [];
@@ -228,7 +221,7 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
     return Object.entries(map);
   };
 
-  const handleUploadPdfPrestador = async (atencionId: string, prestadorRows: PendienteRow[], file: File) => {
+  const handleUploadPdfPrestador = async (atencionId: string, prestadorRows: CompletadoRow[], file: File) => {
     const key = `${atencionId}-${prestadorRows[0]?.prestadorId || "sp"}`;
     setUploadingPdf(key);
     try {
@@ -269,7 +262,8 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
 
       if (vinculoError) throw vinculoError;
 
-      toast.success(`PDF "${file.name}" vinculado a ${prestadorRows.length} examen(es) de ${prestadorRows[0]?.prestadorNombre}`);
+      toast.success(`PDF "${file.name}" reemplazado/agregado correctamente`);
+      await loadCompletados();
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al subir PDF");
@@ -278,8 +272,7 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
     }
   };
 
-  // Save all form data WITHOUT changing exam status
-  const handleSaveAllForPatient = async (atencionId: string, rows: PendienteRow[]) => {
+  const handleSaveCorrections = async (atencionId: string, rows: CompletadoRow[]) => {
     setSavingPatient(atencionId);
     try {
       for (const row of rows) {
@@ -288,74 +281,10 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
           await formRef.saveOnly();
         }
       }
-      toast.success(`Datos guardados correctamente (sin cambiar estado)`);
+      toast.success("Correcciones guardadas correctamente");
     } catch (error) {
       console.error("Error:", error);
-      toast.error("Error al guardar resultados");
-    } finally {
-      setSavingPatient(null);
-    }
-  };
-
-  // Save + validate required fields + validate prestador PDFs + mark as completado
-  const handleMarcarTodosCompletados = async (rows: PendienteRow[]) => {
-    const atencionId = rows[0]?.atencionId;
-    setSavingPatient(atencionId || null);
-    try {
-      // First save all data
-      for (const row of rows) {
-        const formRef = formRefs.current[row.atencionExamenId];
-        if (formRef) {
-          await formRef.saveOnly();
-        }
-      }
-
-      // Validate that each prestador group has at least one shared PDF
-      const prestadorGroups = groupByPrestador(rows);
-      const atencionArchivos = archivosMap[atencionId] || [];
-      const prestadoresSinPdf: string[] = [];
-      for (const [, prestadorRows] of prestadorGroups) {
-        const prestadorExamenIds = prestadorRows.map(r => r.examenId);
-        const tieneArchivo = atencionArchivos.some(a =>
-          a.examenIds.some(eid => prestadorExamenIds.includes(eid))
-        );
-        if (!tieneArchivo) {
-          prestadoresSinPdf.push(prestadorRows[0]?.prestadorNombre || "Sin prestador");
-        }
-      }
-
-      if (prestadoresSinPdf.length > 0) {
-        toast.error(`Falta PDF grupal en: ${prestadoresSinPdf.join(", ")}. Suba el PDF del prestador antes de completar.`);
-        return;
-      }
-
-      // Then validate required fields for each exam
-      const invalidExams: string[] = [];
-      for (const row of rows) {
-        const formRef = formRefs.current[row.atencionExamenId];
-        if (formRef && !formRef.validateRequired()) {
-          invalidExams.push(row.examenNombre);
-        }
-      }
-
-      if (invalidExams.length > 0) {
-        toast.error(`Campos obligatorios (*) sin completar en: ${invalidExams.join(", ")}`);
-        return;
-      }
-
-      // All valid — mark as completado
-      const ids = rows.map((r) => r.atencionExamenId);
-      const { error } = await supabase
-        .from("atencion_examenes")
-        .update({ estado: "completado", fecha_realizacion: new Date().toISOString() })
-        .in("id", ids);
-
-      if (error) throw error;
-      toast.success(`${rows.length} examen(es) completados`);
-      await loadPendientes();
-    } catch (error) {
-      console.error("Error:", error);
-      toast.error("Error al completar exámenes");
+      toast.error("Error al guardar correcciones");
     } finally {
       setSavingPatient(null);
     }
@@ -375,9 +304,9 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-base">
-              <FlaskConical className="h-5 w-5 text-amber-600" />
-              Resultados Pendientes
-              <Badge variant="secondary">{pendientes.length}</Badge>
+              <Pencil className="h-5 w-5 text-blue-600" />
+              Corrección de Resultados
+              <Badge variant="secondary">{completados.length}</Badge>
             </CardTitle>
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -389,11 +318,14 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
               />
             </div>
           </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Permite corregir valores, resubir archivos y enmendar errores en exámenes ya completados.
+          </p>
         </CardHeader>
         <CardContent className="space-y-3">
           {filteredGroups.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No hay resultados pendientes para esta fecha
+              No hay resultados completados para esta fecha
             </div>
           ) : (
             filteredGroups.map(([atencionId, rows]) => {
@@ -402,7 +334,7 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
               const isSaving = savingPatient === atencionId;
 
               return (
-                <Card key={atencionId} className="border-amber-200 dark:border-amber-800">
+                <Card key={atencionId} className="border-blue-200 dark:border-blue-800">
                   <CardHeader className="py-2 px-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -411,8 +343,9 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
                         <span className="text-xs text-muted-foreground font-mono">{first.pacienteRut}</span>
                         <span className="text-xs text-muted-foreground">· {first.empresaNombre}</span>
                       </div>
-                      <Badge className="bg-amber-600 text-white text-xs">
-                        {rows.length} pend.
+                      <Badge className="bg-blue-600 text-white text-xs">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        {rows.length} completados
                       </Badge>
                     </div>
                   </CardHeader>
@@ -472,12 +405,12 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
                                 ) : (
                                   <Upload className="h-3 w-3" />
                                 )}
-                                PDF
+                                Resubir PDF
                               </Button>
                             </div>
                           </div>
 
-                          {/* Archivos subidos para este prestador */}
+                          {/* Archivos subidos */}
                           {(() => {
                             const atencionArchivos = archivosMap[atencionId] || [];
                             const prestadorExamenIds = prestadorRows.map(r => r.examenId);
@@ -507,12 +440,13 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
                             );
                           })()}
 
-                          {/* Compact exam forms */}
+                          {/* Exam forms - editable */}
                           <div className="p-2 space-y-2">
                             {prestadorRows.map((row) => (
                               <div key={row.atencionExamenId} className="border rounded p-2">
                                 <div className="flex items-center gap-2 mb-1">
                                   <span className="font-semibold text-xs">{row.examenNombre}</span>
+                                  <Badge variant="default" className="text-[10px] px-1.5 py-0">Completado</Badge>
                                 </div>
                                 <ExamenFormulario
                                   ref={setFormRef(row.atencionExamenId)}
@@ -536,26 +470,17 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
                       );
                     })}
 
-                    {/* Single action row per patient */}
+                    {/* Save corrections */}
                     <div className="flex justify-end gap-2 pt-2 border-t">
                       <Button
                         variant="outline"
                         size="sm"
                         className="gap-1.5"
                         disabled={isSaving}
-                        onClick={() => handleSaveAllForPatient(atencionId, rows)}
+                        onClick={() => handleSaveCorrections(atencionId, rows)}
                       >
                         {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                        Guardar Todo
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="gap-1.5"
-                        disabled={isSaving}
-                        onClick={() => handleMarcarTodosCompletados(rows)}
-                      >
-                        {isSaving && savingPatient === atencionId ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
-                        Completar Todos
+                        Guardar Correcciones
                       </Button>
                     </div>
                   </CardContent>
@@ -569,4 +494,4 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
   );
 };
 
-export default ResultadosPendientes;
+export default ResultadosCompletados;
