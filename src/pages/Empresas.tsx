@@ -58,6 +58,7 @@ const emptyForm = {
   email: "",
   telefono: "",
   centro_costo: "",
+  afecto_iva: true,
 };
 
 const Empresas = () => {
