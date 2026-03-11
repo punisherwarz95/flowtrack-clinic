@@ -274,63 +274,81 @@ const BusquedaPacientesHistorial = ({
   const exportarExcel = () => {
     const rows: any[] = [];
 
+    // Check if exam-level columns are selected
+    const columnsToExport = selectedExportColumns.length > 0
+      ? selectedExportColumns
+      : ALL_EXPORT_COLUMNS.map(c => c.key);
+    const includeExamColumns = columnsToExport.includes("Código Examen") ||
+      columnsToExport.includes("Nombre Examen") ||
+      columnsToExport.includes("Estado Examen");
+
     resultados.forEach((visita) => {
       const fecha = visita.fecha_ingreso
         ? format(new Date(visita.fecha_ingreso), "dd/MM/yyyy HH:mm")
         : "";
 
+      const baseRow = {
+        Fecha: fecha,
+        RUT: visita.paciente_rut || "",
+        Nombre: visita.paciente_nombre,
+        Empresa: visita.empresa_nombre,
+      };
+
       if (visita.bateriasDetalle.length > 0) {
-        visita.bateriasDetalle.forEach((bat) => {
-          if (bat.examenes.length > 0) {
-            bat.examenes.forEach((ex) => {
-              rows.push({
-                Fecha: fecha,
-                RUT: visita.paciente_rut || "",
-                Nombre: visita.paciente_nombre,
-                Empresa: visita.empresa_nombre,
-                Batería: bat.nombre,
-                "Código Examen": ex.codigo || "",
-                "Nombre Examen": ex.nombre,
-                "Estado Examen": formatEstadoExamen(ex.estado),
+        if (includeExamColumns) {
+          // Expand per exam as before
+          visita.bateriasDetalle.forEach((bat) => {
+            if (bat.examenes.length > 0) {
+              bat.examenes.forEach((ex) => {
+                rows.push({
+                  ...baseRow,
+                  Batería: bat.nombre,
+                  "Código Examen": ex.codigo || "",
+                  "Nombre Examen": ex.nombre,
+                  "Estado Examen": formatEstadoExamen(ex.estado),
+                });
               });
-            });
-          } else {
-            rows.push({
-              Fecha: fecha,
-              RUT: visita.paciente_rut || "",
-              Nombre: visita.paciente_nombre,
-              Empresa: visita.empresa_nombre,
-              Batería: bat.nombre,
-              "Código Examen": "",
-              "Nombre Examen": "Sin exámenes en batería",
-              "Estado Examen": "",
-            });
-          }
-        });
-      } else if (visita.examenes.length > 0) {
-        // Exámenes sueltos sin batería
-        visita.examenes.forEach((ex) => {
-          rows.push({
-            Fecha: fecha,
-            RUT: visita.paciente_rut || "",
-            Nombre: visita.paciente_nombre,
-            Empresa: visita.empresa_nombre,
-            Batería: "Sin batería",
-            "Código Examen": ex.codigo || "",
-            "Nombre Examen": ex.nombre,
-            "Estado Examen": formatEstadoExamen(ex.estado),
+            } else {
+              rows.push({
+                ...baseRow,
+                Batería: bat.nombre,
+                "Código Examen": "",
+                "Nombre Examen": "Sin exámenes en batería",
+                "Estado Examen": "",
+              });
+            }
           });
-        });
+        } else {
+          // One row per battery, no exam expansion
+          visita.bateriasDetalle.forEach((bat) => {
+            rows.push({
+              ...baseRow,
+              Batería: bat.nombre,
+            });
+          });
+        }
+      } else if (visita.examenes.length > 0) {
+        if (includeExamColumns) {
+          visita.examenes.forEach((ex) => {
+            rows.push({
+              ...baseRow,
+              Batería: "Sin batería",
+              "Código Examen": ex.codigo || "",
+              "Nombre Examen": ex.nombre,
+              "Estado Examen": formatEstadoExamen(ex.estado),
+            });
+          });
+        } else {
+          rows.push({
+            ...baseRow,
+            Batería: "Sin batería",
+          });
+        }
       } else {
         rows.push({
-          Fecha: fecha,
-          RUT: visita.paciente_rut || "",
-          Nombre: visita.paciente_nombre,
-          Empresa: visita.empresa_nombre,
+          ...baseRow,
           Batería: "",
-          "Código Examen": "",
-          "Nombre Examen": "Sin exámenes",
-          "Estado Examen": "",
+          ...(includeExamColumns ? { "Código Examen": "", "Nombre Examen": "Sin exámenes", "Estado Examen": "" } : {}),
         });
       }
     });
