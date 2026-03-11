@@ -459,7 +459,7 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
             <CardTitle className="flex items-center gap-2 text-base">
               <FlaskConical className="h-5 w-5 text-amber-600" />
               Resultados Pendientes
-              <Badge variant="secondary">{pendientes.length}</Badge>
+              <Badge variant="secondary">{filteredPendientes.length}</Badge>
             </CardTitle>
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
