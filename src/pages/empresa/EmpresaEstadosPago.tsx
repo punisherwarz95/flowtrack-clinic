@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useEmpresaAuth } from "@/contexts/EmpresaAuthContext";
 import EmpresaLayout from "@/components/empresa/EmpresaLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,15 +13,26 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import {
   Calendar,
-  Download,
   CreditCard,
   FileText,
   DollarSign,
+  Trash2,
+  Package,
 } from "lucide-react";
 
 interface EstadoPago {
@@ -55,6 +66,8 @@ const EmpresaEstadosPago = () => {
   const [estadosPago, setEstadosPago] = useState<EstadoPago[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEstado, setSelectedEstado] = useState<EstadoPago | null>(null);
+  const [estadoToDelete, setEstadoToDelete] = useState<EstadoPago | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Generador de estado
   const [fechaDesde, setFechaDesde] = useState(
@@ -147,14 +160,13 @@ const EmpresaEstadosPago = () => {
         return;
       }
 
-      // 2b. Obtener baterías de atencion_baterias (nueva tabla de trazabilidad)
+      // 2b. Obtener baterías de atencion_baterias
       const atencionIds = atenciones.map((a: any) => a.id);
       const { data: atencionBaterias } = await supabase
         .from("atencion_baterias")
         .select("atencion_id, paquete_id, paquete:paquetes_examenes(id, nombre)")
         .in("atencion_id", atencionIds);
 
-      // Agrupar baterías por atención
       const bateriasPorAtencion: Record<string, { paquete_id: string; nombre: string }[]> = {};
       (atencionBaterias || []).forEach((ab: any) => {
         if (!bateriasPorAtencion[ab.atencion_id]) {
@@ -197,7 +209,6 @@ const EmpresaEstadosPago = () => {
         const bateriasConValor: { nombre: string; valor: number }[] = [];
         let subtotal = 0;
 
-        // Baterías registradas en atencion_baterias
         const bateriasDeAtencion = bateriasPorAtencion[atencion.id] || [];
         bateriasDeAtencion.forEach((b) => {
           const valor = bateriaValores[b.paquete_id] || 0;
@@ -276,6 +287,38 @@ const EmpresaEstadosPago = () => {
     }
   };
 
+  const handleDeleteEstado = async () => {
+    if (!estadoToDelete) return;
+    setDeleting(true);
+    try {
+      // Delete items first
+      const { error: itemsError } = await supabase
+        .from("estado_pago_items")
+        .delete()
+        .eq("estado_pago_id", estadoToDelete.id);
+      if (itemsError) throw itemsError;
+
+      // Delete estado
+      const { error } = await supabase
+        .from("estados_pago")
+        .delete()
+        .eq("id", estadoToDelete.id);
+      if (error) throw error;
+
+      toast({ title: `Estado de pago N° ${estadoToDelete.numero} eliminado` });
+      if (selectedEstado?.id === estadoToDelete.id) {
+        setSelectedEstado(null);
+      }
+      setEstadoToDelete(null);
+      loadEstadosPago();
+    } catch (error: any) {
+      console.error("Error eliminando estado de pago:", error);
+      toast({ title: "Error al eliminar", description: error.message, variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const getNextNumero = async (): Promise<number> => {
     const { data } = await supabase
       .from("estados_pago")
@@ -299,6 +342,21 @@ const EmpresaEstadosPago = () => {
         return <Badge variant="outline">{estado}</Badge>;
     }
   };
+
+  // Compute battery summary for selected estado
+  const bateriaSummary = useMemo(() => {
+    if (!selectedEstado?.items) return [];
+    const map: Record<string, { nombre: string; cantidad: number; valorUnitario: number }> = {};
+    selectedEstado.items.forEach((item) => {
+      (item.baterias as any[] || []).forEach((b: { nombre: string; valor: number }) => {
+        if (!map[b.nombre]) {
+          map[b.nombre] = { nombre: b.nombre, cantidad: 0, valorUnitario: b.valor };
+        }
+        map[b.nombre].cantidad += 1;
+      });
+    });
+    return Object.values(map).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [selectedEstado]);
 
   return (
     <EmpresaLayout>
@@ -392,20 +450,33 @@ const EmpresaEstadosPago = () => {
                           ${estado.total_neto?.toLocaleString("es-CL") || 0}
                         </TableCell>
                         <TableCell className="text-right">
-                          ${estado.total_iva?.toLocaleString("es-CL") || 0}
+                          {(estado.total_iva ?? 0) > 0
+                            ? `$${estado.total_iva?.toLocaleString("es-CL")}`
+                            : <span className="text-muted-foreground text-xs">Exento</span>
+                          }
                         </TableCell>
                         <TableCell className="text-right font-bold">
                           ${estado.total?.toLocaleString("es-CL") || 0}
                         </TableCell>
                         <TableCell>{getEstadoBadge(estado.estado)}</TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setSelectedEstado(estado)}
-                          >
-                            Ver detalle
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setSelectedEstado(estado)}
+                            >
+                              Ver detalle
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => setEstadoToDelete(estado)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -430,7 +501,8 @@ const EmpresaEstadosPago = () => {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6">
+              {/* Items table */}
               <div className="rounded-md border overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -472,7 +544,48 @@ const EmpresaEstadosPago = () => {
                 </Table>
               </div>
 
-              <div className="mt-4 flex justify-end">
+              {/* Resumen de baterías */}
+              {bateriaSummary.length > 0 && (
+                <Card className="border-dashed">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Package className="h-4 w-4" />
+                      Resumen por Batería
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="rounded-md border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Batería</TableHead>
+                            <TableHead className="text-center">Cantidad</TableHead>
+                            <TableHead className="text-right">Valor Unitario</TableHead>
+                            <TableHead className="text-right">Total</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {bateriaSummary.map((b) => (
+                            <TableRow key={b.nombre}>
+                              <TableCell className="font-medium">{b.nombre}</TableCell>
+                              <TableCell className="text-center">{b.cantidad.toString().padStart(2, '0')}</TableCell>
+                              <TableCell className="text-right">
+                                ${b.valorUnitario.toLocaleString("es-CL")}
+                              </TableCell>
+                              <TableCell className="text-right font-semibold">
+                                ${(b.cantidad * b.valorUnitario).toLocaleString("es-CL")}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Totals */}
+              <div className="flex justify-end">
                 <div className="text-right space-y-1">
                   <p className="text-sm">
                     Neto: <span className="font-medium">${selectedEstado.total_neto?.toLocaleString("es-CL")}</span>
@@ -494,6 +607,24 @@ const EmpresaEstadosPago = () => {
           </Card>
         )}
       </div>
+
+      {/* Confirm delete dialog */}
+      <AlertDialog open={!!estadoToDelete} onOpenChange={() => setEstadoToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar estado de pago?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará el Estado de Pago N° {estadoToDelete?.numero} y todos sus ítems. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteEstado} disabled={deleting}>
+              {deleting ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </EmpresaLayout>
   );
 };

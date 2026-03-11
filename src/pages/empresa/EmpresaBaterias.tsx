@@ -19,7 +19,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Package, FileText, DollarSign } from "lucide-react";
+import { Search, Package, FileText, DollarSign, MapPin } from "lucide-react";
 
 interface Faena {
   id: string;
@@ -32,6 +32,15 @@ interface BateriaConPrecio {
   descripcion: string | null;
   valor: number;
   examenes: { examen: { id: string; nombre: string; codigo: string | null } }[];
+  faenaNombre?: string;
+}
+
+interface FaenaExamenIndividual {
+  id: string;
+  nombre: string;
+  codigo: string | null;
+  valor_venta: number;
+  faenaNombre: string;
 }
 
 const EmpresaBaterias = () => {
@@ -39,10 +48,11 @@ const EmpresaBaterias = () => {
 
   const [faenas, setFaenas] = useState<Faena[]>([]);
   const [baterias, setBaterias] = useState<BateriaConPrecio[]>([]);
+  const [examenesIndividuales, setExamenesIndividuales] = useState<FaenaExamenIndividual[]>([]);
   const [selectedFaenaId, setSelectedFaenaId] = useState<string>("");
   const [searchFilter, setSearchFilter] = useState("");
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("precios");
+  const [activeTab, setActiveTab] = useState("faenas");
 
   useEffect(() => {
     if (currentEmpresaId) {
@@ -53,78 +63,75 @@ const EmpresaBaterias = () => {
   }, [currentEmpresaId]);
 
   useEffect(() => {
-    if (selectedFaenaId) {
-      loadBateriasForFaena(selectedFaenaId);
-    } else if (currentEmpresaId) {
-      loadAllBaterias();
+    if (currentEmpresaId) {
+      loadBaterias();
+      loadExamenesIndividuales();
     }
   }, [selectedFaenaId, currentEmpresaId]);
 
   const loadFaenas = async () => {
     if (!currentEmpresaId) return;
-    const { data } = await supabase
-      .from("faenas")
-      .select("*")
+    // Load faenas via empresa_faenas (many-to-many)
+    const { data: efData } = await supabase
+      .from("empresa_faenas")
+      .select("faena_id, faenas(id, nombre)")
       .eq("empresa_id", currentEmpresaId)
-      .eq("activo", true)
-      .order("nombre");
-    setFaenas(data || []);
+      .eq("activo", true);
+
+    const faenasList: Faena[] = (efData || [])
+      .map((ef: any) => ef.faenas)
+      .filter(Boolean)
+      .sort((a: Faena, b: Faena) => a.nombre.localeCompare(b.nombre));
+    setFaenas(faenasList);
   };
 
-  const loadAllBaterias = async () => {
+  const loadBaterias = async () => {
     if (!currentEmpresaId) return;
     setLoading(true);
     try {
-      const { data: empresaBaterias } = await supabase
-        .from("empresa_baterias")
-        .select(`
-          valor,
-          paquete:paquetes_examenes(
-            id,
-            nombre,
-            descripcion,
-            examenes:paquete_examen_items(examen:examenes(id, nombre, codigo))
-          )
-        `)
+      // Get assigned faena IDs
+      const { data: efData } = await supabase
+        .from("empresa_faenas")
+        .select("faena_id")
         .eq("empresa_id", currentEmpresaId)
         .eq("activo", true);
+      const faenaIds = (efData || []).map((ef: any) => ef.faena_id);
 
-      const bats: BateriaConPrecio[] = (empresaBaterias || [])
-        .filter((eb: any) => eb.paquete && eb.valor > 0)
-        .map((eb: any) => ({
-          id: eb.paquete.id,
-          nombre: eb.paquete.nombre,
-          descripcion: eb.paquete.descripcion,
-          valor: eb.valor,
-          examenes: eb.paquete.examenes || [],
-        }));
-      setBaterias(bats);
-    } catch (error) {
-      console.error("Error cargando baterías:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      // If filtering by specific faena
+      const targetFaenaIds = selectedFaenaId ? [selectedFaenaId] : faenaIds;
 
-  const loadBateriasForFaena = async (faenaId: string) => {
-    if (!currentEmpresaId) return;
-    setLoading(true);
-    try {
-      // Get batteries for this faena
-      const { data: faenaBaterias } = await supabase
+      if (targetFaenaIds.length === 0) {
+        setBaterias([]);
+        setLoading(false);
+        return;
+      }
+
+      // Get paquete_ids from bateria_faenas for these faenas
+      const { data: bfData } = await supabase
         .from("bateria_faenas")
-        .select("paquete_id")
-        .eq("faena_id", faenaId)
-        .eq("activo", true);
+        .select("paquete_id, faena_id")
+        .in("faena_id", targetFaenaIds)
+        .neq("activo", false);
 
-      const paqueteIds = (faenaBaterias || []).map((fb: any) => fb.paquete_id);
+      const paqueteIds = [...new Set((bfData || []).map((bf: any) => bf.paquete_id))];
       if (paqueteIds.length === 0) {
         setBaterias([]);
         setLoading(false);
         return;
       }
 
-      // Get empresa_baterias with prices for those paquetes
+      // Build faena name map per paquete
+      const faenaNameMap: Record<string, string[]> = {};
+      const faenaMap = new Map(faenas.map(f => [f.id, f.nombre]));
+      (bfData || []).forEach((bf: any) => {
+        if (!faenaNameMap[bf.paquete_id]) faenaNameMap[bf.paquete_id] = [];
+        const name = faenaMap.get(bf.faena_id);
+        if (name && !faenaNameMap[bf.paquete_id].includes(name)) {
+          faenaNameMap[bf.paquete_id].push(name);
+        }
+      });
+
+      // Get empresa_baterias with prices
       const { data: empresaBaterias } = await supabase
         .from("empresa_baterias")
         .select(`
@@ -149,12 +156,54 @@ const EmpresaBaterias = () => {
           descripcion: eb.paquete.descripcion,
           valor: eb.valor,
           examenes: eb.paquete.examenes || [],
+          faenaNombre: (faenaNameMap[eb.paquete_id] || []).join(", "),
         }));
       setBaterias(bats);
     } catch (error) {
-      console.error("Error cargando baterías de faena:", error);
+      console.error("Error cargando baterías:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadExamenesIndividuales = async () => {
+    if (!currentEmpresaId) return;
+    try {
+      const { data: efData } = await supabase
+        .from("empresa_faenas")
+        .select("faena_id, faenas(id, nombre)")
+        .eq("empresa_id", currentEmpresaId)
+        .eq("activo", true);
+
+      const targetFaenaIds = selectedFaenaId
+        ? [selectedFaenaId]
+        : (efData || []).map((ef: any) => ef.faena_id);
+
+      if (targetFaenaIds.length === 0) {
+        setExamenesIndividuales([]);
+        return;
+      }
+
+      const faenaMap = new Map((efData || []).map((ef: any) => [ef.faena_id, ef.faenas?.nombre || ""]));
+
+      const { data: feData } = await supabase
+        .from("faena_examenes")
+        .select("valor_venta, faena_id, examen:examenes(id, nombre, codigo)")
+        .in("faena_id", targetFaenaIds)
+        .eq("activo", true);
+
+      const exams: FaenaExamenIndividual[] = (feData || [])
+        .filter((fe: any) => fe.examen)
+        .map((fe: any) => ({
+          id: fe.examen.id,
+          nombre: fe.examen.nombre,
+          codigo: fe.examen.codigo,
+          valor_venta: fe.valor_venta || 0,
+          faenaNombre: faenaMap.get(fe.faena_id) || "",
+        }));
+      setExamenesIndividuales(exams);
+    } catch (error) {
+      console.error("Error cargando exámenes individuales:", error);
     }
   };
 
@@ -177,7 +226,7 @@ const EmpresaBaterias = () => {
         <div>
           <h1 className="text-2xl font-bold">Baterías Contratadas</h1>
           <p className="text-muted-foreground">
-            Consulte las baterías contratadas, sus precios y exámenes incluidos
+            Consulte faenas, baterías contratadas, exámenes incluidos y precios
           </p>
         </div>
 
@@ -194,7 +243,7 @@ const EmpresaBaterias = () => {
               <div className="space-y-2">
                 <label className="text-sm font-medium">Faena</label>
                 <Select
-                  value={selectedFaenaId}
+                  value={selectedFaenaId || "__all__"}
                   onValueChange={(v) => setSelectedFaenaId(v === "__all__" ? "" : v)}
                 >
                   <SelectTrigger>
@@ -202,7 +251,7 @@ const EmpresaBaterias = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">Todas las faenas</SelectItem>
-                    {faenas.filter((f) => f.id).map((faena) => (
+                    {faenas.map((faena) => (
                       <SelectItem key={faena.id} value={faena.id}>
                         {faena.nombre}
                       </SelectItem>
@@ -226,18 +275,116 @@ const EmpresaBaterias = () => {
           </CardContent>
         </Card>
 
-        {/* Tabs: Precios / Exámenes */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
+            <TabsTrigger value="faenas" className="gap-2">
+              <MapPin className="h-4 w-4" />
+              Faenas
+            </TabsTrigger>
             <TabsTrigger value="precios" className="gap-2">
               <DollarSign className="h-4 w-4" />
-              Precios
+              Baterías y Precios
             </TabsTrigger>
             <TabsTrigger value="examenes" className="gap-2">
               <FileText className="h-4 w-4" />
-              Exámenes Contratados
+              Detalle Exámenes
             </TabsTrigger>
           </TabsList>
+
+          {/* Tab Faenas */}
+          <TabsContent value="faenas">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">
+                  Faenas Asignadas ({faenas.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {faenas.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No hay faenas asignadas a esta empresa
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {faenas.map((faena) => {
+                      const batsDeFaena = baterias.filter(b =>
+                        b.faenaNombre?.includes(faena.nombre)
+                      );
+                      const examsIndiv = examenesIndividuales.filter(e =>
+                        e.faenaNombre === faena.nombre
+                      );
+                      return (
+                        <div key={faena.id} className="border rounded-lg p-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <MapPin className="h-5 w-5 text-primary" />
+                            <h3 className="font-semibold text-lg">{faena.nombre}</h3>
+                            <Badge variant="secondary" className="ml-auto">
+                              {batsDeFaena.length} baterías
+                            </Badge>
+                            {examsIndiv.length > 0 && (
+                              <Badge variant="outline">
+                                {examsIndiv.length} exámenes individuales
+                              </Badge>
+                            )}
+                          </div>
+
+                          {batsDeFaena.length > 0 && (
+                            <div className="mb-3">
+                              <p className="text-sm font-medium text-muted-foreground mb-2">Baterías:</p>
+                              <div className="grid gap-2">
+                                {batsDeFaena.map((bat) => (
+                                  <div key={bat.id} className="flex items-center justify-between bg-muted/50 rounded-lg p-3">
+                                    <div className="flex items-center gap-2">
+                                      <Package className="h-4 w-4 text-primary" />
+                                      <span className="font-medium text-sm">{bat.nombre}</span>
+                                      <Badge variant="secondary" className="text-xs">
+                                        {bat.examenes?.length || 0} exámenes
+                                      </Badge>
+                                    </div>
+                                    <span className="font-semibold text-primary">
+                                      {formatCurrency(bat.valor)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {examsIndiv.length > 0 && (
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground mb-2">Exámenes individuales:</p>
+                              <div className="grid gap-1">
+                                {examsIndiv.map((ex) => (
+                                  <div key={ex.id} className="flex items-center justify-between bg-muted/30 rounded p-2">
+                                    <div className="flex items-center gap-2">
+                                      <FileText className="h-3 w-3 text-muted-foreground" />
+                                      <span className="text-sm">{ex.nombre}</span>
+                                      {ex.codigo && (
+                                        <span className="text-xs text-muted-foreground font-mono">{ex.codigo}</span>
+                                      )}
+                                    </div>
+                                    <span className="text-sm font-medium">
+                                      {formatCurrency(ex.valor_venta)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {batsDeFaena.length === 0 && examsIndiv.length === 0 && (
+                            <p className="text-sm text-muted-foreground">
+                              Sin baterías ni exámenes configurados para esta faena
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* Tab Precios */}
           <TabsContent value="precios">
@@ -267,9 +414,10 @@ const EmpresaBaterias = () => {
                           <Package className="h-5 w-5 text-primary" />
                           <div>
                             <p className="font-medium">{bateria.nombre}</p>
-                            {bateria.descripcion && (
-                              <p className="text-sm text-muted-foreground">
-                                {bateria.descripcion}
+                            {bateria.faenaNombre && (
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                {bateria.faenaNombre}
                               </p>
                             )}
                           </div>
@@ -316,9 +464,10 @@ const EmpresaBaterias = () => {
                             <Package className="h-4 w-4 text-primary" />
                             <div className="text-left">
                               <div className="font-medium">{bateria.nombre}</div>
-                              {bateria.descripcion && (
-                                <div className="text-sm text-muted-foreground">
-                                  {bateria.descripcion}
+                              {bateria.faenaNombre && (
+                                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <MapPin className="h-3 w-3" />
+                                  {bateria.faenaNombre}
                                 </div>
                               )}
                             </div>
