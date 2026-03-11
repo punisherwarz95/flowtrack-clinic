@@ -330,9 +330,7 @@ const EmpresaBaterias = () => {
                 ) : (
                   <div className="space-y-3">
                     {faenas.map((faena) => {
-                      const batsDeFaena = baterias.filter(b =>
-                        b.faenaNombre?.includes(faena.nombre)
-                      );
+                      const batsDeFaena = faenaBateriasMap[faena.id] || [];
                       const examsIndiv = examenesIndividuales.filter(e =>
                         e.faenaNombre === faena.nombre
                       );
@@ -354,22 +352,37 @@ const EmpresaBaterias = () => {
                           {batsDeFaena.length > 0 && (
                             <div className="mb-3">
                               <p className="text-sm font-medium text-muted-foreground mb-2">Baterías:</p>
-                              <div className="grid gap-2">
+                              <Accordion type="single" collapsible className="w-full">
                                 {batsDeFaena.map((bat) => (
-                                  <div key={bat.id} className="flex items-center justify-between bg-muted/50 rounded-lg p-3">
-                                    <div className="flex items-center gap-2">
-                                      <Package className="h-4 w-4 text-primary" />
-                                      <span className="font-medium text-sm">{bat.nombre}</span>
-                                      <Badge variant="secondary" className="text-xs">
-                                        {bat.examenes?.length || 0} exámenes
-                                      </Badge>
-                                    </div>
-                                    <span className="font-semibold text-primary">
-                                      {formatCurrency(bat.valor)}
-                                    </span>
-                                  </div>
+                                  <AccordionItem key={bat.id} value={bat.id}>
+                                    <AccordionTrigger className="py-2 px-3 bg-muted/50 rounded-lg hover:no-underline">
+                                      <div className="flex items-center gap-2">
+                                        <Package className="h-4 w-4 text-primary" />
+                                        <span className="font-medium text-sm">{bat.nombre}</span>
+                                        <Badge variant="secondary" className="text-xs">
+                                          {bat.examenes?.length || 0} exámenes
+                                        </Badge>
+                                      </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="px-3 pt-2">
+                                      <div className="grid gap-1">
+                                        {bat.examenes.map((ex, idx) => (
+                                          <div key={idx} className="flex items-center gap-2 py-1 text-sm">
+                                            <FileText className="h-3 w-3 text-muted-foreground" />
+                                            <span>{ex.nombre}</span>
+                                            {ex.codigo && (
+                                              <span className="text-xs text-muted-foreground font-mono">({ex.codigo})</span>
+                                            )}
+                                          </div>
+                                        ))}
+                                        {(!bat.examenes || bat.examenes.length === 0) && (
+                                          <p className="text-sm text-muted-foreground">Sin exámenes configurados</p>
+                                        )}
+                                      </div>
+                                    </AccordionContent>
+                                  </AccordionItem>
                                 ))}
-                              </div>
+                              </Accordion>
                             </div>
                           )}
 
