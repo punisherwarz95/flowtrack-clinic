@@ -41,6 +41,7 @@ import EmpresaEstadosPago from "./pages/empresa/EmpresaEstadosPago";
 import EmpresaBaterias from "./pages/empresa/EmpresaBaterias";
 import EmpresaResultados from "./pages/empresa/EmpresaResultados";
 import GuiaUsuario from "./pages/GuiaUsuario";
+import EstadosPago from "./pages/EstadosPago";
 
 const queryClient = new QueryClient();
 
@@ -78,6 +79,7 @@ const App = () => (
                 <Route path="/configuracion" element={<ProtectedRoute path="/configuracion"><Configuracion /></ProtectedRoute>} />
                 <Route path="/actividad" element={<ProtectedRoute path="/actividad"><ActividadLog /></ProtectedRoute>} />
                 <Route path="/evaluacion-medica" element={<ProtectedRoute path="/evaluacion-medica"><EvaluacionMedica /></ProtectedRoute>} />
+                <Route path="/estados-pago" element={<ProtectedRoute path="/estados-pago"><EstadosPago /></ProtectedRoute>} />
                 
                 {/* Portal Empresa routes */}
                 <Route path="/empresa/login" element={<EmpresaLogin />} />
