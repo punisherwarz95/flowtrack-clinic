@@ -399,7 +399,7 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
             {groupCampos.map((campo) => {
               const resultado = resultados[campo.id];
               return (
-                <div key={campo.id} className={`space-y-1 ${(campo.tipo_campo === "audiometria" || campo.tipo_campo === "texto_largo" || campo.tipo_campo === "antropometria") ? "col-span-full" : ""}`}>
+                <div key={campo.id} className={`space-y-1 ${(campo.tipo_campo === "audiometria" || campo.tipo_campo === "texto_largo" || campo.tipo_campo === "antropometria" || campo.tipo_campo === "cuestionario") ? "col-span-full" : ""}`}>
                   <Label className="text-xs flex items-center gap-1">
                     {campo.etiqueta}
                     {campo.requerido && <span className="text-destructive">*</span>}
