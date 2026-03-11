@@ -315,6 +315,18 @@ const ExamenFormularioCamposConfig = ({ examenId, examenNombre, open, onOpenChan
         </div>
       </DialogContent>
     </Dialog>
+
+    {cuestionarioWizardIndex !== null && (
+      <CuestionarioWizard
+        open={true}
+        onOpenChange={() => setCuestionarioWizardIndex(null)}
+        initialConfig={campos[cuestionarioWizardIndex]?.opciones?.preguntas ? campos[cuestionarioWizardIndex].opciones : null}
+        onSave={(config) => {
+          updateCampo(cuestionarioWizardIndex, "opciones", config);
+          setCuestionarioWizardIndex(null);
+        }}
+      />
+    )}
   );
 };
 
