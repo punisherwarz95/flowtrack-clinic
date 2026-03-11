@@ -270,7 +270,16 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
     }
   };
 
-  const grouped = pendientes.reduce<Record<string, PendienteRow[]>>((acc, row) => {
+  // Filter out external-completado exams that already have associated PDFs
+  const filteredPendientes = pendientes.filter(row => {
+    if (!row.isExternoCompletado) return true;
+    // Check if this exam has an associated file
+    const atencionArchivos = archivosMap[row.atencionId] || [];
+    const tieneArchivo = atencionArchivos.some(a => a.examenIds.includes(row.examenId));
+    return !tieneArchivo;
+  });
+
+  const grouped = filteredPendientes.reduce<Record<string, PendienteRow[]>>((acc, row) => {
     if (!acc[row.atencionId]) acc[row.atencionId] = [];
     acc[row.atencionId].push(row);
     return acc;
