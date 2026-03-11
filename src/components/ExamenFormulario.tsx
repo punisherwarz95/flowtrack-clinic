@@ -296,9 +296,12 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
   const handleSave = async () => {
     setSaving(true);
     try {
+      const resultadosParaGuardar = mergeSharedFilesIntoResults(campos, resultados, archivosVinculados);
+      setResultados(resultadosParaGuardar);
+
       // Upsert all results
       for (const campo of campos) {
-        const resultado = resultados[campo.id];
+        const resultado = resultadosParaGuardar[campo.id];
         if (!resultado) continue;
 
         const { error } = await supabase
@@ -319,7 +322,7 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
       // Check if all required fields are filled
       const allRequiredFilled = campos.every((campo) => {
         if (!campo.requerido) return true;
-        const resultado = resultados[campo.id];
+        const resultado = resultadosParaGuardar[campo.id];
         if (!resultado) return false;
         if (campo.tipo_campo === "archivo_pdf") return !!resultado.archivo_url;
         return !!resultado.valor;
