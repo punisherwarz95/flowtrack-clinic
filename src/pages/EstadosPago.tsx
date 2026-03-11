@@ -22,7 +22,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   Calendar, CreditCard, FileText, DollarSign, Trash2, Package,
-  Building2, TrendingUp, Search,
+  Building2, TrendingUp, Search, Users,
 } from "lucide-react";
 
 interface Empresa {
@@ -72,6 +72,24 @@ interface MonthlySale {
   cantidad_estados: number;
 }
 
+interface Prestador {
+  id: string;
+  nombre: string;
+  rut: string | null;
+  especialidad: string | null;
+  tipo: string;
+}
+
+interface PrestadorExamenDetail {
+  atencion_examen_id: string;
+  examen_nombre: string;
+  paciente_nombre: string;
+  paciente_rut: string | null;
+  empresa_nombre: string | null;
+  fecha_realizacion: string;
+  valor_prestacion: number;
+}
+
 const EstadosPago = () => {
   useAuth();
   const { toast } = useToast();
@@ -100,8 +118,18 @@ const EstadosPago = () => {
   const [ventasMensuales, setVentasMensuales] = useState<MonthlySale[]>([]);
   const [ventasLoading, setVentasLoading] = useState(false);
 
+  // Prestadores
+  const [prestadores, setPrestadores] = useState<Prestador[]>([]);
+  const [selectedPrestadorId, setSelectedPrestadorId] = useState<string>("");
+  const [prestadorSearch, setPrestadorSearch] = useState("");
+  const [prestadorFechaDesde, setPrestadorFechaDesde] = useState(format(new Date(new Date().setDate(1)), "yyyy-MM-dd"));
+  const [prestadorFechaHasta, setPrestadorFechaHasta] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [prestadorExamenes, setPrestadorExamenes] = useState<PrestadorExamenDetail[]>([]);
+  const [prestadorLoading, setPrestadorLoading] = useState(false);
+
   useEffect(() => {
     loadEmpresas();
+    loadPrestadores();
   }, []);
 
   useEffect(() => {
@@ -213,6 +241,88 @@ const EstadosPago = () => {
       setVentasLoading(false);
     }
   };
+
+  const loadPrestadores = async () => {
+    const { data } = await supabase
+      .from("prestadores")
+      .select("id, nombre, rut, especialidad, tipo")
+      .eq("activo", true)
+      .order("nombre");
+    setPrestadores(data || []);
+  };
+
+  const handleBuscarPrestadorExamenes = async () => {
+    if (!selectedPrestadorId) return;
+    setPrestadorLoading(true);
+    try {
+      // Get prestador_examenes for this prestador (valor_prestacion per exam)
+      const { data: peData } = await supabase
+        .from("prestador_examenes")
+        .select("examen_id, valor_prestacion")
+        .eq("prestador_id", selectedPrestadorId);
+
+      const valorMap: Record<string, number> = {};
+      (peData || []).forEach((pe: any) => { valorMap[pe.examen_id] = pe.valor_prestacion || 0; });
+
+      // Get atencion_examenes done by this prestador in date range
+      const { data: aeData, error } = await supabase
+        .from("atencion_examenes")
+        .select(`
+          id,
+          examen_id,
+          fecha_realizacion,
+          realizado_por,
+          examen:examenes(nombre),
+          atencion:atenciones(
+            id,
+            fecha_ingreso,
+            paciente:pacientes(nombre, rut, empresa:empresas(nombre))
+          )
+        `)
+        .eq("realizado_por", selectedPrestadorId)
+        .eq("estado", "completado")
+        .gte("fecha_realizacion", `${prestadorFechaDesde}T00:00:00`)
+        .lte("fecha_realizacion", `${prestadorFechaHasta}T23:59:59`);
+
+      if (error) throw error;
+
+      const details: PrestadorExamenDetail[] = (aeData || []).map((ae: any) => ({
+        atencion_examen_id: ae.id,
+        examen_nombre: ae.examen?.nombre || "Examen",
+        paciente_nombre: ae.atencion?.paciente?.nombre || "-",
+        paciente_rut: ae.atencion?.paciente?.rut || null,
+        empresa_nombre: ae.atencion?.paciente?.empresa?.nombre || null,
+        fecha_realizacion: ae.fecha_realizacion?.split("T")[0] || "",
+        valor_prestacion: valorMap[ae.examen_id] || 0,
+      }));
+
+      details.sort((a, b) => a.fecha_realizacion.localeCompare(b.fecha_realizacion));
+      setPrestadorExamenes(details);
+    } catch (error) {
+      console.error("Error:", error);
+      toast({ title: "Error al cargar exámenes del prestador", variant: "destructive" });
+    } finally {
+      setPrestadorLoading(false);
+    }
+  };
+
+  const filteredPrestadores = prestadores.filter(p =>
+    p.nombre.toLowerCase().includes(prestadorSearch.toLowerCase()) ||
+    (p.rut && p.rut.toLowerCase().includes(prestadorSearch.toLowerCase()))
+  );
+
+  const prestadorTotalPagar = useMemo(() => {
+    return prestadorExamenes.reduce((sum, pe) => sum + pe.valor_prestacion, 0);
+  }, [prestadorExamenes]);
+
+  const prestadorResumen = useMemo(() => {
+    const map: Record<string, { nombre: string; cantidad: number; valorUnitario: number }> = {};
+    prestadorExamenes.forEach(pe => {
+      if (!map[pe.examen_nombre]) map[pe.examen_nombre] = { nombre: pe.examen_nombre, cantidad: 0, valorUnitario: pe.valor_prestacion };
+      map[pe.examen_nombre].cantidad += 1;
+    });
+    return Object.values(map).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [prestadorExamenes]);
 
   const handleGenerarEstado = async () => {
     if (!selectedEmpresaId) return;
@@ -437,6 +547,9 @@ const EstadosPago = () => {
             </TabsTrigger>
             <TabsTrigger value="precios">
               <DollarSign className="h-4 w-4 mr-1" /> Baterías y Precios
+            </TabsTrigger>
+            <TabsTrigger value="prestadores">
+              <Users className="h-4 w-4 mr-1" /> Prestadores
             </TabsTrigger>
           </TabsList>
 
@@ -798,6 +911,138 @@ const EstadosPago = () => {
                       </Table>
                     </div>
                   )}
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* === TAB: Prestadores === */}
+          <TabsContent value="prestadores" className="space-y-4">
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex flex-wrap items-end gap-4">
+                  <div className="flex-1 min-w-[200px] max-w-sm">
+                    <label className="text-sm font-medium mb-1 block">Prestador</label>
+                    <Select value={selectedPrestadorId} onValueChange={setSelectedPrestadorId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar prestador..." />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[300px]">
+                        <div className="p-2">
+                          <Input
+                            placeholder="Buscar prestador..."
+                            value={prestadorSearch}
+                            onChange={(e) => setPrestadorSearch(e.target.value)}
+                            className="h-8"
+                          />
+                        </div>
+                        {filteredPrestadores.map(p => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.nombre} {p.especialidad ? `(${p.especialidad})` : ""} {p.rut ? `- ${p.rut}` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">Desde</label>
+                    <Input type="date" value={prestadorFechaDesde} onChange={e => setPrestadorFechaDesde(e.target.value)} className="w-[160px]" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">Hasta</label>
+                    <Input type="date" value={prestadorFechaHasta} onChange={e => setPrestadorFechaHasta(e.target.value)} className="w-[160px]" />
+                  </div>
+                  <Button onClick={handleBuscarPrestadorExamenes} disabled={!selectedPrestadorId || prestadorLoading}>
+                    {prestadorLoading ? "Buscando..." : <><Search className="h-4 w-4 mr-2" />Buscar</>}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {prestadorExamenes.length > 0 && (
+              <>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Exámenes realizados - {prestadores.find(p => p.id === selectedPrestadorId)?.nombre}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="rounded-md border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Fecha</TableHead>
+                            <TableHead>Paciente</TableHead>
+                            <TableHead>RUT</TableHead>
+                            <TableHead>Empresa</TableHead>
+                            <TableHead>Examen</TableHead>
+                            <TableHead className="text-right">Valor Prestación</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {prestadorExamenes.map((pe, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell>{pe.fecha_realizacion ? format(new Date(pe.fecha_realizacion + "T12:00:00"), "dd/MM/yyyy") : "-"}</TableCell>
+                              <TableCell className="font-medium">{pe.paciente_nombre}</TableCell>
+                              <TableCell className="font-mono text-sm">{pe.paciente_rut || "-"}</TableCell>
+                              <TableCell>{pe.empresa_nombre || "-"}</TableCell>
+                              <TableCell>{pe.examen_nombre}</TableCell>
+                              <TableCell className="text-right">${pe.valor_prestacion.toLocaleString("es-CL")}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Resumen */}
+                <Card className="border-dashed">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Package className="h-4 w-4" /> Resumen por Examen
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="rounded-md border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Examen</TableHead>
+                            <TableHead className="text-center">Cantidad</TableHead>
+                            <TableHead className="text-right">Valor Unitario</TableHead>
+                            <TableHead className="text-right">Total</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {prestadorResumen.map(r => (
+                            <TableRow key={r.nombre}>
+                              <TableCell className="font-medium">{r.nombre}</TableCell>
+                              <TableCell className="text-center">{r.cantidad.toString().padStart(2, "0")}</TableCell>
+                              <TableCell className="text-right">${r.valorUnitario.toLocaleString("es-CL")}</TableCell>
+                              <TableCell className="text-right font-semibold">${(r.cantidad * r.valorUnitario).toLocaleString("es-CL")}</TableCell>
+                            </TableRow>
+                          ))}
+                          <TableRow className="bg-muted/50 font-bold">
+                            <TableCell>TOTAL A PAGAR</TableCell>
+                            <TableCell className="text-center">{prestadorExamenes.length}</TableCell>
+                            <TableCell />
+                            <TableCell className="text-right text-lg">${prestadorTotalPagar.toLocaleString("es-CL")}</TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+
+            {selectedPrestadorId && !prestadorLoading && prestadorExamenes.length === 0 && (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  No se encontraron exámenes realizados por este prestador en el período seleccionado
                 </CardContent>
               </Card>
             )}
