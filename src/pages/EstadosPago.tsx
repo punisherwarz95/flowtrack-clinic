@@ -129,6 +129,7 @@ const EstadosPago = () => {
 
   useEffect(() => {
     loadEmpresas();
+    loadPrestadores();
   }, []);
 
   useEffect(() => {
