@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import MetricasCompletados from "@/components/MetricasCompletados";
 import ResultadosPendientes from "@/components/ResultadosPendientes";
+import ResultadosCompletados from "@/components/ResultadosCompletados";
 
 interface AtencionCompletada {
   id: string;
