@@ -66,6 +66,7 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
         ? new Date(new Date(selectedDate).setHours(23, 59, 59, 999)).toISOString()
         : null;
 
+      // First query: muestra_tomada and incompleto exams
       let query = supabase
         .from("atencion_examenes")
         .select(`
@@ -93,13 +94,15 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
       const { data, error } = await query.limit(500);
       if (error) throw error;
 
-      const examenIds = [...new Set((data || []).map((ae: any) => ae.examen_id))];
-      let prestadorMap: Record<string, { prestadorId: string; prestadorNombre: string }> = {};
+      // Collect all examen_ids to fetch prestador info (including tipo)
+      const allData = data || [];
+      const examenIds = [...new Set(allData.map((ae: any) => ae.examen_id))];
+      let prestadorMap: Record<string, { prestadorId: string; prestadorNombre: string; prestadorTipo: string }> = {};
 
       if (examenIds.length > 0) {
         const { data: peData } = await supabase
           .from("prestador_examenes")
-          .select("examen_id, prestador_id, prestadores(id, nombre)")
+          .select("examen_id, prestador_id, prestadores(id, nombre, tipo)")
           .in("examen_id", examenIds);
 
         if (peData) {
@@ -107,12 +110,80 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
             prestadorMap[pe.examen_id] = {
               prestadorId: pe.prestador_id,
               prestadorNombre: pe.prestadores?.nombre || "Sin prestador",
+              prestadorTipo: pe.prestadores?.tipo || "interno",
             };
           }
         }
       }
 
-      const rows: PendienteRow[] = (data || []).map((ae: any) => ({
+      // Also fetch "completado" exams from external providers (incorrectly completed in box)
+      // Get all external examen_ids
+      const externoExamenIds = Object.entries(prestadorMap)
+        .filter(([, v]) => v.prestadorTipo === "externo")
+        .map(([examenId]) => examenId);
+
+      // Also search for any completado exams from external providers not yet in our list
+      if (externoExamenIds.length > 0 || true) {
+        // We need to find all external provider examen_ids first
+        const { data: allExternosPe } = await supabase
+          .from("prestador_examenes")
+          .select("examen_id, prestador_id, prestadores(id, nombre, tipo)")
+          .eq("prestadores.tipo", "externo");
+
+        const externoExamenIdsAll = (allExternosPe || [])
+          .filter((pe: any) => pe.prestadores?.tipo === "externo")
+          .map((pe: any) => pe.examen_id);
+
+        // Update prestadorMap with these
+        (allExternosPe || []).forEach((pe: any) => {
+          if (pe.prestadores?.tipo === "externo" && !prestadorMap[pe.examen_id]) {
+            prestadorMap[pe.examen_id] = {
+              prestadorId: pe.prestador_id,
+              prestadorNombre: pe.prestadores?.nombre || "Sin prestador",
+              prestadorTipo: "externo",
+            };
+          }
+        });
+
+        if (externoExamenIdsAll.length > 0) {
+          let queryExtComp = supabase
+            .from("atencion_examenes")
+            .select(`
+              id,
+              examen_id,
+              estado,
+              atenciones!inner(
+                id,
+                fecha_ingreso,
+                numero_ingreso,
+                pacientes!inner(id, nombre, rut, fecha_nacimiento, tipo_servicio, empresas(nombre))
+              ),
+              examenes(nombre)
+            `)
+            .eq("estado", "completado")
+            .in("examen_id", externoExamenIdsAll)
+            .eq("atenciones.pacientes.tipo_servicio", "jenner")
+            .order("created_at", { ascending: false });
+
+          if (startOfDay && endOfDay) {
+            queryExtComp = queryExtComp
+              .gte("atenciones.fecha_ingreso", startOfDay)
+              .lte("atenciones.fecha_ingreso", endOfDay);
+          }
+
+          const { data: extCompData } = await queryExtComp.limit(200);
+
+          // Add these to allData, avoiding duplicates
+          const existingIds = new Set(allData.map((ae: any) => ae.id));
+          (extCompData || []).forEach((ae: any) => {
+            if (!existingIds.has(ae.id)) {
+              allData.push(ae);
+            }
+          });
+        }
+      }
+
+      const rows: PendienteRow[] = allData.map((ae: any) => ({
         atencionId: ae.atenciones.id,
         atencionExamenId: ae.id,
         examenId: ae.examen_id,
