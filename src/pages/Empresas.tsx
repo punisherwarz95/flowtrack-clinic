@@ -195,6 +195,11 @@ const Empresas = () => {
   };
 
   const handleSelectFaena = async (faenaId: string) => {
+    if (!faenaId || faenaId === selectedFaenaId) {
+      setSelectedFaenaId(null);
+      setFaenaBaterias([]);
+      return;
+    }
     setSelectedFaenaId(faenaId);
     await loadFaenaBaterias(faenaId);
   };
