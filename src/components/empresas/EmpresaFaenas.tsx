@@ -224,61 +224,7 @@ const EmpresaFaenas = ({ empresaId, empresaNombre }: EmpresaFaenasProps) => {
         if (error) throw error;
       }
 
-      // Copiar baterías de la faena a empresa_baterias (si no existen)
-      // Importante: consultamos en backend para evitar estado desactualizado y
-      // tratamos activo=null como activo (solo excluimos activo=false).
-      const { data: bateriasDeFaenaRaw, error: bateriasFaenaError } = await supabase
-        .from("bateria_faenas")
-        .select("paquete_id, activo")
-        .eq("faena_id", faenaId);
-
-      if (bateriasFaenaError) throw bateriasFaenaError;
-
-      const bateriasDeEstaFaena = (bateriasDeFaenaRaw || []).filter(
-        (bf: { paquete_id: string; activo: boolean | null }) => bf.activo !== false
-      );
-
-      if (bateriasDeEstaFaena.length > 0) {
-        // Obtener baterías ya existentes en la empresa
-        const { data: empresaBateriasExistentes } = await supabase
-          .from("empresa_baterias")
-          .select("paquete_id")
-          .eq("empresa_id", empresaId);
-
-        const paquetesExistentes = new Set(
-          empresaBateriasExistentes?.map(eb => eb.paquete_id) || []
-        );
-
-        // Filtrar baterías que aún no están en la empresa
-        const nuevasBaterias = bateriasDeEstaFaena
-          .filter(bf => !paquetesExistentes.has(bf.paquete_id))
-          .map(bf => ({
-            empresa_id: empresaId,
-            paquete_id: bf.paquete_id,
-            valor: 0, // Precio inicial 0, el staff debe configurarlo
-            activo: true,
-          }));
-
-        if (nuevasBaterias.length > 0) {
-          const { error: batError } = await supabase
-            .from("empresa_baterias")
-            .insert(nuevasBaterias);
-          
-          if (batError) {
-            console.error("Error agregando baterías:", batError);
-            toast.warning(
-              `Faena asignada, pero no se pudieron vincular ${nuevasBaterias.length} baterías. Revisa permisos/políticas y reintenta.`
-            );
-          } else {
-            toast.success(`Faena asignada con ${nuevasBaterias.length} baterías agregadas`);
-          }
-        } else {
-          toast.success("Faena asignada (baterías ya existían)");
-        }
-      } else {
-        toast.success("Faena asignada a la empresa");
-      }
-
+      toast.success("Faena asignada a la empresa");
       loadData();
     } catch (error: any) {
       console.error("Error:", error);
