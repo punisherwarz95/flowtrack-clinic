@@ -225,7 +225,7 @@ const EmpresaEstadosPago = () => {
         return;
       }
 
-      const totalIva = Math.ceil(totalNeto * 0.19);
+      const totalIva = esAfectaIva ? Math.ceil(totalNeto * 0.19) : 0;
       const total = totalNeto + totalIva;
 
       // 5. Crear estado de pago
