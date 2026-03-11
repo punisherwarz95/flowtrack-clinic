@@ -176,20 +176,13 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
 
           // Add these to allData, avoiding duplicates; track external completado IDs
           const existingIds = new Set(allData.map((ae: any) => ae.id));
-          const externoCompletadoIds = new Set<string>();
           (extCompData || []).forEach((ae: any) => {
             if (!existingIds.has(ae.id)) {
               allData.push(ae);
-              externoCompletadoIds.add(ae.id);
             }
           });
-
-          // Store in closure for later filtering
-          externoCompletadoIdsRef = externoCompletadoIds;
         }
       }
-
-      let externoCompletadoIdsRef = new Set<string>();
 
       const rows: PendienteRow[] = allData.map((ae: any) => ({
         atencionId: ae.atenciones.id,
