@@ -127,6 +127,40 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
       }));
 
       setPendientes(rows);
+
+      // Load archivos compartidos for all atenciones
+      const atencionIds = [...new Set(rows.map(r => r.atencionId))];
+      if (atencionIds.length > 0) {
+        const { data: archivosData } = await supabase
+          .from("examen_archivos_compartidos")
+          .select("id, atencion_id, nombre_archivo, archivo_url")
+          .in("atencion_id", atencionIds);
+
+        const { data: vinculosData } = await supabase
+          .from("examen_archivo_vinculos")
+          .select("archivo_compartido_id, examen_id")
+          .in("archivo_compartido_id", (archivosData || []).map(a => a.id));
+
+        const vinculosByArchivo: Record<string, string[]> = {};
+        (vinculosData || []).forEach((v: any) => {
+          if (!vinculosByArchivo[v.archivo_compartido_id]) vinculosByArchivo[v.archivo_compartido_id] = [];
+          vinculosByArchivo[v.archivo_compartido_id].push(v.examen_id);
+        });
+
+        const map: Record<string, ArchivoCompartido[]> = {};
+        (archivosData || []).forEach((a: any) => {
+          if (!map[a.atencion_id]) map[a.atencion_id] = [];
+          map[a.atencion_id].push({
+            id: a.id,
+            nombre_archivo: a.nombre_archivo,
+            archivo_url: a.archivo_url,
+            examenIds: vinculosByArchivo[a.id] || [],
+          });
+        });
+        setArchivosMap(map);
+      } else {
+        setArchivosMap({});
+      }
     } catch (error) {
       console.error("Error cargando pendientes:", error);
       toast.error("Error al cargar resultados pendientes");
