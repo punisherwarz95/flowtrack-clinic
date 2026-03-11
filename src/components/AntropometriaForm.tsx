@@ -262,7 +262,61 @@ const AntropometriaForm = ({ value, onChange, readonly = false, fechaNacimiento,
     }
   }, [fechaNacimiento]);
 
-  // Timer logic
+  // Auto-fetch Colesterol Total and HDL from Perfil Lipídico exam results
+  useEffect(() => {
+    if (!atencionId) return;
+    // Only fetch if both fields are empty (don't overwrite manual input)
+    if (data.colesterol_total && data.colesterol_hdl) return;
+
+    const fetchLipidResults = async () => {
+      try {
+        // Known campo IDs for PERFIL LIPIDICO
+        const CAMPO_COLESTEROL_TOTAL = "e80439ae-68de-4638-be63-3f8eabb0a6ea";
+        const CAMPO_COLESTEROL_HDL = "c74bf77b-dd69-49ff-8311-9d0ccb1480e9";
+
+        // Get atencion_examenes for this atencion
+        const { data: aeData } = await supabase
+          .from("atencion_examenes")
+          .select("id")
+          .eq("atencion_id", atencionId)
+          .eq("examen_id", "7d33fffa-e1c6-42b0-b8af-34dc0b6bd35a"); // PERFIL LIPIDICO examen_id
+
+        if (!aeData || aeData.length === 0) return;
+
+        const atencionExamenId = aeData[0].id;
+
+        const { data: resultados } = await supabase
+          .from("examen_resultados")
+          .select("campo_id, valor")
+          .eq("atencion_examen_id", atencionExamenId)
+          .in("campo_id", [CAMPO_COLESTEROL_TOTAL, CAMPO_COLESTEROL_HDL]);
+
+        if (!resultados || resultados.length === 0) return;
+
+        let colTotal = "";
+        let hdl = "";
+        for (const r of resultados) {
+          if (r.campo_id === CAMPO_COLESTEROL_TOTAL && r.valor) colTotal = r.valor;
+          if (r.campo_id === CAMPO_COLESTEROL_HDL && r.valor) hdl = r.valor;
+        }
+
+        // Update only empty fields
+        if (colTotal && !data.colesterol_total) {
+          updateField("colesterol_total", colTotal);
+        }
+        if (hdl && !data.colesterol_hdl) {
+          // Small delay to avoid state race with colesterol_total update
+          setTimeout(() => updateField("colesterol_hdl", hdl), 50);
+        }
+      } catch (error) {
+        console.error("Error fetching lipid results:", error);
+      }
+    };
+
+    fetchLipidResults();
+  }, [atencionId]);
+
+
   useEffect(() => {
     if (data.pa_timer_inicio) {
       const inicio = new Date(data.pa_timer_inicio).getTime();
