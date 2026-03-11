@@ -128,9 +128,11 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
 
       setPendientes(rows);
 
-      // Load archivos compartidos for all atenciones
+      // Load archivos compartidos AND examen_resultados files for all atenciones
       const atencionIds = [...new Set(rows.map(r => r.atencionId))];
+      const allAtencionExamenIds = rows.map(r => r.atencionExamenId);
       if (atencionIds.length > 0) {
+        // Fetch shared files
         const { data: archivosData } = await supabase
           .from("examen_archivos_compartidos")
           .select("id, atencion_id, nombre_archivo, archivo_url")
@@ -140,6 +142,13 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
           .from("examen_archivo_vinculos")
           .select("archivo_compartido_id, examen_id")
           .in("archivo_compartido_id", (archivosData || []).map(a => a.id));
+
+        // Also fetch files from examen_resultados (uploaded during box exams)
+        const { data: resultadosArchivos } = await supabase
+          .from("examen_resultados")
+          .select("atencion_examen_id, archivo_url, examen_formulario_campos(etiqueta)")
+          .in("atencion_examen_id", allAtencionExamenIds)
+          .not("archivo_url", "is", null);
 
         const vinculosByArchivo: Record<string, string[]> = {};
         (vinculosData || []).forEach((v: any) => {
@@ -157,6 +166,24 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
             examenIds: vinculosByArchivo[a.id] || [],
           });
         });
+
+        // Add files from examen_resultados to the map
+        (resultadosArchivos || []).forEach((r: any) => {
+          const row = rows.find(ro => ro.atencionExamenId === r.atencion_examen_id);
+          if (!row || !r.archivo_url) return;
+          if (!map[row.atencionId]) map[row.atencionId] = [];
+          // Avoid duplicates
+          const alreadyExists = map[row.atencionId].some(a => a.archivo_url === r.archivo_url);
+          if (!alreadyExists) {
+            map[row.atencionId].push({
+              id: `resultado-${r.atencion_examen_id}`,
+              nombre_archivo: r.examen_formulario_campos?.etiqueta || `Archivo - ${row.examenNombre}`,
+              archivo_url: r.archivo_url,
+              examenIds: [row.examenId],
+            });
+          }
+        });
+
         setArchivosMap(map);
       } else {
         setArchivosMap({});
