@@ -22,7 +22,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   Calendar, CreditCard, FileText, DollarSign, Trash2, Package,
-  Building2, TrendingUp, Search,
+  Building2, TrendingUp, Search, Users,
 } from "lucide-react";
 
 interface Empresa {
