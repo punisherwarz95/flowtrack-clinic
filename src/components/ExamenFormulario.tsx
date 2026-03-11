@@ -33,6 +33,8 @@ interface ResultadoCampo {
 
 export interface ExamenFormularioRef {
   save: () => Promise<void>;
+  saveOnly: () => Promise<void>;
+  validateRequired: () => boolean;
   hasPendingChanges: () => boolean;
 }
 
