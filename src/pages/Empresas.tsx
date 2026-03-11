@@ -454,9 +454,12 @@ const Empresas = () => {
             setFormData(emptyForm);
             setEmpresaBaterias([]);
             setBateriaPrecios({});
+            setEmpresaFaenasList([]);
+            setSelectedFaenaId(null);
+            setFaenaBaterias([]);
           }
         }}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Building2 className="h-5 w-5" />
@@ -467,7 +470,7 @@ const Empresas = () => {
             <Tabs value={activeTab} onValueChange={(tab) => {
               setActiveTab(tab);
               if (tab === "baterias" && editingEmpresa) {
-                loadEmpresaBaterias(editingEmpresa.id);
+                Promise.all([loadEmpresaBaterias(editingEmpresa.id), loadEmpresaFaenasList(editingEmpresa.id)]);
               }
             }}>
               <TabsList className="w-full">
@@ -579,53 +582,138 @@ const Empresas = () => {
 
               {/* Tab: Baterías y Precios */}
               <TabsContent value="baterias" className="mt-4">
-                <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    Define los precios para las baterías vinculadas a esta empresa. Si una batería tiene precio $0, queda como pendiente de configurar.
-                  </p>
-
-                  <div className="border rounded-md divide-y max-h-96 overflow-y-auto">
-                    {linkedPaquetes.map((paquete) => (
-                      <div key={paquete.id} className="flex items-center justify-between p-3 gap-4">
-                        <span className="text-sm font-medium flex-1">{paquete.nombre}</span>
-                        <div className="flex items-center gap-1">
-                          <DollarSign className="h-4 w-4 text-muted-foreground" />
-                          <Input
-                            type="number"
-                            step="any"
-                            value={bateriaPrecios[paquete.id] ?? ""}
-                            onChange={(e) =>
-                              setBateriaPrecios({
-                                ...bateriaPrecios,
-                                [paquete.id]: e.target.value,
-                              })
-                            }
-                            placeholder="0"
-                            className="w-28 h-8"
-                          />
-                        </div>
+                <div className="grid grid-cols-2 gap-6 min-h-[400px]">
+                  {/* LEFT: Faena selector + available batteries */}
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-sm font-semibold flex items-center gap-2 mb-2">
+                        <MapPin className="h-4 w-4 text-primary" />
+                        Faenas de esta empresa
+                      </Label>
+                      <div className="border rounded-md divide-y max-h-40 overflow-y-auto">
+                        {empresaFaenasList.length === 0 ? (
+                          <p className="text-sm text-muted-foreground text-center py-4">
+                            No hay faenas asignadas. Ve a la pestaña "Faenas" primero.
+                          </p>
+                        ) : (
+                          empresaFaenasList.map((ef) => (
+                            <button
+                              key={ef.faena_id}
+                              type="button"
+                              onClick={() => handleSelectFaena(ef.faena_id)}
+                              className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors ${
+                                selectedFaenaId === ef.faena_id ? "bg-primary/10 font-medium" : ""
+                              }`}
+                            >
+                              <span>{(ef as any).faena?.nombre || ef.faena_id}</span>
+                              <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${selectedFaenaId === ef.faena_id ? "text-primary" : ""}`} />
+                            </button>
+                          ))
+                        )}
                       </div>
-                    ))}
-                    {linkedPaquetes.length === 0 && (
-                      <p className="text-sm text-muted-foreground text-center py-8">
-                        Esta empresa no tiene baterías vinculadas. Primero vincula una faena con baterías en la pestaña "Faenas".
-                      </p>
-                    )}
+                    </div>
+
+                    {/* Available batteries from selected faena */}
+                    <div>
+                      <Label className="text-sm font-semibold flex items-center gap-2 mb-2">
+                        <Package className="h-4 w-4 text-primary" />
+                        Baterías disponibles
+                      </Label>
+                      {!selectedFaenaId ? (
+                        <div className="border rounded-md p-4 text-center">
+                          <p className="text-sm text-muted-foreground">Selecciona una faena arriba para ver sus baterías disponibles</p>
+                        </div>
+                      ) : availableBaterias.length === 0 ? (
+                        <div className="border rounded-md p-4 text-center">
+                          <p className="text-sm text-muted-foreground">Todas las baterías de esta faena ya están agregadas</p>
+                        </div>
+                      ) : (
+                        <ScrollArea className="border rounded-md h-[220px]">
+                          <div className="divide-y">
+                            {availableBaterias.map((fb) => (
+                              <div key={fb.paquete_id} className="flex items-center justify-between px-3 py-2">
+                                <span className="text-sm">{(fb as any).paquete?.nombre || fb.paquete_id}</span>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs gap-1"
+                                  onClick={() => handleAddBateria(fb.paquete_id, (fb as any).paquete?.nombre || "")}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                  Agregar
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      )}
+                    </div>
                   </div>
 
-                  {linkedPaquetes.length > 0 && (
-                    <div className="flex justify-between items-center pt-2">
-                      <p className="text-xs text-muted-foreground">
-                        {linkedPaquetes.length} vinculadas · {linkedPaquetes.filter((p) => {
-                          const v = (bateriaPrecios[p.id] ?? "").trim();
-                          return v !== "" && Number(v) > 0;
-                        }).length} con precio &gt; 0
-                      </p>
-                      <Button onClick={handleSaveBaterias}>
-                        Guardar Precios
-                      </Button>
-                    </div>
-                  )}
+                  {/* RIGHT: Assigned batteries with prices */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-semibold flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-primary" />
+                      Baterías contratadas y precios
+                    </Label>
+                    {empresaBaterias.length === 0 ? (
+                      <div className="border rounded-md p-8 text-center">
+                        <Package className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
+                        <p className="text-sm text-muted-foreground">
+                          No hay baterías agregadas. Selecciona una faena y agrega baterías desde la izquierda.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <ScrollArea className="border rounded-md h-[320px]">
+                          <div className="divide-y">
+                            {empresaBaterias.map((eb) => (
+                              <div key={eb.paquete_id} className="flex items-center gap-2 px-3 py-2">
+                                <span className="text-sm font-medium flex-1 truncate">
+                                  {eb.paquete?.nombre || eb.paquete_id}
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                                  <Input
+                                    type="number"
+                                    step="any"
+                                    value={bateriaPrecios[eb.paquete_id] ?? ""}
+                                    onChange={(e) =>
+                                      setBateriaPrecios({
+                                        ...bateriaPrecios,
+                                        [eb.paquete_id]: e.target.value,
+                                      })
+                                    }
+                                    placeholder="0"
+                                    className="w-24 h-7 text-sm"
+                                  />
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 shrink-0"
+                                  onClick={() => handleRemoveBateria(eb.paquete_id)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                        <div className="flex justify-between items-center pt-1">
+                          <p className="text-xs text-muted-foreground">
+                            {empresaBaterias.length} baterías · {empresaBaterias.filter((eb) => {
+                              const v = (bateriaPrecios[eb.paquete_id] ?? "").trim();
+                              return v !== "" && Number(v) > 0;
+                            }).length} con precio &gt; 0
+                          </p>
+                          <Button size="sm" onClick={handleSaveBaterias}>
+                            Guardar Precios
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>
