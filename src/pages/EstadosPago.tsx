@@ -118,6 +118,15 @@ const EstadosPago = () => {
   const [ventasMensuales, setVentasMensuales] = useState<MonthlySale[]>([]);
   const [ventasLoading, setVentasLoading] = useState(false);
 
+  // Prestadores
+  const [prestadores, setPrestadores] = useState<Prestador[]>([]);
+  const [selectedPrestadorId, setSelectedPrestadorId] = useState<string>("");
+  const [prestadorSearch, setPrestadorSearch] = useState("");
+  const [prestadorFechaDesde, setPrestadorFechaDesde] = useState(format(new Date(new Date().setDate(1)), "yyyy-MM-dd"));
+  const [prestadorFechaHasta, setPrestadorFechaHasta] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [prestadorExamenes, setPrestadorExamenes] = useState<PrestadorExamenDetail[]>([]);
+  const [prestadorLoading, setPrestadorLoading] = useState(false);
+
   useEffect(() => {
     loadEmpresas();
   }, []);
