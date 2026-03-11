@@ -351,6 +351,12 @@ const EvaluacionMedica = () => {
       toast.error("Selecciona un resultado");
       return;
     }
+    // Block final aptitude if not all exams are completed
+    const bat = bateriasConEstado.find(b => b.paqueteId === evaluandoPaquete);
+    if (bat && !bat.listaParaEvaluar && !bat.evaluacion) {
+      toast.error("No puedes asignar aptitud hasta que todos los exámenes estén completados");
+      return;
+    }
     setSavingEval(true);
     try {
       const datosClinicosPayload = {
