@@ -159,6 +159,7 @@ const Empresas = () => {
         email: formData.email || null,
         telefono: formData.telefono || null,
         centro_costo: formData.centro_costo || null,
+        afecto_iva: formData.afecto_iva,
       };
 
       if (editingEmpresa) {
