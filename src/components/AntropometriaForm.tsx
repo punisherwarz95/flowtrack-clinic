@@ -634,16 +634,21 @@ const AntropometriaForm = ({ value, onChange, readonly = false, fechaNacimiento,
           <CardTitle className="text-sm flex items-center gap-2">
             <Droplets className="h-4 w-4" /> Índice de Framingham (Riesgo Cardiovascular a 10 años)
           </CardTitle>
+          {atencionId && (
+            <p className="text-[10px] text-muted-foreground">
+              Colesterol Total y HDL se importan automáticamente desde Perfil Lipídico
+            </p>
+          )}
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div>
-              <Label className="text-xs">Colesterol Total (mg/dL)</Label>
+              <Label className="text-xs">Colesterol Total (mg/dL) {data.colesterol_total && atencionId ? "✓" : ""}</Label>
               <Input type="number" value={data.colesterol_total} disabled={readonly}
                 onChange={(e) => updateField("colesterol_total", e.target.value)} placeholder="200" />
             </div>
             <div>
-              <Label className="text-xs">Colesterol HDL (mg/dL)</Label>
+              <Label className="text-xs">Colesterol HDL (mg/dL) {data.colesterol_hdl && atencionId ? "✓" : ""}</Label>
               <Input type="number" value={data.colesterol_hdl} disabled={readonly}
                 onChange={(e) => updateField("colesterol_hdl", e.target.value)} placeholder="50" />
             </div>
