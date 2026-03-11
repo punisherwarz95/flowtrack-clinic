@@ -576,8 +576,16 @@ const EvaluacionMedica = () => {
     return map;
   };
 
-  // Render inline evaluation view (replaces dialog)
-  const renderEvaluacionInline = () => {
+  // Group exams by prestador (without showing names)
+  const groupExamsByPrestador = (exams: PacienteAtencion["atencion_examenes"]) => {
+    const groups: Record<string, typeof exams> = {};
+    exams.forEach(ae => {
+      const key = prestadorExamenMap[ae.examen_id] || "sin_prestador";
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(ae);
+    });
+    return Object.values(groups);
+  };
     if (!selectedPaciente || !evaluandoPaquete) return null;
 
     const bat = bateriasConEstado.find(b => b.paqueteId === evaluandoPaquete);
