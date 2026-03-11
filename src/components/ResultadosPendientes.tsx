@@ -174,15 +174,22 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
 
           const { data: extCompData } = await queryExtComp.limit(200);
 
-          // Add these to allData, avoiding duplicates
+          // Add these to allData, avoiding duplicates; track external completado IDs
           const existingIds = new Set(allData.map((ae: any) => ae.id));
+          const externoCompletadoIds = new Set<string>();
           (extCompData || []).forEach((ae: any) => {
             if (!existingIds.has(ae.id)) {
               allData.push(ae);
+              externoCompletadoIds.add(ae.id);
             }
           });
+
+          // Store in closure for later filtering
+          externoCompletadoIdsRef = externoCompletadoIds;
         }
       }
+
+      let externoCompletadoIdsRef = new Set<string>();
 
       const rows: PendienteRow[] = allData.map((ae: any) => ({
         atencionId: ae.atenciones.id,
@@ -197,6 +204,7 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
         fechaNacimiento: ae.atenciones.pacientes?.fecha_nacimiento || null,
         prestadorId: prestadorMap[ae.examen_id]?.prestadorId || null,
         prestadorNombre: prestadorMap[ae.examen_id]?.prestadorNombre || "Sin prestador",
+        isExternoCompletado: ae.estado === "completado" && (prestadorMap[ae.examen_id]?.prestadorTipo === "externo"),
       }));
 
       setPendientes(rows);
