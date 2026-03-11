@@ -747,143 +747,142 @@ const EvaluacionMedica = () => {
                   <p className="text-sm text-muted-foreground text-center py-8">Sin exámenes</p>
                 ) : (
                   <div className="space-y-4">
-                    {examenesRelacionados.map(ae => {
-                      const resultados = resultadosByExamen[ae.id] || [];
-                      const sorted = [...resultados].sort((a, b) => (a.examen_formulario_campos?.orden || 0) - (b.examen_formulario_campos?.orden || 0));
+                    {groupExamsByPrestador(examenesRelacionados).map((group, groupIdx) => (
+                      <div key={groupIdx} className={groupIdx > 0 ? "pt-4 border-t border-border/40" : ""}>
+                        <div className="space-y-4">
+                          {group.map(ae => {
+                            const resultados = resultadosByExamen[ae.id] || [];
+                            const sorted = [...resultados].sort((a, b) => (a.examen_formulario_campos?.orden || 0) - (b.examen_formulario_campos?.orden || 0));
 
-                      return (
-                        <div key={ae.id} className="border rounded-lg overflow-hidden">
-                          <div className={`px-3 py-2 font-medium text-sm flex items-center justify-between ${
-                            ae.estado === "completado"
-                              ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
-                              : ae.estado === "muestra_tomada"
-                              ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
-                              : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
-                          }`}>
-                            <span>{ae.examenes.nombre}</span>
-                            <Badge variant="outline" className="text-xs">
-                              {ae.estado === "completado" ? "✓ Completado" : ae.estado === "muestra_tomada" ? "⏳ Esperando" : "Pendiente"}
-                            </Badge>
-                          </div>
-                          <div className="p-3">
-                            {sorted.length > 0 ? (
-                              <div className="space-y-2">
-                                {sorted.map((r, idx) => {
-                                  const campo = r.examen_formulario_campos;
-                                  const tipoCampo = campo?.tipo_campo;
-                                  const unidad = (campo?.opciones as Record<string, string>)?.unidad;
+                            return (
+                              <div key={ae.id} className="border rounded-lg overflow-hidden">
+                                <div className={`px-3 py-2 font-medium text-sm flex items-center justify-between ${
+                                  ae.estado === "completado"
+                                    ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                                    : ae.estado === "muestra_tomada"
+                                    ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                                    : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                                }`}>
+                                  <span>{ae.examenes.nombre}</span>
+                                  <Badge variant="outline" className="text-xs">
+                                    {ae.estado === "completado" ? "✓ Completado" : ae.estado === "muestra_tomada" ? "⏳ Esperando" : "Pendiente"}
+                                  </Badge>
+                                </div>
+                                <div className="p-3">
+                                  {sorted.length > 0 ? (
+                                    <div className="space-y-2">
+                                      {sorted.map((r, idx) => {
+                                        const campo = r.examen_formulario_campos;
+                                        const tipoCampo = campo?.tipo_campo;
+                                        const unidad = (campo?.opciones as Record<string, string>)?.unidad;
 
-                                  // PDF / archivo
-                                  if (tipoCampo === "archivo_pdf" && r.archivo_url) {
-                                    return (
-                                      <div key={idx} className="border-b last:border-0 pb-2 last:pb-0">
-                                        <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Archivo"}</span>
-                                        <div className="space-y-2">
-                                          {r.archivo_url.toLowerCase().endsWith(".pdf") || r.archivo_url.includes("pdf") ? (
-                                            <iframe src={r.archivo_url} className="w-full h-48 border rounded-md" title={r.valor || "PDF"} />
-                                          ) : (
-                                            <img src={r.archivo_url} alt={r.valor || "Imagen"} className="max-h-48 rounded-md border object-contain" />
-                                          )}
-                                          <a href={r.archivo_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline flex items-center gap-1">
-                                            <FileText className="h-3 w-3" /> {r.valor || "Ver archivo completo"}
-                                          </a>
-                                        </div>
-                                      </div>
-                                    );
-                                  }
+                                        if (tipoCampo === "archivo_pdf" && r.archivo_url) {
+                                          return (
+                                            <div key={idx} className="border-b last:border-0 pb-2 last:pb-0">
+                                              <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Archivo"}</span>
+                                              <div className="space-y-2">
+                                                {r.archivo_url.toLowerCase().endsWith(".pdf") || r.archivo_url.includes("pdf") ? (
+                                                  <iframe src={r.archivo_url} className="w-full h-48 border rounded-md" title={r.valor || "PDF"} />
+                                                ) : (
+                                                  <img src={r.archivo_url} alt={r.valor || "Imagen"} className="max-h-48 rounded-md border object-contain" />
+                                                )}
+                                                <a href={r.archivo_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline flex items-center gap-1">
+                                                  <FileText className="h-3 w-3" /> {r.valor || "Ver archivo completo"}
+                                                </a>
+                                              </div>
+                                            </div>
+                                          );
+                                        }
 
-                                  // Multi-select
-                                  if (tipoCampo === "multi_select" && r.valor) {
-                                    try {
-                                      const items = JSON.parse(r.valor) as string[];
-                                      return (
-                                        <div key={idx} className="border-b last:border-0 pb-1 last:pb-0">
-                                          <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Campo"}</span>
-                                          <div className="flex flex-wrap gap-1">
-                                            {items.map((item, i) => (
-                                              <Badge key={i} variant="secondary" className="text-xs">{item}</Badge>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      );
-                                    } catch { /* fallthrough */ }
-                                  }
-
-                                  // Audiometria - show chart
-                                  if (tipoCampo === "audiometria" && r.valor) {
-                                    return (
-                                      <div key={idx} className="border-b last:border-0 pb-2 last:pb-0">
-                                        <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Audiometría"}</span>
-                                        <AudiometriaChart value={r.valor} />
-                                      </div>
-                                    );
-                                  }
-
-                                  // Antropometria (JSON data - key/value display)
-                                  if (tipoCampo === "antropometria" && r.valor) {
-                                    try {
-                                      const parsed = JSON.parse(r.valor) as Record<string, unknown>;
-                                      return (
-                                        <div key={idx} className="border-b last:border-0 pb-2 last:pb-0">
-                                          <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Campo"}</span>
-                                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm bg-muted/40 rounded-md p-2">
-                                            {Object.entries(parsed).map(([key, val]) => {
-                                              if (val === null || val === undefined || val === "") return null;
-                                              if (key.includes("timer") || key.includes("_inicio")) return null;
-                                              const label = key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
-                                              const displayVal = typeof val === "object" ? JSON.stringify(val) : String(val);
-                                              return (
-                                                <div key={key} className="flex justify-between">
-                                                  <span className="text-muted-foreground text-xs">{label}</span>
-                                                  <span className="font-medium text-xs">{displayVal}</span>
+                                        if (tipoCampo === "multi_select" && r.valor) {
+                                          try {
+                                            const items = JSON.parse(r.valor) as string[];
+                                            return (
+                                              <div key={idx} className="border-b last:border-0 pb-1 last:pb-0">
+                                                <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Campo"}</span>
+                                                <div className="flex flex-wrap gap-1">
+                                                  {items.map((item, i) => (
+                                                    <Badge key={i} variant="secondary" className="text-xs">{item}</Badge>
+                                                  ))}
                                                 </div>
-                                              );
-                                            })}
+                                              </div>
+                                            );
+                                          } catch { /* fallthrough */ }
+                                        }
+
+                                        if (tipoCampo === "audiometria" && r.valor) {
+                                          return (
+                                            <div key={idx} className="border-b last:border-0 pb-2 last:pb-0">
+                                              <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Audiometría"}</span>
+                                              <AudiometriaChart value={r.valor} />
+                                            </div>
+                                          );
+                                        }
+
+                                        if (tipoCampo === "antropometria" && r.valor) {
+                                          try {
+                                            const parsed = JSON.parse(r.valor) as Record<string, unknown>;
+                                            return (
+                                              <div key={idx} className="border-b last:border-0 pb-2 last:pb-0">
+                                                <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Campo"}</span>
+                                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm bg-muted/40 rounded-md p-2">
+                                                  {Object.entries(parsed).map(([key, val]) => {
+                                                    if (val === null || val === undefined || val === "") return null;
+                                                    if (key.includes("timer") || key.includes("_inicio")) return null;
+                                                    const label = key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+                                                    const displayVal = typeof val === "object" ? JSON.stringify(val) : String(val);
+                                                    return (
+                                                      <div key={key} className="flex justify-between">
+                                                        <span className="text-muted-foreground text-xs">{label}</span>
+                                                        <span className="font-medium text-xs">{displayVal}</span>
+                                                      </div>
+                                                    );
+                                                  })}
+                                                </div>
+                                              </div>
+                                            );
+                                          } catch { /* fallthrough */ }
+                                        }
+
+                                        if (tipoCampo === "cuestionario" && r.valor) {
+                                          return (
+                                            <div key={idx} className="border-b last:border-0 pb-2 last:pb-0">
+                                              <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Cuestionario"}</span>
+                                              <CuestionarioScoreSummary value={r.valor} />
+                                            </div>
+                                          );
+                                        }
+
+                                        if (tipoCampo === "checkbox") {
+                                          return (
+                                            <div key={idx} className="flex justify-between items-center text-sm border-b last:border-0 pb-1 last:pb-0">
+                                              <span className="text-muted-foreground">{campo?.etiqueta || "Campo"}</span>
+                                              <span className="font-medium">{r.valor === "true" ? "✓ Sí" : "✗ No"}</span>
+                                            </div>
+                                          );
+                                        }
+
+                                        return (
+                                          <div key={idx} className="flex justify-between items-center text-sm border-b last:border-0 pb-1 last:pb-0">
+                                            <span className="text-muted-foreground">{campo?.etiqueta || "Campo"}</span>
+                                            <span className="font-medium">
+                                              {r.valor || "-"}
+                                              {unidad && unidad !== "none" && <span className="text-xs text-muted-foreground ml-1">{unidad}</span>}
+                                            </span>
                                           </div>
-                                        </div>
-                                      );
-                                    } catch { /* fallthrough */ }
-                                  }
-
-                                  // Cuestionario
-                                  if (tipoCampo === "cuestionario" && r.valor) {
-                                    return (
-                                      <div key={idx} className="border-b last:border-0 pb-2 last:pb-0">
-                                        <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Cuestionario"}</span>
-                                        <CuestionarioScoreSummary value={r.valor} />
-                                      </div>
-                                    );
-                                  }
-
-                                  // Checkbox
-                                  if (tipoCampo === "checkbox") {
-                                    return (
-                                      <div key={idx} className="flex justify-between items-center text-sm border-b last:border-0 pb-1 last:pb-0">
-                                        <span className="text-muted-foreground">{campo?.etiqueta || "Campo"}</span>
-                                        <span className="font-medium">{r.valor === "true" ? "✓ Sí" : "✗ No"}</span>
-                                      </div>
-                                    );
-                                  }
-
-                                  // Default: texto, numero, select, fecha, textarea
-                                  return (
-                                    <div key={idx} className="flex justify-between items-center text-sm border-b last:border-0 pb-1 last:pb-0">
-                                      <span className="text-muted-foreground">{campo?.etiqueta || "Campo"}</span>
-                                      <span className="font-medium">
-                                        {r.valor || "-"}
-                                        {unidad && unidad !== "none" && <span className="text-xs text-muted-foreground ml-1">{unidad}</span>}
-                                      </span>
+                                        );
+                                      })}
                                     </div>
-                                  );
-                                })}
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground text-center py-2">Sin resultados cargados</p>
+                                  )}
+                                </div>
                               </div>
-                            ) : (
-                              <p className="text-xs text-muted-foreground text-center py-2">Sin resultados cargados</p>
-                            )}
-                          </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
+                      </div>
+                    ))}
                   </div>
                 )}
               </CardContent>
