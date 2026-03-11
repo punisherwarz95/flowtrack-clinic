@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
-import { CheckCircle, Calendar as CalendarIcon, RotateCcw, BarChart3, FlaskConical } from "lucide-react";
+import { CheckCircle, Calendar as CalendarIcon, RotateCcw, BarChart3, FlaskConical, Pencil } from "lucide-react";
 import { logActivity } from "@/lib/activityLog";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import MetricasCompletados from "@/components/MetricasCompletados";
 import ResultadosPendientes from "@/components/ResultadosPendientes";
+import ResultadosCompletados from "@/components/ResultadosCompletados";
 
 interface AtencionCompletada {
   id: string;
@@ -190,6 +191,10 @@ const Completados = () => {
               <FlaskConical className="h-4 w-4" />
               Resultados Pendientes
             </TabsTrigger>
+            <TabsTrigger value="correccion" className="gap-2">
+              <Pencil className="h-4 w-4" />
+              Corrección
+            </TabsTrigger>
             <TabsTrigger value="metricas" className="gap-2">
               <BarChart3 className="h-4 w-4" />
               Métricas
@@ -280,6 +285,10 @@ const Completados = () => {
 
           <TabsContent value="resultados-pendientes">
             <ResultadosPendientes selectedDate={selectedDate} />
+          </TabsContent>
+
+          <TabsContent value="correccion">
+            <ResultadosCompletados selectedDate={selectedDate} />
           </TabsContent>
 
           <TabsContent value="metricas">
