@@ -223,7 +223,10 @@ const Examenes = () => {
   const [selectedFaenas, setSelectedFaenas] = useState<string[]>([]);
   const [openExamenDialog, setOpenExamenDialog] = useState(false);
   const [openPaqueteDialog, setOpenPaqueteDialog] = useState(false);
-  const [examenToDelete, setExamenToDelete] = useState<string | null>(null);
+  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+  const [deleteSearch, setDeleteSearch] = useState("");
+  const [examenToDelete, setExamenToDelete] = useState<Examen | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [paqueteToDelete, setPaqueteToDelete] = useState<string | null>(null);
   const [editingExamen, setEditingExamen] = useState<Examen | null>(null);
   const [editingPaquete, setEditingPaquete] = useState<Paquete | null>(null);
