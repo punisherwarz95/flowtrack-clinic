@@ -104,6 +104,7 @@ const EvaluacionMedica = () => {
   const [bateriasConEstado, setBateriasConEstado] = useState<BateriaConEstado[]>([]);
   const [evaluaciones, setEvaluaciones] = useState<EvaluacionClinica[]>([]);
   const [paqueteExamenItems, setPaqueteExamenItems] = useState<Record<string, string[]>>({});
+  const [prestadorExamenMap, setPrestadorExamenMap] = useState<Record<string, string>>({});
 
   const [listEvaluaciones, setListEvaluaciones] = useState<Record<string, EvaluacionClinica[]>>({});
   const [listPaqueteExamItems, setListPaqueteExamItems] = useState<Record<string, string[]>>({});
@@ -237,12 +238,16 @@ const EvaluacionMedica = () => {
     const paqueteIds = atencion.atencion_baterias.map(ab => ab.paquete_id);
     if (paqueteIds.length === 0) {
       setBateriasConEstado([]);
+      setPrestadorExamenMap({});
       setActiveTab("evaluacion");
       return;
     }
 
     let peiMap = listPaqueteExamItems;
     let evals = listEvaluaciones[atencion.id] || [];
+
+    // Get all examen_ids for this patient
+    const allExamenIds = Array.from(new Set(atencion.atencion_examenes.map(ae => ae.examen_id)));
 
     if (Object.keys(peiMap).length === 0) {
       const [peiRes, evalRes] = await Promise.all([
@@ -256,6 +261,19 @@ const EvaluacionMedica = () => {
         peiMap[item.paquete_id].push(item.examen_id);
       });
       evals = (evalRes.data || []) as unknown as EvaluacionClinica[];
+    }
+
+    // Fetch prestador mapping for exams
+    if (allExamenIds.length > 0) {
+      const { data: prestadorData } = await supabase
+        .from("prestador_examenes")
+        .select("examen_id, prestador_id")
+        .in("examen_id", allExamenIds);
+      const pMap: Record<string, string> = {};
+      (prestadorData || []).forEach(pe => { pMap[pe.examen_id] = pe.prestador_id; });
+      setPrestadorExamenMap(pMap);
+    } else {
+      setPrestadorExamenMap({});
     }
 
     setPaqueteExamenItems(peiMap);
@@ -558,6 +576,17 @@ const EvaluacionMedica = () => {
     return map;
   };
 
+  // Group exams by prestador (without showing names)
+  const groupExamsByPrestador = (exams: PacienteAtencion["atencion_examenes"]) => {
+    const groups: Record<string, typeof exams> = {};
+    exams.forEach(ae => {
+      const key = prestadorExamenMap[ae.examen_id] || "sin_prestador";
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(ae);
+    });
+    return Object.values(groups);
+  };
+
   // Render inline evaluation view (replaces dialog)
   const renderEvaluacionInline = () => {
     if (!selectedPaciente || !evaluandoPaquete) return null;
@@ -602,24 +631,28 @@ const EvaluacionMedica = () => {
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Evaluación por Examen</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {examenesRelacionados.map(ae => (
-                  <div key={ae.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
-                    <span className="text-sm font-medium flex-1">{ae.examenes.nombre}</span>
-                    <RadioGroup
-                      value={examenEvals[ae.examen_id] || ""}
-                      onValueChange={(val) => setExamenEvals(prev => ({ ...prev, [ae.examen_id]: val }))}
-                      className="flex gap-4"
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <RadioGroupItem value="normal" id={`${ae.id}-normal`} />
-                        <Label htmlFor={`${ae.id}-normal`} className="text-xs cursor-pointer text-green-700">Normal</Label>
+              <CardContent className="space-y-1">
+                {groupExamsByPrestador(examenesRelacionados).map((group, groupIdx) => (
+                  <div key={groupIdx} className={`space-y-3 ${groupIdx > 0 ? "pt-3 border-t border-border/50" : ""}`}>
+                    {group.map(ae => (
+                      <div key={ae.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+                        <span className="text-sm font-medium flex-1">{ae.examenes.nombre}</span>
+                        <RadioGroup
+                          value={examenEvals[ae.examen_id] || ""}
+                          onValueChange={(val) => setExamenEvals(prev => ({ ...prev, [ae.examen_id]: val }))}
+                          className="flex gap-4"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <RadioGroupItem value="normal" id={`${ae.id}-normal`} />
+                            <Label htmlFor={`${ae.id}-normal`} className="text-xs cursor-pointer text-green-700">Normal</Label>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <RadioGroupItem value="anormal" id={`${ae.id}-anormal`} />
+                            <Label htmlFor={`${ae.id}-anormal`} className="text-xs cursor-pointer text-red-700">Anormal</Label>
+                          </div>
+                        </RadioGroup>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <RadioGroupItem value="anormal" id={`${ae.id}-anormal`} />
-                        <Label htmlFor={`${ae.id}-anormal`} className="text-xs cursor-pointer text-red-700">Anormal</Label>
-                      </div>
-                    </RadioGroup>
+                    ))}
                   </div>
                 ))}
                 {examenesRelacionados.length === 0 && (
@@ -714,143 +747,142 @@ const EvaluacionMedica = () => {
                   <p className="text-sm text-muted-foreground text-center py-8">Sin exámenes</p>
                 ) : (
                   <div className="space-y-4">
-                    {examenesRelacionados.map(ae => {
-                      const resultados = resultadosByExamen[ae.id] || [];
-                      const sorted = [...resultados].sort((a, b) => (a.examen_formulario_campos?.orden || 0) - (b.examen_formulario_campos?.orden || 0));
+                    {groupExamsByPrestador(examenesRelacionados).map((group, groupIdx) => (
+                      <div key={groupIdx} className={groupIdx > 0 ? "pt-4 border-t border-border/40" : ""}>
+                        <div className="space-y-4">
+                          {group.map(ae => {
+                            const resultados = resultadosByExamen[ae.id] || [];
+                            const sorted = [...resultados].sort((a, b) => (a.examen_formulario_campos?.orden || 0) - (b.examen_formulario_campos?.orden || 0));
 
-                      return (
-                        <div key={ae.id} className="border rounded-lg overflow-hidden">
-                          <div className={`px-3 py-2 font-medium text-sm flex items-center justify-between ${
-                            ae.estado === "completado"
-                              ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
-                              : ae.estado === "muestra_tomada"
-                              ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
-                              : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
-                          }`}>
-                            <span>{ae.examenes.nombre}</span>
-                            <Badge variant="outline" className="text-xs">
-                              {ae.estado === "completado" ? "✓ Completado" : ae.estado === "muestra_tomada" ? "⏳ Esperando" : "Pendiente"}
-                            </Badge>
-                          </div>
-                          <div className="p-3">
-                            {sorted.length > 0 ? (
-                              <div className="space-y-2">
-                                {sorted.map((r, idx) => {
-                                  const campo = r.examen_formulario_campos;
-                                  const tipoCampo = campo?.tipo_campo;
-                                  const unidad = (campo?.opciones as Record<string, string>)?.unidad;
+                            return (
+                              <div key={ae.id} className="border rounded-lg overflow-hidden">
+                                <div className={`px-3 py-2 font-medium text-sm flex items-center justify-between ${
+                                  ae.estado === "completado"
+                                    ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                                    : ae.estado === "muestra_tomada"
+                                    ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                                    : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                                }`}>
+                                  <span>{ae.examenes.nombre}</span>
+                                  <Badge variant="outline" className="text-xs">
+                                    {ae.estado === "completado" ? "✓ Completado" : ae.estado === "muestra_tomada" ? "⏳ Esperando" : "Pendiente"}
+                                  </Badge>
+                                </div>
+                                <div className="p-3">
+                                  {sorted.length > 0 ? (
+                                    <div className="space-y-2">
+                                      {sorted.map((r, idx) => {
+                                        const campo = r.examen_formulario_campos;
+                                        const tipoCampo = campo?.tipo_campo;
+                                        const unidad = (campo?.opciones as Record<string, string>)?.unidad;
 
-                                  // PDF / archivo
-                                  if (tipoCampo === "archivo_pdf" && r.archivo_url) {
-                                    return (
-                                      <div key={idx} className="border-b last:border-0 pb-2 last:pb-0">
-                                        <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Archivo"}</span>
-                                        <div className="space-y-2">
-                                          {r.archivo_url.toLowerCase().endsWith(".pdf") || r.archivo_url.includes("pdf") ? (
-                                            <iframe src={r.archivo_url} className="w-full h-48 border rounded-md" title={r.valor || "PDF"} />
-                                          ) : (
-                                            <img src={r.archivo_url} alt={r.valor || "Imagen"} className="max-h-48 rounded-md border object-contain" />
-                                          )}
-                                          <a href={r.archivo_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline flex items-center gap-1">
-                                            <FileText className="h-3 w-3" /> {r.valor || "Ver archivo completo"}
-                                          </a>
-                                        </div>
-                                      </div>
-                                    );
-                                  }
+                                        if (tipoCampo === "archivo_pdf" && r.archivo_url) {
+                                          return (
+                                            <div key={idx} className="border-b last:border-0 pb-2 last:pb-0">
+                                              <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Archivo"}</span>
+                                              <div className="space-y-2">
+                                                {r.archivo_url.toLowerCase().endsWith(".pdf") || r.archivo_url.includes("pdf") ? (
+                                                  <iframe src={r.archivo_url} className="w-full h-48 border rounded-md" title={r.valor || "PDF"} />
+                                                ) : (
+                                                  <img src={r.archivo_url} alt={r.valor || "Imagen"} className="max-h-48 rounded-md border object-contain" />
+                                                )}
+                                                <a href={r.archivo_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline flex items-center gap-1">
+                                                  <FileText className="h-3 w-3" /> {r.valor || "Ver archivo completo"}
+                                                </a>
+                                              </div>
+                                            </div>
+                                          );
+                                        }
 
-                                  // Multi-select
-                                  if (tipoCampo === "multi_select" && r.valor) {
-                                    try {
-                                      const items = JSON.parse(r.valor) as string[];
-                                      return (
-                                        <div key={idx} className="border-b last:border-0 pb-1 last:pb-0">
-                                          <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Campo"}</span>
-                                          <div className="flex flex-wrap gap-1">
-                                            {items.map((item, i) => (
-                                              <Badge key={i} variant="secondary" className="text-xs">{item}</Badge>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      );
-                                    } catch { /* fallthrough */ }
-                                  }
-
-                                  // Audiometria - show chart
-                                  if (tipoCampo === "audiometria" && r.valor) {
-                                    return (
-                                      <div key={idx} className="border-b last:border-0 pb-2 last:pb-0">
-                                        <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Audiometría"}</span>
-                                        <AudiometriaChart value={r.valor} />
-                                      </div>
-                                    );
-                                  }
-
-                                  // Antropometria (JSON data - key/value display)
-                                  if (tipoCampo === "antropometria" && r.valor) {
-                                    try {
-                                      const parsed = JSON.parse(r.valor) as Record<string, unknown>;
-                                      return (
-                                        <div key={idx} className="border-b last:border-0 pb-2 last:pb-0">
-                                          <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Campo"}</span>
-                                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm bg-muted/40 rounded-md p-2">
-                                            {Object.entries(parsed).map(([key, val]) => {
-                                              if (val === null || val === undefined || val === "") return null;
-                                              if (key.includes("timer") || key.includes("_inicio")) return null;
-                                              const label = key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
-                                              const displayVal = typeof val === "object" ? JSON.stringify(val) : String(val);
-                                              return (
-                                                <div key={key} className="flex justify-between">
-                                                  <span className="text-muted-foreground text-xs">{label}</span>
-                                                  <span className="font-medium text-xs">{displayVal}</span>
+                                        if (tipoCampo === "multi_select" && r.valor) {
+                                          try {
+                                            const items = JSON.parse(r.valor) as string[];
+                                            return (
+                                              <div key={idx} className="border-b last:border-0 pb-1 last:pb-0">
+                                                <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Campo"}</span>
+                                                <div className="flex flex-wrap gap-1">
+                                                  {items.map((item, i) => (
+                                                    <Badge key={i} variant="secondary" className="text-xs">{item}</Badge>
+                                                  ))}
                                                 </div>
-                                              );
-                                            })}
+                                              </div>
+                                            );
+                                          } catch { /* fallthrough */ }
+                                        }
+
+                                        if (tipoCampo === "audiometria" && r.valor) {
+                                          return (
+                                            <div key={idx} className="border-b last:border-0 pb-2 last:pb-0">
+                                              <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Audiometría"}</span>
+                                              <AudiometriaChart value={r.valor} />
+                                            </div>
+                                          );
+                                        }
+
+                                        if (tipoCampo === "antropometria" && r.valor) {
+                                          try {
+                                            const parsed = JSON.parse(r.valor) as Record<string, unknown>;
+                                            return (
+                                              <div key={idx} className="border-b last:border-0 pb-2 last:pb-0">
+                                                <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Campo"}</span>
+                                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm bg-muted/40 rounded-md p-2">
+                                                  {Object.entries(parsed).map(([key, val]) => {
+                                                    if (val === null || val === undefined || val === "") return null;
+                                                    if (key.includes("timer") || key.includes("_inicio")) return null;
+                                                    const label = key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+                                                    const displayVal = typeof val === "object" ? JSON.stringify(val) : String(val);
+                                                    return (
+                                                      <div key={key} className="flex justify-between">
+                                                        <span className="text-muted-foreground text-xs">{label}</span>
+                                                        <span className="font-medium text-xs">{displayVal}</span>
+                                                      </div>
+                                                    );
+                                                  })}
+                                                </div>
+                                              </div>
+                                            );
+                                          } catch { /* fallthrough */ }
+                                        }
+
+                                        if (tipoCampo === "cuestionario" && r.valor) {
+                                          return (
+                                            <div key={idx} className="border-b last:border-0 pb-2 last:pb-0">
+                                              <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Cuestionario"}</span>
+                                              <CuestionarioScoreSummary value={r.valor} />
+                                            </div>
+                                          );
+                                        }
+
+                                        if (tipoCampo === "checkbox") {
+                                          return (
+                                            <div key={idx} className="flex justify-between items-center text-sm border-b last:border-0 pb-1 last:pb-0">
+                                              <span className="text-muted-foreground">{campo?.etiqueta || "Campo"}</span>
+                                              <span className="font-medium">{r.valor === "true" ? "✓ Sí" : "✗ No"}</span>
+                                            </div>
+                                          );
+                                        }
+
+                                        return (
+                                          <div key={idx} className="flex justify-between items-center text-sm border-b last:border-0 pb-1 last:pb-0">
+                                            <span className="text-muted-foreground">{campo?.etiqueta || "Campo"}</span>
+                                            <span className="font-medium">
+                                              {r.valor || "-"}
+                                              {unidad && unidad !== "none" && <span className="text-xs text-muted-foreground ml-1">{unidad}</span>}
+                                            </span>
                                           </div>
-                                        </div>
-                                      );
-                                    } catch { /* fallthrough */ }
-                                  }
-
-                                  // Cuestionario
-                                  if (tipoCampo === "cuestionario" && r.valor) {
-                                    return (
-                                      <div key={idx} className="border-b last:border-0 pb-2 last:pb-0">
-                                        <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Cuestionario"}</span>
-                                        <CuestionarioScoreSummary value={r.valor} />
-                                      </div>
-                                    );
-                                  }
-
-                                  // Checkbox
-                                  if (tipoCampo === "checkbox") {
-                                    return (
-                                      <div key={idx} className="flex justify-between items-center text-sm border-b last:border-0 pb-1 last:pb-0">
-                                        <span className="text-muted-foreground">{campo?.etiqueta || "Campo"}</span>
-                                        <span className="font-medium">{r.valor === "true" ? "✓ Sí" : "✗ No"}</span>
-                                      </div>
-                                    );
-                                  }
-
-                                  // Default: texto, numero, select, fecha, textarea
-                                  return (
-                                    <div key={idx} className="flex justify-between items-center text-sm border-b last:border-0 pb-1 last:pb-0">
-                                      <span className="text-muted-foreground">{campo?.etiqueta || "Campo"}</span>
-                                      <span className="font-medium">
-                                        {r.valor || "-"}
-                                        {unidad && unidad !== "none" && <span className="text-xs text-muted-foreground ml-1">{unidad}</span>}
-                                      </span>
+                                        );
+                                      })}
                                     </div>
-                                  );
-                                })}
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground text-center py-2">Sin resultados cargados</p>
+                                  )}
+                                </div>
                               </div>
-                            ) : (
-                              <p className="text-xs text-muted-foreground text-center py-2">Sin resultados cargados</p>
-                            )}
-                          </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
+                      </div>
+                    ))}
                   </div>
                 )}
               </CardContent>
@@ -1072,24 +1104,30 @@ const EvaluacionMedica = () => {
                             </CardHeader>
                             <CardContent>
                               <div className="flex flex-wrap gap-2">
-                                {selectedPaciente.atencion_examenes
-                                  .filter(ae => (paqueteExamenItems[bat.paqueteId] || []).includes(ae.examen_id))
-                                  .map(ae => (
-                                    <Badge
-                                      key={ae.id}
-                                      variant="outline"
-                                      className={`text-xs ${
-                                        ae.estado === "completado"
-                                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                                          : ae.estado === "muestra_tomada"
-                                          ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
-                                          : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
-                                      }`}
-                                    >
-                                      {ae.examenes.nombre}: {ae.estado === "completado" ? "✓ Resultado cargado" : ae.estado === "muestra_tomada" ? "⏳ Esperando resultado" : "Pendiente"}
-                                    </Badge>
-                                  ))
-                                }
+                                {(() => {
+                                  const filteredExams = selectedPaciente.atencion_examenes
+                                    .filter(ae => (paqueteExamenItems[bat.paqueteId] || []).includes(ae.examen_id));
+                                  const groups = groupExamsByPrestador(filteredExams);
+                                  return groups.map((group, groupIdx) => (
+                                    <div key={groupIdx} className={`flex flex-wrap gap-2 ${groupIdx > 0 ? "ml-2 pl-2 border-l border-border/50" : ""}`}>
+                                      {group.map(ae => (
+                                        <Badge
+                                          key={ae.id}
+                                          variant="outline"
+                                          className={`text-xs ${
+                                            ae.estado === "completado"
+                                              ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                                              : ae.estado === "muestra_tomada"
+                                              ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+                                              : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+                                          }`}
+                                        >
+                                          {ae.examenes.nombre}: {ae.estado === "completado" ? "✓ Resultado cargado" : ae.estado === "muestra_tomada" ? "⏳ Esperando resultado" : "Pendiente"}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  ));
+                                })()}
                               </div>
                               {bat.evaluacion && (
                                 <div className="mt-3 p-3 bg-muted rounded-md text-sm space-y-1">
