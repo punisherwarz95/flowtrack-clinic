@@ -1058,14 +1058,10 @@ const EvaluacionMedica = () => {
                                   <Button size="sm" onClick={() => handleEvaluar(bat.paqueteId)}>
                                     Editar Evaluación
                                   </Button>
-                                ) : bat.listaParaEvaluar ? (
-                                  <Button size="sm" onClick={() => handleEvaluar(bat.paqueteId)}>
-                                    Evaluar
-                                  </Button>
                                 ) : (
-                                  <Badge variant="outline" className="text-xs text-muted-foreground">
-                                    Faltan exámenes por completar
-                                  </Badge>
+                                  <Button size="sm" onClick={() => handleEvaluar(bat.paqueteId)} variant={bat.listaParaEvaluar ? "default" : "outline"}>
+                                    {bat.listaParaEvaluar ? "Evaluar" : "Evaluar (parcial)"}
+                                  </Button>
                                 )}
                               </div>
                             </CardHeader>
