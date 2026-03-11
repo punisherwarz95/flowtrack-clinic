@@ -1214,6 +1214,7 @@ export type Database = {
       empresas: {
         Row: {
           activo: boolean | null
+          afecto_iva: boolean
           centro_costo: string | null
           contacto: string | null
           created_at: string | null
@@ -1226,6 +1227,7 @@ export type Database = {
         }
         Insert: {
           activo?: boolean | null
+          afecto_iva?: boolean
           centro_costo?: string | null
           contacto?: string | null
           created_at?: string | null
@@ -1238,6 +1240,7 @@ export type Database = {
         }
         Update: {
           activo?: boolean | null
+          afecto_iva?: boolean
           centro_costo?: string | null
           contacto?: string | null
           created_at?: string | null
