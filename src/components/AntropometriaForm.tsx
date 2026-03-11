@@ -89,6 +89,7 @@ interface Props {
   onChange: (value: string) => void;
   readonly?: boolean;
   fechaNacimiento?: string | null;
+  atencionId?: string | null;
 }
 
 // IMC classification
