@@ -677,7 +677,7 @@ const Examenes = () => {
       if (error) throw error;
       
       toast.success(`Examen "${examenToDelete.nombre}" eliminado con todos sus registros asociados`);
-      logActivity("eliminar_examen_cascada", { examen_id: examenId, nombre: examenToDelete.nombre }, "/examenes");
+      logActivity("eliminar_examen", { examen_id: examenId, nombre: examenToDelete.nombre, cascada: true }, "/examenes");
       setExamenToDelete(null);
       loadExamenes();
       loadPaquetes();
