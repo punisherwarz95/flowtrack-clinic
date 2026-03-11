@@ -85,6 +85,7 @@ const BusquedaPacientesHistorial = ({
   const [buscado, setBuscado] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
+  const [selectedExportColumns, setSelectedExportColumns] = useState<string[]>([]);
 
   useEffect(() => {
     if (isStaffAdmin || !empresaId) {
