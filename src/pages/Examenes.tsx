@@ -639,24 +639,53 @@ const Examenes = () => {
     }
   };
 
-  const handleDeleteExamen = async () => {
+  const handleDeleteExamenCascade = async () => {
     if (!examenToDelete) return;
+    setIsDeleting(true);
 
     try {
-      const { error } = await supabase
-        .from("examenes")
-        .delete()
-        .eq("id", examenToDelete);
+      const examenId = examenToDelete.id;
 
+      // 1. Delete examen_resultados (via atencion_examenes)
+      const { data: aeIds } = await supabase
+        .from("atencion_examenes")
+        .select("id")
+        .eq("examen_id", examenId);
+      
+      if (aeIds && aeIds.length > 0) {
+        const ids = aeIds.map(ae => ae.id);
+        await supabase.from("examen_resultados").delete().in("atencion_examen_id", ids);
+      }
+
+      // 2. Delete from all referencing tables in parallel
+      await Promise.all([
+        supabase.from("atencion_examenes").delete().eq("examen_id", examenId),
+        supabase.from("box_examenes").delete().eq("examen_id", examenId),
+        supabase.from("paquete_examen_items").delete().eq("examen_id", examenId),
+        supabase.from("prestador_examenes").delete().eq("examen_id", examenId),
+        supabase.from("faena_examenes").delete().eq("examen_id", examenId),
+        supabase.from("examen_formulario_campos").delete().eq("examen_id", examenId),
+        supabase.from("examen_trazabilidad").delete().eq("examen_id_a", examenId),
+        supabase.from("examen_trazabilidad").delete().eq("examen_id_b", examenId),
+        supabase.from("examen_archivo_vinculos").delete().eq("examen_id", examenId),
+        supabase.from("cotizacion_items").delete().eq("examen_id", examenId),
+        supabase.from("cotizacion_solicitud_items").delete().eq("examen_id", examenId),
+      ]);
+
+      // 3. Finally delete the exam itself
+      const { error } = await supabase.from("examenes").delete().eq("id", examenId);
       if (error) throw error;
       
-      toast.success("Examen eliminado exitosamente");
-      logActivity("eliminar_examen", { examen_id: examenToDelete }, "/examenes");
+      toast.success(`Examen "${examenToDelete.nombre}" eliminado con todos sus registros asociados`);
+      logActivity("eliminar_examen_cascada", { examen_id: examenId, nombre: examenToDelete.nombre }, "/examenes");
       setExamenToDelete(null);
       loadExamenes();
+      loadPaquetes();
     } catch (error: any) {
       console.error("Error:", error);
       toast.error(error.message || "Error al eliminar examen");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
