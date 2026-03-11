@@ -99,8 +99,46 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
     }
   };
 
+  const handleSaveOnly = async () => {
+    setSaving(true);
+    try {
+      for (const campo of campos) {
+        const resultado = resultados[campo.id];
+        if (!resultado) continue;
+
+        const { error } = await supabase
+          .from("examen_resultados")
+          .upsert(
+            {
+              atencion_examen_id: atencionExamenId,
+              campo_id: campo.id,
+              valor: resultado.valor,
+              archivo_url: resultado.archivo_url,
+            },
+            { onConflict: "atencion_examen_id,campo_id" }
+          );
+
+        if (error) throw error;
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const checkRequiredFields = (): boolean => {
+    return campos.every((campo) => {
+      if (!campo.requerido) return true;
+      const resultado = resultados[campo.id];
+      if (!resultado) return false;
+      if (campo.tipo_campo === "archivo_pdf") return !!resultado.archivo_url;
+      return !!resultado.valor;
+    });
+  };
+
   useImperativeHandle(ref, () => ({
     save: handleSave,
+    saveOnly: handleSaveOnly,
+    validateRequired: checkRequiredFields,
     hasPendingChanges: () => Object.keys(resultados).length > 0,
   }));
 
