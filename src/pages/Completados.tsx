@@ -287,6 +287,10 @@ const Completados = () => {
             <ResultadosPendientes selectedDate={selectedDate} />
           </TabsContent>
 
+          <TabsContent value="correccion">
+            <ResultadosCompletados selectedDate={selectedDate} />
+          </TabsContent>
+
           <TabsContent value="metricas">
             <MetricasCompletados selectedDate={selectedDate} />
           </TabsContent>
