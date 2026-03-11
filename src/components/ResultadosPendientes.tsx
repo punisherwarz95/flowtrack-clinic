@@ -23,6 +23,7 @@ interface PendienteRow {
   fechaNacimiento: string | null;
   prestadorId: string | null;
   prestadorNombre: string | null;
+  isExternoCompletado: boolean;
 }
 
 interface ArchivoCompartido {
@@ -173,7 +174,7 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
 
           const { data: extCompData } = await queryExtComp.limit(200);
 
-          // Add these to allData, avoiding duplicates
+          // Add these to allData, avoiding duplicates; track external completado IDs
           const existingIds = new Set(allData.map((ae: any) => ae.id));
           (extCompData || []).forEach((ae: any) => {
             if (!existingIds.has(ae.id)) {
@@ -196,6 +197,7 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
         fechaNacimiento: ae.atenciones.pacientes?.fecha_nacimiento || null,
         prestadorId: prestadorMap[ae.examen_id]?.prestadorId || null,
         prestadorNombre: prestadorMap[ae.examen_id]?.prestadorNombre || "Sin prestador",
+        isExternoCompletado: ae.estado === "completado" && (prestadorMap[ae.examen_id]?.prestadorTipo === "externo"),
       }));
 
       setPendientes(rows);
@@ -268,7 +270,16 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
     }
   };
 
-  const grouped = pendientes.reduce<Record<string, PendienteRow[]>>((acc, row) => {
+  // Filter out external-completado exams that already have associated PDFs
+  const filteredPendientes = pendientes.filter(row => {
+    if (!row.isExternoCompletado) return true;
+    // Check if this exam has an associated file
+    const atencionArchivos = archivosMap[row.atencionId] || [];
+    const tieneArchivo = atencionArchivos.some(a => a.examenIds.includes(row.examenId));
+    return !tieneArchivo;
+  });
+
+  const grouped = filteredPendientes.reduce<Record<string, PendienteRow[]>>((acc, row) => {
     if (!acc[row.atencionId]) acc[row.atencionId] = [];
     acc[row.atencionId].push(row);
     return acc;
@@ -448,7 +459,7 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
             <CardTitle className="flex items-center gap-2 text-base">
               <FlaskConical className="h-5 w-5 text-amber-600" />
               Resultados Pendientes
-              <Badge variant="secondary">{pendientes.length}</Badge>
+              <Badge variant="secondary">{filteredPendientes.length}</Badge>
             </CardTitle>
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
