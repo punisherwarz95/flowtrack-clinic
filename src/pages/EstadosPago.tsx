@@ -255,6 +255,9 @@ const EstadosPago = () => {
     if (!selectedPrestadorId) return;
     setPrestadorLoading(true);
     try {
+      // Get the prestador's user_id (realizado_por stores auth user id, not prestador id)
+      const selectedPrestador = prestadores.find(p => p.id === selectedPrestadorId);
+      
       // Get prestador_examenes for this prestador (valor_prestacion per exam)
       const { data: peData } = await supabase
         .from("prestador_examenes")
@@ -262,10 +265,23 @@ const EstadosPago = () => {
         .eq("prestador_id", selectedPrestadorId);
 
       const valorMap: Record<string, number> = {};
-      (peData || []).forEach((pe: any) => { valorMap[pe.examen_id] = pe.valor_prestacion || 0; });
+      const examenIds = new Set<string>();
+      (peData || []).forEach((pe: any) => { 
+        valorMap[pe.examen_id] = pe.valor_prestacion || 0;
+        examenIds.add(pe.examen_id);
+      });
 
-      // Get atencion_examenes done by this prestador in date range
-      const { data: aeData, error } = await supabase
+      // Look up prestador's user_id from the prestadores table
+      const { data: prestadorData } = await supabase
+        .from("prestadores")
+        .select("user_id")
+        .eq("id", selectedPrestadorId)
+        .single();
+
+      const prestadorUserId = prestadorData?.user_id;
+
+      // Build the query for atencion_examenes
+      let query = supabase
         .from("atencion_examenes")
         .select(`
           id,
@@ -279,10 +295,23 @@ const EstadosPago = () => {
             paciente:pacientes(nombre, rut, empresa:empresas(nombre))
           )
         `)
-        .eq("realizado_por", selectedPrestadorId)
         .eq("estado", "completado")
         .gte("fecha_realizacion", `${prestadorFechaDesde}T00:00:00`)
         .lte("fecha_realizacion", `${prestadorFechaHasta}T23:59:59`);
+
+      // Filter by user_id if prestador has one, otherwise filter by examen_ids assigned to this prestador
+      if (prestadorUserId) {
+        query = query.eq("realizado_por", prestadorUserId);
+      } else if (examenIds.size > 0) {
+        // Fallback: filter by exams this prestador is assigned to
+        query = query.in("examen_id", Array.from(examenIds));
+      } else {
+        setPrestadorExamenes([]);
+        setPrestadorLoading(false);
+        return;
+      }
+
+      const { data: aeData, error } = await query;
 
       if (error) throw error;
 
