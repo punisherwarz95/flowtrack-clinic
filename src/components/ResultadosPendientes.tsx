@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { FlaskConical, Upload, Search, CheckCircle, Save, Loader2 } from "lucide-react";
+import { FlaskConical, Upload, Search, CheckCircle, Save, Loader2, FileText as FileIcon, ExternalLink } from "lucide-react";
 import ExamenFormulario, { ExamenFormularioRef } from "@/components/ExamenFormulario";
 
 interface PendienteRow {
@@ -25,12 +25,20 @@ interface PendienteRow {
   prestadorNombre: string | null;
 }
 
+interface ArchivoCompartido {
+  id: string;
+  nombre_archivo: string;
+  archivo_url: string;
+  examenIds: string[];
+}
+
 interface Props {
   selectedDate: Date | undefined;
 }
 
 const ResultadosPendientes = ({ selectedDate }: Props) => {
   const [pendientes, setPendientes] = useState<PendienteRow[]>([]);
+  const [archivosMap, setArchivosMap] = useState<Record<string, ArchivoCompartido[]>>({});
   const [loading, setLoading] = useState(true);
   const [searchFilter, setSearchFilter] = useState("");
   const [uploadingPdf, setUploadingPdf] = useState<string | null>(null);
@@ -119,6 +127,40 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
       }));
 
       setPendientes(rows);
+
+      // Load archivos compartidos for all atenciones
+      const atencionIds = [...new Set(rows.map(r => r.atencionId))];
+      if (atencionIds.length > 0) {
+        const { data: archivosData } = await supabase
+          .from("examen_archivos_compartidos")
+          .select("id, atencion_id, nombre_archivo, archivo_url")
+          .in("atencion_id", atencionIds);
+
+        const { data: vinculosData } = await supabase
+          .from("examen_archivo_vinculos")
+          .select("archivo_compartido_id, examen_id")
+          .in("archivo_compartido_id", (archivosData || []).map(a => a.id));
+
+        const vinculosByArchivo: Record<string, string[]> = {};
+        (vinculosData || []).forEach((v: any) => {
+          if (!vinculosByArchivo[v.archivo_compartido_id]) vinculosByArchivo[v.archivo_compartido_id] = [];
+          vinculosByArchivo[v.archivo_compartido_id].push(v.examen_id);
+        });
+
+        const map: Record<string, ArchivoCompartido[]> = {};
+        (archivosData || []).forEach((a: any) => {
+          if (!map[a.atencion_id]) map[a.atencion_id] = [];
+          map[a.atencion_id].push({
+            id: a.id,
+            nombre_archivo: a.nombre_archivo,
+            archivo_url: a.archivo_url,
+            examenIds: vinculosByArchivo[a.id] || [],
+          });
+        });
+        setArchivosMap(map);
+      } else {
+        setArchivosMap({});
+      }
     } catch (error) {
       console.error("Error cargando pendientes:", error);
       toast.error("Error al cargar resultados pendientes");
@@ -144,6 +186,8 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
       first.pacienteRut.toLowerCase().includes(s) ||
       first.empresaNombre.toLowerCase().includes(s)
     );
+  }).sort(([, aRows], [, bRows]) => {
+    return (aRows[0]?.numeroIngreso || 0) - (bRows[0]?.numeroIngreso || 0);
   });
 
   const groupByPrestador = (rows: PendienteRow[]) => {
@@ -359,6 +403,36 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
                               </Button>
                             </div>
                           </div>
+
+                          {/* Archivos subidos para este prestador */}
+                          {(() => {
+                            const atencionArchivos = archivosMap[atencionId] || [];
+                            const prestadorExamenIds = prestadorRows.map(r => r.examenId);
+                            const archivosDelPrestador = atencionArchivos.filter(a =>
+                              a.examenIds.some(eid => prestadorExamenIds.includes(eid))
+                            );
+                            if (archivosDelPrestador.length === 0) return null;
+                            return (
+                              <div className="px-3 py-2 border-b bg-green-50 dark:bg-green-950/20">
+                                <p className="text-[10px] font-medium text-muted-foreground mb-1">Archivos subidos:</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {archivosDelPrestador.map(archivo => (
+                                    <a
+                                      key={archivo.id}
+                                      href={archivo.archivo_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors"
+                                    >
+                                      <FileIcon className="h-3 w-3" />
+                                      {archivo.nombre_archivo}
+                                      <ExternalLink className="h-2.5 w-2.5" />
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })()}
 
                           {/* Compact exam forms */}
                           <div className="p-2 space-y-2">
