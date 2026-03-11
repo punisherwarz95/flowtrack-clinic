@@ -474,7 +474,7 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
 
               return (
                 <Card key={atencionId} className="border-amber-200 dark:border-amber-800">
-                  <CardHeader className="py-2 px-4">
+                  <CardHeader className="py-2 px-4 sticky top-0 z-10 bg-card border-b">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge variant="outline" className="font-bold text-xs">#{first.numeroIngreso}</Badge>

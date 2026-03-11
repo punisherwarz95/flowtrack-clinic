@@ -224,7 +224,7 @@ const Completados = () => {
                       key={atencion.id}
                       className="p-4 rounded-lg border border-border bg-card hover:shadow-md transition-shadow"
                     >
-                      <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-start justify-between mb-3 sticky top-0 z-10 bg-card py-2 -mx-4 px-4 border-b">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
                             <Badge variant="outline" className="font-bold">#{atencion.numero_ingreso}</Badge>
