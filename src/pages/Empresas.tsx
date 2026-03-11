@@ -126,7 +126,6 @@ const Empresas = () => {
 
   const loadEmpresaBaterias = async (empresaId: string) => {
     try {
-      // Load empresa_baterias
       const { data, error } = await supabase
         .from("empresa_baterias")
         .select("*, paquete:paquetes_examenes(nombre)")
@@ -142,7 +141,6 @@ const Empresas = () => {
 
       const faenaIds = (efData || []).map((ef: any) => ef.faena_id);
 
-      // Load which paquetes belong to those faenas
       let validPaqueteIds = new Set<string>();
       if (faenaIds.length > 0) {
         const { data: bfData } = await supabase
@@ -153,7 +151,6 @@ const Empresas = () => {
         (bfData || []).forEach((bf: any) => validPaqueteIds.add(bf.paquete_id));
       }
 
-      // Only keep empresa_baterias whose paquete belongs to an assigned faena
       const filtered = (data || []).filter((eb: any) => validPaqueteIds.has(eb.paquete_id));
       
       setEmpresaBaterias(filtered);
@@ -166,6 +163,85 @@ const Empresas = () => {
       console.error("Error:", error);
     }
   };
+
+  const loadEmpresaFaenasList = async (empresaId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("empresa_faenas")
+        .select("id, faena_id, activo, faena:faenas(id, nombre)")
+        .eq("empresa_id", empresaId)
+        .eq("activo", true);
+      if (error) throw error;
+      setEmpresaFaenasList((data || []) as any);
+      setSelectedFaenaId(null);
+      setFaenaBaterias([]);
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
+
+  const loadFaenaBaterias = async (faenaId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("bateria_faenas")
+        .select("paquete_id, activo, paquete:paquetes_examenes(id, nombre)")
+        .eq("faena_id", faenaId)
+        .neq("activo", false);
+      if (error) throw error;
+      setFaenaBaterias((data || []) as any);
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
+
+  const handleSelectFaena = async (faenaId: string) => {
+    setSelectedFaenaId(faenaId);
+    await loadFaenaBaterias(faenaId);
+  };
+
+  const handleAddBateria = async (paqueteId: string, paqueteNombre: string) => {
+    if (!editingEmpresa) return;
+    try {
+      // Check if already exists
+      const existing = empresaBaterias.find(eb => eb.paquete_id === paqueteId);
+      if (existing) {
+        toast.info(`${paqueteNombre} ya está agregada`);
+        return;
+      }
+      const { error } = await supabase
+        .from("empresa_baterias")
+        .insert([{ empresa_id: editingEmpresa.id, paquete_id: paqueteId, valor: 0, activo: true }]);
+      if (error) throw error;
+      toast.success(`${paqueteNombre} agregada`);
+      await loadEmpresaBaterias(editingEmpresa.id);
+    } catch (error: any) {
+      console.error("Error:", error);
+      toast.error("Error al agregar batería");
+    }
+  };
+
+  const handleRemoveBateria = async (paqueteId: string) => {
+    if (!editingEmpresa) return;
+    try {
+      const { error } = await supabase
+        .from("empresa_baterias")
+        .delete()
+        .eq("empresa_id", editingEmpresa.id)
+        .eq("paquete_id", paqueteId);
+      if (error) throw error;
+      toast.success("Batería eliminada");
+      await loadEmpresaBaterias(editingEmpresa.id);
+    } catch (error: any) {
+      console.error("Error:", error);
+      toast.error("Error al eliminar batería");
+    }
+  };
+
+  // Derived: paquete IDs already assigned to empresa
+  const assignedPaqueteIds = new Set(empresaBaterias.map(eb => eb.paquete_id));
+
+  // Available baterias from the selected faena that are NOT yet assigned
+  const availableBaterias = faenaBaterias.filter(fb => !assignedPaqueteIds.has(fb.paquete_id));
 
   const openEmpresaDialog = async (empresa: Empresa) => {
     setEditingEmpresa(empresa);
