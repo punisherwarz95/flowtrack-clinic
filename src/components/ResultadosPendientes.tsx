@@ -502,6 +502,12 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
                                   onComplete={() => {}}
                                   fechaNacimiento={row.fechaNacimiento}
                                   hideSaveButton
+                                  archivosVinculados={(archivosMap[atencionId] || [])
+                                    .filter((archivo) => archivo.examenIds.includes(row.examenId))
+                                    .map((archivo) => ({
+                                      nombre_archivo: archivo.nombre_archivo,
+                                      archivo_url: archivo.archivo_url,
+                                    }))}
                                 />
                               </div>
                             ))}

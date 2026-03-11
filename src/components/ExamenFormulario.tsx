@@ -31,6 +31,11 @@ interface ResultadoCampo {
   archivo_url: string | null;
 }
 
+interface ArchivoVinculado {
+  nombre_archivo: string;
+  archivo_url: string;
+}
+
 export interface ExamenFormularioRef {
   save: () => Promise<void>;
   saveOnly: () => Promise<void>;
@@ -47,9 +52,10 @@ interface Props {
   fechaNacimiento?: string | null;
   esExterno?: boolean;
   hideSaveButton?: boolean;
+  archivosVinculados?: ArchivoVinculado[];
 }
 
-const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExamenId, examenId, examenNombre, onComplete, readonly = false, fechaNacimiento, esExterno = false, hideSaveButton = false }, ref) => {
+const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExamenId, examenId, examenNombre, onComplete, readonly = false, fechaNacimiento, esExterno = false, hideSaveButton = false, archivosVinculados = [] }, ref) => {
   const [campos, setCampos] = useState<CampoFormulario[]>([]);
   const [resultados, setResultados] = useState<Record<string, ResultadoCampo>>({});
   const [loading, setLoading] = useState(true);
@@ -57,9 +63,58 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
   const [uploading, setUploading] = useState<string | null>(null);
   const [dragOverCampo, setDragOverCampo] = useState<string | null>(null);
 
+  const mergeSharedFilesIntoResults = (
+    camposDef: CampoFormulario[],
+    resultadosActuales: Record<string, ResultadoCampo>,
+    archivosDisponibles: ArchivoVinculado[]
+  ) => {
+    if (archivosDisponibles.length === 0 || camposDef.length === 0) {
+      return resultadosActuales;
+    }
+
+    const urlsUsadas = new Set(
+      Object.values(resultadosActuales)
+        .map((resultado) => resultado.archivo_url)
+        .filter((url): url is string => Boolean(url))
+    );
+
+    const archivosLibres = archivosDisponibles.filter((archivo) => !urlsUsadas.has(archivo.archivo_url));
+    if (archivosLibres.length === 0) return resultadosActuales;
+
+    const siguientesResultados: Record<string, ResultadoCampo> = { ...resultadosActuales };
+    const camposPdfSinArchivo = camposDef.filter(
+      (campo) => campo.tipo_campo === "archivo_pdf" && !siguientesResultados[campo.id]?.archivo_url
+    );
+
+    let idxArchivo = 0;
+    let huboCambios = false;
+
+    for (const campo of camposPdfSinArchivo) {
+      const archivo = archivosLibres[idxArchivo];
+      if (!archivo) break;
+
+      siguientesResultados[campo.id] = {
+        ...siguientesResultados[campo.id],
+        campo_id: campo.id,
+        valor: siguientesResultados[campo.id]?.valor || archivo.nombre_archivo || "Archivo compartido",
+        archivo_url: archivo.archivo_url,
+      };
+
+      idxArchivo += 1;
+      huboCambios = true;
+    }
+
+    return huboCambios ? siguientesResultados : resultadosActuales;
+  };
+
   useEffect(() => {
     loadCamposYResultados();
   }, [atencionExamenId, examenId]);
+
+  useEffect(() => {
+    if (campos.length === 0 || archivosVinculados.length === 0) return;
+    setResultados((prev) => mergeSharedFilesIntoResults(campos, prev, archivosVinculados));
+  }, [campos, archivosVinculados]);
 
   const loadCamposYResultados = async () => {
     setLoading(true);
@@ -72,7 +127,8 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
         .order("orden");
 
       if (camposError) throw camposError;
-      setCampos(camposData || []);
+      const camposDef = camposData || [];
+      setCampos(camposDef);
 
       // Load existing results
       const { data: resultadosData, error: resultadosError } = await supabase
@@ -91,7 +147,8 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
           archivo_url: r.archivo_url,
         };
       });
-      setResultados(resultadosMap);
+
+      setResultados(mergeSharedFilesIntoResults(camposDef, resultadosMap, archivosVinculados));
     } catch (error) {
       console.error("Error:", error);
     } finally {
@@ -102,8 +159,11 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
   const handleSaveOnly = async () => {
     setSaving(true);
     try {
+      const resultadosParaGuardar = mergeSharedFilesIntoResults(campos, resultados, archivosVinculados);
+      setResultados(resultadosParaGuardar);
+
       for (const campo of campos) {
-        const resultado = resultados[campo.id];
+        const resultado = resultadosParaGuardar[campo.id];
         if (!resultado) continue;
 
         const { error } = await supabase
@@ -126,9 +186,11 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
   };
 
   const checkRequiredFields = (): boolean => {
+    const resultadosValidados = mergeSharedFilesIntoResults(campos, resultados, archivosVinculados);
+
     return campos.every((campo) => {
       if (!campo.requerido) return true;
-      const resultado = resultados[campo.id];
+      const resultado = resultadosValidados[campo.id];
       if (!resultado) return false;
       if (campo.tipo_campo === "archivo_pdf") return !!resultado.archivo_url;
       return !!resultado.valor;
@@ -234,9 +296,12 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
   const handleSave = async () => {
     setSaving(true);
     try {
+      const resultadosParaGuardar = mergeSharedFilesIntoResults(campos, resultados, archivosVinculados);
+      setResultados(resultadosParaGuardar);
+
       // Upsert all results
       for (const campo of campos) {
-        const resultado = resultados[campo.id];
+        const resultado = resultadosParaGuardar[campo.id];
         if (!resultado) continue;
 
         const { error } = await supabase
@@ -257,7 +322,7 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
       // Check if all required fields are filled
       const allRequiredFilled = campos.every((campo) => {
         if (!campo.requerido) return true;
-        const resultado = resultados[campo.id];
+        const resultado = resultadosParaGuardar[campo.id];
         if (!resultado) return false;
         if (campo.tipo_campo === "archivo_pdf") return !!resultado.archivo_url;
         return !!resultado.valor;
@@ -354,9 +419,10 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
     groups[group].push(campo);
   });
 
+  const resultadosConArchivos = mergeSharedFilesIntoResults(campos, resultados, archivosVinculados);
   const allRequiredFilled = campos.every((campo) => {
     if (!campo.requerido) return true;
-    const resultado = resultados[campo.id];
+    const resultado = resultadosConArchivos[campo.id];
     if (!resultado) return false;
     if (campo.tipo_campo === "archivo_pdf") return !!resultado.archivo_url;
     return !!resultado.valor;
