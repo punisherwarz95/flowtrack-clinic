@@ -327,7 +327,7 @@ const ExamenFormularioCamposConfig = ({ examenId, examenNombre, open, onOpenChan
           setCuestionarioWizardIndex(null);
         }}
       />
-    )}
+    </>
   );
 };
 
