@@ -242,7 +242,89 @@ const EstadosPago = () => {
     }
   };
 
-  const handleGenerarEstado = async () => {
+  const loadPrestadores = async () => {
+    const { data } = await supabase
+      .from("prestadores")
+      .select("id, nombre, rut, especialidad, tipo")
+      .eq("activo", true)
+      .order("nombre");
+    setPrestadores(data || []);
+  };
+
+  const handleBuscarPrestadorExamenes = async () => {
+    if (!selectedPrestadorId) return;
+    setPrestadorLoading(true);
+    try {
+      // Get prestador_examenes for this prestador (valor_prestacion per exam)
+      const { data: peData } = await supabase
+        .from("prestador_examenes")
+        .select("examen_id, valor_prestacion")
+        .eq("prestador_id", selectedPrestadorId);
+
+      const valorMap: Record<string, number> = {};
+      (peData || []).forEach((pe: any) => { valorMap[pe.examen_id] = pe.valor_prestacion || 0; });
+
+      // Get atencion_examenes done by this prestador in date range
+      const { data: aeData, error } = await supabase
+        .from("atencion_examenes")
+        .select(`
+          id,
+          examen_id,
+          fecha_realizacion,
+          realizado_por,
+          examen:examenes(nombre),
+          atencion:atenciones(
+            id,
+            fecha_ingreso,
+            paciente:pacientes(nombre, rut, empresa:empresas(nombre))
+          )
+        `)
+        .eq("realizado_por", selectedPrestadorId)
+        .eq("estado", "completado")
+        .gte("fecha_realizacion", `${prestadorFechaDesde}T00:00:00`)
+        .lte("fecha_realizacion", `${prestadorFechaHasta}T23:59:59`);
+
+      if (error) throw error;
+
+      const details: PrestadorExamenDetail[] = (aeData || []).map((ae: any) => ({
+        atencion_examen_id: ae.id,
+        examen_nombre: ae.examen?.nombre || "Examen",
+        paciente_nombre: ae.atencion?.paciente?.nombre || "-",
+        paciente_rut: ae.atencion?.paciente?.rut || null,
+        empresa_nombre: ae.atencion?.paciente?.empresa?.nombre || null,
+        fecha_realizacion: ae.fecha_realizacion?.split("T")[0] || "",
+        valor_prestacion: valorMap[ae.examen_id] || 0,
+      }));
+
+      details.sort((a, b) => a.fecha_realizacion.localeCompare(b.fecha_realizacion));
+      setPrestadorExamenes(details);
+    } catch (error) {
+      console.error("Error:", error);
+      toast({ title: "Error al cargar exámenes del prestador", variant: "destructive" });
+    } finally {
+      setPrestadorLoading(false);
+    }
+  };
+
+  const filteredPrestadores = prestadores.filter(p =>
+    p.nombre.toLowerCase().includes(prestadorSearch.toLowerCase()) ||
+    (p.rut && p.rut.toLowerCase().includes(prestadorSearch.toLowerCase()))
+  );
+
+  const prestadorTotalPagar = useMemo(() => {
+    return prestadorExamenes.reduce((sum, pe) => sum + pe.valor_prestacion, 0);
+  }, [prestadorExamenes]);
+
+  const prestadorResumen = useMemo(() => {
+    const map: Record<string, { nombre: string; cantidad: number; valorUnitario: number }> = {};
+    prestadorExamenes.forEach(pe => {
+      if (!map[pe.examen_nombre]) map[pe.examen_nombre] = { nombre: pe.examen_nombre, cantidad: 0, valorUnitario: pe.valor_prestacion };
+      map[pe.examen_nombre].cantidad += 1;
+    });
+    return Object.values(map).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [prestadorExamenes]);
+
+
     if (!selectedEmpresaId) return;
     setGenerando(true);
     try {
