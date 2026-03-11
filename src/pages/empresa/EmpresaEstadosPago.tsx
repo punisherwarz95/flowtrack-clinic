@@ -99,6 +99,14 @@ const EmpresaEstadosPago = () => {
 
     setGenerando(true);
     try {
+      // 0. Verificar si la empresa es afecta a IVA
+      const { data: empresaData } = await supabase
+        .from("empresas")
+        .select("afecto_iva")
+        .eq("id", currentEmpresaId)
+        .single();
+      const esAfectaIva = empresaData?.afecto_iva !== false;
+
       // 1. Obtener IDs de pacientes de esta empresa
       const { data: pacientesEmpresa, error: pacError } = await supabase
         .from("pacientes")
