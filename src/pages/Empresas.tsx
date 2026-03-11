@@ -428,6 +428,17 @@ const Empresas = () => {
                         placeholder="Código centro costo"
                       />
                     </div>
+                    <div className="col-span-2 flex items-center justify-between rounded-lg border p-3">
+                      <div>
+                        <Label htmlFor="afecto_iva" className="font-medium">Afecto a IVA</Label>
+                        <p className="text-xs text-muted-foreground">Si está desactivado, los estados de pago se generarán sin IVA (exento)</p>
+                      </div>
+                      <Switch
+                        id="afecto_iva"
+                        checked={formData.afecto_iva}
+                        onCheckedChange={(checked) => setFormData({ ...formData, afecto_iva: checked })}
+                      />
+                    </div>
                   </div>
                   <Button type="submit" className="w-full">
                     {editingEmpresa ? "Guardar Cambios" : "Crear Empresa"}

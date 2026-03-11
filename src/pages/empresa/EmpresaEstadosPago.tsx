@@ -477,9 +477,14 @@ const EmpresaEstadosPago = () => {
                   <p className="text-sm">
                     Neto: <span className="font-medium">${selectedEstado.total_neto?.toLocaleString("es-CL")}</span>
                   </p>
-                  <p className="text-sm">
-                    IVA (19%): <span className="font-medium">${selectedEstado.total_iva?.toLocaleString("es-CL")}</span>
-                  </p>
+                  {(selectedEstado.total_iva ?? 0) > 0 && (
+                    <p className="text-sm">
+                      IVA (19%): <span className="font-medium">${selectedEstado.total_iva?.toLocaleString("es-CL")}</span>
+                    </p>
+                  )}
+                  {(selectedEstado.total_iva ?? 0) === 0 && (
+                    <p className="text-sm text-muted-foreground">Exento de IVA</p>
+                  )}
                   <p className="text-lg font-bold">
                     Total: ${selectedEstado.total?.toLocaleString("es-CL")}
                   </p>
