@@ -33,6 +33,7 @@ interface Empresa {
   email?: string;
   telefono?: string;
   centro_costo?: string;
+  afecto_iva?: boolean;
   created_at: string;
 }
 
