@@ -278,19 +278,17 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
     }
   };
 
-  // Global save per patient: saves all exam forms + marks all as completado
+  // Save all form data WITHOUT changing exam status
   const handleSaveAllForPatient = async (atencionId: string, rows: PendienteRow[]) => {
     setSavingPatient(atencionId);
     try {
-      // Save all form data
       for (const row of rows) {
         const formRef = formRefs.current[row.atencionExamenId];
         if (formRef) {
-          await formRef.save();
+          await formRef.saveOnly();
         }
       }
-      toast.success(`Todos los resultados del paciente guardados`);
-      await loadPendientes();
+      toast.success(`Datos guardados correctamente (sin cambiar estado)`);
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al guardar resultados");
@@ -299,8 +297,33 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
     }
   };
 
+  // Save + validate required fields + mark as completado only if all required filled
   const handleMarcarTodosCompletados = async (rows: PendienteRow[]) => {
+    setSavingPatient(rows[0]?.atencionId || null);
     try {
+      // First save all data
+      for (const row of rows) {
+        const formRef = formRefs.current[row.atencionExamenId];
+        if (formRef) {
+          await formRef.saveOnly();
+        }
+      }
+
+      // Then validate required fields for each exam
+      const invalidExams: string[] = [];
+      for (const row of rows) {
+        const formRef = formRefs.current[row.atencionExamenId];
+        if (formRef && !formRef.validateRequired()) {
+          invalidExams.push(row.examenNombre);
+        }
+      }
+
+      if (invalidExams.length > 0) {
+        toast.error(`Campos obligatorios (*) sin completar en: ${invalidExams.join(", ")}`);
+        return;
+      }
+
+      // All valid — mark as completado
       const ids = rows.map((r) => r.atencionExamenId);
       const { error } = await supabase
         .from("atencion_examenes")
@@ -308,11 +331,13 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
         .in("id", ids);
 
       if (error) throw error;
-      toast.success(`${rows.length} examen(es) marcados como completados`);
+      toast.success(`${rows.length} examen(es) completados`);
       await loadPendientes();
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al completar exámenes");
+    } finally {
+      setSavingPatient(null);
     }
   };
 
@@ -500,9 +525,10 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
                       <Button
                         size="sm"
                         className="gap-1.5"
+                        disabled={isSaving}
                         onClick={() => handleMarcarTodosCompletados(rows)}
                       >
-                        <CheckCircle className="h-4 w-4" />
+                        {isSaving && savingPatient === atencionId ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
                         Completar Todos
                       </Button>
                     </div>
