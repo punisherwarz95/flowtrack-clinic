@@ -581,71 +581,79 @@ const Empresas = () => {
 
               {/* Tab: Baterías y Precios */}
               <TabsContent value="baterias" className="mt-4">
-                <div className="grid grid-cols-2 gap-6 min-h-[400px]">
-                  {/* LEFT: Faena selector + available batteries */}
-                  <div className="space-y-4">
+                <div className="grid grid-cols-5 gap-6 min-h-[400px]">
+                  {/* LEFT: Faena selector + available batteries (3 cols) */}
+                  <div className="col-span-3 space-y-4">
                     <div>
                       <Label className="text-sm font-semibold flex items-center gap-2 mb-2">
                         <MapPin className="h-4 w-4 text-primary" />
                         Faenas de esta empresa
                       </Label>
-                      <div className="border rounded-md divide-y max-h-40 overflow-y-auto">
+                      <div className="border rounded-md max-h-48 overflow-y-auto">
                         {empresaFaenasList.length === 0 ? (
                           <p className="text-sm text-muted-foreground text-center py-4">
                             No hay faenas asignadas. Ve a la pestaña "Faenas" primero.
                           </p>
                         ) : (
-                          empresaFaenasList.map((ef) => (
-                            <button
-                              key={ef.faena_id}
-                              type="button"
-                              onClick={() => handleSelectFaena(ef.faena_id)}
-                              className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors ${
-                                selectedFaenaId === ef.faena_id ? "bg-primary/10 font-medium" : ""
-                              }`}
-                            >
-                              <span>{(ef as any).faena?.nombre || ef.faena_id}</span>
-                              <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${selectedFaenaId === ef.faena_id ? "text-primary" : ""}`} />
-                            </button>
-                          ))
+                          <div className="divide-y">
+                            {empresaFaenasList.map((ef) => {
+                              const isExpanded = selectedFaenaId === ef.faena_id;
+                              const faenaName = (ef as any).faena?.nombre || ef.faena_id;
+                              return (
+                                <div key={ef.faena_id}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSelectFaena(isExpanded ? "" : ef.faena_id)}
+                                    className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors ${
+                                      isExpanded ? "bg-primary/10 font-medium" : ""
+                                    }`}
+                                  >
+                                    <span>{faenaName}</span>
+                                    <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? "rotate-180 text-primary" : ""}`} />
+                                  </button>
+                                  {isExpanded && faenaBaterias.length > 0 && (
+                                    <div className="px-3 pb-2 bg-muted/20">
+                                      <p className="text-xs text-muted-foreground mb-1 pt-1">Baterías de esta faena:</p>
+                                      <div className="space-y-1">
+                                        {faenaBaterias.map((fb) => {
+                                          const name = (fb as any).paquete?.nombre || fb.paquete_id;
+                                          const alreadyAdded = assignedPaqueteIds.has(fb.paquete_id);
+                                          return (
+                                            <div key={fb.paquete_id} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-background border">
+                                              <span className={alreadyAdded ? "text-muted-foreground" : ""}>{name}</span>
+                                              {alreadyAdded ? (
+                                                <Badge variant="secondary" className="text-[10px] h-5">Agregada</Badge>
+                                              ) : (
+                                                <Button
+                                                  size="sm"
+                                                  variant="outline"
+                                                  className="h-6 text-[10px] gap-1 px-2"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleAddBateria(fb.paquete_id, name);
+                                                  }}
+                                                >
+                                                  <Plus className="h-3 w-3" />
+                                                  Agregar
+                                                </Button>
+                                              )}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {isExpanded && faenaBaterias.length === 0 && (
+                                    <div className="px-3 pb-2 bg-muted/20">
+                                      <p className="text-xs text-muted-foreground py-1">Esta faena no tiene baterías asignadas</p>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
                         )}
                       </div>
-                    </div>
-
-                    {/* Available batteries from selected faena */}
-                    <div>
-                      <Label className="text-sm font-semibold flex items-center gap-2 mb-2">
-                        <Package className="h-4 w-4 text-primary" />
-                        Baterías disponibles
-                      </Label>
-                      {!selectedFaenaId ? (
-                        <div className="border rounded-md p-4 text-center">
-                          <p className="text-sm text-muted-foreground">Selecciona una faena arriba para ver sus baterías disponibles</p>
-                        </div>
-                      ) : availableBaterias.length === 0 ? (
-                        <div className="border rounded-md p-4 text-center">
-                          <p className="text-sm text-muted-foreground">Todas las baterías de esta faena ya están agregadas</p>
-                        </div>
-                      ) : (
-                        <ScrollArea className="border rounded-md h-[220px]">
-                          <div className="divide-y">
-                            {availableBaterias.map((fb) => (
-                              <div key={fb.paquete_id} className="flex items-center justify-between px-3 py-2">
-                                <span className="text-sm">{(fb as any).paquete?.nombre || fb.paquete_id}</span>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 text-xs gap-1"
-                                  onClick={() => handleAddBateria(fb.paquete_id, (fb as any).paquete?.nombre || "")}
-                                >
-                                  <Plus className="h-3 w-3" />
-                                  Agregar
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        </ScrollArea>
-                      )}
                     </div>
                   </div>
 
