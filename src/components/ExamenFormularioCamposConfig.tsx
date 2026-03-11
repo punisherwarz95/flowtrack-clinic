@@ -275,6 +275,27 @@ const ExamenFormularioCamposConfig = ({ examenId, examenNombre, open, onOpenChan
                         />
                       </div>
                     )}
+
+                    {campo.tipo_campo === "cuestionario" && (
+                      <div className="ml-8">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCuestionarioWizardIndex(index)}
+                          className="gap-2"
+                        >
+                          <Settings2 className="h-3 w-3" />
+                          {campo.opciones?.preguntas
+                            ? `Editar cuestionario (${campo.opciones.preguntas.length} preguntas)`
+                            : "Configurar cuestionario"}
+                        </Button>
+                        {campo.opciones?.preguntas && (
+                          <Badge variant="secondary" className="ml-2 text-xs">
+                            {campo.opciones.preguntas.length} preguntas · {campo.opciones.tipo_puntaje === "simple" ? "Simple" : "Ponderado"}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
