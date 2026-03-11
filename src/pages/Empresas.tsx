@@ -132,6 +132,7 @@ const Empresas = () => {
       email: empresa.email || "",
       telefono: empresa.telefono || "",
       centro_costo: empresa.centro_costo || "",
+      afecto_iva: empresa.afecto_iva !== false,
     });
     await loadEmpresaBaterias(empresa.id);
     setActiveTab("datos");
