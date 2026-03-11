@@ -255,7 +255,7 @@ const Empresas = () => {
       centro_costo: empresa.centro_costo || "",
       afecto_iva: empresa.afecto_iva !== false,
     });
-    await loadEmpresaBaterias(empresa.id);
+    await Promise.all([loadEmpresaBaterias(empresa.id), loadEmpresaFaenasList(empresa.id)]);
     setActiveTab("datos");
     setOpenDialog(true);
   };
