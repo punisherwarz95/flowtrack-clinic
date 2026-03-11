@@ -238,12 +238,16 @@ const EvaluacionMedica = () => {
     const paqueteIds = atencion.atencion_baterias.map(ab => ab.paquete_id);
     if (paqueteIds.length === 0) {
       setBateriasConEstado([]);
+      setPrestadorExamenMap({});
       setActiveTab("evaluacion");
       return;
     }
 
     let peiMap = listPaqueteExamItems;
     let evals = listEvaluaciones[atencion.id] || [];
+
+    // Get all examen_ids for this patient
+    const allExamenIds = Array.from(new Set(atencion.atencion_examenes.map(ae => ae.examen_id)));
 
     if (Object.keys(peiMap).length === 0) {
       const [peiRes, evalRes] = await Promise.all([
@@ -257,6 +261,19 @@ const EvaluacionMedica = () => {
         peiMap[item.paquete_id].push(item.examen_id);
       });
       evals = (evalRes.data || []) as unknown as EvaluacionClinica[];
+    }
+
+    // Fetch prestador mapping for exams
+    if (allExamenIds.length > 0) {
+      const { data: prestadorData } = await supabase
+        .from("prestador_examenes")
+        .select("examen_id, prestador_id")
+        .in("examen_id", allExamenIds);
+      const pMap: Record<string, string> = {};
+      (prestadorData || []).forEach(pe => { pMap[pe.examen_id] = pe.prestador_id; });
+      setPrestadorExamenMap(pMap);
+    } else {
+      setPrestadorExamenMap({});
     }
 
     setPaqueteExamenItems(peiMap);
