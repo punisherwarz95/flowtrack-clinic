@@ -19,6 +19,7 @@ import { Calendar as CalendarIcon, Stethoscope, AlertTriangle, FileText, Refresh
 import { logActivity } from "@/lib/activityLog";
 import Navigation from "@/components/Navigation";
 import AudiometriaChart from "@/components/AudiometriaChart";
+import { CuestionarioScoreSummary } from "@/components/CuestionarioRenderer";
 import { useAuth } from "@/hooks/useAuth";
 
 interface PacienteAtencion {
@@ -798,6 +799,16 @@ const EvaluacionMedica = () => {
                                         </div>
                                       );
                                     } catch { /* fallthrough */ }
+                                  }
+
+                                  // Cuestionario
+                                  if (tipoCampo === "cuestionario" && r.valor) {
+                                    return (
+                                      <div key={idx} className="border-b last:border-0 pb-2 last:pb-0">
+                                        <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Cuestionario"}</span>
+                                        <CuestionarioScoreSummary value={r.valor} />
+                                      </div>
+                                    );
                                   }
 
                                   // Checkbox

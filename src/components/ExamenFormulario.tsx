@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Save, Upload, FileText, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import AudiometriaForm from "@/components/AudiometriaForm";
 import AntropometriaForm from "@/components/AntropometriaForm";
+import CuestionarioRenderer from "@/components/CuestionarioRenderer";
 
 interface CampoFormulario {
   id: string;
@@ -398,7 +399,7 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
             {groupCampos.map((campo) => {
               const resultado = resultados[campo.id];
               return (
-                <div key={campo.id} className={`space-y-1 ${(campo.tipo_campo === "audiometria" || campo.tipo_campo === "texto_largo" || campo.tipo_campo === "antropometria") ? "col-span-full" : ""}`}>
+                <div key={campo.id} className={`space-y-1 ${(campo.tipo_campo === "audiometria" || campo.tipo_campo === "texto_largo" || campo.tipo_campo === "antropometria" || campo.tipo_campo === "cuestionario") ? "col-span-full" : ""}`}>
                   <Label className="text-xs flex items-center gap-1">
                     {campo.etiqueta}
                     {campo.requerido && <span className="text-destructive">*</span>}
@@ -617,6 +618,15 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
                         fechaNacimiento={fechaNacimiento}
                       />
                     </div>
+                  )}
+
+                  {campo.tipo_campo === "cuestionario" && campo.opciones?.preguntas && (
+                    <CuestionarioRenderer
+                      config={campo.opciones}
+                      value={resultado?.valor || null}
+                      onChange={(v) => updateResultado(campo.id, v)}
+                      readonly={readonly}
+                    />
                   )}
                 </div>
               );
