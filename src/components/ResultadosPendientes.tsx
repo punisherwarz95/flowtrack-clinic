@@ -23,6 +23,7 @@ interface PendienteRow {
   fechaNacimiento: string | null;
   prestadorId: string | null;
   prestadorNombre: string | null;
+  isExternoCompletado: boolean;
 }
 
 interface ArchivoCompartido {
