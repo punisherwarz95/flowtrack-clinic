@@ -525,9 +525,10 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
                       <Button
                         size="sm"
                         className="gap-1.5"
+                        disabled={isSaving}
                         onClick={() => handleMarcarTodosCompletados(rows)}
                       >
-                        <CheckCircle className="h-4 w-4" />
+                        {isSaving && savingPatient === atencionId ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
                         Completar Todos
                       </Button>
                     </div>
