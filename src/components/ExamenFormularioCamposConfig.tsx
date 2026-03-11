@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Plus, Trash2, GripVertical, Save, Settings2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import CuestionarioWizard from "@/components/CuestionarioWizard";
 
 interface CampoFormulario {
   id?: string;
