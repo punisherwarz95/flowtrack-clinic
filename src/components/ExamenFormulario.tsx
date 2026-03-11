@@ -419,9 +419,10 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
     groups[group].push(campo);
   });
 
+  const resultadosConArchivos = mergeSharedFilesIntoResults(campos, resultados, archivosVinculados);
   const allRequiredFilled = campos.every((campo) => {
     if (!campo.requerido) return true;
-    const resultado = resultados[campo.id];
+    const resultado = resultadosConArchivos[campo.id];
     if (!resultado) return false;
     if (campo.tipo_campo === "archivo_pdf") return !!resultado.archivo_url;
     return !!resultado.valor;
