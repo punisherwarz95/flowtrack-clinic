@@ -84,6 +84,28 @@ const EmpresaBaterias = () => {
       .filter(Boolean)
       .sort((a: Faena, b: Faena) => a.nombre.localeCompare(b.nombre));
     setFaenas(faenasList);
+
+    // Load bateria_faenas composition for each faena
+    const faenaIds = faenasList.map(f => f.id);
+    if (faenaIds.length > 0) {
+      const { data: bfData } = await supabase
+        .from("bateria_faenas")
+        .select("faena_id, paquete_id, paquete:paquetes_examenes(id, nombre, examenes:paquete_examen_items(examen:examenes(nombre, codigo)))")
+        .in("faena_id", faenaIds)
+        .eq("activo", true);
+
+      const map: Record<string, { id: string; nombre: string; examenes: { nombre: string; codigo: string | null }[] }[]> = {};
+      (bfData || []).forEach((bf: any) => {
+        if (!bf.paquete) return;
+        if (!map[bf.faena_id]) map[bf.faena_id] = [];
+        map[bf.faena_id].push({
+          id: bf.paquete.id,
+          nombre: bf.paquete.nombre,
+          examenes: (bf.paquete.examenes || []).map((e: any) => e.examen).filter(Boolean),
+        });
+      });
+      setFaenaBateriasMap(map);
+    }
   };
 
   const loadBaterias = async () => {
