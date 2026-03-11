@@ -160,7 +160,8 @@ const ExamenFormularioCamposConfig = ({ examenId, examenNombre, open, onOpenChan
           {loading ? (
             <p className="text-center text-muted-foreground py-8">Cargando...</p>
           ) : (
-            <>
+    )}
+    </>
               {campos.length === 0 && (
                 <p className="text-center text-muted-foreground py-4">
                   No hay campos configurados. Este examen se marcará como completado con un simple checkbox.
