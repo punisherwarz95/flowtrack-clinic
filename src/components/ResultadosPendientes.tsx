@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { FlaskConical, Upload, Search, CheckCircle, Save, Loader2 } from "lucide-react";
+import { FlaskConical, Upload, Search, CheckCircle, Save, Loader2, FileText as FileIcon, ExternalLink } from "lucide-react";
 import ExamenFormulario, { ExamenFormularioRef } from "@/components/ExamenFormulario";
 
 interface PendienteRow {
