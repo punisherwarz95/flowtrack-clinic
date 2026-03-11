@@ -404,6 +404,36 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
                             </div>
                           </div>
 
+                          {/* Archivos subidos para este prestador */}
+                          {(() => {
+                            const atencionArchivos = archivosMap[atencionId] || [];
+                            const prestadorExamenIds = prestadorRows.map(r => r.examenId);
+                            const archivosDelPrestador = atencionArchivos.filter(a =>
+                              a.examenIds.some(eid => prestadorExamenIds.includes(eid))
+                            );
+                            if (archivosDelPrestador.length === 0) return null;
+                            return (
+                              <div className="px-3 py-2 border-b bg-green-50 dark:bg-green-950/20">
+                                <p className="text-[10px] font-medium text-muted-foreground mb-1">Archivos subidos:</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {archivosDelPrestador.map(archivo => (
+                                    <a
+                                      key={archivo.id}
+                                      href={archivo.archivo_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors"
+                                    >
+                                      <FileIcon className="h-3 w-3" />
+                                      {archivo.nombre_archivo}
+                                      <ExternalLink className="h-2.5 w-2.5" />
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })()}
+
                           {/* Compact exam forms */}
                           <div className="p-2 space-y-2">
                             {prestadorRows.map((row) => (
