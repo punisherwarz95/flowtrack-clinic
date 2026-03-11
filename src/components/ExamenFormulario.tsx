@@ -619,6 +619,15 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
                       />
                     </div>
                   )}
+
+                  {campo.tipo_campo === "cuestionario" && campo.opciones?.preguntas && (
+                    <CuestionarioRenderer
+                      config={campo.opciones}
+                      value={resultado?.valor || null}
+                      onChange={(v) => updateResultado(campo.id, v)}
+                      readonly={readonly}
+                    />
+                  )}
                 </div>
               );
             })}
