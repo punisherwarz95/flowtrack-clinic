@@ -191,6 +191,10 @@ const Completados = () => {
               <FlaskConical className="h-4 w-4" />
               Resultados Pendientes
             </TabsTrigger>
+            <TabsTrigger value="correccion" className="gap-2">
+              <Pencil className="h-4 w-4" />
+              Corrección
+            </TabsTrigger>
             <TabsTrigger value="metricas" className="gap-2">
               <BarChart3 className="h-4 w-4" />
               Métricas
