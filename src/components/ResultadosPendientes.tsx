@@ -76,11 +76,12 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
             id,
             fecha_ingreso,
             numero_ingreso,
-            pacientes(id, nombre, rut, fecha_nacimiento, empresas(nombre))
+            pacientes!inner(id, nombre, rut, fecha_nacimiento, tipo_servicio, empresas(nombre))
           ),
           examenes(nombre)
         `)
         .eq("estado", "muestra_tomada")
+        .eq("atenciones.pacientes.tipo_servicio", "jenner")
         .order("created_at", { ascending: false });
 
       if (startOfDay && endOfDay) {
