@@ -30,6 +30,7 @@ const Navigation = () => {
     { to: "/configuracion", icon: Settings, label: "Configuración" },
     { to: "/actividad", icon: ScrollText, label: "Actividad" },
     { to: "/evaluacion-medica", icon: Stethoscope, label: "Evaluación Médica" },
+    { to: "/estados-pago", icon: CreditCard, label: "Estados de Pago" },
     { to: "/pantalla", icon: Monitor, label: "Pantalla TV" },
   ];
 
