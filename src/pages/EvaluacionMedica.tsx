@@ -631,24 +631,28 @@ const EvaluacionMedica = () => {
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Evaluación por Examen</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {examenesRelacionados.map(ae => (
-                  <div key={ae.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
-                    <span className="text-sm font-medium flex-1">{ae.examenes.nombre}</span>
-                    <RadioGroup
-                      value={examenEvals[ae.examen_id] || ""}
-                      onValueChange={(val) => setExamenEvals(prev => ({ ...prev, [ae.examen_id]: val }))}
-                      className="flex gap-4"
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <RadioGroupItem value="normal" id={`${ae.id}-normal`} />
-                        <Label htmlFor={`${ae.id}-normal`} className="text-xs cursor-pointer text-green-700">Normal</Label>
+              <CardContent className="space-y-1">
+                {groupExamsByPrestador(examenesRelacionados).map((group, groupIdx) => (
+                  <div key={groupIdx} className={`space-y-3 ${groupIdx > 0 ? "pt-3 border-t border-border/50" : ""}`}>
+                    {group.map(ae => (
+                      <div key={ae.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+                        <span className="text-sm font-medium flex-1">{ae.examenes.nombre}</span>
+                        <RadioGroup
+                          value={examenEvals[ae.examen_id] || ""}
+                          onValueChange={(val) => setExamenEvals(prev => ({ ...prev, [ae.examen_id]: val }))}
+                          className="flex gap-4"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <RadioGroupItem value="normal" id={`${ae.id}-normal`} />
+                            <Label htmlFor={`${ae.id}-normal`} className="text-xs cursor-pointer text-green-700">Normal</Label>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <RadioGroupItem value="anormal" id={`${ae.id}-anormal`} />
+                            <Label htmlFor={`${ae.id}-anormal`} className="text-xs cursor-pointer text-red-700">Anormal</Label>
+                          </div>
+                        </RadioGroup>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <RadioGroupItem value="anormal" id={`${ae.id}-anormal`} />
-                        <Label htmlFor={`${ae.id}-anormal`} className="text-xs cursor-pointer text-red-700">Anormal</Label>
-                      </div>
-                    </RadioGroup>
+                    ))}
                   </div>
                 ))}
                 {examenesRelacionados.length === 0 && (
