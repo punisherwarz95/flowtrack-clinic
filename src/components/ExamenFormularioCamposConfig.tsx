@@ -51,6 +51,7 @@ const ExamenFormularioCamposConfig = ({ examenId, examenNombre, open, onOpenChan
   const [campos, setCampos] = useState<CampoFormulario[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [cuestionarioWizardIndex, setCuestionarioWizardIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (open && examenId) {
