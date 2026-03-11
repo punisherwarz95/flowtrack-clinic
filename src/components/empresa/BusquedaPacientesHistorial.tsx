@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,10 +19,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Calendar, Building2, User, Download } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Search, Calendar, Building2, User, Download, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import * as XLSX from "xlsx";
+
+const ALL_EXPORT_COLUMNS = [
+  { key: "Fecha", label: "Fecha" },
+  { key: "RUT", label: "RUT" },
+  { key: "Nombre", label: "Nombre" },
+  { key: "Empresa", label: "Empresa" },
+  { key: "Batería", label: "Batería" },
+  { key: "Código Examen", label: "Código Examen" },
+  { key: "Nombre Examen", label: "Nombre Examen" },
+  { key: "Estado Examen", label: "Estado Examen" },
+] as const;
 
 interface Empresa {
   id: string;
