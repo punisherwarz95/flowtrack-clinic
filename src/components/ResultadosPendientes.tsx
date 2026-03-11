@@ -25,12 +25,20 @@ interface PendienteRow {
   prestadorNombre: string | null;
 }
 
+interface ArchivoCompartido {
+  id: string;
+  nombre_archivo: string;
+  archivo_url: string;
+  examenIds: string[];
+}
+
 interface Props {
   selectedDate: Date | undefined;
 }
 
 const ResultadosPendientes = ({ selectedDate }: Props) => {
   const [pendientes, setPendientes] = useState<PendienteRow[]>([]);
+  const [archivosMap, setArchivosMap] = useState<Record<string, ArchivoCompartido[]>>({});
   const [loading, setLoading] = useState(true);
   const [searchFilter, setSearchFilter] = useState("");
   const [uploadingPdf, setUploadingPdf] = useState<string | null>(null);
