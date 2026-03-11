@@ -335,13 +335,26 @@ const BusquedaPacientesHistorial = ({
       }
     });
 
-    const ws = XLSX.utils.json_to_sheet(rows);
+    // Filter columns based on selection (empty = all)
+    const columnsToExport = selectedExportColumns.length > 0
+      ? selectedExportColumns
+      : ALL_EXPORT_COLUMNS.map(c => c.key);
+
+    const filteredRows = rows.map(row => {
+      const filtered: any = {};
+      columnsToExport.forEach(col => {
+        if (col in row) filtered[col] = row[col];
+      });
+      return filtered;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(filteredRows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Historial");
 
     // Auto-width columns
-    const colWidths = Object.keys(rows[0] || {}).map((key) => ({
-      wch: Math.max(key.length, ...rows.map((r) => String(r[key] || "").length)) + 2,
+    const colWidths = Object.keys(filteredRows[0] || {}).map((key) => ({
+      wch: Math.max(key.length, ...filteredRows.map((r) => String(r[key] || "").length)) + 2,
     }));
     ws["!cols"] = colWidths;
 
