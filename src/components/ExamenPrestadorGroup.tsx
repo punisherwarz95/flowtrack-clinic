@@ -329,6 +329,17 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
     setSavingBulk(groupKey);
     try {
       const ids = Array.from(selected);
+
+      // Persistir cambios de formularios (incluye archivos cargados) antes de marcar muestra tomada
+      await Promise.all(
+        ids.map(async (atencionExamenId) => {
+          const ref = formRefsMap.current[atencionExamenId];
+          if (ref?.current) {
+            await ref.current.saveOnly();
+          }
+        })
+      );
+
       const { error } = await supabase
         .from("atencion_examenes")
         .update({ estado: "muestra_tomada" as any, fecha_realizacion: new Date().toISOString() })
