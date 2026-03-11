@@ -801,6 +801,16 @@ const EvaluacionMedica = () => {
                                     } catch { /* fallthrough */ }
                                   }
 
+                                  // Cuestionario
+                                  if (tipoCampo === "cuestionario" && r.valor) {
+                                    return (
+                                      <div key={idx} className="border-b last:border-0 pb-2 last:pb-0">
+                                        <span className="text-xs text-muted-foreground block mb-1">{campo?.etiqueta || "Cuestionario"}</span>
+                                        <CuestionarioScoreSummary value={r.valor} />
+                                      </div>
+                                    );
+                                  }
+
                                   // Checkbox
                                   if (tipoCampo === "checkbox") {
                                     return (
