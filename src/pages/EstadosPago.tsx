@@ -324,7 +324,7 @@ const EstadosPago = () => {
     return Object.values(map).sort((a, b) => a.nombre.localeCompare(b.nombre));
   }, [prestadorExamenes]);
 
-
+  const handleGenerarEstado = async () => {
     if (!selectedEmpresaId) return;
     setGenerando(true);
     try {
