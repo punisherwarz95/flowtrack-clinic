@@ -104,6 +104,7 @@ const EvaluacionMedica = () => {
   const [bateriasConEstado, setBateriasConEstado] = useState<BateriaConEstado[]>([]);
   const [evaluaciones, setEvaluaciones] = useState<EvaluacionClinica[]>([]);
   const [paqueteExamenItems, setPaqueteExamenItems] = useState<Record<string, string[]>>({});
+  const [prestadorExamenMap, setPrestadorExamenMap] = useState<Record<string, string>>({});
 
   const [listEvaluaciones, setListEvaluaciones] = useState<Record<string, EvaluacionClinica[]>>({});
   const [listPaqueteExamItems, setListPaqueteExamItems] = useState<Record<string, string[]>>({});
