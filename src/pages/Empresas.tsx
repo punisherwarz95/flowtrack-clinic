@@ -89,6 +89,10 @@ const Empresas = () => {
   const [bateriaPrecios, setBateriaPrecios] = useState<Record<string, string>>({});
   const [searchTerm, setSearchTerm] = useState("");
   const [formData, setFormData] = useState(emptyForm);
+  // Baterías tab state
+  const [empresaFaenasList, setEmpresaFaenasList] = useState<EmpresaFaenaRow[]>([]);
+  const [selectedFaenaId, setSelectedFaenaId] = useState<string | null>(null);
+  const [faenaBaterias, setFaenaBaterias] = useState<BateriaFaenaRow[]>([]);
 
   const filteredEmpresas = empresas.filter((empresa) =>
     empresa.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
