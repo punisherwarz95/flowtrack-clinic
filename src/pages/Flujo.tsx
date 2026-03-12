@@ -25,6 +25,7 @@ interface Atencion {
   id: string;
   estado: string;
   fecha_ingreso: string;
+  fecha_inicio_atencion: string | null;
   numero_ingreso: number;
   box_id: string | null;
   estado_ficha: string;
