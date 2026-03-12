@@ -639,9 +639,10 @@ const Flujo = () => {
         toast.success("Exámenes completados - paciente listo para finalizar");
         await logActivity("cambiar_estado_examen", { atencion_id: atencionId, estado: "completado_box" }, "/flujo");
       } else {
+        // Finalizar directamente (puede venir de en_espera o en_atencion sin box)
         const { error } = await supabase
           .from("atenciones")
-          .update({ estado, fecha_fin_atencion: new Date().toISOString() })
+          .update({ estado, fecha_fin_atencion: new Date().toISOString(), fecha_inicio_atencion: atencionActual?.fecha_inicio_atencion || new Date().toISOString() })
           .eq("id", atencionId);
         if (error) throw error;
         toast.success(estado === "completado" ? "Atención completada" : "Atención marcada como incompleta");
