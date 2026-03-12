@@ -102,7 +102,7 @@ const CuestionarioRenderer = ({ config, value, onChange, readonly = false }: Pro
 
   return (
     <div className="space-y-3 col-span-full">
-      {scoreInfo && (
+      {scoreInfo && readonly && (
         <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border">
           <Badge variant={scoreInfo.porcentaje >= 70 ? "default" : "destructive"} className="text-sm px-3 py-1">
             {scoreInfo.obtenido} / {scoreInfo.total}
@@ -117,14 +117,14 @@ const CuestionarioRenderer = ({ config, value, onChange, readonly = false }: Pro
       {config.preguntas.map((pregunta) => {
         const resp = respuestas[String(pregunta.numero)] || "";
         const isAnswered = resp !== "";
-        const isCorrect = pregunta.tipo === "texto" ? null : (isAnswered ? resp === pregunta.respuesta_correcta : null);
+        const isCorrect = pregunta.tipo === "texto" ? null : (isAnswered && readonly ? resp === pregunta.respuesta_correcta : null);
 
         return (
           <div key={pregunta.numero} className="border rounded-lg p-3 space-y-2">
             <div className="flex items-start gap-2">
               <Badge variant="outline" className="shrink-0 mt-0.5">{pregunta.numero}</Badge>
               <span className="text-sm font-medium flex-1">{pregunta.texto}</span>
-              {pregunta.tipo !== "texto" && config.tipo_puntaje === "ponderado" && (
+              {readonly && pregunta.tipo !== "texto" && config.tipo_puntaje === "ponderado" && (
                 <Badge variant="secondary" className="text-xs shrink-0">{pregunta.puntaje} pts</Badge>
               )}
               {readonly && isCorrect !== null && (
