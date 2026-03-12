@@ -23,6 +23,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn, formatRutStandard, normalizeRut as normalizeRutUtil } from "@/lib/utils";
 import { useAtencionDocumentos } from "@/hooks/useAtencionDocumentos";
 import { DocumentoFormViewer, DocumentoStatusCard, DocumentoContextData } from "@/components/DocumentoFormViewer";
+import PortalCuestionarios from "@/components/PortalCuestionarios";
 
 interface Paciente {
   id: string;
@@ -1794,6 +1795,9 @@ export default function PortalPaciente() {
             </CardContent>
           </Card>
         )}
+
+        {/* Cuestionarios completables por el paciente */}
+        {atencion && <PortalCuestionarios atencionId={atencion.id} />}
 
         {/* Tests / Forms */}
         {examenTests.length > 0 && (
