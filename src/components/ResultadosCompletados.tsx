@@ -336,17 +336,29 @@ const ResultadosCompletados = ({ selectedDate }: Props) => {
               return (
                 <Card key={atencionId} className="border-blue-200 dark:border-blue-800">
                   <CardHeader className="py-2 px-4 sticky top-0 z-10 bg-card border-b">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap min-w-0">
                         <Badge variant="outline" className="font-bold text-xs">#{first.numeroIngreso}</Badge>
                         <span className="font-medium text-sm">{first.pacienteNombre}</span>
                         <span className="text-xs text-muted-foreground font-mono">{first.pacienteRut}</span>
                         <span className="text-xs text-muted-foreground">· {first.empresaNombre}</span>
                       </div>
-                      <Badge className="bg-blue-600 text-white text-xs">
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                        {rows.length} completados
-                      </Badge>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1 h-7 text-xs"
+                          disabled={isSaving}
+                          onClick={() => handleSaveCorrections(atencionId, rows)}
+                        >
+                          {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                          Guardar Corrección
+                        </Button>
+                        <Badge className="bg-blue-600 text-white text-xs">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          {rows.length}
+                        </Badge>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0 pb-3 space-y-2">
@@ -471,19 +483,6 @@ const ResultadosCompletados = ({ selectedDate }: Props) => {
                       );
                     })}
 
-                    {/* Save corrections */}
-                    <div className="flex justify-end gap-2 pt-2 border-t">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5"
-                        disabled={isSaving}
-                        onClick={() => handleSaveCorrections(atencionId, rows)}
-                      >
-                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                        Guardar Correcciones
-                      </Button>
-                    </div>
                   </CardContent>
                 </Card>
               );

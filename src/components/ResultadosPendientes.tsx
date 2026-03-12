@@ -486,16 +486,37 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
               return (
                 <Card key={atencionId} className="border-amber-200 dark:border-amber-800">
                   <CardHeader className="py-2 px-4 sticky top-0 z-10 bg-card border-b">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap min-w-0">
                         <Badge variant="outline" className="font-bold text-xs">#{first.numeroIngreso}</Badge>
                         <span className="font-medium text-sm">{first.pacienteNombre}</span>
                         <span className="text-xs text-muted-foreground font-mono">{first.pacienteRut}</span>
                         <span className="text-xs text-muted-foreground">· {first.empresaNombre}</span>
                       </div>
-                      <Badge className="bg-amber-600 text-white text-xs">
-                        {rows.length} pend.
-                      </Badge>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1 h-7 text-xs"
+                          disabled={isSaving}
+                          onClick={() => handleSaveAllForPatient(atencionId, rows)}
+                        >
+                          {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                          Guardar
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="gap-1 h-7 text-xs"
+                          disabled={isSaving}
+                          onClick={() => handleMarcarTodosCompletados(rows)}
+                        >
+                          {isSaving && savingPatient === atencionId ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
+                          Completar
+                        </Button>
+                        <Badge className="bg-amber-600 text-white text-xs">
+                          {rows.length} pend.
+                        </Badge>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0 pb-3 space-y-2">
@@ -619,28 +640,6 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
                       );
                     })}
 
-                    {/* Single action row per patient */}
-                    <div className="flex justify-end gap-2 pt-2 border-t">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5"
-                        disabled={isSaving}
-                        onClick={() => handleSaveAllForPatient(atencionId, rows)}
-                      >
-                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                        Guardar Todo
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="gap-1.5"
-                        disabled={isSaving}
-                        onClick={() => handleMarcarTodosCompletados(rows)}
-                      >
-                        {isSaving && savingPatient === atencionId ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
-                        Completar Todos
-                      </Button>
-                    </div>
                   </CardContent>
                 </Card>
               );
