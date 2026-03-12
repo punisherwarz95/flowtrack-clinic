@@ -102,7 +102,7 @@ const CuestionarioRenderer = ({ config, value, onChange, readonly = false }: Pro
 
   return (
     <div className="space-y-3 col-span-full">
-      {scoreInfo && (
+      {scoreInfo && readonly && (
         <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border">
           <Badge variant={scoreInfo.porcentaje >= 70 ? "default" : "destructive"} className="text-sm px-3 py-1">
             {scoreInfo.obtenido} / {scoreInfo.total}
