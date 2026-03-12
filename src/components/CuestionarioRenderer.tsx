@@ -124,7 +124,7 @@ const CuestionarioRenderer = ({ config, value, onChange, readonly = false }: Pro
             <div className="flex items-start gap-2">
               <Badge variant="outline" className="shrink-0 mt-0.5">{pregunta.numero}</Badge>
               <span className="text-sm font-medium flex-1">{pregunta.texto}</span>
-              {pregunta.tipo !== "texto" && config.tipo_puntaje === "ponderado" && (
+              {readonly && pregunta.tipo !== "texto" && config.tipo_puntaje === "ponderado" && (
                 <Badge variant="secondary" className="text-xs shrink-0">{pregunta.puntaje} pts</Badge>
               )}
               {readonly && isCorrect !== null && (
