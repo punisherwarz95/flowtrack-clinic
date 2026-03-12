@@ -117,7 +117,7 @@ const CuestionarioRenderer = ({ config, value, onChange, readonly = false }: Pro
       {config.preguntas.map((pregunta) => {
         const resp = respuestas[String(pregunta.numero)] || "";
         const isAnswered = resp !== "";
-        const isCorrect = pregunta.tipo === "texto" ? null : (isAnswered ? resp === pregunta.respuesta_correcta : null);
+        const isCorrect = pregunta.tipo === "texto" ? null : (isAnswered && readonly ? resp === pregunta.respuesta_correcta : null);
 
         return (
           <div key={pregunta.numero} className="border rounded-lg p-3 space-y-2">
