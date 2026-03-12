@@ -601,7 +601,7 @@ const EvaluacionMedica = () => {
     return (
       <div className="space-y-4">
         {/* Header */}
-        <Card>
+        <Card className="sticky top-0 z-20">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
