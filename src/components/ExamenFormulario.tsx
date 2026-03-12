@@ -345,27 +345,43 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
       // If completed, also complete trazabilidad-linked exams in the same atencion
       if (allRequiredFilled && nuevoEstado === "completado") {
         try {
+          console.log("[TRAZABILIDAD] Iniciando sync - examenId:", examenId, "atencionExamenId:", atencionExamenId);
+          
           // Get atencion_id from this atencion_examen
-          const { data: aeData } = await supabase
+          const { data: aeData, error: aeError } = await supabase
             .from("atencion_examenes")
-            .select("atencion_id")
+            .select("atencion_id, examen_id")
             .eq("id", atencionExamenId)
             .single();
 
+          console.log("[TRAZABILIDAD] atencion_examen data:", aeData, "error:", aeError);
+
           if (aeData) {
             // Get trazabilidad links for this exam
-            const { data: trazData } = await supabase
+            const { data: trazData, error: trazError } = await supabase
               .from("examen_trazabilidad")
               .select("examen_id_a, examen_id_b")
               .or(`examen_id_a.eq.${examenId},examen_id_b.eq.${examenId}`);
+
+            console.log("[TRAZABILIDAD] Links encontrados:", trazData, "error:", trazError);
 
             if (trazData && trazData.length > 0) {
               const linkedExamenIds = trazData.map(t => 
                 t.examen_id_a === examenId ? t.examen_id_b : t.examen_id_a
               );
+              console.log("[TRAZABILIDAD] Exámenes vinculados IDs:", linkedExamenIds);
+
+              // First check what exams exist in this atencion with those IDs
+              const { data: existingLinked } = await supabase
+                .from("atencion_examenes")
+                .select("id, examen_id, estado, examenes(nombre)")
+                .eq("atencion_id", aeData.atencion_id)
+                .in("examen_id", linkedExamenIds);
+              
+              console.log("[TRAZABILIDAD] Exámenes vinculados en esta atención:", existingLinked);
 
               // Update linked exams in this atencion that are still pending/incomplete
-              await supabase
+              const { data: updateResult, error: updateError } = await supabase
                 .from("atencion_examenes")
                 .update({ 
                   estado: "completado" as any, 
@@ -373,12 +389,19 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
                 })
                 .eq("atencion_id", aeData.atencion_id)
                 .in("examen_id", linkedExamenIds)
-                .in("estado", ["pendiente", "incompleto"]);
+                .in("estado", ["pendiente", "incompleto"])
+                .select();
+              
+              console.log("[TRAZABILIDAD] Resultado update:", updateResult, "error:", updateError);
+            } else {
+              console.log("[TRAZABILIDAD] No se encontraron links de trazabilidad para examen:", examenId);
             }
           }
         } catch (trazError) {
-          console.error("Error updating trazabilidad-linked exams:", trazError);
+          console.error("[TRAZABILIDAD] Error updating trazabilidad-linked exams:", trazError);
         }
+      } else {
+        console.log("[TRAZABILIDAD] No se ejecuta sync - allRequiredFilled:", allRequiredFilled, "nuevoEstado:", nuevoEstado);
       }
 
       toast.success(
