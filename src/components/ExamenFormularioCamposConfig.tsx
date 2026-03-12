@@ -120,7 +120,7 @@ const ExamenFormularioCamposConfig = ({ examenId, examenNombre, open, onOpenChan
           tipo_campo: c.tipo_campo,
           opciones: (c.tipo_campo === "select" || c.tipo_campo === "multi_select") && c.opciones
             ? (Array.isArray(c.opciones) ? c.opciones.filter((o: string) => o.trim()) : c.opciones)
-            : c.tipo_campo === "numero" && c.opciones && typeof c.opciones === "object" && !Array.isArray(c.opciones)
+            : (c.tipo_campo === "numero" || c.tipo_campo === "cuestionario") && c.opciones && typeof c.opciones === "object" && !Array.isArray(c.opciones)
             ? c.opciones
             : null,
           requerido: c.requerido,
