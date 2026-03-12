@@ -1,61 +1,58 @@
 
 
-# Plan: Pestaña de Métricas de Trazabilidad en Completados
+## Plan: Cuestionarios completables desde el Portal Paciente
 
-## Problema Principal
+### Contexto
+Los exámenes tipo cuestionario (ej: Test Western) se configuran como campos `tipo_campo = "cuestionario"` dentro de `examen_formulario_campos`. Actualmente solo el staff puede completarlos desde `ExamenFormulario`. El portal del paciente no tiene acceso a estos formularios.
 
-Actualmente el sistema **no registra el historial de visitas a boxes**. Cuando un paciente entra a un box, se actualiza `atenciones.box_id` y `fecha_inicio_atencion`, y cuando sale se pone `box_id = null`. Esto **sobreescribe** los datos anteriores, por lo que no hay forma de saber cuántas veces entró a cada box ni cuánto tiempo estuvo.
+### Enfoque
+Detectar qué exámenes del paciente tienen campos tipo "cuestionario", mostrarlos como sección expandible en el Portal Paciente (similar a los documentos), y permitir al paciente completarlos. Al responder todas las preguntas, auto-marcar el `atencion_examen` como completado.
 
-## Cambios Necesarios
+### Cambios necesarios
 
-### 1. Nueva tabla: `atencion_box_visitas`
+**1. Migración de base de datos (RLS policies)**
+- Agregar policy en `examen_resultados` para que `anon` pueda INSERT y UPDATE (necesario para que el portal guarde respuestas de cuestionarios).
+- Agregar policy en `atencion_examenes` para que `anon/public` pueda UPDATE del campo `estado` y `fecha_realizacion`.
 
-Tabla para registrar cada entrada/salida de un paciente a un box:
+Policies con restricciones:
+```sql
+-- Portal puede guardar resultados de cuestionarios
+CREATE POLICY "Portal puede insertar examen_resultados"
+ON public.examen_resultados FOR INSERT TO anon
+WITH CHECK (true);
 
-```text
-atencion_box_visitas
-├── id (uuid, PK)
-├── atencion_id (uuid, FK → atenciones)
-├── box_id (uuid, FK → boxes)
-├── fecha_entrada (timestamptz)
-├── fecha_salida (timestamptz, nullable)
-├── created_at (timestamptz)
+CREATE POLICY "Portal puede actualizar examen_resultados"
+ON public.examen_resultados FOR UPDATE TO anon
+USING (true);
+
+-- Portal puede actualizar estado de atencion_examenes
+CREATE POLICY "Portal puede actualizar atencion_examenes"
+ON public.atencion_examenes FOR UPDATE TO public
+USING (true);
 ```
 
-Con RLS: staff puede gestionar, portal puede leer.
+**2. Portal Paciente (`src/pages/PortalPaciente.tsx`)**
+- Tras cargar la atención, consultar `examen_formulario_campos` para cada `atencion_examen` pendiente, filtrando por `tipo_campo = 'cuestionario'`.
+- Mostrar una nueva sección "Cuestionarios a Completar" (entre documentos y formularios externos) con interfaz expandible inline (mismo patrón que documentos).
+- Cada cuestionario se renderiza con `CuestionarioRenderer`.
+- Al completar todas las preguntas: guardar resultado en `examen_resultados` vía upsert, y actualizar `atencion_examenes.estado` a `completado`.
+- Polling cada 5s para detectar nuevos cuestionarios asignados.
 
-### 2. Registrar entradas en Flujo.tsx y MiBox.tsx
+**3. Componente auxiliar (nuevo o inline)**
+- Lógica de guardado simplificada: upsert a `examen_resultados` con el JSON del cuestionario, luego update a `atencion_examenes` con estado `completado` + `fecha_realizacion`.
+- Validar que todas las preguntas no-texto estén respondidas antes de permitir envío.
 
-Cuando se llama a un paciente (`handleIniciarAtencion` / `handleLlamarPaciente`):
-- Insertar un registro en `atencion_box_visitas` con `fecha_entrada = now()`.
+### Flujo del paciente
+1. Paciente entra al portal y ve sus exámenes
+2. Nueva sección "Cuestionarios" aparece con los tests pendientes (ej: "TEST WESTERN")
+3. Paciente toca para expandir, responde las preguntas
+4. Botón "Enviar" guarda y marca como completado
+5. El cuestionario se muestra con check verde, deshabilitado
 
-Cuando se completa en un box (`handleCompletarAtencion`):
-- Actualizar el registro abierto (sin `fecha_salida`) con `fecha_salida = now()`.
+### Archivos a modificar
+- `src/pages/PortalPaciente.tsx` - Agregar sección de cuestionarios
+- Migración SQL - Agregar RLS policies para anon
 
-### 3. Nueva pestaña "Métricas" en Completados.tsx
-
-Agregar un componente con `Tabs` en la página de Completados:
-- **Pestaña "Completados"**: contenido actual (lista de atenciones completadas con botón devolver).
-- **Pestaña "Métricas"**: tabla detallada con:
-  - Paciente (nombre, RUT, empresa)
-  - Baterías asignadas (desde `atencion_baterias`)
-  - Exámenes asignados (desde `atencion_examenes`)
-  - Hora de llegada (`fecha_ingreso`)
-  - Por cada box visitado: instancia #, hora entrada, hora salida, duración
-  - Tiempo total en centro
-
-La tabla de métricas consultará `atencion_box_visitas` agrupando por `atencion_id` y `box_id`, mostrando cada instancia numerada.
-
-### 4. Datos históricos
-
-Los registros anteriores a este cambio **no tendrán datos de visitas a boxes** ya que no se registraban. Solo las nuevas atenciones tendrán trazabilidad completa. Se mostrará un mensaje indicando esto cuando no haya datos de visitas.
-
-## Archivos a modificar
-
-| Archivo | Cambio |
-|---------|--------|
-| Migration SQL | Crear tabla `atencion_box_visitas` |
-| `src/pages/Flujo.tsx` | Insertar/actualizar visitas al llamar/completar |
-| `src/pages/MiBox.tsx` | Insertar/actualizar visitas al llamar/completar |
-| `src/pages/Completados.tsx` | Agregar tabs + pestaña Métricas con tabla detallada |
+### Archivos que se reutilizan sin cambios
+- `src/components/CuestionarioRenderer.tsx` - Se usa directamente
 
