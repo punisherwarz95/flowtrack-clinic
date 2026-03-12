@@ -443,18 +443,36 @@ export default function PortalPaciente() {
         setAgendaDiferidaMatch(agendaDiferida);
       }
 
-      // Buscar por RUT en formato estándar
+      // Buscar TODOS los registros con este RUT para encontrar el más actualizado
       const { data: pacientesData, error: pacienteError } = await supabase
         .from("pacientes")
         .select("*")
         .eq("rut", rutFormateado)
-        .order("created_at", { ascending: false })
-        .limit(1);
+        .order("created_at", { ascending: false });
 
       if (pacienteError) throw pacienteError;
       
-      // Tomar el primer resultado (el más reciente si hay duplicados)
-      const pacienteData = pacientesData && pacientesData.length > 0 ? pacientesData[0] : null;
+      // Si hay múltiples registros con el mismo RUT, buscar cuál tiene la atención más reciente
+      let pacienteData: typeof pacientesData[0] | null = null;
+      if (pacientesData && pacientesData.length > 1) {
+        const pacienteIds = pacientesData.map(p => p.id);
+        const { data: atencionesRecientes } = await supabase
+          .from("atenciones")
+          .select("paciente_id, fecha_ingreso")
+          .in("paciente_id", pacienteIds)
+          .order("fecha_ingreso", { ascending: false })
+          .limit(1);
+        
+        if (atencionesRecientes && atencionesRecientes.length > 0) {
+          // Usar el paciente con la atención más reciente (tiene los datos más actualizados)
+          pacienteData = pacientesData.find(p => p.id === atencionesRecientes[0].paciente_id) || pacientesData[0];
+          console.log("[Portal] Múltiples registros RUT, usando paciente con atención más reciente:", pacienteData.id);
+        } else {
+          pacienteData = pacientesData[0];
+        }
+      } else {
+        pacienteData = pacientesData && pacientesData.length > 0 ? pacientesData[0] : null;
+      }
 
       // Usar zona horaria de Chile para el rango del día
       const today = new Date();
