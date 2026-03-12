@@ -25,6 +25,7 @@ interface Atencion {
   id: string;
   estado: string;
   fecha_ingreso: string;
+  fecha_inicio_atencion: string | null;
   numero_ingreso: number;
   box_id: string | null;
   estado_ficha: string;
@@ -639,9 +640,10 @@ const Flujo = () => {
         toast.success("Exámenes completados - paciente listo para finalizar");
         await logActivity("cambiar_estado_examen", { atencion_id: atencionId, estado: "completado_box" }, "/flujo");
       } else {
+        // Finalizar directamente (puede venir de en_espera o en_atencion sin box)
         const { error } = await supabase
           .from("atenciones")
-          .update({ estado, fecha_fin_atencion: new Date().toISOString() })
+          .update({ estado, fecha_fin_atencion: new Date().toISOString(), fecha_inicio_atencion: atencionActual?.fecha_inicio_atencion || new Date().toISOString() })
           .eq("id", atencionId);
         if (error) throw error;
         toast.success(estado === "completado" ? "Atención completada" : "Atención marcada como incompleta");
@@ -680,9 +682,15 @@ const Flujo = () => {
     enAtencion = enAtencion.filter((a) => a.box_id === filtroBoxAtencion);
   }
 
-  // Pacientes listos para finalizar: en_atencion sin box_id asignado (ya liberados de todos los boxes)
+  // Pacientes listos para finalizar: en_atencion sin box_id O en_espera sin exámenes pendientes
   const listosParaFinalizar = atenciones.filter((a) => {
-    return a.estado === "en_atencion" && !a.box_id;
+    if (a.estado === "en_atencion" && !a.box_id) return true;
+    // Pacientes en espera que ya no tienen exámenes pendientes (completados vía portal u otro medio)
+    if (a.estado === "en_espera") {
+      const pending = examenesPendientes[a.id];
+      return pending && pending.length === 0;
+    }
+    return false;
   });
 
   const getEstadoBadge = (estado: string) => {
