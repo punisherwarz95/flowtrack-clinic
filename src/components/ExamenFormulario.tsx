@@ -342,8 +342,8 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
         })
         .eq("id", atencionExamenId);
 
-      // If completed, also complete trazabilidad-linked exams in the same atencion
-      if (allRequiredFilled && nuevoEstado === "completado") {
+      // If completed (or muestra_tomada for external), also complete trazabilidad-linked exams
+      if (allRequiredFilled && (nuevoEstado === "completado" || nuevoEstado === "muestra_tomada")) {
         try {
           console.log("[TRAZABILIDAD] Iniciando sync - examenId:", examenId, "atencionExamenId:", atencionExamenId);
           
