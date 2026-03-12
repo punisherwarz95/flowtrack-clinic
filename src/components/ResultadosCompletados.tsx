@@ -483,19 +483,6 @@ const ResultadosCompletados = ({ selectedDate }: Props) => {
                       );
                     })}
 
-                    {/* Save corrections */}
-                    <div className="flex justify-end gap-2 pt-2 border-t">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5"
-                        disabled={isSaving}
-                        onClick={() => handleSaveCorrections(atencionId, rows)}
-                      >
-                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                        Guardar Correcciones
-                      </Button>
-                    </div>
                   </CardContent>
                 </Card>
               );

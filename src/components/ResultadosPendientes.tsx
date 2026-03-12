@@ -640,28 +640,6 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
                       );
                     })}
 
-                    {/* Single action row per patient */}
-                    <div className="flex justify-end gap-2 pt-2 border-t">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5"
-                        disabled={isSaving}
-                        onClick={() => handleSaveAllForPatient(atencionId, rows)}
-                      >
-                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                        Guardar Todo
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="gap-1.5"
-                        disabled={isSaving}
-                        onClick={() => handleMarcarTodosCompletados(rows)}
-                      >
-                        {isSaving && savingPatient === atencionId ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
-                        Completar Todos
-                      </Button>
-                    </div>
                   </CardContent>
                 </Card>
               );
