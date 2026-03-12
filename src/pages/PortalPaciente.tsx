@@ -1796,6 +1796,9 @@ export default function PortalPaciente() {
           </Card>
         )}
 
+        {/* Cuestionarios completables por el paciente */}
+        {atencion && <PortalCuestionarios atencionId={atencion.id} />}
+
         {/* Tests / Forms */}
         {examenTests.length > 0 && (
           <Card>
