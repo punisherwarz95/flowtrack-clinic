@@ -342,63 +342,89 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
         })
         .eq("id", atencionExamenId);
 
-      // If completed (or muestra_tomada for external), also complete trazabilidad-linked exams
+      // Trazabilidad: share files and sync estado with linked exams
       if (allRequiredFilled && (nuevoEstado === "completado" || nuevoEstado === "muestra_tomada")) {
         try {
           console.log("[TRAZABILIDAD] Iniciando sync - examenId:", examenId, "atencionExamenId:", atencionExamenId);
           
           // Get atencion_id from this atencion_examen
-          const { data: aeData, error: aeError } = await supabase
+          const { data: aeData } = await supabase
             .from("atencion_examenes")
-            .select("atencion_id, examen_id")
+            .select("atencion_id")
             .eq("id", atencionExamenId)
             .single();
 
-          console.log("[TRAZABILIDAD] atencion_examen data:", aeData, "error:", aeError);
-
           if (aeData) {
+            const currentAtencionId = atencionId || aeData.atencion_id;
+
             // Get trazabilidad links for this exam
-            const { data: trazData, error: trazError } = await supabase
+            const { data: trazData } = await supabase
               .from("examen_trazabilidad")
               .select("examen_id_a, examen_id_b")
               .or(`examen_id_a.eq.${examenId},examen_id_b.eq.${examenId}`);
 
-            console.log("[TRAZABILIDAD] Links encontrados:", trazData, "error:", trazError);
+            console.log("[TRAZABILIDAD] Links encontrados:", trazData);
 
             if (trazData && trazData.length > 0) {
               const linkedExamenIds = trazData.map(t => 
                 t.examen_id_a === examenId ? t.examen_id_b : t.examen_id_a
               );
-              console.log("[TRAZABILIDAD] Exámenes vinculados IDs:", linkedExamenIds);
+              const allExamenIds = [examenId, ...linkedExamenIds];
 
-              // First check what exams exist in this atencion with those IDs
-              const { data: existingLinked } = await supabase
-                .from("atencion_examenes")
-                .select("id, examen_id, estado, examenes(nombre)")
-                .eq("atencion_id", aeData.atencion_id)
-                .in("examen_id", linkedExamenIds);
-              
-              console.log("[TRAZABILIDAD] Exámenes vinculados en esta atención:", existingLinked);
+              // 1) Share uploaded PDF files with linked exams
+              const archivosSubidos = Object.values(resultadosParaGuardar).filter(r => r.archivo_url);
+              for (const archivo of archivosSubidos) {
+                // Check if this file is already shared
+                const { data: existingShared } = await supabase
+                  .from("examen_archivos_compartidos")
+                  .select("id")
+                  .eq("atencion_id", currentAtencionId)
+                  .eq("archivo_url", archivo.archivo_url)
+                  .maybeSingle();
 
-              // Update linked exams in this atencion that are still pending/incomplete
-              const { data: updateResult, error: updateError } = await supabase
+                if (!existingShared) {
+                  // Create shared file record
+                  const { data: sharedFile } = await supabase
+                    .from("examen_archivos_compartidos")
+                    .insert({
+                      atencion_id: currentAtencionId,
+                      nombre_archivo: archivo.valor || "Archivo compartido",
+                      archivo_url: archivo.archivo_url,
+                    })
+                    .select("id")
+                    .single();
+
+                  if (sharedFile) {
+                    // Create vinculos for all exams in the trazabilidad group
+                    const vinculos = allExamenIds.map(eid => ({
+                      archivo_compartido_id: sharedFile.id,
+                      examen_id: eid,
+                    }));
+                    await supabase.from("examen_archivo_vinculos").insert(vinculos);
+                    console.log("[TRAZABILIDAD] Archivo compartido creado para", allExamenIds.length, "exámenes");
+                  }
+                }
+              }
+
+              // 2) Update linked exams estado (use same estado as this exam)
+              const { data: updateResult } = await supabase
                 .from("atencion_examenes")
                 .update({ 
-                  estado: "completado" as any, 
+                  estado: nuevoEstado as any, 
                   fecha_realizacion: new Date().toISOString() 
                 })
-                .eq("atencion_id", aeData.atencion_id)
+                .eq("atencion_id", currentAtencionId)
                 .in("examen_id", linkedExamenIds)
                 .in("estado", ["pendiente", "incompleto"])
                 .select();
               
-              console.log("[TRAZABILIDAD] Resultado update:", updateResult, "error:", updateError);
+              console.log("[TRAZABILIDAD] Exámenes actualizados:", updateResult?.length || 0);
             } else {
-              console.log("[TRAZABILIDAD] No se encontraron links de trazabilidad para examen:", examenId);
+              console.log("[TRAZABILIDAD] No hay links de trazabilidad para examen:", examenId);
             }
           }
         } catch (trazError) {
-          console.error("[TRAZABILIDAD] Error updating trazabilidad-linked exams:", trazError);
+          console.error("[TRAZABILIDAD] Error en sync trazabilidad:", trazError);
         }
       } else {
         console.log("[TRAZABILIDAD] No se ejecuta sync - allRequiredFilled:", allRequiredFilled, "nuevoEstado:", nuevoEstado);
