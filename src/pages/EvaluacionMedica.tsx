@@ -1057,7 +1057,7 @@ const EvaluacionMedica = () => {
                 renderEvaluacionInline()
               ) : (
                 <div className="space-y-4">
-                  <Card>
+                  <Card className="sticky top-0 z-20">
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
                         <div>
