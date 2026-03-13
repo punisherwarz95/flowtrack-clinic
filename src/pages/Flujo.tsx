@@ -263,7 +263,29 @@ const Flujo = () => {
     }
   };
 
-  // OPTIMIZACIÓN v0.0.1: Una sola consulta para todos los exámenes pendientes
+  // Load total exam count per atencion (to distinguish "no exams" from "all completed")
+  const loadTotalExamenesPorAtencion = async (atencionesData: Atencion[]) => {
+    if (atencionesData.length === 0) {
+      setTotalExamenesPorAtencion({});
+      return;
+    }
+    try {
+      const atencionIds = atencionesData.map(a => a.id);
+      const { data, error } = await supabase
+        .from("atencion_examenes")
+        .select("atencion_id")
+        .in("atencion_id", atencionIds);
+      if (error) throw error;
+      const counts: {[id: string]: number} = {};
+      atencionIds.forEach(id => { counts[id] = 0; });
+      (data || []).forEach(d => { counts[d.atencion_id] = (counts[d.atencion_id] || 0) + 1; });
+      setTotalExamenesPorAtencion(counts);
+    } catch (error) {
+      console.error("Error loading total examenes:", error);
+    }
+  };
+
+
   const loadExamenesPendientesOptimized = async (atenciones: Atencion[], examenesList: Examen[]) => {
     if (atenciones.length === 0) {
       setExamenesPendientes({});
