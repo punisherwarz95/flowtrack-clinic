@@ -575,6 +575,9 @@ const MiBox = () => {
                             {atencion.pacientes.empresas?.nombre && (
                               <span className="text-xs text-muted-foreground">| {atencion.pacientes.empresas.nombre}</span>
                             )}
+                            {atencion.pacientes.fecha_nacimiento && (
+                              <span className="text-xs text-muted-foreground">| {new Date(atencion.pacientes.fecha_nacimiento + 'T12:00:00').toLocaleDateString('es-CL')} ({calcularEdad(atencion.pacientes.fecha_nacimiento)} años)</span>
+                            )}
                             <PresionTimerBadge timer={timerByAtencion[atencion.id]} />
                           </div>
                           <div className="mt-1">
