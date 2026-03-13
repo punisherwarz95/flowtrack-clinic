@@ -81,6 +81,7 @@ const Flujo = () => {
   // FASE 7: Document counts per atencion (pendientes y totales)
   const [docsPendientes, setDocsPendientes] = useState<{[atencionId: string]: number}>({});
   const [docsTotal, setDocsTotal] = useState<{[atencionId: string]: number}>({});
+  const [totalExamenesPorAtencion, setTotalExamenesPorAtencion] = useState<{[atencionId: string]: number}>({});
 
   const atencionIdsConTemporizador = useMemo(() => atenciones.map((a) => a.id), [atenciones]);
   const { timerByAtencion } = usePresionTimers(atencionIdsConTemporizador);
@@ -216,7 +217,8 @@ const Flujo = () => {
         loadPendingBoxesOptimized(atencionesRes.data || [], boxesRes.data || []),
         loadAtencionExamenesOptimized(atencionesRes.data || [], boxesRes.data || []),
         loadExamenesPendientesOptimized(atencionesRes.data || [], examenesRes.data || []),
-        loadDocsPendientesCount(atencionesRes.data || [])
+        loadDocsPendientesCount(atencionesRes.data || []),
+        loadTotalExamenesPorAtencion(atencionesRes.data || [])
       ]);
     } catch (error) {
       console.error("Error:", error);
@@ -261,7 +263,29 @@ const Flujo = () => {
     }
   };
 
-  // OPTIMIZACIÓN v0.0.1: Una sola consulta para todos los exámenes pendientes
+  // Load total exam count per atencion (to distinguish "no exams" from "all completed")
+  const loadTotalExamenesPorAtencion = async (atencionesData: Atencion[]) => {
+    if (atencionesData.length === 0) {
+      setTotalExamenesPorAtencion({});
+      return;
+    }
+    try {
+      const atencionIds = atencionesData.map(a => a.id);
+      const { data, error } = await supabase
+        .from("atencion_examenes")
+        .select("atencion_id")
+        .in("atencion_id", atencionIds);
+      if (error) throw error;
+      const counts: {[id: string]: number} = {};
+      atencionIds.forEach(id => { counts[id] = 0; });
+      (data || []).forEach(d => { counts[d.atencion_id] = (counts[d.atencion_id] || 0) + 1; });
+      setTotalExamenesPorAtencion(counts);
+    } catch (error) {
+      console.error("Error loading total examenes:", error);
+    }
+  };
+
+
   const loadExamenesPendientesOptimized = async (atenciones: Atencion[], examenesList: Examen[]) => {
     if (atenciones.length === 0) {
       setExamenesPendientes({});
@@ -682,13 +706,15 @@ const Flujo = () => {
     enAtencion = enAtencion.filter((a) => a.box_id === filtroBoxAtencion);
   }
 
-  // Pacientes listos para finalizar: en_atencion sin box_id O en_espera sin exámenes pendientes
+  // Pacientes listos para finalizar: en_atencion sin box_id O en_espera con exámenes asignados y todos completados
   const listosParaFinalizar = atenciones.filter((a) => {
     if (a.estado === "en_atencion" && !a.box_id) return true;
     // Pacientes en espera que ya no tienen exámenes pendientes (completados vía portal u otro medio)
+    // PERO deben tener al menos 1 examen asignado (si no, aún no se les ha ingresado nada)
     if (a.estado === "en_espera") {
       const pending = examenesPendientes[a.id];
-      return pending && pending.length === 0;
+      const totalExams = totalExamenesPorAtencion[a.id] || 0;
+      return pending && pending.length === 0 && totalExams > 0;
     }
     return false;
   });
