@@ -706,13 +706,15 @@ const Flujo = () => {
     enAtencion = enAtencion.filter((a) => a.box_id === filtroBoxAtencion);
   }
 
-  // Pacientes listos para finalizar: en_atencion sin box_id O en_espera sin exámenes pendientes
+  // Pacientes listos para finalizar: en_atencion sin box_id O en_espera con exámenes asignados y todos completados
   const listosParaFinalizar = atenciones.filter((a) => {
     if (a.estado === "en_atencion" && !a.box_id) return true;
     // Pacientes en espera que ya no tienen exámenes pendientes (completados vía portal u otro medio)
+    // PERO deben tener al menos 1 examen asignado (si no, aún no se les ha ingresado nada)
     if (a.estado === "en_espera") {
       const pending = examenesPendientes[a.id];
-      return pending && pending.length === 0;
+      const totalExams = totalExamenesPorAtencion[a.id] || 0;
+      return pending && pending.length === 0 && totalExams > 0;
     }
     return false;
   });
