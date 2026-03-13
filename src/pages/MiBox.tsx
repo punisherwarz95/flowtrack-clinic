@@ -626,6 +626,9 @@ const MiBox = () => {
                           {atencion.pacientes.empresas?.nombre && (
                             <span className="text-xs text-muted-foreground">| {atencion.pacientes.empresas.nombre}</span>
                           )}
+                          {atencion.pacientes.fecha_nacimiento && (
+                            <span className="text-xs text-muted-foreground">| {calcularEdad(atencion.pacientes.fecha_nacimiento)} años</span>
+                          )}
                           <PresionTimerBadge timer={timerByAtencion[atencion.id]} />
                         </div>
                         <EstadoFichaCheckboxes atencionId={atencion.id} estadoFicha={atencion.estado_ficha} onUpdate={loadData} prefix="done-" />
