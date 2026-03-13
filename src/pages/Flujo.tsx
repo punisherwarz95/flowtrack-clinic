@@ -217,7 +217,8 @@ const Flujo = () => {
         loadPendingBoxesOptimized(atencionesRes.data || [], boxesRes.data || []),
         loadAtencionExamenesOptimized(atencionesRes.data || [], boxesRes.data || []),
         loadExamenesPendientesOptimized(atencionesRes.data || [], examenesRes.data || []),
-        loadDocsPendientesCount(atencionesRes.data || [])
+        loadDocsPendientesCount(atencionesRes.data || []),
+        loadTotalExamenesPorAtencion(atencionesRes.data || [])
       ]);
     } catch (error) {
       console.error("Error:", error);
