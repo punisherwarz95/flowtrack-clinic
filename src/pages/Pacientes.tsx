@@ -518,20 +518,42 @@ const Pacientes = () => {
     await loadFaenasDeEmpresa(empresaId);
   };
 
-  // Cargar exámenes vinculados a una faena
+  // Cargar exámenes vinculados a una faena (directos + los de baterías de la faena)
   const loadFaenaExamenes = async (faenaId: string) => {
     if (!faenaId) {
       setFaenaExamenesIds([]);
       return;
     }
     try {
-      const { data, error } = await supabase
+      // 1. Exámenes directos de la faena
+      const { data: directos, error: errDirectos } = await supabase
         .from("faena_examenes")
         .select("examen_id")
         .eq("faena_id", faenaId)
         .eq("activo", true);
-      if (error) throw error;
-      setFaenaExamenesIds((data || []).map((fe: any) => fe.examen_id));
+      if (errDirectos) throw errDirectos;
+
+      // 2. Exámenes de las baterías vinculadas a esta faena
+      const { data: bateriasFaena, error: errBF } = await supabase
+        .from("bateria_faenas")
+        .select("paquete_id")
+        .eq("faena_id", faenaId)
+        .eq("activo", true);
+      if (errBF) throw errBF;
+
+      let batExIds: string[] = [];
+      const pIds = (bateriasFaena || []).map((bf: any) => bf.paquete_id);
+      if (pIds.length > 0) {
+        const { data: pItems, error: errPI } = await supabase
+          .from("paquete_examen_items")
+          .select("examen_id")
+          .in("paquete_id", pIds);
+        if (errPI) throw errPI;
+        batExIds = (pItems || []).map((pi: any) => pi.examen_id);
+      }
+
+      const directIds = (directos || []).map((fe: any) => fe.examen_id);
+      setFaenaExamenesIds([...new Set([...directIds, ...batExIds])]);
     } catch (error) {
       console.error("Error loading faena_examenes:", error);
       setFaenaExamenesIds([]);
