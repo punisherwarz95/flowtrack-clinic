@@ -1409,7 +1409,17 @@ const Pacientes = () => {
 
           <TabsContent value="nuevo">
             <div className="mb-4">
-              <h1 className="text-2xl font-bold text-foreground">{editingPatient ? "Editar Paciente" : "Nuevo Paciente"}</h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold text-foreground">{editingPatient ? "Editar Paciente" : "Nuevo Paciente"}</h1>
+                {editingPatient && (() => {
+                  const pat = patients.find(p => p.id === editingPatient);
+                  return pat?.atencion_actual ? (
+                    <Badge variant="outline" className="text-lg font-bold px-3 py-1">
+                      Atención #{pat.atencion_actual.numero_ingreso}
+                    </Badge>
+                  ) : null;
+                })()}
+              </div>
               <p className="text-muted-foreground text-sm">Complete los datos del paciente y seleccione los exámenes</p>
             </div>
             <form onSubmit={handleSubmit} className="flex flex-col" style={{ height: "calc(100vh - 250px)" }}>
