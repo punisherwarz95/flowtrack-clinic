@@ -81,6 +81,7 @@ const Flujo = () => {
   // FASE 7: Document counts per atencion (pendientes y totales)
   const [docsPendientes, setDocsPendientes] = useState<{[atencionId: string]: number}>({});
   const [docsTotal, setDocsTotal] = useState<{[atencionId: string]: number}>({});
+  const [totalExamenesPorAtencion, setTotalExamenesPorAtencion] = useState<{[atencionId: string]: number}>({});
 
   const atencionIdsConTemporizador = useMemo(() => atenciones.map((a) => a.id), [atenciones]);
   const { timerByAtencion } = usePresionTimers(atencionIdsConTemporizador);
