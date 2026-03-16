@@ -186,6 +186,25 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
     }
   };
 
+  // Helper: validate internal antropometria required fields
+  const checkAntropometriaRequired = (jsonStr: string | null): boolean => {
+    if (!jsonStr) return false;
+    try {
+      const d = JSON.parse(jsonStr);
+      // Core required fields
+      return !!(d.peso && d.talla && d.pulso && d.pa_sistolica_1 && d.pa_diastolica_1 && d.saturacion_o2 && d.sexo);
+    } catch { return false; }
+  };
+
+  // Helper: check if antropometria has pending pressure retake
+  const checkAntropometriaPresionPendiente = (jsonStr: string | null): boolean => {
+    if (!jsonStr) return false;
+    try {
+      const d = JSON.parse(jsonStr);
+      return !!d.pa_alerta;
+    } catch { return false; }
+  };
+
   const checkRequiredFields = (): boolean => {
     const resultadosValidados = mergeSharedFilesIntoResults(campos, resultados, archivosVinculados);
 
@@ -194,6 +213,7 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
       const resultado = resultadosValidados[campo.id];
       if (!resultado) return false;
       if (campo.tipo_campo === "archivo_pdf") return !!resultado.archivo_url;
+      if (campo.tipo_campo === "antropometria") return checkAntropometriaRequired(resultado.valor);
       return !!resultado.valor;
     });
   };
