@@ -535,8 +535,10 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Badge variant={allRequiredFilled ? "default" : "secondary"} className="gap-1">
-            {allRequiredFilled ? (
+          <Badge variant={presionPendienteUI ? "destructive" : allRequiredFilled ? "default" : "secondary"} className="gap-1">
+            {presionPendienteUI ? (
+              <><AlertCircle className="h-3 w-3" /> Presión pendiente</>
+            ) : allRequiredFilled ? (
               <><CheckCircle className="h-3 w-3" /> Completo</>
             ) : (
               <><AlertCircle className="h-3 w-3" /> Incompleto</>
