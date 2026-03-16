@@ -346,19 +346,33 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
         const resultado = resultadosParaGuardar[campo.id];
         if (!resultado) return false;
         if (campo.tipo_campo === "archivo_pdf") return !!resultado.archivo_url;
+        if (campo.tipo_campo === "antropometria") return checkAntropometriaRequired(resultado.valor);
         return !!resultado.valor;
+      });
+
+      // Check if antropometria has a pending pressure retake (pa_alerta)
+      const presionPendiente = campos.some((campo) => {
+        if (campo.tipo_campo !== "antropometria") return false;
+        const resultado = resultadosParaGuardar[campo.id];
+        return checkAntropometriaPresionPendiente(resultado?.valor || null);
       });
 
       // Update atencion_examenes status
       // If prestador is external, mark as muestra_tomada instead of completado
-      const nuevoEstado = allRequiredFilled
-        ? (esExterno ? "muestra_tomada" : "completado")
-        : "incompleto";
+      // If pressure retake is pending, force incompleto regardless of filled fields
+      let nuevoEstado: string;
+      if (presionPendiente) {
+        nuevoEstado = "incompleto";
+      } else if (allRequiredFilled) {
+        nuevoEstado = esExterno ? "muestra_tomada" : "completado";
+      } else {
+        nuevoEstado = "incompleto";
+      }
       await supabase
         .from("atencion_examenes")
         .update({
           estado: nuevoEstado as any,
-          fecha_realizacion: allRequiredFilled ? new Date().toISOString() : null,
+          fecha_realizacion: (allRequiredFilled && !presionPendiente) ? new Date().toISOString() : null,
         })
         .eq("id", atencionExamenId);
 
