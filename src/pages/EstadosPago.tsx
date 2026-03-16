@@ -22,8 +22,9 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   Calendar, CreditCard, FileText, DollarSign, Trash2, Package,
-  Building2, TrendingUp, Search, Users,
+  Building2, TrendingUp, Search, Users, Download,
 } from "lucide-react";
+import { generateEstadoPagoPDF } from "@/components/cotizacion/EstadoPagoPDF";
 
 interface Empresa {
   id: string;
@@ -716,7 +717,27 @@ const EstadosPago = () => {
                         <CardTitle className="text-base flex items-center gap-2">
                           <DollarSign className="h-4 w-4" /> Detalle Estado N° {selectedEstado.numero}
                         </CardTitle>
-                        <Button variant="outline" size="sm" onClick={() => setSelectedEstado(null)}>Cerrar</Button>
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" onClick={() => {
+                            if (!selectedEstado || !selectedEmpresa) return;
+                            generateEstadoPagoPDF({
+                              numero: selectedEstado.numero,
+                              fecha_desde: selectedEstado.fecha_desde,
+                              fecha_hasta: selectedEstado.fecha_hasta,
+                              empresa_nombre: selectedEmpresa.nombre,
+                              empresa_rut: selectedEmpresa.rut,
+                              total_neto: selectedEstado.total_neto,
+                              total_iva: selectedEstado.total_iva,
+                              total: selectedEstado.total,
+                              items: selectedEstado.items || [],
+                              bateriaSummary,
+                              afecto_iva: selectedEmpresa.afecto_iva,
+                            });
+                          }}>
+                            <Download className="h-4 w-4 mr-1" /> Exportar PDF
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => setSelectedEstado(null)}>Cerrar</Button>
+                        </div>
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-6">
