@@ -50,7 +50,6 @@ const COLORS = {
   accent: [0, 188, 212] as [number, number, number],
   tableHeader: [0, 56, 101] as [number, number, number],
   text: [50, 50, 50] as [number, number, number],
-  lightGray: [240, 240, 240] as [number, number, number],
 };
 
 export const generateEstadoPagoPDF = (data: EstadoPagoData) => {
@@ -58,6 +57,9 @@ export const generateEstadoPagoPDF = (data: EstadoPagoData) => {
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 15;
+  const headerStartY = 5;
+  const footerHeight = 34;
+  const sectionGap = 8;
 
   const drawHeader = (startY: number) => {
     doc.setFillColor(...COLORS.accent);
@@ -90,7 +92,7 @@ export const generateEstadoPagoPDF = (data: EstadoPagoData) => {
 
   const drawClientInfo = (startY: number) => {
     doc.setFillColor(...COLORS.accent);
-    doc.rect(margin, startY, 2, 22, "F");
+    doc.rect(margin, startY, 2, 24, "F");
 
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
@@ -98,6 +100,7 @@ export const generateEstadoPagoPDF = (data: EstadoPagoData) => {
 
     const leftCol = margin + 6;
     const valueCol = margin + 28;
+    const rightCol = pageWidth - margin;
 
     doc.text("Empresa:", leftCol, startY + 6);
     doc.text("RUT:", leftCol, startY + 13);
@@ -109,18 +112,25 @@ export const generateEstadoPagoPDF = (data: EstadoPagoData) => {
     doc.text(data.empresa_rut || "-", valueCol, startY + 13);
     doc.text(`${formatDateShort(data.fecha_desde)} al ${formatDateShort(data.fecha_hasta)}`, valueCol, startY + 20);
 
-    // Right side - Estado de Pago number
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...COLORS.accent);
-    doc.text(`ESTADO DE PAGO N°: ${data.numero}`, pageWidth - margin - 75, startY + 10);
+    doc.text(`ESTADO DE PAGO N° ${data.numero}`, rightCol, startY + 8, { align: "right" });
 
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...COLORS.text);
-    doc.text(`${data.items.length} atenciones`, pageWidth - margin - 75, startY + 18);
+    doc.text(`${data.items.length} atenciones`, rightCol, startY + 16, { align: "right" });
 
-    return startY + 28;
+    return startY + 30;
+  };
+
+  const drawSectionTitle = (title: string, startY: number) => {
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...COLORS.primary);
+    doc.text(title, margin, startY);
+    return startY + 4;
   };
 
   const drawTotals = (startY: number) => {
@@ -133,7 +143,6 @@ export const generateEstadoPagoPDF = (data: EstadoPagoData) => {
 
     let currentY = startY + 8;
 
-    // Neto
     doc.text("Neto:", rightCol, currentY);
     doc.text(formatCurrency(data.total_neto || 0), valueCol, currentY, { align: "right" });
     currentY += 7;
@@ -149,7 +158,6 @@ export const generateEstadoPagoPDF = (data: EstadoPagoData) => {
       currentY += 7;
     }
 
-    // Total box
     doc.setFillColor(...COLORS.primary);
     doc.rect(rightCol - 4, currentY + 1, 62, 10, "F");
     doc.setTextColor(255, 255, 255);
@@ -181,29 +189,31 @@ export const generateEstadoPagoPDF = (data: EstadoPagoData) => {
     doc.text("57 226 2772 - 9 9543 1823", margin + 55, footerY + 16);
   };
 
-  // Page 1: Header + client info
-  drawHeader(5);
-  drawClientInfo(43);
+  const drawFullPageHeader = (sectionTitle?: string) => {
+    const headerBottom = drawHeader(headerStartY);
+    const infoBottom = drawClientInfo(headerBottom);
 
-  const tableStartY = 76;
-  const footerHeight = 40;
+    if (!sectionTitle) return infoBottom;
+    return drawSectionTitle(sectionTitle, infoBottom + 2);
+  };
 
-  // Detail table
-  const tableData = data.items.map((item, idx) => [
+  const detailTableData = data.items.map((item, idx) => [
     (idx + 1).toString(),
     formatDateShort(item.fecha_atencion),
     item.paciente_nombre,
     item.paciente_rut || "-",
     item.cargo || "-",
     item.faena || "-",
-    (item.baterias || []).map(b => b.nombre).join(", "),
+    (item.baterias || []).map((b) => b.nombre).join(", "),
     formatCurrency(item.subtotal || 0),
   ]);
 
+  const detailStartY = drawFullPageHeader("Detalle de atenciones") + 2;
+
   autoTable(doc, {
-    startY: tableStartY,
+    startY: detailStartY,
     head: [["#", "Fecha", "Paciente", "RUT", "Cargo", "Faena", "Baterías", "Subtotal"]],
-    body: tableData,
+    body: detailTableData,
     theme: "plain",
     headStyles: {
       fillColor: COLORS.tableHeader,
@@ -227,44 +237,27 @@ export const generateEstadoPagoPDF = (data: EstadoPagoData) => {
       cellPadding: 2,
       lineColor: [200, 200, 200],
       lineWidth: 0.1,
+      valign: "middle",
+      overflow: "linebreak",
     },
     alternateRowStyles: {
       fillColor: [250, 250, 250],
     },
-    margin: { left: margin, right: margin, top: 50, bottom: footerHeight },
+    margin: { left: margin, right: margin, top: detailStartY, bottom: footerHeight },
     didDrawPage: (hookData) => {
       if (hookData.pageNumber > 1) {
-        drawHeader(5);
-        doc.setFontSize(8);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(...COLORS.text);
-        doc.text(`Estado de Pago N° ${data.numero} - ${data.empresa_nombre}`, margin, 45);
+        drawFullPageHeader("Detalle de atenciones");
       }
     },
   });
 
   let currentY = (doc as any).lastAutoTable.finalY;
 
-  // Battery summary table
   if (data.bateriaSummary.length > 0) {
-    if (currentY + 60 > pageHeight - footerHeight) {
-      doc.addPage();
-      drawHeader(5);
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(...COLORS.text);
-      doc.text(`Estado de Pago N° ${data.numero} - ${data.empresa_nombre}`, margin, 45);
-      currentY = 50;
-    }
+    doc.addPage();
 
-    currentY += 8;
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(...COLORS.primary);
-    doc.text("Resumen por Batería", margin, currentY);
-    currentY += 4;
-
-    const summaryData = data.bateriaSummary.map(b => [
+    const summaryTitleY = drawFullPageHeader("Resumen por Batería") + 2;
+    const summaryData = data.bateriaSummary.map((b) => [
       b.nombre,
       b.cantidad.toString(),
       formatCurrency(b.valorUnitario),
@@ -272,7 +265,7 @@ export const generateEstadoPagoPDF = (data: EstadoPagoData) => {
     ]);
 
     autoTable(doc, {
-      startY: currentY,
+      startY: summaryTitleY,
       head: [["Batería", "Cantidad", "Valor Unitario", "Total"]],
       body: summaryData,
       theme: "plain",
@@ -294,14 +287,16 @@ export const generateEstadoPagoPDF = (data: EstadoPagoData) => {
         cellPadding: 3,
         lineColor: [200, 200, 200],
         lineWidth: 0.1,
+        valign: "middle",
+        overflow: "linebreak",
       },
       alternateRowStyles: {
         fillColor: [250, 250, 250],
       },
-      margin: { left: margin, right: margin, bottom: footerHeight },
+      margin: { left: margin, right: margin, top: summaryTitleY, bottom: footerHeight },
       didDrawPage: (hookData) => {
         if (hookData.pageNumber > 1) {
-          drawHeader(5);
+          drawFullPageHeader("Resumen por Batería");
         }
       },
     });
@@ -309,16 +304,15 @@ export const generateEstadoPagoPDF = (data: EstadoPagoData) => {
     currentY = (doc as any).lastAutoTable.finalY;
   }
 
-  // Totals
-  if (currentY + 40 > pageHeight - footerHeight) {
+  if (currentY + 36 > pageHeight - footerHeight) {
     doc.addPage();
-    drawHeader(5);
-    currentY = 48;
+    currentY = drawFullPageHeader("Totales") + 2;
+  } else {
+    currentY += sectionGap;
   }
 
   drawTotals(currentY);
 
-  // Footer on every page
   const totalPages = doc.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
