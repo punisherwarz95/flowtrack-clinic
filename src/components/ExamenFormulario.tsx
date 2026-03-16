@@ -511,7 +511,13 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
     const resultado = resultadosConArchivos[campo.id];
     if (!resultado) return false;
     if (campo.tipo_campo === "archivo_pdf") return !!resultado.archivo_url;
+    if (campo.tipo_campo === "antropometria") return checkAntropometriaRequired(resultado.valor);
     return !!resultado.valor;
+  });
+  const presionPendienteUI = campos.some((campo) => {
+    if (campo.tipo_campo !== "antropometria") return false;
+    const resultado = resultadosConArchivos[campo.id];
+    return checkAntropometriaPresionPendiente(resultado?.valor || null);
   });
 
   // Fields eligible for "Todo Normal": text and select fields (excluding special types)
