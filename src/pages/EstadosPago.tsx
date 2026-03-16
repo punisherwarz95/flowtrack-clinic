@@ -22,8 +22,9 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   Calendar, CreditCard, FileText, DollarSign, Trash2, Package,
-  Building2, TrendingUp, Search, Users,
+  Building2, TrendingUp, Search, Users, Download,
 } from "lucide-react";
+import { generateEstadoPagoPDF } from "@/components/cotizacion/EstadoPagoPDF";
 
 interface Empresa {
   id: string;
