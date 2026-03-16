@@ -186,6 +186,25 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
     }
   };
 
+  // Helper: validate internal antropometria required fields
+  const checkAntropometriaRequired = (jsonStr: string | null): boolean => {
+    if (!jsonStr) return false;
+    try {
+      const d = JSON.parse(jsonStr);
+      // Core required fields
+      return !!(d.peso && d.talla && d.pulso && d.pa_sistolica_1 && d.pa_diastolica_1 && d.saturacion_o2 && d.sexo);
+    } catch { return false; }
+  };
+
+  // Helper: check if antropometria has pending pressure retake
+  const checkAntropometriaPresionPendiente = (jsonStr: string | null): boolean => {
+    if (!jsonStr) return false;
+    try {
+      const d = JSON.parse(jsonStr);
+      return !!d.pa_alerta;
+    } catch { return false; }
+  };
+
   const checkRequiredFields = (): boolean => {
     const resultadosValidados = mergeSharedFilesIntoResults(campos, resultados, archivosVinculados);
 
@@ -194,6 +213,7 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
       const resultado = resultadosValidados[campo.id];
       if (!resultado) return false;
       if (campo.tipo_campo === "archivo_pdf") return !!resultado.archivo_url;
+      if (campo.tipo_campo === "antropometria") return checkAntropometriaRequired(resultado.valor);
       return !!resultado.valor;
     });
   };
@@ -326,19 +346,33 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
         const resultado = resultadosParaGuardar[campo.id];
         if (!resultado) return false;
         if (campo.tipo_campo === "archivo_pdf") return !!resultado.archivo_url;
+        if (campo.tipo_campo === "antropometria") return checkAntropometriaRequired(resultado.valor);
         return !!resultado.valor;
+      });
+
+      // Check if antropometria has a pending pressure retake (pa_alerta)
+      const presionPendiente = campos.some((campo) => {
+        if (campo.tipo_campo !== "antropometria") return false;
+        const resultado = resultadosParaGuardar[campo.id];
+        return checkAntropometriaPresionPendiente(resultado?.valor || null);
       });
 
       // Update atencion_examenes status
       // If prestador is external, mark as muestra_tomada instead of completado
-      const nuevoEstado = allRequiredFilled
-        ? (esExterno ? "muestra_tomada" : "completado")
-        : "incompleto";
+      // If pressure retake is pending, force incompleto regardless of filled fields
+      let nuevoEstado: string;
+      if (presionPendiente) {
+        nuevoEstado = "incompleto";
+      } else if (allRequiredFilled) {
+        nuevoEstado = esExterno ? "muestra_tomada" : "completado";
+      } else {
+        nuevoEstado = "incompleto";
+      }
       await supabase
         .from("atencion_examenes")
         .update({
           estado: nuevoEstado as any,
-          fecha_realizacion: allRequiredFilled ? new Date().toISOString() : null,
+          fecha_realizacion: (allRequiredFilled && !presionPendiente) ? new Date().toISOString() : null,
         })
         .eq("id", atencionExamenId);
 
@@ -431,9 +465,11 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
       }
 
       toast.success(
-        allRequiredFilled
-          ? (esExterno ? "Muestra tomada registrada y datos guardados" : "Examen completado y guardado")
-          : "Datos guardados (parcial - faltan campos requeridos)"
+        presionPendiente
+          ? "Datos guardados — presión arterial elevada, requiere retoma"
+          : allRequiredFilled
+            ? (esExterno ? "Muestra tomada registrada y datos guardados" : "Examen completado y guardado")
+            : "Datos guardados (parcial - faltan campos requeridos)"
       );
 
       onComplete?.();
@@ -475,7 +511,13 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
     const resultado = resultadosConArchivos[campo.id];
     if (!resultado) return false;
     if (campo.tipo_campo === "archivo_pdf") return !!resultado.archivo_url;
+    if (campo.tipo_campo === "antropometria") return checkAntropometriaRequired(resultado.valor);
     return !!resultado.valor;
+  });
+  const presionPendienteUI = campos.some((campo) => {
+    if (campo.tipo_campo !== "antropometria") return false;
+    const resultado = resultadosConArchivos[campo.id];
+    return checkAntropometriaPresionPendiente(resultado?.valor || null);
   });
 
   // Fields eligible for "Todo Normal": text and select fields (excluding special types)
@@ -493,8 +535,10 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Badge variant={allRequiredFilled ? "default" : "secondary"} className="gap-1">
-            {allRequiredFilled ? (
+          <Badge variant={presionPendienteUI ? "destructive" : allRequiredFilled ? "default" : "secondary"} className="gap-1">
+            {presionPendienteUI ? (
+              <><AlertCircle className="h-3 w-3" /> Presión pendiente</>
+            ) : allRequiredFilled ? (
               <><CheckCircle className="h-3 w-3" /> Completo</>
             ) : (
               <><AlertCircle className="h-3 w-3" /> Incompleto</>
