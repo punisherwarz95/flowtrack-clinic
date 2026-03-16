@@ -530,17 +530,18 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
                             type="file"
                             accept=".pdf,.jpg,.jpeg,.png"
                             className="hidden"
-                            id={`shared-file-${groupKey}`}
+                            id={`shared-file-${atencionId}-${groupKey}`}
                             onChange={(e) => {
                               const file = e.target.files?.[0];
                               if (file) handleUploadSharedFile(groupKey, group, file);
+                              e.target.value = '';
                             }}
                           />
                           <Button
                             variant="outline"
                             size="sm"
                             className="gap-1 text-xs h-7"
-                            onClick={() => document.getElementById(`shared-file-${groupKey}`)?.click()}
+                            onClick={() => document.getElementById(`shared-file-${atencionId}-${groupKey}`)?.click()}
                             disabled={uploading === groupKey}
                           >
                             {uploading === groupKey ? (
