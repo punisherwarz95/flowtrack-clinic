@@ -465,9 +465,11 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
       }
 
       toast.success(
-        allRequiredFilled
-          ? (esExterno ? "Muestra tomada registrada y datos guardados" : "Examen completado y guardado")
-          : "Datos guardados (parcial - faltan campos requeridos)"
+        presionPendiente
+          ? "Datos guardados — presión arterial elevada, requiere retoma"
+          : allRequiredFilled
+            ? (esExterno ? "Muestra tomada registrada y datos guardados" : "Examen completado y guardado")
+            : "Datos guardados (parcial - faltan campos requeridos)"
       );
 
       onComplete?.();
