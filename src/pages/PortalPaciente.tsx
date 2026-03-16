@@ -1,20 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import portalBackground from "@/assets/portal-background.jpeg";
 
-// Portal Paciente v0.0.9 - Pacientes existentes pueden verificar/actualizar datos
-// Cambios: Cuando un paciente conocido ingresa sin atención del día, ahora ve el formulario
-//          con sus datos pre-llenados para verificar/actualizar antes de continuar
-const PORTAL_VERSION = "0.0.9";
+// Portal Paciente v0.1.0 - Sin toasts, sin sonidos, sin vibraciones, sin popups
+// Banner sticky superior muestra estado de atención en todo momento
+const PORTAL_VERSION = "0.1.0";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import { ToastAction } from "@/components/ui/toast";
-import { Loader2, ExternalLink, CheckCircle2, Clock, Building2, FileText, AlertCircle, X, RefreshCw, ChevronDown, CalendarIcon, ClipboardList } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Loader2, ExternalLink, CheckCircle2, Clock, Building2, FileText, AlertCircle, RefreshCw, ChevronDown, CalendarIcon, ClipboardList, MapPin } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { format, parse, isValid } from "date-fns";
 import { es } from "date-fns/locale";
@@ -82,6 +78,12 @@ interface TestTracking {
   completado: boolean;
 }
 
+// Inline message component - replaces all toasts
+interface InlineMsg {
+  text: string;
+  type: "error" | "success" | "info";
+}
+
 export default function PortalPaciente() {
   const [step, setStep] = useState<"codigo" | "identificacion" | "registro" | "portal">("codigo");
   const [rut, setRut] = useState("");
@@ -94,12 +96,21 @@ export default function PortalPaciente() {
   const [pendingBoxes, setPendingBoxes] = useState<string[]>([]);
   const [examenTests, setExamenTests] = useState<ExamenTest[]>([]);
   const [testTracking, setTestTracking] = useState<TestTracking[]>([]);
-  const [testModalOpen, setTestModalOpen] = useState(false);
-  const [currentTest, setCurrentTest] = useState<ExamenTest | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [agendaDiferidaMatch, setAgendaDiferidaMatch] = useState<any>(null);
   
-  // Documentos del paciente
+  // Inline message state (replaces toasts)
+  const [inlineMsg, setInlineMsg] = useState<InlineMsg | null>(null);
+  const inlineMsgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showMsg = useCallback((text: string, type: InlineMsg["type"] = "info", duration = 5000) => {
+    if (inlineMsgTimerRef.current) clearTimeout(inlineMsgTimerRef.current);
+    setInlineMsg({ text, type });
+    if (duration > 0) {
+      inlineMsgTimerRef.current = setTimeout(() => setInlineMsg(null), duration);
+    }
+  }, []);
+
   // Documentos del paciente - expand inline
   const [selectedDocumentoIndex, setSelectedDocumentoIndex] = useState<number | null>(null);
   
@@ -139,7 +150,6 @@ export default function PortalPaciente() {
 
   // Form fields for new registration
   const [formData, setFormData] = useState({
-    // Campos separados para nombre
     primerNombre: "",
     apellidoPaterno: "",
     apellidoMaterno: "",
@@ -148,7 +158,6 @@ export default function PortalPaciente() {
     fecha_nacimiento_display: "",
     email: "",
     telefono: "",
-    // Campos separados para dirección
     calle: "",
     numeracion: "",
     ciudad: ""
@@ -158,126 +167,12 @@ export default function PortalPaciente() {
   const [ciudadSugerencias, setCiudadSugerencias] = useState<string[]>([]);
   const [showCiudadSugerencias, setShowCiudadSugerencias] = useState(false);
 
-  const { toast, dismiss } = useToast();
-  const lastNotificationBoxRef = useRef<string | null>(null);
   const prevEstadoRef = useRef<string | null>(null);
   const prevBoxIdRef = useRef<string | null>(null);
   const prevDataHashRef = useRef<string>("");
   const prevBoxesHashRef = useRef<string>("");
-  
-  // Audio para Android
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const audioUnlockedRef = useRef<boolean>(false);
 
-  // Desbloquear audio en el primer toque (requerido para Android)
-  useEffect(() => {
-    const unlockAudio = () => {
-      if (audioUnlockedRef.current) return;
-      
-      try {
-        // Crear AudioContext
-        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-        if (AudioContextClass) {
-          audioContextRef.current = new AudioContextClass();
-          // Reproducir un sonido silencioso para desbloquear
-          const oscillator = audioContextRef.current.createOscillator();
-          const gainNode = audioContextRef.current.createGain();
-          gainNode.gain.value = 0; // Silencioso
-          oscillator.connect(gainNode);
-          gainNode.connect(audioContextRef.current.destination);
-          oscillator.start();
-          oscillator.stop(audioContextRef.current.currentTime + 0.001);
-          audioUnlockedRef.current = true;
-          console.log("[Portal] Audio desbloqueado para Android");
-        }
-      } catch (e) {
-        console.log("[Portal] Error desbloqueando audio:", e);
-      }
-    };
-
-    // Escuchar primer toque/click
-    document.addEventListener("touchstart", unlockAudio, { once: true });
-    document.addEventListener("click", unlockAudio, { once: true });
-
-    return () => {
-      document.removeEventListener("touchstart", unlockAudio);
-      document.removeEventListener("click", unlockAudio);
-    };
-  }, []);
-
-  // Función para reproducir sonido de notificación (v0.0.5 - defensiva para Android 12+)
-  const reproducirSonido = useCallback(() => {
-    // Ejecutar de forma asíncrona para no bloquear el renderizado
-    setTimeout(() => {
-      try {
-        if (!audioContextRef.current || audioContextRef.current.state === "closed") {
-          const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-          if (AudioContextClass) {
-            audioContextRef.current = new AudioContextClass();
-          }
-        }
-
-        const ctx = audioContextRef.current;
-        if (!ctx) {
-          console.log("[Portal v" + PORTAL_VERSION + "] AudioContext no disponible");
-          return;
-        }
-
-        // Resumir si está suspendido
-        if (ctx.state === "suspended") {
-          ctx.resume().catch(() => {
-            console.log("[Portal v" + PORTAL_VERSION + "] No se pudo resumir AudioContext");
-          });
-        }
-
-        // Reproducir 3 beeps
-        const beepDuration = 0.15;
-        const beepGap = 0.1;
-        
-        for (let i = 0; i < 3; i++) {
-          const startTime = ctx.currentTime + i * (beepDuration + beepGap);
-          
-          const oscillator = ctx.createOscillator();
-          const gainNode = ctx.createGain();
-          
-          oscillator.type = "sine";
-          oscillator.frequency.value = 880; // Nota A5
-          
-          gainNode.gain.setValueAtTime(0.3, startTime);
-          gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + beepDuration);
-          
-          oscillator.connect(gainNode);
-          gainNode.connect(ctx.destination);
-          
-          oscillator.start(startTime);
-          oscillator.stop(startTime + beepDuration);
-        }
-        console.log("[Portal v" + PORTAL_VERSION + "] Sonido reproducido");
-      } catch (e) {
-        console.log("[Portal v" + PORTAL_VERSION + "] Error reproduciendo sonido:", e);
-        // No propagar el error para evitar crash
-      }
-    }, 0);
-  }, []);
-
-  // Función para vibrar (Android) - v0.0.5 - defensiva para Xiaomi Android 12+
-  const vibrar = useCallback(() => {
-    // Ejecutar de forma asíncrona para no bloquear el renderizado
-    setTimeout(() => {
-      try {
-        if ("vibrate" in navigator && typeof navigator.vibrate === "function") {
-          // Patrón de vibración más simple para mejor compatibilidad
-          const result = navigator.vibrate([200, 100, 200]);
-          console.log("[Portal v" + PORTAL_VERSION + "] Vibración:", result ? "OK" : "No soportado");
-        }
-      } catch (e) {
-        console.log("[Portal v" + PORTAL_VERSION + "] Error vibrando:", e);
-        // No propagar el error para evitar crash
-      }
-    }, 50); // Pequeño delay para dispositivos problemáticos
-  }, []);
-
-  // Usar formatRutStandard de utils para display (mismo formato estándar)
+  // Usar formatRutStandard de utils para display
   const formatRutForDisplay = (value: string) => {
     return formatRutStandard(value);
   };
@@ -294,11 +189,7 @@ export default function PortalPaciente() {
 
   const validarCodigoDiario = async () => {
     if (!codigoIngresado.trim()) {
-      toast({
-        title: "Error",
-        description: "Ingrese el código del día",
-        variant: "destructive"
-      });
+      showMsg("Ingrese el código del día", "error");
       return;
     }
 
@@ -316,34 +207,22 @@ export default function PortalPaciente() {
       if (error) throw error;
 
       if (data) {
-        toast({
-          title: "Código válido",
-          description: "Puede continuar con su identificación",
-        });
+        setInlineMsg(null);
         setStep("identificacion");
       } else {
-        toast({
-          title: "Código inválido",
-          description: "El código ingresado no es correcto. Solicítelo al personal de recepción.",
-          variant: "destructive"
-        });
+        showMsg("El código ingresado no es correcto. Solicítelo al personal de recepción.", "error", 8000);
       }
     } catch (error) {
       console.error("Error validating código:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo validar el código. Intente nuevamente.",
-        variant: "destructive"
-      });
+      showMsg("No se pudo validar el código. Intente nuevamente.", "error");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Helper para vincular agenda diferida: crea baterías, resuelve exámenes de paquetes, genera documentos
+  // Helper para vincular agenda diferida
   const vincularAgendaDiferida = async (agendaDiferida: any, atencionId: string) => {
     try {
-      // 1. Actualizar estado de agenda diferida
       const { error: updateError } = await supabase.from("agenda_diferida").update({
         estado: "vinculado",
         atencion_id: atencionId,
@@ -354,7 +233,6 @@ export default function PortalPaciente() {
         console.error("[Portal] Error actualizando agenda diferida:", updateError);
       }
 
-      // 2. Crear atencion_baterias
       if (agendaDiferida.paquetes_ids?.length > 0) {
         const baterias = agendaDiferida.paquetes_ids.map((pId: string) => ({
           atencion_id: atencionId,
@@ -363,7 +241,6 @@ export default function PortalPaciente() {
         await supabase.from("atencion_baterias").insert(baterias);
       }
 
-      // 3. Resolver exámenes desde los paquetes (paquete_examen_items)
       const allExamenIds = new Set<string>(agendaDiferida.examenes_ids || []);
 
       if (agendaDiferida.paquetes_ids?.length > 0) {
@@ -377,7 +254,6 @@ export default function PortalPaciente() {
         }
       }
 
-      // 4. Crear atencion_examenes con todos los exámenes resueltos
       if (allExamenIds.size > 0) {
         const examenes = Array.from(allExamenIds).map((eId: string) => ({
           atencion_id: atencionId,
@@ -387,7 +263,6 @@ export default function PortalPaciente() {
         await supabase.from("atencion_examenes").insert(examenes);
       }
 
-      // 5. Generar documentos desde las baterías (bateria_documentos)
       if (agendaDiferida.paquetes_ids?.length > 0) {
         const { data: bateriaDocumentos } = await supabase
           .from("bateria_documentos")
@@ -414,21 +289,14 @@ export default function PortalPaciente() {
 
   const buscarPaciente = async () => {
     if (!rut.trim()) {
-      toast({
-        title: "Error",
-        description: "Ingrese su RUT",
-        variant: "destructive"
-      });
+      showMsg("Ingrese su RUT", "error");
       return;
     }
 
-
     setIsLoading(true);
     try {
-      // Convertir RUT al formato estándar para búsqueda
       const rutFormateado = formatRutStandard(rut);
 
-      // Buscar registros en agenda diferida pendientes para este RUT
       const { data: agendaDiferidaData } = await supabase
         .from("agenda_diferida")
         .select("*, empresas(id, nombre), faenas(id, nombre)")
@@ -443,7 +311,6 @@ export default function PortalPaciente() {
         setAgendaDiferidaMatch(agendaDiferida);
       }
 
-      // Buscar TODOS los registros con este RUT para encontrar el más actualizado
       const { data: pacientesData, error: pacienteError } = await supabase
         .from("pacientes")
         .select("*")
@@ -452,7 +319,6 @@ export default function PortalPaciente() {
 
       if (pacienteError) throw pacienteError;
       
-      // Si hay múltiples registros con el mismo RUT, buscar cuál tiene la atención más reciente
       let pacienteData: typeof pacientesData[0] | null = null;
       if (pacientesData && pacientesData.length > 1) {
         const pacienteIds = pacientesData.map(p => p.id);
@@ -464,9 +330,7 @@ export default function PortalPaciente() {
           .limit(1);
         
         if (atencionesRecientes && atencionesRecientes.length > 0) {
-          // Usar el paciente con la atención más reciente (tiene los datos más actualizados)
           pacienteData = pacientesData.find(p => p.id === atencionesRecientes[0].paciente_id) || pacientesData[0];
-          console.log("[Portal] Múltiples registros RUT, usando paciente con atención más reciente:", pacienteData.id);
         } else {
           pacienteData = pacientesData[0];
         }
@@ -474,22 +338,16 @@ export default function PortalPaciente() {
         pacienteData = pacientesData && pacientesData.length > 0 ? pacientesData[0] : null;
       }
 
-      // Usar zona horaria de Chile para el rango del día
       const today = new Date();
       const startOfDayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
       const endOfDayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
       const startOfDay = startOfDayDate.toISOString();
       const endOfDay = endOfDayDate.toISOString();
-      
-      console.log("[Portal] Buscando atención - RUT:", rutFormateado, "Rango:", startOfDay, "a", endOfDay);
 
       if (pacienteData) {
         setPaciente(pacienteData);
         
-        // Si el paciente tiene nombre "PENDIENTE DE REGISTRO", llevarlo al formulario
-        // para que complete sus datos (caso: recargó la página antes de terminar)
         if (pacienteData.nombre === "PENDIENTE DE REGISTRO") {
-          // Buscar su atención existente
           const { data: existingAtencion } = await supabase
             .from("atenciones")
             .select("*, boxes(*)")
@@ -502,19 +360,14 @@ export default function PortalPaciente() {
 
           if (existingAtencion) {
             setAtencion({ ...existingAtencion, atencion_examenes: [] });
-            toast({
-              title: `Su número de atención es #${existingAtencion.numero_ingreso}`,
-              description: "Por favor complete sus datos a continuación",
-            });
+            showMsg(`Su número de atención es #${existingAtencion.numero_ingreso}. Complete sus datos.`, "info", 0);
           }
 
-          // Ir a registro con el RUT ya establecido
           setFormData(prev => ({ ...prev, rut: rut }));
           setStep("registro");
           return;
         }
         
-        // Misma query que Flujo - un solo select con joins
         const { data: existingAtencion } = await supabase
           .from("atenciones")
           .select("*, pacientes(id, nombre, rut, tipo_servicio), boxes(*)")
@@ -526,7 +379,6 @@ export default function PortalPaciente() {
           .maybeSingle();
 
         if (existingAtencion) {
-          // Cargar exámenes por separado
           const { data: examenesData } = await supabase
             .from("atencion_examenes")
             .select("id, examen_id, estado, examenes(id, nombre)")
@@ -550,25 +402,16 @@ export default function PortalPaciente() {
           setAtencion(atencionCompleta);
           prevEstadoRef.current = existingAtencion.estado;
           prevBoxIdRef.current = existingAtencion.box_id;
-          
-          // NO cargar empresa automáticamente - recepción la asigna manualmente
-          // porque el paciente puede venir por diferentes empresas en distintas visitas
-          
-          toast({
-            title: "Bienvenido",
-            description: `Su número de atención es #${existingAtencion.numero_ingreso}`,
-          });
+          setInlineMsg(null);
         } else {
           console.log("[Portal] No se encontró atención existente, creando nueva para paciente:", pacienteData.id);
           
-          // Si hay agenda diferida, usar empresa/faena de ahí
           const insertData: any = {
             paciente_id: pacienteData.id,
             estado: "en_espera",
             fecha_ingreso: new Date().toISOString()
           };
 
-          // Actualizar paciente con datos de agenda diferida si existen
           if (agendaDiferida) {
             if (agendaDiferida.empresa_id) {
               await supabase.from("pacientes").update({
@@ -586,14 +429,8 @@ export default function PortalPaciente() {
             .select("*, boxes(*)")
             .single();
 
-          if (atencionError) {
-            console.error("[Portal] Error creando atención:", atencionError);
-            throw atencionError;
-          }
-          
-          console.log("[Portal] Atención creada:", newAtencion);
+          if (atencionError) throw atencionError;
 
-          // Vincular agenda diferida si existe
           if (agendaDiferida) {
             await vincularAgendaDiferida(agendaDiferida, newAtencion.id);
           }
@@ -605,7 +442,6 @@ export default function PortalPaciente() {
           prevEstadoRef.current = "en_espera";
           prevBoxIdRef.current = null;
           
-          // Pre-llenar formulario - priorizar datos de agenda diferida si existen
           const sourceData = agendaDiferida || pacienteData;
           const nombreParts = (sourceData.nombre || pacienteData.nombre)?.split(" ") || [];
           const direccionSource = agendaDiferida?.direccion || pacienteData.direccion;
@@ -627,14 +463,7 @@ export default function PortalPaciente() {
             ciudad: direccionParts[2] || direccionParts[0] || ""
           });
           
-          const toastMsg = agendaDiferida
-            ? `Tiene una cita programada${agendaDiferida.empresas?.nombre ? ` con ${agendaDiferida.empresas.nombre}` : ""}. Verifique sus datos.`
-            : "Verifique sus datos. Si son correctos, confirme para continuar.";
-          
-          toast({
-            title: `Su número de atención es #${newAtencion.numero_ingreso}`,
-            description: toastMsg,
-          });
+          showMsg(`Su número de atención es #${newAtencion.numero_ingreso}. Verifique sus datos.`, "info", 0);
           
           setStep("registro");
           return;
@@ -642,8 +471,6 @@ export default function PortalPaciente() {
         
         setStep("portal");
       } else {
-        // NUEVO FLUJO: Crear paciente placeholder y atención inmediatamente
-        // Esto garantiza que el paciente obtenga su número de atención antes de completar el registro
         const { data: newPaciente, error: createError } = await supabase
           .from("pacientes")
           .insert({
@@ -663,7 +490,6 @@ export default function PortalPaciente() {
 
         if (createError) throw createError;
 
-        // Crear atención inmediatamente para obtener número de ingreso
         const { data: newAtencion, error: atencionError } = await supabase
           .from("atenciones")
           .insert({
@@ -676,12 +502,10 @@ export default function PortalPaciente() {
 
         if (atencionError) throw atencionError;
 
-        // Vincular agenda diferida si existe
         if (agendaDiferida) {
           await vincularAgendaDiferida(agendaDiferida, newAtencion.id);
         }
 
-        // Pre-llenar formulario con datos de agenda diferida si existen
         if (agendaDiferida && agendaDiferida.nombre !== "PENDIENTE DE REGISTRO") {
           const nombreParts = agendaDiferida.nombre?.split(" ") || [];
           const direccionParts = agendaDiferida.direccion?.split(", ") || [];
@@ -704,14 +528,7 @@ export default function PortalPaciente() {
           setFormData(prev => ({ ...prev, rut: rut }));
         }
 
-        const toastDesc = agendaDiferida
-          ? `Tiene una cita programada${agendaDiferida.empresas?.nombre ? ` con ${agendaDiferida.empresas.nombre}` : ""}. Verifique sus datos.`
-          : "Por favor complete sus datos a continuación";
-
-        toast({
-          title: `Su número de atención es #${newAtencion.numero_ingreso}`,
-          description: toastDesc,
-        });
+        showMsg(`Su número de atención es #${newAtencion.numero_ingreso}. Complete sus datos.`, "info", 0);
 
         setPaciente(newPaciente);
         setAtencion({ ...newAtencion, atencion_examenes: [], boxes: null });
@@ -719,11 +536,7 @@ export default function PortalPaciente() {
       }
     } catch (error: any) {
       console.error("Error buscando paciente:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo buscar el paciente",
-        variant: "destructive"
-      });
+      showMsg("No se pudo buscar el paciente", "error");
     } finally {
       setIsLoading(false);
     }
@@ -734,41 +547,34 @@ export default function PortalPaciente() {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
-  // Validar que los 3 campos de nombre estén completos
   const isValidNombreCompleto = () => {
     return formData.primerNombre.trim().length > 0 && 
            formData.apellidoPaterno.trim().length > 0 && 
            formData.apellidoMaterno.trim().length > 0;
   };
 
-  // Concatenar nombre completo
   const getNombreCompleto = () => {
     return `${formData.primerNombre.trim()} ${formData.apellidoPaterno.trim()} ${formData.apellidoMaterno.trim()}`.trim();
   };
 
-  // Validar ciudad de Chile
   const isValidCiudad = (ciudad: string) => {
     return ciudadesChile.some(c => c.toLowerCase() === ciudad.toLowerCase().trim());
   };
 
-  // Concatenar dirección completa
   const getDireccionCompleta = () => {
     return `${formData.calle.trim()} ${formData.numeracion.trim()} ${formData.ciudad.trim()}`.trim();
   };
 
-  // Handler para campos de nombre - auto mayúsculas, sin espacios
   const handleNombreFieldChange = (field: 'primerNombre' | 'apellidoPaterno' | 'apellidoMaterno') => (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\s/g, '').toUpperCase();
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  // Handler para calle - auto mayúsculas
   const handleCalleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.toUpperCase();
     setFormData(prev => ({ ...prev, calle: value }));
   };
 
-  // Handler para ciudad con autocompletado
   const handleCiudadChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setFormData(prev => ({ ...prev, ciudad: value }));
@@ -785,20 +591,17 @@ export default function PortalPaciente() {
     }
   };
 
-  // Seleccionar ciudad de sugerencias
   const seleccionarCiudad = (ciudad: string) => {
     setFormData(prev => ({ ...prev, ciudad }));
     setShowCiudadSugerencias(false);
     setCiudadSugerencias([]);
   };
 
-  // Handler para teléfono - solo 9 dígitos
   const handleTelefonoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, "").slice(0, 9);
     setFormData(prev => ({ ...prev, telefono: value }));
   };
 
-  // Formatear teléfono para display (9 1234 5678)
   const formatTelefonoDisplay = (value: string) => {
     if (!value) return "";
     const cleaned = value.replace(/\D/g, "");
@@ -807,22 +610,19 @@ export default function PortalPaciente() {
     return `${cleaned.slice(0, 1)} ${cleaned.slice(1, 5)} ${cleaned.slice(5)}`;
   };
 
-  // Handler para fecha manual (DD/MM/AAAA)
   const handleFechaNacimientoManual = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/[^\d]/g, "");
     
-    // Auto-formatear con slashes
     if (value.length >= 2) {
       value = value.slice(0, 2) + "/" + value.slice(2);
     }
     if (value.length >= 5) {
       value = value.slice(0, 5) + "/" + value.slice(5);
     }
-    value = value.slice(0, 10); // Max DD/MM/AAAA
+    value = value.slice(0, 10);
     
     setFormData(prev => ({ ...prev, fecha_nacimiento_display: value }));
     
-    // Intentar parsear y guardar en formato ISO
     if (value.length === 10) {
       const parsed = parse(value, "dd/MM/yyyy", new Date());
       if (isValid(parsed) && parsed <= new Date()) {
@@ -835,7 +635,6 @@ export default function PortalPaciente() {
     }
   };
 
-  // Handler para selección de calendario
   const handleCalendarSelect = (date: Date | undefined) => {
     if (date) {
       setFormData(prev => ({
@@ -847,45 +646,25 @@ export default function PortalPaciente() {
   };
 
   const registrarPaciente = async () => {
-    // Validaciones
     const errores: string[] = [];
     
-    if (!formData.primerNombre.trim()) {
-      errores.push("Nombre es obligatorio");
-    }
-    if (!formData.apellidoPaterno.trim()) {
-      errores.push("Apellido paterno es obligatorio");
-    }
-    if (!formData.apellidoMaterno.trim()) {
-      errores.push("Apellido materno es obligatorio");
-    }
-    
-    if (!formData.rut.trim()) {
-      errores.push("RUT es obligatorio");
-    }
-    
-    if (!formData.fecha_nacimiento) {
-      errores.push("Fecha de nacimiento es obligatoria");
-    }
-    
+    if (!formData.primerNombre.trim()) errores.push("Nombre es obligatorio");
+    if (!formData.apellidoPaterno.trim()) errores.push("Apellido paterno es obligatorio");
+    if (!formData.apellidoMaterno.trim()) errores.push("Apellido materno es obligatorio");
+    if (!formData.rut.trim()) errores.push("RUT es obligatorio");
+    if (!formData.fecha_nacimiento) errores.push("Fecha de nacimiento es obligatoria");
     if (!formData.email.trim()) {
       errores.push("Email es obligatorio");
     } else if (!isValidEmail(formData.email)) {
       errores.push("Email no tiene formato válido");
     }
-    
     if (!formData.telefono) {
       errores.push("Teléfono es obligatorio");
     } else if (formData.telefono.length !== 9) {
       errores.push("El teléfono debe tener 9 dígitos");
     }
-    
-    if (!formData.calle.trim()) {
-      errores.push("Calle es obligatoria");
-    }
-    if (!formData.numeracion.trim()) {
-      errores.push("Numeración es obligatoria");
-    }
+    if (!formData.calle.trim()) errores.push("Calle es obligatoria");
+    if (!formData.numeracion.trim()) errores.push("Numeración es obligatoria");
     if (!formData.ciudad.trim()) {
       errores.push("Ciudad es obligatoria");
     } else if (!isValidCiudad(formData.ciudad)) {
@@ -893,11 +672,7 @@ export default function PortalPaciente() {
     }
 
     if (errores.length > 0) {
-      toast({
-        title: "Campos incompletos",
-        description: errores[0],
-        variant: "destructive"
-      });
+      showMsg(errores[0], "error", 8000);
       return;
     }
 
@@ -906,7 +681,6 @@ export default function PortalPaciente() {
 
     setIsLoading(true);
     try {
-      // PASO 1: Siempre resolver el paciente por RUT para evitar problemas de pérdida de estado
       const { data: pacientesPorRut } = await supabase
         .from("pacientes")
         .select("*")
@@ -914,32 +688,10 @@ export default function PortalPaciente() {
         .order("created_at", { ascending: false })
         .limit(1);
 
-      // Usar el paciente encontrado por RUT o el que tenemos en estado
       const pacienteActual = pacientesPorRut?.[0] ?? paciente;
 
-      // PASO 2: Si encontramos un paciente existente (placeholder o no)
       if (pacienteActual) {
-        // Si ya está completamente registrado (no es placeholder), redirigir a identificación
-        if (pacienteActual.nombre !== "PENDIENTE DE REGISTRO" && pacienteActual.nombre !== null) {
-          // Verificar si es el mismo paciente intentando re-registrarse o uno diferente
-          const nombreExistente = pacienteActual.nombre?.toLowerCase().trim();
-          const nombreNuevo = getNombreCompleto().toLowerCase().trim();
-          
-          if (nombreExistente !== nombreNuevo) {
-            toast({
-              title: "RUT ya registrado",
-              description: "Este RUT ya está registrado con otro nombre. Por favor verifique.",
-              variant: "destructive"
-            });
-            setRut(formData.rut);
-            setStep("identificacion");
-            setIsLoading(false);
-            return;
-          }
-        }
-
-        // Actualizar el paciente (sea placeholder o existente)
-        const { data: updateData, error: updateError } = await supabase
+        const { error: updateError } = await supabase
           .from("pacientes")
           .update({
             nombre: getNombreCompleto(),
@@ -949,53 +701,22 @@ export default function PortalPaciente() {
             telefono: telefonoCompleto,
             direccion: getDireccionCompleta()
           })
-          .eq("id", pacienteActual.id)
-          .select("id");
+          .eq("id", pacienteActual.id);
 
         if (updateError) throw updateError;
 
-        // Verificar que el UPDATE afectó al menos una fila
-        if (!updateData || updateData.length === 0) {
-          toast({
-            title: "No se pudo guardar",
-            description: "El registro no pudo ser actualizado. Verifique que todos los campos estén completos e intente nuevamente.",
-            variant: "destructive"
-          });
-          setIsLoading(false);
-          return;
-        }
-
-        // Recuperar el paciente actualizado
-        const { data: updatedPacientes, error: selectError } = await supabase
-          .from("pacientes")
-          .select("*")
-          .eq("id", pacienteActual.id)
-          .limit(1);
-
-        if (selectError) throw selectError;
-        
-        const updatedPaciente = updatedPacientes?.[0] ?? null;
-        
-        if (!updatedPaciente) {
-          throw new Error("No se pudo confirmar el guardado. Por favor reingrese su RUT.");
-        }
-
-        // Verificar que el nombre ya no sea PENDIENTE DE REGISTRO
-        if (updatedPaciente.nombre === "PENDIENTE DE REGISTRO") {
-          toast({
-            title: "Registro incompleto",
-            description: "Los datos no se guardaron correctamente. Por favor intente nuevamente.",
-            variant: "destructive"
-          });
-          setIsLoading(false);
-          return;
-        }
-
+        const updatedPaciente = { 
+          ...pacienteActual, 
+          nombre: getNombreCompleto(),
+          rut: rutFormateado,
+          fecha_nacimiento: formData.fecha_nacimiento,
+          email: formData.email.trim().toLowerCase(),
+          telefono: telefonoCompleto,
+          direccion: getDireccionCompleta()
+        };
         setPaciente(updatedPaciente);
 
-        // PASO 3: Recuperar la atención existente si no la tenemos en estado
         let atencionFinal = atencion;
-        
         if (!atencionFinal) {
           const today = new Date();
           const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).toISOString();
@@ -1020,14 +741,9 @@ export default function PortalPaciente() {
           }
         }
         
-        toast({
-          title: "Registro completado",
-          description: `Su número de atención es #${atencionFinal?.numero_ingreso || "pendiente"}. Espere a que el recepcionista complete su registro.`,
-        });
-
+        setInlineMsg(null);
         setStep("portal");
       } else {
-        // PASO 4: Caso extremo - no hay paciente ni en estado ni en DB (no debería pasar normalmente)
         const { data: newPaciente, error } = await supabase
           .from("pacientes")
           .insert({
@@ -1062,32 +778,24 @@ export default function PortalPaciente() {
         prevEstadoRef.current = "en_espera";
         prevBoxIdRef.current = null;
         
-        toast({
-          title: "Registro exitoso",
-          description: `Su número de atención es #${newAtencion.numero_ingreso}. Espere a que el recepcionista complete su registro.`,
-        });
-
+        setInlineMsg(null);
         setStep("portal");
       }
     } catch (error: any) {
       console.error("Error registrando paciente:", error);
-      toast({
-        title: "Error",
-        description: error.message || "No se pudo registrar el paciente",
-        variant: "destructive"
-      });
+      showMsg(error.message || "No se pudo registrar el paciente", "error");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const abrirTest = async (test: ExamenTest) => {
-    setCurrentTest(test);
-    setTestModalOpen(true);
+  const abrirTest = (test: ExamenTest) => {
+    // Open in new tab instead of modal popup
+    window.open(test.url, "_blank");
 
     if (atencion) {
       try {
-        await supabase
+        supabase
           .from("paciente_test_tracking" as any)
           .upsert({
             atencion_id: atencion.id,
@@ -1095,7 +803,7 @@ export default function PortalPaciente() {
             abierto_at: new Date().toISOString()
           } as any, {
             onConflict: "atencion_id,examen_test_id"
-          });
+          }).then(() => {});
 
         setTestTracking(prev => {
           const exists = prev.find(t => t.examen_test_id === test.id);
@@ -1108,42 +816,9 @@ export default function PortalPaciente() {
     }
   };
 
-  const cerrarTest = () => {
-    setTestModalOpen(false);
-    setCurrentTest(null);
+  const isTestCompleted = (testId: string) => {
+    return testTracking.some(t => t.examen_test_id === testId);
   };
-
-  // Mostrar notificación cuando el paciente es llamado - v0.0.5 defensiva
-  const mostrarNotificacionLlamado = useCallback((boxName: string) => {
-    console.log("[Portal v" + PORTAL_VERSION + "] Mostrando notificación para box:", boxName);
-
-    // Primero mostrar el toast (lo más importante)
-    let toastId: string | undefined;
-    try {
-      const result = toast({
-        title: "¡ES SU TURNO!",
-        description: `Diríjase al box: ${boxName}`,
-        duration: 0, // Persistente hasta que el usuario cierre
-        action: (
-          <ToastAction
-            altText="Entendido"
-            onClick={() => {
-              if (toastId) dismiss(toastId);
-            }}
-          >
-            OK
-          </ToastAction>
-        ),
-      });
-      toastId = result.id;
-    } catch (e) {
-      console.error("[Portal v" + PORTAL_VERSION + "] Error mostrando toast:", e);
-    }
-
-    // Luego intentar sonido y vibración (en segundo plano, sin bloquear)
-    reproducirSonido();
-    vibrar();
-  }, [toast, dismiss, reproducirSonido, vibrar]);
 
   // Polling con la MISMA lógica que Flujo
   useEffect(() => {
@@ -1155,13 +830,11 @@ export default function PortalPaciente() {
         const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).toISOString();
         const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).toISOString();
 
-        // Cargar boxes con sus exámenes (como Flujo)
         const { data: boxesData } = await supabase
           .from("boxes")
           .select("*, box_examenes(examen_id)")
           .eq("activo", true);
         
-        // Solo actualizar boxes si hay cambios
         const boxesHash = JSON.stringify(boxesData || []);
         if (boxesHash !== prevBoxesHashRef.current) {
           prevBoxesHashRef.current = boxesHash;
@@ -1170,7 +843,6 @@ export default function PortalPaciente() {
           }
         }
 
-        // Query IDÉNTICA a Flujo - un solo select con join a boxes
         const { data: atencionData, error } = await supabase
           .from("atenciones")
           .select("*, pacientes(id, nombre, rut, tipo_servicio), boxes(*)")
@@ -1188,26 +860,22 @@ export default function PortalPaciente() {
 
         if (!atencionData) return;
 
-        // Obtener nombre del box directamente del join (como Flujo)
         const boxNombre = atencionData.boxes?.nombre || null;
 
-        // Detectar si el paciente fue llamado (transición a en_atencion con box)
+        // Detectar si el paciente fue llamado
         const fueRecienLlamado = 
           atencionData.estado === "en_atencion" && 
           atencionData.box_id && 
           (prevEstadoRef.current !== "en_atencion" || prevBoxIdRef.current !== atencionData.box_id);
 
-        // Actualizar refs ANTES de mostrar notificación
         prevEstadoRef.current = atencionData.estado;
         prevBoxIdRef.current = atencionData.box_id;
 
-        // Cargar exámenes
         const { data: examenesData } = await supabase
           .from("atencion_examenes")
           .select("id, examen_id, estado, examenes(id, nombre)")
           .eq("atencion_id", atencionData.id);
 
-        // Crear hash para comparar si hay cambios
         const dataHash = JSON.stringify({
           estado: atencionData.estado,
           box_id: atencionData.box_id,
@@ -1216,11 +884,9 @@ export default function PortalPaciente() {
           examenes: examenesData
         });
 
-        // Solo actualizar si hay cambios reales
         if (dataHash !== prevDataHashRef.current) {
           prevDataHashRef.current = dataHash;
 
-          // Construir objeto de atención
           const atencionCompleta: Atencion = {
             id: atencionData.id,
             estado: atencionData.estado,
@@ -1238,7 +904,6 @@ export default function PortalPaciente() {
 
           setAtencion(atencionCompleta);
 
-          // Calcular boxes pendientes (como Flujo)
           const examenesPendientesIds = (examenesData || [])
             .filter((ae: any) => ae.estado === "pendiente" || ae.estado === "incompleto")
             .map((ae: any) => ae.examen_id);
@@ -1250,28 +915,17 @@ export default function PortalPaciente() {
           setPendingBoxes(boxesPendientes);
         }
 
-        // Mostrar notificación si fue llamado
-        if (fueRecienLlamado && boxNombre) {
-          mostrarNotificacionLlamado(boxNombre);
-        }
-
-        // Cargar empresa si no está cargada
-        // Ya no cargamos empresa ni tipo_servicio automáticamente
-        // Recepción los asigna manualmente porque el paciente puede venir por diferentes empresas
+        // No notification needed - the sticky banner auto-updates via state
 
       } catch (error) {
         console.error("[Portal] Error en polling:", error);
       }
     };
 
-    // Carga inicial
     cargarDatos();
-
-    // Polling cada 3 segundos (igual que antes)
     const interval = setInterval(cargarDatos, 3000);
-
     return () => clearInterval(interval);
-  }, [paciente?.id, step, mostrarNotificacionLlamado]);
+  }, [paciente?.id, step]);
 
   // Refrescar manual
   const refreshData = useCallback(async () => {
@@ -1313,20 +967,89 @@ export default function PortalPaciente() {
           }))
         });
       }
-
-      toast({
-        title: "Actualizado",
-        description: "Información actualizada correctamente",
-      });
     } catch (error) {
       console.error("Error refreshing:", error);
     } finally {
       setIsRefreshing(false);
     }
-  }, [paciente?.id, isRefreshing, toast]);
+  }, [paciente?.id, isRefreshing]);
 
-  const isTestCompleted = (testId: string) => {
-    return testTracking.some(t => t.examen_test_id === testId);
+  // ============ Inline message banner (replaces toasts) ============
+  const InlineMessageBanner = () => {
+    if (!inlineMsg) return null;
+    const bgClass = inlineMsg.type === "error" 
+      ? "bg-destructive text-destructive-foreground" 
+      : inlineMsg.type === "success" 
+        ? "bg-green-600 text-white"
+        : "bg-primary text-primary-foreground";
+    return (
+      <div className={`w-full px-4 py-3 text-sm font-medium text-center rounded-lg mb-3 ${bgClass}`}>
+        {inlineMsg.text}
+      </div>
+    );
+  };
+
+  // ============ Sticky Status Banner for portal view ============
+  const StickyStatusBanner = () => {
+    if (!atencion) return null;
+
+    if (atencion.estado === "en_atencion" && atencion.boxes?.nombre) {
+      return (
+        <div className="sticky top-0 z-50 w-full">
+          <div className="bg-green-600 text-white px-4 py-4 text-center shadow-lg animate-pulse">
+            <div className="flex items-center justify-center gap-2">
+              <MapPin className="h-5 w-5" />
+              <span className="text-lg font-bold">¡ES SU TURNO!</span>
+            </div>
+            <div className="text-xl font-black mt-1">
+              Diríjase al Box {atencion.boxes.nombre}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (atencion.estado === "en_espera") {
+      return (
+        <div className="sticky top-0 z-50 w-full">
+          <div className="bg-amber-500 text-white px-4 py-3 text-center shadow-md">
+            <div className="flex items-center justify-center gap-2">
+              <Clock className="h-4 w-4" />
+              <span className="font-semibold">En espera de atención — Turno #{atencion.numero_ingreso}</span>
+            </div>
+            <p className="text-xs mt-0.5 opacity-90">Le informaremos aquí cuando sea llamado a un box</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (atencion.estado === "completado") {
+      return (
+        <div className="sticky top-0 z-50 w-full">
+          <div className="bg-green-700 text-white px-4 py-3 text-center shadow-md">
+            <div className="flex items-center justify-center gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              <span className="font-semibold">Atención completada</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (atencion.estado === "incompleto") {
+      return (
+        <div className="sticky top-0 z-50 w-full">
+          <div className="bg-amber-600 text-white px-4 py-3 text-center shadow-md">
+            <div className="flex items-center justify-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              <span className="font-semibold">Atención incompleta — Turno #{atencion.numero_ingreso}</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return null;
   };
 
   if (step === "codigo") {
@@ -1338,6 +1061,7 @@ export default function PortalPaciente() {
             <CardDescription>Ingrese el código del día proporcionado en recepción</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <InlineMessageBanner />
             <div>
               <Label htmlFor="codigo">Código del Día</Label>
               <Input
@@ -1380,6 +1104,7 @@ export default function PortalPaciente() {
             <CardDescription>Ingrese su RUT para identificarse</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <InlineMessageBanner />
             <div>
               <Label htmlFor="rut">RUT</Label>
               <Input
@@ -1421,6 +1146,7 @@ export default function PortalPaciente() {
             <CardDescription>Complete sus datos para registrarse</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
+            <InlineMessageBanner />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="primerNombre" className="text-sm font-medium mb-1.5 block">Nombre *</Label>
@@ -1464,7 +1190,7 @@ export default function PortalPaciente() {
               </div>
               <div>
                 <Label htmlFor="fecha_nacimiento" className="text-sm font-medium mb-1.5 block">Fecha de Nacimiento *</Label>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
                   <Input
                     id="fecha_nacimiento"
                     placeholder="DD/MM/AAAA"
@@ -1472,10 +1198,11 @@ export default function PortalPaciente() {
                     onChange={handleFechaNacimientoManual}
                     className="h-11 flex-1"
                     maxLength={10}
+                    inputMode="numeric"
                   />
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" size="icon" className="h-11 w-11 shrink-0">
+                      <Button variant="outline" size="icon" className="h-11 w-11 flex-shrink-0">
                         <CalendarIcon className="h-4 w-4" />
                       </Button>
                     </PopoverTrigger>
@@ -1484,9 +1211,12 @@ export default function PortalPaciente() {
                         mode="single"
                         selected={formData.fecha_nacimiento ? new Date(formData.fecha_nacimiento + "T12:00:00") : undefined}
                         onSelect={handleCalendarSelect}
-                        disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                        disabled={(date) => date > new Date()}
                         initialFocus
-                        className={cn("p-3 pointer-events-auto")}
+                        captionLayout="dropdown-buttons"
+                        fromYear={1920}
+                        toYear={new Date().getFullYear()}
+                        className={cn("p-3")}
                       />
                     </PopoverContent>
                   </Popover>
@@ -1599,10 +1329,12 @@ export default function PortalPaciente() {
 
   // Portal view
   return (
-    <div className="min-h-screen p-4" style={{ backgroundImage: `url(${portalBackground})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+    <div className="min-h-screen" style={{ backgroundImage: `url(${portalBackground})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+      {/* Sticky Status Banner - always visible at top */}
+      <StickyStatusBanner />
 
-      <div className="max-w-lg mx-auto space-y-4">
-        {/* Patient Card - Similar to Flujo */}
+      <div className="max-w-lg mx-auto space-y-4 p-4">
+        {/* Patient Card */}
         <Card className="border-border">
           <CardContent className="pt-6">
             <div className="flex items-start justify-between mb-3">
@@ -1643,7 +1375,7 @@ export default function PortalPaciente() {
                   </div>
                 )}
 
-                {/* Exams grouped by box - Like Flujo */}
+                {/* Exams grouped by box */}
                 {atencion && atencion.atencion_examenes.length > 0 && (
                   <Collapsible className="mt-3" defaultOpen>
                     <CollapsibleTrigger className="flex items-center gap-1 text-sm text-primary hover:underline">
@@ -1707,7 +1439,7 @@ export default function PortalPaciente() {
                 )}
               </div>
               
-              {/* Status Badge */}
+              {/* Refresh button */}
               <div className="flex flex-col items-end gap-2">
                 <Button
                   variant="outline"
@@ -1718,24 +1450,6 @@ export default function PortalPaciente() {
                 >
                   <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 </Button>
-                {atencion && (
-                  <Badge 
-                    variant={
-                      atencion.estado === "completado" ? "default" :
-                      atencion.estado === "en_atencion" ? "secondary" : "outline"
-                    }
-                    className={`text-xs ${
-                      atencion.estado === "completado" ? "bg-green-600" :
-                      atencion.estado === "en_atencion" ? "bg-blue-600 text-white" : 
-                      atencion.estado === "incompleto" ? "bg-amber-500 text-white" : ""
-                    }`}
-                  >
-                    {atencion.estado === "en_espera" && "En Espera"}
-                    {atencion.estado === "en_atencion" && `En Box ${atencion.boxes?.nombre || ""}`}
-                    {atencion.estado === "completado" && "Completado"}
-                    {atencion.estado === "incompleto" && "Incompleto"}
-                  </Badge>
-                )}
               </div>
             </div>
             
@@ -1817,7 +1531,7 @@ export default function PortalPaciente() {
         {/* Cuestionarios completables por el paciente */}
         {atencion && <PortalCuestionarios atencionId={atencion.id} />}
 
-        {/* Tests / Forms */}
+        {/* Tests / Forms - opens in new tab */}
         {examenTests.length > 0 && (
           <Card>
             <CardHeader>
@@ -1873,32 +1587,6 @@ export default function PortalPaciente() {
           Cambiar Paciente
         </Button>
       </div>
-
-      {/* Test Modal */}
-      <Dialog open={testModalOpen} onOpenChange={setTestModalOpen}>
-        <DialogContent className="max-w-4xl h-[90vh] p-0 flex flex-col">
-          <DialogHeader className="p-4 border-b flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <DialogTitle>{currentTest?.nombre}</DialogTitle>
-              <Button variant="ghost" size="icon" onClick={cerrarTest}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </DialogHeader>
-          <div className="flex-1 overflow-hidden">
-            {currentTest && (
-              <iframe
-                src={currentTest.url}
-                className="w-full h-full border-0"
-                title={currentTest.nombre}
-                allow="camera; microphone"
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Documento Modal removed - documents now expand inline */}
 
       {/* Indicador de versión */}
       <div className="fixed bottom-2 left-2 text-xs text-muted-foreground/50 select-none pointer-events-none">
