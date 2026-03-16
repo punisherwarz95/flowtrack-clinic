@@ -672,6 +672,10 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
                           esExterno={group.prestadorTipo === "externo"}
                           hideSaveButton
                           atencionId={atencionId}
+                          archivosVinculados={group.archivosCompartidos.map(a => ({
+                            nombre_archivo: a.nombre_archivo,
+                            archivo_url: a.archivo_url,
+                          }))}
                           onComplete={() => {
                             onComplete?.();
                             loadPrestadorData();
