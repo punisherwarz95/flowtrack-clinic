@@ -10,7 +10,7 @@ import { logActivity } from "@/lib/activityLog";
 const Navigation = () => {
   const location = useLocation();
   const { user, signOut } = useAuth();
-  const { hasPermission } = usePermissions(user);
+  const { hasPermission } = useAuthContext();
   const { theme, toggleTheme } = useTheme();
 
   const allLinks = [
