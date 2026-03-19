@@ -1592,10 +1592,17 @@ const Pacientes = () => {
                 <div className="flex flex-col overflow-hidden">
                   <h3 className="font-semibold text-sm text-muted-foreground border-b pb-2 mb-2 flex-shrink-0 flex items-center justify-between">
                     Agregar Exámenes
-                    <Button type="button" variant={mostrarPegarTexto ? "secondary" : "outline"} size="sm" className="h-7 text-xs gap-1"
-                      onClick={() => setMostrarPegarTexto(!mostrarPegarTexto)}>
-                      <ClipboardPaste className="h-3 w-3" />Pegar texto
-                    </Button>
+                    <div className="flex gap-1">
+                      <CopiarExamenesPaciente
+                        onCopyExamenes={(examenIds) => {
+                          setSelectedExamenes(prev => [...new Set([...prev, ...examenIds])]);
+                        }}
+                      />
+                      <Button type="button" variant={mostrarPegarTexto ? "secondary" : "outline"} size="sm" className="h-7 text-xs gap-1"
+                        onClick={() => setMostrarPegarTexto(!mostrarPegarTexto)}>
+                        <ClipboardPaste className="h-3 w-3" />Pegar texto
+                      </Button>
+                    </div>
                   </h3>
 
                   {mostrarPegarTexto && (
