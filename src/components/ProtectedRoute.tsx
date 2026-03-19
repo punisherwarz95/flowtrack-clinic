@@ -1,5 +1,4 @@
 import { Navigate } from "react-router-dom";
-import { usePermissions } from "@/hooks/usePermissions";
 import { useAuthContext } from "@/contexts/AuthContext";
 
 interface ProtectedRouteProps {
@@ -8,12 +7,11 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ children, path }: ProtectedRouteProps) => {
-  const { user, loading: authLoading } = useAuthContext();
-  const { hasPermission, loading: permLoading } = usePermissions(user);
+  const { user, loading: authLoading, hasPermission, permissionsLoading } = useAuthContext();
 
   const userTipo = (user?.user_metadata as any)?.tipo;
 
-  if (authLoading || permLoading) {
+  if (authLoading || permissionsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -21,17 +19,14 @@ const ProtectedRoute = ({ children, path }: ProtectedRouteProps) => {
     );
   }
 
-  // No user logged in, redirect to login
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  // Usuario autenticado pero pertenece al Portal Empresas
   if (userTipo === "empresa") {
     return <Navigate to="/empresa" replace />;
   }
 
-  // User logged in but no permission for this path
   if (!hasPermission(path)) {
     return <Navigate to="/login" replace />;
   }
