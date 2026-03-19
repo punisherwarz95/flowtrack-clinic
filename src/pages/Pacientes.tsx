@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PreReservasManagement from "@/components/PreReservasManagement";
 import CodigoDelDia from "@/components/CodigoDelDia";
 import { useGenerateDocumentosFromBateria } from "@/hooks/useAtencionDocumentos";
+import CopiarExamenesPaciente from "@/components/CopiarExamenesPaciente";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
