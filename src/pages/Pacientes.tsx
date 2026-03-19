@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PreReservasManagement from "@/components/PreReservasManagement";
 import CodigoDelDia from "@/components/CodigoDelDia";
 import { useGenerateDocumentosFromBateria } from "@/hooks/useAtencionDocumentos";
+import CopiarExamenesPaciente from "@/components/CopiarExamenesPaciente";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
@@ -1591,10 +1592,17 @@ const Pacientes = () => {
                 <div className="flex flex-col overflow-hidden">
                   <h3 className="font-semibold text-sm text-muted-foreground border-b pb-2 mb-2 flex-shrink-0 flex items-center justify-between">
                     Agregar Exámenes
-                    <Button type="button" variant={mostrarPegarTexto ? "secondary" : "outline"} size="sm" className="h-7 text-xs gap-1"
-                      onClick={() => setMostrarPegarTexto(!mostrarPegarTexto)}>
-                      <ClipboardPaste className="h-3 w-3" />Pegar texto
-                    </Button>
+                    <div className="flex gap-1">
+                      <CopiarExamenesPaciente
+                        onCopyExamenes={(examenIds) => {
+                          setSelectedExamenes(prev => [...new Set([...prev, ...examenIds])]);
+                        }}
+                      />
+                      <Button type="button" variant={mostrarPegarTexto ? "secondary" : "outline"} size="sm" className="h-7 text-xs gap-1"
+                        onClick={() => setMostrarPegarTexto(!mostrarPegarTexto)}>
+                        <ClipboardPaste className="h-3 w-3" />Pegar texto
+                      </Button>
+                    </div>
                   </h3>
 
                   {mostrarPegarTexto && (
