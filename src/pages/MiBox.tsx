@@ -17,7 +17,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
-import { usePermissions } from "@/hooks/usePermissions";
+import { useAuthContext } from "@/contexts/AuthContext";
 import { GlobalChat } from "@/components/GlobalChat";
 import { useAtencionDocumentos } from "@/hooks/useAtencionDocumentos";
 import { usePresionTimers } from "@/hooks/usePresionTimers";
