@@ -269,7 +269,7 @@ const MiBox = () => {
       // Completados hoy
       const pacientesAtendidosBox: AtencionConExamenes[] = [];
       for (const atencion of todasData) {
-        const exams = (examenesByAtencion[atencion.id] || []).filter((e: any) => e.estado === "completado");
+        const exams = (examenesByAtencion[atencion.id] || []).filter((e: any) => e.estado === "completado" || e.estado === "muestra_tomada");
         if (exams.length > 0) {
           pacientesAtendidosBox.push({
             ...atencion,
