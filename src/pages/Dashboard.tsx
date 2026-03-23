@@ -229,7 +229,7 @@ const Dashboard = () => {
       const startOfDay = new Date(dateToUse.getFullYear(), dateToUse.getMonth(), dateToUse.getDate(), 0, 0, 0, 0).toISOString();
       const endOfDay = new Date(dateToUse.getFullYear(), dateToUse.getMonth(), dateToUse.getDate(), 23, 59, 59, 999).toISOString();
 
-      const [atencionesRes, completadosRes, examenesRes, examenesRealizadosRes, boxExamenesRes] = await Promise.all([
+      const [atencionesRes, completadosRes, examenesRes, examenesRealizadosRes] = await Promise.all([
         supabase
           .from("atenciones")
           .select("estado, pacientes(tipo_servicio)")
@@ -248,9 +248,6 @@ const Dashboard = () => {
           .select("id, examen_id, estado, examenes(nombre), atencion_id, atenciones!inner(fecha_ingreso)")
           .gte("atenciones.fecha_ingreso", startOfDay)
           .lte("atenciones.fecha_ingreso", endOfDay),
-        supabase
-          .from("box_examenes")
-          .select("examen_id, boxes(nombre)"),
       ]);
 
       const enEsperaData = atencionesRes.data?.filter((a: any) => a.estado === "en_espera") || [];
