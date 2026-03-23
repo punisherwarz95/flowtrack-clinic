@@ -196,25 +196,17 @@ const Flujo = () => {
         atencionesQuery = atencionesQuery.gte("fecha_ingreso", startOfDay).lte("fecha_ingreso", endOfDay);
       }
 
-      const [atencionesRes, boxesRes, examenesRes] = await Promise.all([
-        atencionesQuery,
-        supabase
-          .from("boxes")
-          .select("*, box_examenes(examen_id)")
-          .eq("activo", true),
-        supabase
-          .from("examenes")
-          .select("*")
-          .order("nombre", { ascending: true }),
-      ]);
+      // Use cached reference data, only fetch atenciones from DB
+      const atencionesRes = await atencionesQuery;
 
       if (atencionesRes.error) throw atencionesRes.error;
-      if (boxesRes.error) throw boxesRes.error;
-      if (examenesRes.error) throw examenesRes.error;
+
+      const boxesData = cachedBoxes || [];
+      const examenesData = cachedExamenes || [];
 
       setAtenciones(atencionesRes.data || []);
-      setBoxes(boxesRes.data || []);
-      setExamenes(examenesRes.data || []);
+      setBoxes(boxesData as Box[]);
+      setExamenes(examenesData as Examen[]);
 
       // Cargar datos optimizados en paralelo (v0.0.1)
       await Promise.all([
