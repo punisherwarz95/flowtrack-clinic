@@ -10,6 +10,7 @@ import CodigoDelDia from "@/components/CodigoDelDia";
 import { useGenerateDocumentosFromBateria } from "@/hooks/useAtencionDocumentos";
 import CopiarExamenesPaciente from "@/components/CopiarExamenesPaciente";
 import { supabase } from "@/integrations/supabase/client";
+import { useEmpresas, useExamenes, usePaquetes, useFaenas, useDocumentosFormularios, useBateriaFaenasMap } from "@/hooks/useReferenceData";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import { format } from "date-fns";
@@ -195,16 +196,35 @@ const Pacientes = () => {
     direccion: "",
   });
 
-  useEffect(() => {
-    // Load all reference data in parallel on mount
-    Promise.all([
-      loadEmpresas(),
-      loadExamenes(),
-      loadPaquetes(),
-      loadAllFaenasAndBateriaFaenas(),
-      loadDocumentosDisponibles(),
-    ]);
+  // Use cached reference data hooks
+  const { data: cachedEmpresas } = useEmpresas();
+  const { data: cachedExamenes } = useExamenes();
+  const { data: cachedPaquetes } = usePaquetes();
+  const { data: cachedFaenas } = useFaenas();
+  const { data: cachedDocumentos } = useDocumentosFormularios();
+  const { data: cachedBateriaFaenasMap } = useBateriaFaenasMap();
 
+  // Sync cached data to local state
+  useEffect(() => {
+    if (cachedEmpresas) setEmpresas(cachedEmpresas as Empresa[]);
+  }, [cachedEmpresas]);
+  useEffect(() => {
+    if (cachedExamenes) setExamenes(cachedExamenes as Examen[]);
+  }, [cachedExamenes]);
+  useEffect(() => {
+    if (cachedPaquetes) setPaquetes(cachedPaquetes as Paquete[]);
+  }, [cachedPaquetes]);
+  useEffect(() => {
+    if (cachedFaenas) setAllFaenas(cachedFaenas as Faena[]);
+  }, [cachedFaenas]);
+  useEffect(() => {
+    if (cachedDocumentos) setDocumentosDisponibles(cachedDocumentos as DocumentoFormulario[]);
+  }, [cachedDocumentos]);
+  useEffect(() => {
+    if (cachedBateriaFaenasMap) setPaqueteFaenasMap(cachedBateriaFaenasMap);
+  }, [cachedBateriaFaenasMap]);
+
+  useEffect(() => {
     // Auto-refresh patients every 15 seconds
     const interval = setInterval(() => {
       loadPatients();

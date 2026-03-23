@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { useBoxes, useExamenes } from "@/hooks/useReferenceData";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import { Play, CheckCircle, XCircle, Calendar as CalendarIcon, FileText, RefreshCw, ChevronDown, Check, FileWarning } from "lucide-react";
@@ -63,6 +65,8 @@ interface Examen {
 
 const Flujo = () => {
   const { user } = useAuth(); // Protect route and get current user
+  const { data: cachedBoxes } = useBoxes();
+  const { data: cachedExamenes } = useExamenes();
   const [atenciones, setAtenciones] = useState<Atencion[]>([]);
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [examenes, setExamenes] = useState<Examen[]>([]);
@@ -192,31 +196,23 @@ const Flujo = () => {
         atencionesQuery = atencionesQuery.gte("fecha_ingreso", startOfDay).lte("fecha_ingreso", endOfDay);
       }
 
-      const [atencionesRes, boxesRes, examenesRes] = await Promise.all([
-        atencionesQuery,
-        supabase
-          .from("boxes")
-          .select("*, box_examenes(examen_id)")
-          .eq("activo", true),
-        supabase
-          .from("examenes")
-          .select("*")
-          .order("nombre", { ascending: true }),
-      ]);
+      // Use cached reference data, only fetch atenciones from DB
+      const atencionesRes = await atencionesQuery;
 
       if (atencionesRes.error) throw atencionesRes.error;
-      if (boxesRes.error) throw boxesRes.error;
-      if (examenesRes.error) throw examenesRes.error;
+
+      const boxesData = cachedBoxes || [];
+      const examenesData = cachedExamenes || [];
 
       setAtenciones(atencionesRes.data || []);
-      setBoxes(boxesRes.data || []);
-      setExamenes(examenesRes.data || []);
+      setBoxes(boxesData as Box[]);
+      setExamenes(examenesData as Examen[]);
 
       // Cargar datos optimizados en paralelo (v0.0.1)
       await Promise.all([
-        loadPendingBoxesOptimized(atencionesRes.data || [], boxesRes.data || []),
-        loadAtencionExamenesOptimized(atencionesRes.data || [], boxesRes.data || []),
-        loadExamenesPendientesOptimized(atencionesRes.data || [], examenesRes.data || []),
+        loadPendingBoxesOptimized(atencionesRes.data || [], boxesData as Box[]),
+        loadAtencionExamenesOptimized(atencionesRes.data || [], boxesData as Box[]),
+        loadExamenesPendientesOptimized(atencionesRes.data || [], examenesData as Examen[]),
         loadDocsPendientesCount(atencionesRes.data || []),
         loadTotalExamenesPorAtencion(atencionesRes.data || [])
       ]);

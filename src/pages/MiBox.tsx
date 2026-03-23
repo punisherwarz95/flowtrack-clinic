@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { useBoxes } from "@/hooks/useReferenceData";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import CodigoDelDia from "@/components/CodigoDelDia";
@@ -73,6 +74,7 @@ const CALL_MODE_KEY = "mediflow_call_mode"; // "single" or "multi"
 const MiBox = () => {
   const { user } = useAuth();
   const { isAdmin } = useAuthContext();
+  const { data: cachedBoxes } = useBoxes();
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [selectedBoxId, setSelectedBoxId] = useState<string | null>(null);
   const [showBoxSelector, setShowBoxSelector] = useState(false);
@@ -117,8 +119,9 @@ const MiBox = () => {
     const savedBox = localStorage.getItem(STORAGE_KEY);
     if (savedBox) setSelectedBoxId(savedBox);
     else setShowBoxSelector(true);
-    loadBoxes();
-  }, []);
+    // Use cached boxes instead of fetching
+    if (cachedBoxes) setBoxes(cachedBoxes as Box[]);
+  }, [cachedBoxes]);
 
   useEffect(() => {
     if (selectedBoxId) {
