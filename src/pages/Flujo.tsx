@@ -65,6 +65,8 @@ interface Examen {
 
 const Flujo = () => {
   const { user } = useAuth(); // Protect route and get current user
+  const { data: cachedBoxes } = useBoxes();
+  const { data: cachedExamenes } = useExamenes();
   const [atenciones, setAtenciones] = useState<Atencion[]>([]);
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [examenes, setExamenes] = useState<Examen[]>([]);
