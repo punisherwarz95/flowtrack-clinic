@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, ClipboardCheck, Calendar as CalendarIcon, Users, Check, Building2, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { useBoxExamenesMap } from "@/hooks/useReferenceData";
 import Navigation from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -54,7 +53,6 @@ interface Empresa {
 
 const Dashboard = () => {
   const { loading: authLoading } = useAuth();
-  const { data: cachedBoxExamenesMap } = useBoxExamenesMap();
   
   // Filtro diario (sección 1)
   const [selectedDateDaily, setSelectedDateDaily] = useState<Date | undefined>(new Date());
@@ -229,7 +227,7 @@ const Dashboard = () => {
       const startOfDay = new Date(dateToUse.getFullYear(), dateToUse.getMonth(), dateToUse.getDate(), 0, 0, 0, 0).toISOString();
       const endOfDay = new Date(dateToUse.getFullYear(), dateToUse.getMonth(), dateToUse.getDate(), 23, 59, 59, 999).toISOString();
 
-      const [atencionesRes, completadosRes, examenesRes, examenesRealizadosRes] = await Promise.all([
+      const [atencionesRes, completadosRes, examenesRes, examenesRealizadosRes, boxExamenesRes] = await Promise.all([
         supabase
           .from("atenciones")
           .select("estado, pacientes(tipo_servicio)")
@@ -248,6 +246,9 @@ const Dashboard = () => {
           .select("id, examen_id, estado, examenes(nombre), atencion_id, atenciones!inner(fecha_ingreso)")
           .gte("atenciones.fecha_ingreso", startOfDay)
           .lte("atenciones.fecha_ingreso", endOfDay),
+        supabase
+          .from("box_examenes")
+          .select("examen_id, boxes(nombre)"),
       ]);
 
       const enEsperaData = atencionesRes.data?.filter((a: any) => a.estado === "en_espera") || [];
@@ -260,13 +261,12 @@ const Dashboard = () => {
       const completadosWM = completadosRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "workmed").length || 0;
       const completadosJ = completadosRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "jenner").length || 0;
 
-      // Usar mapa cacheado de examen_id -> box nombre
+      // Crear mapa examen_id -> box nombre (desde box_examenes)
       const examenBoxMap = new Map<string, string>();
-      if (cachedBoxExamenesMap) {
-        cachedBoxExamenesMap.forEach((info, examenId) => {
-          examenBoxMap.set(examenId, info.boxNombre);
-        });
-      }
+      boxExamenesRes.data?.forEach((be: any) => {
+        const boxNombre = be.boxes?.nombre || "Sin Box";
+        examenBoxMap.set(be.examen_id, boxNombre);
+      });
 
       // Conteo de exámenes diarios (global y por box)
       const conteoExamenes: Record<string, { asignados: number; completados: number }> = {};
@@ -320,8 +320,8 @@ const Dashboard = () => {
       const startOfMonth = new Date(monthToUse.getFullYear(), monthToUse.getMonth(), 1, 0, 0, 0, 0).toISOString();
       const endOfMonth = new Date(monthToUse.getFullYear(), monthToUse.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
 
-      // Obtener pacientes mensuales y prestador_examenes (box_examenes ya cacheado)
-      const [pacientesMensualesRes, prestadorExamenesRes] = await Promise.all([
+      // Obtener pacientes mensuales, prestador_examenes y box_examenes en paralelo
+      const [pacientesMensualesRes, prestadorExamenesRes, boxExamenesMonthlyRes] = await Promise.all([
         supabase
           .from("atenciones")
           .select("id, pacientes(tipo_servicio)")
@@ -330,6 +330,9 @@ const Dashboard = () => {
         supabase
           .from("prestador_examenes")
           .select("examen_id, prestadores(nombre)"),
+        supabase
+          .from("box_examenes")
+          .select("examen_id, boxes(nombre)"),
       ]);
 
       const pacientesMensualesWM = pacientesMensualesRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "workmed").length || 0;
@@ -343,13 +346,12 @@ const Dashboard = () => {
         examenPrestadorMap.set(pe.examen_id, prestadorNombre);
       });
 
-      // Usar mapa cacheado de examen_id -> box nombre
+      // Crear mapa examen_id -> box nombre
       const examenBoxMonthlyMap = new Map<string, string>();
-      if (cachedBoxExamenesMap) {
-        cachedBoxExamenesMap.forEach((info, examenId) => {
-          examenBoxMonthlyMap.set(examenId, info.boxNombre);
-        });
-      }
+      boxExamenesMonthlyRes.data?.forEach((be: any) => {
+        const boxNombre = be.boxes?.nombre || "Sin Box";
+        examenBoxMonthlyMap.set(be.examen_id, boxNombre);
+      });
 
       // Obtener todos los exámenes mensuales con paginación para evitar límite de 1000
       let allExamenes: any[] = [];
@@ -440,7 +442,8 @@ const Dashboard = () => {
       const startOfDay = new Date(dateToUse.getFullYear(), dateToUse.getMonth(), dateToUse.getDate(), 0, 0, 0, 0).toISOString();
       const endOfDay = new Date(dateToUse.getFullYear(), dateToUse.getMonth(), dateToUse.getDate(), 23, 59, 59, 999).toISOString();
 
-      const atencionesRes = await supabase
+      const [atencionesRes, boxExamenesRes] = await Promise.all([
+        supabase
           .from("atenciones")
           .select(`
             id,
@@ -467,14 +470,20 @@ const Dashboard = () => {
           `)
           .gte("fecha_ingreso", startOfDay)
           .lte("fecha_ingreso", endOfDay)
-          .order("numero_ingreso", { ascending: true });
+          .order("numero_ingreso", { ascending: true }),
+        supabase
+          .from("box_examenes")
+          .select("examen_id, box_id, boxes(id, nombre)"),
+      ]);
 
       setAtencionesIngresadas((atencionesRes.data as AtencionIngresada[]) || []);
 
-      // Use cached box-examen map
-      if (cachedBoxExamenesMap) {
-        setBoxExamenesMap(cachedBoxExamenesMap);
-      }
+      // Build box-examen map
+      const beMap = new Map<string, { boxId: string; boxNombre: string }>();
+      boxExamenesRes.data?.forEach((be: any) => {
+        beMap.set(be.examen_id, { boxId: be.box_id, boxNombre: be.boxes?.nombre || "Sin Box" });
+      });
+      setBoxExamenesMap(beMap);
     } catch (error) {
       console.error("Error cargando tabla de pacientes:", error);
     }

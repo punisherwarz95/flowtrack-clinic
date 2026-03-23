@@ -43,16 +43,7 @@ import EmpresaResultados from "./pages/empresa/EmpresaResultados";
 import GuiaUsuario from "./pages/GuiaUsuario";
 import EstadosPago from "./pages/EstadosPago";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutos: datos cacheados entre navegaciones
-      gcTime: 10 * 60 * 1000, // 10 minutos en memoria
-      refetchOnWindowFocus: false, // No refrescar al cambiar pestaña
-      retry: 2,
-    },
-  },
-});
+const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
