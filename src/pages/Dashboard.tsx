@@ -320,8 +320,8 @@ const Dashboard = () => {
       const startOfMonth = new Date(monthToUse.getFullYear(), monthToUse.getMonth(), 1, 0, 0, 0, 0).toISOString();
       const endOfMonth = new Date(monthToUse.getFullYear(), monthToUse.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
 
-      // Obtener pacientes mensuales, prestador_examenes y box_examenes en paralelo
-      const [pacientesMensualesRes, prestadorExamenesRes, boxExamenesMonthlyRes] = await Promise.all([
+      // Obtener pacientes mensuales y prestador_examenes (box_examenes ya cacheado)
+      const [pacientesMensualesRes, prestadorExamenesRes] = await Promise.all([
         supabase
           .from("atenciones")
           .select("id, pacientes(tipo_servicio)")
@@ -330,9 +330,6 @@ const Dashboard = () => {
         supabase
           .from("prestador_examenes")
           .select("examen_id, prestadores(nombre)"),
-        supabase
-          .from("box_examenes")
-          .select("examen_id, boxes(nombre)"),
       ]);
 
       const pacientesMensualesWM = pacientesMensualesRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "workmed").length || 0;
@@ -346,12 +343,13 @@ const Dashboard = () => {
         examenPrestadorMap.set(pe.examen_id, prestadorNombre);
       });
 
-      // Crear mapa examen_id -> box nombre
+      // Usar mapa cacheado de examen_id -> box nombre
       const examenBoxMonthlyMap = new Map<string, string>();
-      boxExamenesMonthlyRes.data?.forEach((be: any) => {
-        const boxNombre = be.boxes?.nombre || "Sin Box";
-        examenBoxMonthlyMap.set(be.examen_id, boxNombre);
-      });
+      if (cachedBoxExamenesMap) {
+        cachedBoxExamenesMap.forEach((info, examenId) => {
+          examenBoxMonthlyMap.set(examenId, info.boxNombre);
+        });
+      }
 
       // Obtener todos los exámenes mensuales con paginación para evitar límite de 1000
       let allExamenes: any[] = [];
