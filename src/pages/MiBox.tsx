@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { useBoxes } from "@/hooks/useReferenceData";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import CodigoDelDia from "@/components/CodigoDelDia";
