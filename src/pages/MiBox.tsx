@@ -74,6 +74,7 @@ const CALL_MODE_KEY = "mediflow_call_mode"; // "single" or "multi"
 const MiBox = () => {
   const { user } = useAuth();
   const { isAdmin } = useAuthContext();
+  const { data: cachedBoxes } = useBoxes();
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [selectedBoxId, setSelectedBoxId] = useState<string | null>(null);
   const [showBoxSelector, setShowBoxSelector] = useState(false);
