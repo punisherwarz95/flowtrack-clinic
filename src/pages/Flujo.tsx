@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { useBoxes, useExamenes } from "@/hooks/useReferenceData";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import { Play, CheckCircle, XCircle, Calendar as CalendarIcon, FileText, RefreshCw, ChevronDown, Check, FileWarning } from "lucide-react";
