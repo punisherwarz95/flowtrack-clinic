@@ -119,8 +119,9 @@ const MiBox = () => {
     const savedBox = localStorage.getItem(STORAGE_KEY);
     if (savedBox) setSelectedBoxId(savedBox);
     else setShowBoxSelector(true);
-    loadBoxes();
-  }, []);
+    // Use cached boxes instead of fetching
+    if (cachedBoxes) setBoxes(cachedBoxes as Box[]);
+  }, [cachedBoxes]);
 
   useEffect(() => {
     if (selectedBoxId) {
