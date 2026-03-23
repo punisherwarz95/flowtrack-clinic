@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, ClipboardCheck, Calendar as CalendarIcon, Users, Check, Building2, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
+import { useBoxExamenesMap } from "@/hooks/useReferenceData";
 import Navigation from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
