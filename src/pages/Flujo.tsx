@@ -210,9 +210,9 @@ const Flujo = () => {
 
       // Cargar datos optimizados en paralelo (v0.0.1)
       await Promise.all([
-        loadPendingBoxesOptimized(atencionesRes.data || [], boxesRes.data || []),
-        loadAtencionExamenesOptimized(atencionesRes.data || [], boxesRes.data || []),
-        loadExamenesPendientesOptimized(atencionesRes.data || [], examenesRes.data || []),
+        loadPendingBoxesOptimized(atencionesRes.data || [], boxesData as Box[]),
+        loadAtencionExamenesOptimized(atencionesRes.data || [], boxesData as Box[]),
+        loadExamenesPendientesOptimized(atencionesRes.data || [], examenesData as Examen[]),
         loadDocsPendientesCount(atencionesRes.data || []),
         loadTotalExamenesPorAtencion(atencionesRes.data || [])
       ]);
