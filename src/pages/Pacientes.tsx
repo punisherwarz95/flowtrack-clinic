@@ -200,11 +200,8 @@ const Pacientes = () => {
   });
 
   useEffect(() => {
-    // Load all reference data in parallel on mount
+    // empresas, examenes, paquetes now come from React Query cache
     Promise.all([
-      loadEmpresas(),
-      loadExamenes(),
-      loadPaquetes(),
       loadAllFaenasAndBateriaFaenas(),
       loadDocumentosDisponibles(),
     ]);
