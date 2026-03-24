@@ -1,61 +1,66 @@
 
 
-# Plan: Pestaña de Métricas de Trazabilidad en Completados
+# Diagnostico: Por que algunos usuarios cargan lento y otros no
 
-## Problema Principal
+## Hallazgo clave
 
-Actualmente el sistema **no registra el historial de visitas a boxes**. Cuando un paciente entra a un box, se actualiza `atenciones.box_id` y `fecha_inicio_atencion`, y cuando sale se pone `box_id = null`. Esto **sobreescribe** los datos anteriores, por lo que no hay forma de saber cuántas veces entró a cada box ni cuánto tiempo estuvo.
+El archivo `src/hooks/useReferenceData.ts` **no existe** a pesar de estar documentado en la memoria del proyecto. Esto significa que el cache global de datos de referencia **nunca fue implementado**. Cada pagina (Dashboard, Flujo, MiBox, Pacientes) hace queries independientes cada vez que se abre.
 
-## Cambios Necesarios
+## Por que "operaciones" carga rapido y Gerardo/Ornella no
 
-### 1. Nueva tabla: `atencion_box_visitas`
+La diferencia no es de internet — es una combinacion de:
 
-Tabla para registrar cada entrada/salida de un paciente a un box:
+1. **Rol y permisos**: Si "operaciones" es admin, sus permisos se cachean en sessionStorage tras el primer login. Si Gerardo/Ornella son no-admin, la query de `menu_permissions` puede ser mas lenta dependiendo de cuantos registros tengan.
 
-```text
-atencion_box_visitas
-├── id (uuid, PK)
-├── atencion_id (uuid, FK → atenciones)
-├── box_id (uuid, FK → boxes)
-├── fecha_entrada (timestamptz)
-├── fecha_salida (timestamptz, nullable)
-├── created_at (timestamptz)
-```
+2. **Dispositivo**: Un PC con menos RAM o CPU mas lento procesa el rendering de React significativamente mas lento. Chrome con muchas pestanas abiertas consume memoria y ralentiza todo.
 
-Con RLS: staff puede gestionar, portal puede leer.
+3. **Cold start del backend**: El primer usuario que accede tras inactividad "paga" el cold start (~250ms-1s extra). Los siguientes usuarios se benefician de la instancia ya caliente.
 
-### 2. Registrar entradas en Flujo.tsx y MiBox.tsx
+4. **Sin cache entre modulos**: Al navegar de Dashboard a Flujo, se re-consultan boxes, examenes, empresas — datos identicos que ya estaban cargados.
 
-Cuando se llama a un paciente (`handleIniciarAtencion` / `handleLlamarPaciente`):
-- Insertar un registro en `atencion_box_visitas` con `fecha_entrada = now()`.
+## Requisitos para conexion optima
 
-Cuando se completa en un box (`handleCompletarAtencion`):
-- Actualizar el registro abierto (sin `fecha_salida`) con `fecha_salida = now()`.
+### Dispositivo
+- **RAM minima**: 8 GB (Chrome consume ~500MB-1GB con la app abierta)
+- **Navegador**: Chrome o Edge actualizado (no Firefox, no Safari)
+- **Pestanas**: Maximo 5-8 pestanas abiertas simultaneamente
+- **Cache del navegador**: No usar modo incognito (pierde sessionStorage cache)
+- **Disco**: SSD preferido sobre HDD (afecta cache del navegador)
 
-### 3. Nueva pestaña "Métricas" en Completados.tsx
+### Internet
+- **Latencia**: Menos de 50ms al servidor (mas importante que velocidad). Probar con `ping szqnsuxmbvxxdzlbdglz.supabase.co`
+- **Velocidad**: 10 Mbps es suficiente (los 250 Mbps que tienen estan bien)
+- **Estabilidad**: WiFi 5GHz preferido sobre 2.4GHz. Cable ethernet es ideal
+- **VPN/Proxy**: Desactivar si hay — agrega latencia
 
-Agregar un componente con `Tabs` en la página de Completados:
-- **Pestaña "Completados"**: contenido actual (lista de atenciones completadas con botón devolver).
-- **Pestaña "Métricas"**: tabla detallada con:
-  - Paciente (nombre, RUT, empresa)
-  - Baterías asignadas (desde `atencion_baterias`)
-  - Exámenes asignados (desde `atencion_examenes`)
-  - Hora de llegada (`fecha_ingreso`)
-  - Por cada box visitado: instancia #, hora entrada, hora salida, duración
-  - Tiempo total en centro
+### Navegador
+- **Extensiones**: Desactivar ad-blockers y extensiones innecesarias (pueden interceptar requests)
+- **Cache**: No limpiar cache frecuentemente (destruye el sessionStorage de permisos)
 
-La tabla de métricas consultará `atencion_box_visitas` agrupando por `atencion_id` y `box_id`, mostrando cada instancia numerada.
+## Solucion tecnica: Implementar el cache que falta
 
-### 4. Datos históricos
+### 1. Crear `src/hooks/useReferenceData.ts`
+- Hooks `useBoxes()`, `useExamenes()`, `useEmpresas()` usando React Query
+- `staleTime: 5 min`, `gcTime: 10 min` — datos cargados una vez sirven para toda la sesion
+- Exportar tipos compartidos
 
-Los registros anteriores a este cambio **no tendrán datos de visitas a boxes** ya que no se registraban. Solo las nuevas atenciones tendrán trazabilidad completa. Se mostrará un mensaje indicando esto cuando no haya datos de visitas.
+### 2. Actualizar `src/pages/Flujo.tsx`
+- Reemplazar queries directas de `boxes` y `examenes` en `loadData()` por `useBoxes()` y `useExamenes()`
+- Solo consultar `atenciones` (dato que cambia) en cada carga
 
-## Archivos a modificar
+### 3. Actualizar `src/pages/Dashboard.tsx`
+- Usar `useBoxes()` en vez de queries independientes para box_examenes
+- Eliminar queries duplicadas entre `loadDailyStats` y `loadMonthlyStats`
 
-| Archivo | Cambio |
-|---------|--------|
-| Migration SQL | Crear tabla `atencion_box_visitas` |
-| `src/pages/Flujo.tsx` | Insertar/actualizar visitas al llamar/completar |
-| `src/pages/MiBox.tsx` | Insertar/actualizar visitas al llamar/completar |
-| `src/pages/Completados.tsx` | Agregar tabs + pestaña Métricas con tabla detallada |
+### 4. Actualizar `src/pages/MiBox.tsx`
+- Reemplazar `loadBoxes()` por `useBoxes()`
+- Usar cache para examenes
+
+### 5. Actualizar `src/pages/Pacientes.tsx`
+- Usar hooks cacheados para examenes, empresas, paquetes
+
+## Resultado esperado
+- Primera carga: similar (las queries se hacen 1 vez)
+- **Navegacion entre modulos**: de 1-3s a **instantanea** para datos de referencia
+- Menos queries al backend = menos probabilidad de cold start
 
