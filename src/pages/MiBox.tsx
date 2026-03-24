@@ -26,6 +26,7 @@ import ExamenResultadosOtrosBoxes from "@/components/ExamenResultadosOtrosBoxes"
 import ExamenPrestadorGroup from "@/components/ExamenPrestadorGroup";
 import PresionTimerBadge from "@/components/PresionTimerBadge";
 import PresionRetakeForm from "@/components/PresionRetakeForm";
+import { useBoxes } from "@/hooks/useReferenceData";
 
 interface Atencion {
   id: string;
@@ -73,7 +74,8 @@ const CALL_MODE_KEY = "mediflow_call_mode"; // "single" or "multi"
 const MiBox = () => {
   const { user } = useAuth();
   const { isAdmin } = useAuthContext();
-  const [boxes, setBoxes] = useState<Box[]>([]);
+  const { data: cachedBoxes = [] } = useBoxes();
+  const boxes = cachedBoxes as Box[];
   const [selectedBoxId, setSelectedBoxId] = useState<string | null>(null);
   const [showBoxSelector, setShowBoxSelector] = useState(false);
   const [tempSelectedBox, setTempSelectedBox] = useState<string>("");
@@ -117,7 +119,7 @@ const MiBox = () => {
     const savedBox = localStorage.getItem(STORAGE_KEY);
     if (savedBox) setSelectedBoxId(savedBox);
     else setShowBoxSelector(true);
-    loadBoxes();
+    // boxes come from useBoxes() cache, no need to loadBoxes()
   }, []);
 
   useEffect(() => {
@@ -136,11 +138,7 @@ const MiBox = () => {
     }
   }, [selectedBoxId]);
 
-  const loadBoxes = async () => {
-    const { data, error } = await supabase.from("boxes").select("*, box_examenes(examen_id)").eq("activo", true);
-    if (error) { toast.error("Error al cargar boxes"); return; }
-    setBoxes(data || []);
-  };
+  // loadBoxes is no longer needed - boxes come from useBoxes() cache
 
   const loadData = async () => {
     if (!selectedBoxId) return;

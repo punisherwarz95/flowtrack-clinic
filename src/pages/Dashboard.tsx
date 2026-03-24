@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePresionTimers } from "@/hooks/usePresionTimers";
 import PresionTimerBadge from "@/components/PresionTimerBadge";
 import BusquedaPacientesHistorial from "@/components/empresa/BusquedaPacientesHistorial";
+import { useBoxExamenesMap, usePrestadorExamenesMap } from "@/hooks/useReferenceData";
 
 interface AtencionIngresada {
   id: string;
