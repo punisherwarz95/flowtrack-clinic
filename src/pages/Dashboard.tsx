@@ -433,8 +433,7 @@ const Dashboard = () => {
       const startOfDay = new Date(dateToUse.getFullYear(), dateToUse.getMonth(), dateToUse.getDate(), 0, 0, 0, 0).toISOString();
       const endOfDay = new Date(dateToUse.getFullYear(), dateToUse.getMonth(), dateToUse.getDate(), 23, 59, 59, 999).toISOString();
 
-      const [atencionesRes, boxExamenesRes] = await Promise.all([
-        supabase
+      const atencionesRes = await supabase
           .from("atenciones")
           .select(`
             id,
@@ -461,20 +460,14 @@ const Dashboard = () => {
           `)
           .gte("fecha_ingreso", startOfDay)
           .lte("fecha_ingreso", endOfDay)
-          .order("numero_ingreso", { ascending: true }),
-        supabase
-          .from("box_examenes")
-          .select("examen_id, box_id, boxes(id, nombre)"),
-      ]);
+          .order("numero_ingreso", { ascending: true });
 
       setAtencionesIngresadas((atencionesRes.data as AtencionIngresada[]) || []);
 
-      // Build box-examen map
-      const beMap = new Map<string, { boxId: string; boxNombre: string }>();
-      boxExamenesRes.data?.forEach((be: any) => {
-        beMap.set(be.examen_id, { boxId: be.box_id, boxNombre: be.boxes?.nombre || "Sin Box" });
-      });
-      setBoxExamenesMap(beMap);
+      // Use cached box-examen map
+      if (boxExamenesMapCached) {
+        setBoxExamenesMap(boxExamenesMapCached);
+      }
     } catch (error) {
       console.error("Error cargando tabla de pacientes:", error);
     }
