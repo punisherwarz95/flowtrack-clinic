@@ -322,37 +322,27 @@ const Dashboard = () => {
       const endOfMonth = new Date(monthToUse.getFullYear(), monthToUse.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
 
       // Obtener pacientes mensuales, prestador_examenes y box_examenes en paralelo
-      const [pacientesMensualesRes, prestadorExamenesRes, boxExamenesMonthlyRes] = await Promise.all([
+      const [pacientesMensualesRes] = await Promise.all([
         supabase
           .from("atenciones")
           .select("id, pacientes(tipo_servicio)")
           .gte("fecha_ingreso", startOfMonth)
           .lte("fecha_ingreso", endOfMonth),
-        supabase
-          .from("prestador_examenes")
-          .select("examen_id, prestadores(nombre)"),
-        supabase
-          .from("box_examenes")
-          .select("examen_id, boxes(nombre)"),
       ]);
 
       const pacientesMensualesWM = pacientesMensualesRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "workmed").length || 0;
       const pacientesMensualesJ = pacientesMensualesRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "jenner").length || 0;
       const pacientesMensualesTotal = pacientesMensualesRes.data?.length || 0;
 
-      // Crear mapa examen_id -> prestador nombre
-      const examenPrestadorMap = new Map<string, string>();
-      prestadorExamenesRes.data?.forEach((pe: any) => {
-        const prestadorNombre = pe.prestadores?.nombre || "Sin Prestador";
-        examenPrestadorMap.set(pe.examen_id, prestadorNombre);
-      });
+      // Usar mapas cacheados desde React Query
+      const examenPrestadorMap = prestadorExamenesMapCached || new Map<string, string>();
 
-      // Crear mapa examen_id -> box nombre
       const examenBoxMonthlyMap = new Map<string, string>();
-      boxExamenesMonthlyRes.data?.forEach((be: any) => {
-        const boxNombre = be.boxes?.nombre || "Sin Box";
-        examenBoxMonthlyMap.set(be.examen_id, boxNombre);
-      });
+      if (boxExamenesMapCached) {
+        boxExamenesMapCached.forEach((val, key) => {
+          examenBoxMonthlyMap.set(key, val.boxNombre);
+        });
+      }
 
       // Obtener todos los exámenes mensuales con paginación para evitar límite de 1000
       let allExamenes: any[] = [];
