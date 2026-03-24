@@ -261,12 +261,13 @@ const Dashboard = () => {
       const completadosWM = completadosRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "workmed").length || 0;
       const completadosJ = completadosRes.data?.filter((a: any) => a.pacientes?.tipo_servicio === "jenner").length || 0;
 
-      // Crear mapa examen_id -> box nombre (desde box_examenes)
+      // Crear mapa examen_id -> box nombre (desde cache)
       const examenBoxMap = new Map<string, string>();
-      boxExamenesRes.data?.forEach((be: any) => {
-        const boxNombre = be.boxes?.nombre || "Sin Box";
-        examenBoxMap.set(be.examen_id, boxNombre);
-      });
+      if (boxExamenesMapCached) {
+        boxExamenesMapCached.forEach((val, key) => {
+          examenBoxMap.set(key, val.boxNombre);
+        });
+      }
 
       // Conteo de exámenes diarios (global y por box)
       const conteoExamenes: Record<string, { asignados: number; completados: number }> = {};
