@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -82,14 +82,30 @@ const Flujo = () => {
   const [docsPendientes, setDocsPendientes] = useState<{[atencionId: string]: number}>({});
   const [docsTotal, setDocsTotal] = useState<{[atencionId: string]: number}>({});
   const [totalExamenesPorAtencion, setTotalExamenesPorAtencion] = useState<{[atencionId: string]: number}>({});
+  const atencionesRef = useRef<Atencion[]>([]);
+  const boxesRef = useRef<Box[]>([]);
+  const examenesRef = useRef<Examen[]>([]);
 
   const atencionIdsConTemporizador = useMemo(() => atenciones.map((a) => a.id), [atenciones]);
   const { timerByAtencion } = usePresionTimers(atencionIdsConTemporizador);
+
+  useEffect(() => {
+    atencionesRef.current = atenciones;
+  }, [atenciones]);
+
+  useEffect(() => {
+    boxesRef.current = boxes;
+  }, [boxes]);
+
+  useEffect(() => {
+    examenesRef.current = examenes;
+  }, [examenes]);
 
   // OPTIMIZACIÓN v0.0.2: Realtime inteligente - actualiza solo lo necesario
   const handleRealtimeAtencionChange = async (payload: any) => {
     const { eventType, new: newRecord, old: oldRecord } = payload;
     const recordId = newRecord?.id || oldRecord?.id;
+    const currentAtenciones = atencionesRef.current;
     
     if (!recordId) {
       await loadData();
@@ -98,7 +114,7 @@ const Flujo = () => {
 
     // Si es un cambio de estado o box_id, necesitamos recargar
     if (eventType === 'UPDATE') {
-      const atencion = atenciones.find(a => a.id === recordId);
+      const atencion = currentAtenciones.find(a => a.id === recordId);
       const hasStatusChange = newRecord?.estado !== atencion?.estado;
       const hasBoxChange = newRecord?.box_id !== atencion?.box_id;
       
@@ -123,6 +139,9 @@ const Flujo = () => {
   const handleRealtimeExamenChange = async (payload: any) => {
     const { new: newRecord, old: oldRecord } = payload;
     const atencionId = newRecord?.atencion_id || oldRecord?.atencion_id;
+    const currentAtenciones = atencionesRef.current;
+    const currentBoxes = boxesRef.current;
+    const currentExamenes = examenesRef.current;
     
     if (!atencionId) {
       await loadData();
@@ -130,14 +149,17 @@ const Flujo = () => {
     }
 
     // Solo recargar los datos de exámenes para esta atención específica
-    const atencion = atenciones.find(a => a.id === atencionId);
+    const atencion = currentAtenciones.find(a => a.id === atencionId);
     if (atencion) {
       // Recargar solo las funciones de exámenes
       await Promise.all([
-        loadPendingBoxesOptimized(atenciones, boxes),
-        loadAtencionExamenesOptimized(atenciones, boxes),
-        loadExamenesPendientesOptimized(atenciones, examenes)
+        loadPendingBoxesOptimized(currentAtenciones, currentBoxes),
+        loadAtencionExamenesOptimized(currentAtenciones, currentBoxes),
+        loadExamenesPendientesOptimized(currentAtenciones, currentExamenes),
+        loadTotalExamenesPorAtencion(currentAtenciones)
       ]);
+    } else {
+      await loadData();
     }
   };
 
@@ -179,8 +201,28 @@ const Flujo = () => {
 
   const loadData = async () => {
     try {
-      const startOfDay = selectedDate ? new Date(selectedDate.setHours(0, 0, 0, 0)).toISOString() : null;
-      const endOfDay = selectedDate ? new Date(selectedDate.setHours(23, 59, 59, 999)).toISOString() : null;
+      const startOfDay = selectedDate
+        ? new Date(
+            selectedDate.getFullYear(),
+            selectedDate.getMonth(),
+            selectedDate.getDate(),
+            0,
+            0,
+            0,
+            0
+          ).toISOString()
+        : null;
+      const endOfDay = selectedDate
+        ? new Date(
+            selectedDate.getFullYear(),
+            selectedDate.getMonth(),
+            selectedDate.getDate(),
+            23,
+            59,
+            59,
+            999
+          ).toISOString()
+        : null;
 
       let atencionesQuery = supabase
         .from("atenciones")
@@ -211,6 +253,9 @@ const Flujo = () => {
       setAtenciones(atencionesRes.data || []);
       setBoxes(boxesRes.data || []);
       setExamenes(examenesRes.data || []);
+      atencionesRef.current = atencionesRes.data || [];
+      boxesRef.current = boxesRes.data || [];
+      examenesRef.current = examenesRes.data || [];
 
       // Cargar datos optimizados en paralelo (v0.0.1)
       await Promise.all([
