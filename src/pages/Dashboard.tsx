@@ -54,6 +54,8 @@ interface Empresa {
 
 const Dashboard = () => {
   const { loading: authLoading } = useAuth();
+  const { data: boxExamenesMapCached } = useBoxExamenesMap();
+  const { data: prestadorExamenesMapCached } = usePrestadorExamenesMap();
   
   // Filtro diario (sección 1)
   const [selectedDateDaily, setSelectedDateDaily] = useState<Date | undefined>(new Date());
