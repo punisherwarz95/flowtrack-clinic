@@ -390,7 +390,6 @@ const Pacientes = () => {
   };
 
   // loadEmpresas, loadExamenes, loadPaquetes removed — data comes from useReferenceData hooks
-  };
 
   const loadDocumentosDisponibles = async () => {
     try {
