@@ -10,6 +10,7 @@ import CodigoDelDia from "@/components/CodigoDelDia";
 import { useGenerateDocumentosFromBateria } from "@/hooks/useAtencionDocumentos";
 import CopiarExamenesPaciente from "@/components/CopiarExamenesPaciente";
 import { supabase } from "@/integrations/supabase/client";
+import { useEmpresas, useExamenes, usePaquetes } from "@/hooks/useReferenceData";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import { format } from "date-fns";
@@ -128,10 +129,12 @@ interface ExamenCompletado {
 const Pacientes = () => {
   useAuth(); // Protect route
   const [patients, setPatients] = useState<Patient[]>([]);
-  const [empresas, setEmpresas] = useState<Empresa[]>([]);
-  const [examenes, setExamenes] = useState<Examen[]>([]);
-  const [paquetes, setPaquetes] = useState<Paquete[]>([]);
-  const [documentosDisponibles, setDocumentosDisponibles] = useState<DocumentoFormulario[]>([]);
+  const { data: cachedEmpresas = [] } = useEmpresas();
+  const empresas = cachedEmpresas as Empresa[];
+  const { data: cachedExamenes = [] } = useExamenes();
+  const examenes = cachedExamenes as Examen[];
+  const { data: cachedPaquetes = [] } = usePaquetes();
+  const paquetes = cachedPaquetes as Paquete[];
   const [selectedDocumentos, setSelectedDocumentos] = useState<string[]>([]);
   const [documentoFilter, setDocumentoFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
