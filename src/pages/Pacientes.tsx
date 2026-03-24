@@ -10,6 +10,7 @@ import CodigoDelDia from "@/components/CodigoDelDia";
 import { useGenerateDocumentosFromBateria } from "@/hooks/useAtencionDocumentos";
 import CopiarExamenesPaciente from "@/components/CopiarExamenesPaciente";
 import { supabase } from "@/integrations/supabase/client";
+import { useEmpresas, useExamenes, usePaquetes } from "@/hooks/useReferenceData";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import { format } from "date-fns";
@@ -128,9 +129,12 @@ interface ExamenCompletado {
 const Pacientes = () => {
   useAuth(); // Protect route
   const [patients, setPatients] = useState<Patient[]>([]);
-  const [empresas, setEmpresas] = useState<Empresa[]>([]);
-  const [examenes, setExamenes] = useState<Examen[]>([]);
-  const [paquetes, setPaquetes] = useState<Paquete[]>([]);
+  const { data: cachedEmpresas = [] } = useEmpresas();
+  const empresas = cachedEmpresas as Empresa[];
+  const { data: cachedExamenes = [] } = useExamenes();
+  const examenes = cachedExamenes as Examen[];
+  const { data: cachedPaquetes = [] } = usePaquetes();
+  const paquetes = cachedPaquetes as Paquete[];
   const [documentosDisponibles, setDocumentosDisponibles] = useState<DocumentoFormulario[]>([]);
   const [selectedDocumentos, setSelectedDocumentos] = useState<string[]>([]);
   const [documentoFilter, setDocumentoFilter] = useState("");
@@ -196,11 +200,8 @@ const Pacientes = () => {
   });
 
   useEffect(() => {
-    // Load all reference data in parallel on mount
+    // empresas, examenes, paquetes now come from React Query cache
     Promise.all([
-      loadEmpresas(),
-      loadExamenes(),
-      loadPaquetes(),
       loadAllFaenasAndBateriaFaenas(),
       loadDocumentosDisponibles(),
     ]);
@@ -388,50 +389,7 @@ const Pacientes = () => {
     }
   };
 
-  const loadEmpresas = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("empresas")
-        .select("*")
-        .order("nombre");
-
-      if (error) throw error;
-      setEmpresas(data || []);
-    } catch (error) {
-      console.error("Error:", error);
-      toast.error("Error al cargar empresas");
-    }
-  };
-
-  const loadExamenes = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("examenes")
-        .select("id, nombre, descripcion, codigo")
-        .order("nombre");
-
-      if (error) throw error;
-      setExamenes(data || []);
-    } catch (error) {
-      console.error("Error:", error);
-      toast.error("Error al cargar exámenes");
-    }
-  };
-
-  const loadPaquetes = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("paquetes_examenes")
-        .select("*, paquete_examen_items(examen_id)")
-        .order("nombre");
-
-      if (error) throw error;
-      setPaquetes(data || []);
-    } catch (error) {
-      console.error("Error:", error);
-      toast.error("Error al cargar paquetes");
-    }
-  };
+  // loadEmpresas, loadExamenes, loadPaquetes removed — data comes from useReferenceData hooks
 
   const loadDocumentosDisponibles = async () => {
     try {

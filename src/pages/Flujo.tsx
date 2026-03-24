@@ -20,6 +20,7 @@ import { GlobalChat } from "@/components/GlobalChat";
 import { usePresionTimers } from "@/hooks/usePresionTimers";
 import PresionTimerBadge from "@/components/PresionTimerBadge";
 import { logActivity } from "@/lib/activityLog";
+import { useBoxes, useExamenes } from "@/hooks/useReferenceData";
 
 interface Atencion {
   id: string;
@@ -64,8 +65,10 @@ interface Examen {
 const Flujo = () => {
   const { user } = useAuth(); // Protect route and get current user
   const [atenciones, setAtenciones] = useState<Atencion[]>([]);
-  const [boxes, setBoxes] = useState<Box[]>([]);
-  const [examenes, setExamenes] = useState<Examen[]>([]);
+  const { data: cachedBoxes = [] } = useBoxes();
+  const { data: cachedExamenes = [] } = useExamenes();
+  const boxes = cachedBoxes as Box[];
+  const examenes = cachedExamenes as Examen[];
   const [selectedBox, setSelectedBox] = useState<{[atencionId: string]: string}>({});
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [pendingBoxes, setPendingBoxes] = useState<{[atencionId: string]: string[]}>({});
@@ -234,34 +237,21 @@ const Flujo = () => {
         atencionesQuery = atencionesQuery.gte("fecha_ingreso", startOfDay).lte("fecha_ingreso", endOfDay);
       }
 
-      const [atencionesRes, boxesRes, examenesRes] = await Promise.all([
-        atencionesQuery,
-        supabase
-          .from("boxes")
-          .select("*, box_examenes(examen_id)")
-          .eq("activo", true),
-        supabase
-          .from("examenes")
-          .select("*")
-          .order("nombre", { ascending: true }),
-      ]);
+      const atencionesRes = await atencionesQuery;
 
       if (atencionesRes.error) throw atencionesRes.error;
-      if (boxesRes.error) throw boxesRes.error;
-      if (examenesRes.error) throw examenesRes.error;
 
       setAtenciones(atencionesRes.data || []);
-      setBoxes(boxesRes.data || []);
-      setExamenes(examenesRes.data || []);
       atencionesRef.current = atencionesRes.data || [];
-      boxesRef.current = boxesRes.data || [];
-      examenesRef.current = examenesRes.data || [];
+      // boxes and examenes come from React Query cache (useBoxes/useExamenes)
+      boxesRef.current = boxes;
+      examenesRef.current = examenes;
 
       // Cargar datos optimizados en paralelo (v0.0.1)
       await Promise.all([
-        loadPendingBoxesOptimized(atencionesRes.data || [], boxesRes.data || []),
-        loadAtencionExamenesOptimized(atencionesRes.data || [], boxesRes.data || []),
-        loadExamenesPendientesOptimized(atencionesRes.data || [], examenesRes.data || []),
+        loadPendingBoxesOptimized(atencionesRes.data || [], boxes),
+        loadAtencionExamenesOptimized(atencionesRes.data || [], boxes),
+        loadExamenesPendientesOptimized(atencionesRes.data || [], examenes),
         loadDocsPendientesCount(atencionesRes.data || []),
         loadTotalExamenesPorAtencion(atencionesRes.data || [])
       ]);
