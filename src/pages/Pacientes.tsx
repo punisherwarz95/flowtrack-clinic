@@ -135,6 +135,7 @@ const Pacientes = () => {
   const examenes = cachedExamenes as Examen[];
   const { data: cachedPaquetes = [] } = usePaquetes();
   const paquetes = cachedPaquetes as Paquete[];
+  const [documentosDisponibles, setDocumentosDisponibles] = useState<DocumentoFormulario[]>([]);
   const [selectedDocumentos, setSelectedDocumentos] = useState<string[]>([]);
   const [documentoFilter, setDocumentoFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
