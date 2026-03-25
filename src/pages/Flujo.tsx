@@ -166,6 +166,17 @@ const Flujo = () => {
     }
   };
 
+  // Re-run dependent calculations when cached reference data arrives
+  useEffect(() => {
+    if (boxes.length > 0 && examenes.length > 0 && atencionesRef.current.length > 0) {
+      Promise.all([
+        loadPendingBoxesOptimized(atencionesRef.current, boxes),
+        loadAtencionExamenesOptimized(atencionesRef.current, boxes),
+        loadExamenesPendientesOptimized(atencionesRef.current, examenes),
+      ]);
+    }
+  }, [boxes, examenes]);
+
   useEffect(() => {
     loadData();
     
@@ -243,15 +254,18 @@ const Flujo = () => {
 
       setAtenciones(atencionesRes.data || []);
       atencionesRef.current = atencionesRes.data || [];
-      // boxes and examenes come from React Query cache (useBoxes/useExamenes)
-      boxesRef.current = boxes;
-      examenesRef.current = examenes;
+
+      // Use latest cached reference data
+      const currentBoxes = boxes.length > 0 ? boxes : boxesRef.current;
+      const currentExamenes = examenes.length > 0 ? examenes : examenesRef.current;
+      boxesRef.current = currentBoxes;
+      examenesRef.current = currentExamenes;
 
       // Cargar datos optimizados en paralelo (v0.0.1)
       await Promise.all([
-        loadPendingBoxesOptimized(atencionesRes.data || [], boxes),
-        loadAtencionExamenesOptimized(atencionesRes.data || [], boxes),
-        loadExamenesPendientesOptimized(atencionesRes.data || [], examenes),
+        loadPendingBoxesOptimized(atencionesRes.data || [], currentBoxes),
+        loadAtencionExamenesOptimized(atencionesRes.data || [], currentBoxes),
+        loadExamenesPendientesOptimized(atencionesRes.data || [], currentExamenes),
         loadDocsPendientesCount(atencionesRes.data || []),
         loadTotalExamenesPorAtencion(atencionesRes.data || [])
       ]);
