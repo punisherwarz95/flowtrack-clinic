@@ -5,6 +5,8 @@ import { useAuthContext } from "@/contexts/AuthContext";
 import { useTheme } from "@/hooks/useTheme";
 import { Button } from "@/components/ui/button";
 import ChangeOwnPassword from "@/components/ChangeOwnPassword";
+import SyncStatusBadge from "@/components/SyncStatusBadge";
+import { useSyncContext } from "@/contexts/SyncContext";
 import { logActivity } from "@/lib/activityLog";
 
 const Navigation = () => {
