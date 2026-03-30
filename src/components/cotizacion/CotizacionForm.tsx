@@ -743,7 +743,7 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
         subtotal_neto: Math.round(totals.subtotalNeto),
         total_iva: Math.round(totals.totalIva),
         total_con_iva: Math.round(totals.totalConIva),
-        total_con_margen: Math.round(totals.totalFinal),
+        total_con_margen: Math.round(totals.totalConDescuento),
         estado,
         observaciones: observaciones || null,
         afecto_iva: afectoIva,
