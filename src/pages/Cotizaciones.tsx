@@ -46,6 +46,8 @@ import MargenesConfig from "@/components/cotizacion/MargenesConfig";
 import { format, startOfDay, endOfDay, isWithinInterval } from "date-fns";
 import { es } from "date-fns/locale";
 import { logActivity } from "@/lib/activityLog";
+import { localDb, type LocalCotizacion, type LocalCotizacionSolicitud } from "@/lib/localDb";
+import { liveQuery } from "dexie";
 
 interface Cotizacion {
   id: string;
