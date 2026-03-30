@@ -21,6 +21,8 @@ import { usePresionTimers } from "@/hooks/usePresionTimers";
 import PresionTimerBadge from "@/components/PresionTimerBadge";
 import { logActivity } from "@/lib/activityLog";
 import { useBoxes, useExamenes } from "@/hooks/useReferenceData";
+import { useLocalAtenciones } from "@/hooks/useLocalAtenciones";
+import { useSyncContext } from "@/contexts/SyncContext";
 
 interface Atencion {
   id: string;
@@ -89,6 +91,13 @@ const Flujo = () => {
   const boxesRef = useRef<Box[]>([]);
   const examenesRef = useRef<Examen[]>([]);
 
+  // ── Offline-first: read from local cache ──────────────────────────
+  const localData = useLocalAtenciones();
+  const syncCtx = useSyncContext();
+  const isToday = selectedDate ? (
+    selectedDate.toDateString() === new Date().toDateString()
+  ) : true;
+
   const atencionIdsConTemporizador = useMemo(() => atenciones.map((a) => a.id), [atenciones]);
   const { timerByAtencion } = usePresionTimers(atencionIdsConTemporizador);
 
@@ -103,6 +112,115 @@ const Flujo = () => {
   useEffect(() => {
     examenesRef.current = examenes;
   }, [examenes]);
+
+  // ── Populate from local cache when viewing today ──────────────────
+  useEffect(() => {
+    if (!isToday || !localData.isLoaded) return;
+    
+    // Map local cache data to Atencion[] format
+    const localAtenciones: Atencion[] = localData.atenciones
+      .filter(a => a.estado === 'en_espera' || a.estado === 'en_atencion')
+      .sort((a, b) => (a.numero_ingreso || 0) - (b.numero_ingreso || 0))
+      .map(la => ({
+        id: la.id,
+        estado: la.estado,
+        fecha_ingreso: la.fecha_ingreso,
+        fecha_inicio_atencion: la.fecha_inicio_atencion,
+        numero_ingreso: la.numero_ingreso || 0,
+        box_id: la.box_id,
+        estado_ficha: la.estado_ficha,
+        pacientes: {
+          id: la.paciente_id,
+          nombre: la.paciente_nombre || '',
+          rut: la.paciente_rut || '',
+          tipo_servicio: la.paciente_tipo_servicio || '',
+        },
+        boxes: la.box_nombre ? { nombre: la.box_nombre } : null,
+      }));
+
+    setAtenciones(localAtenciones);
+    atencionesRef.current = localAtenciones;
+
+    // Compute derived data from local cache
+    const atencionIds = localAtenciones.map(a => a.id);
+    
+    // Examenes pendientes
+    const newExamenesPendientes: {[id: string]: string[]} = {};
+    const newTotalExamenes: {[id: string]: number} = {};
+    const newAtencionExamenes: {[id: string]: AtencionExamen[]} = {};
+    const newPendingBoxes: {[id: string]: string[]} = {};
+    
+    atencionIds.forEach(id => {
+      newExamenesPendientes[id] = [];
+      newTotalExamenes[id] = 0;
+      newAtencionExamenes[id] = [];
+      newPendingBoxes[id] = [];
+    });
+
+    const allLocalExamenes = localData.atencionExamenes.filter(ae => atencionIds.includes(ae.atencion_id));
+    
+    allLocalExamenes.forEach(ae => {
+      newTotalExamenes[ae.atencion_id] = (newTotalExamenes[ae.atencion_id] || 0) + 1;
+      
+      if (ae.estado === 'pendiente' || ae.estado === 'incompleto') {
+        const nombre = ae.examen_nombre || '';
+        if (nombre) {
+          const nombreConEstado = ae.estado === 'incompleto' ? `${nombre} (I)` : nombre;
+          newExamenesPendientes[ae.atencion_id]?.push(nombreConEstado);
+        }
+        
+        // Atencion examenes for box filtering
+        const atencion = localAtenciones.find(a => a.id === ae.atencion_id);
+        if (atencion?.estado === 'en_atencion' && atencion.box_id) {
+          const box = boxes.find(b => b.id === atencion.box_id);
+          const boxExamIds = box?.box_examenes.map(be => be.examen_id) || [];
+          if (boxExamIds.includes(ae.examen_id)) {
+            newAtencionExamenes[ae.atencion_id].push({
+              id: ae.id,
+              examen_id: ae.examen_id,
+              estado: ae.estado,
+              examenes: { nombre: ae.examen_nombre || '' },
+            });
+          }
+        } else {
+          newAtencionExamenes[ae.atencion_id].push({
+            id: ae.id,
+            examen_id: ae.examen_id,
+            estado: ae.estado,
+            examenes: { nombre: ae.examen_nombre || '' },
+          });
+        }
+
+        // Pending boxes
+        const examenId = ae.examen_id;
+        boxes.forEach(box => {
+          if (box.box_examenes.some(be => be.examen_id === examenId)) {
+            if (!newPendingBoxes[ae.atencion_id]?.includes(box.nombre)) {
+              newPendingBoxes[ae.atencion_id]?.push(box.nombre);
+            }
+          }
+        });
+      }
+    });
+
+    setExamenesPendientes(newExamenesPendientes);
+    setTotalExamenesPorAtencion(newTotalExamenes);
+    setAtencionExamenes(newAtencionExamenes);
+    setPendingBoxes(newPendingBoxes);
+
+    // Docs counts from local cache
+    const allLocalDocs = localData.atencionDocumentos.filter(d => atencionIds.includes(d.atencion_id));
+    const pendingCounts: {[id: string]: number} = {};
+    const totalCounts: {[id: string]: number} = {};
+    allLocalDocs.forEach(d => {
+      totalCounts[d.atencion_id] = (totalCounts[d.atencion_id] || 0) + 1;
+      if (d.estado === 'pendiente') {
+        pendingCounts[d.atencion_id] = (pendingCounts[d.atencion_id] || 0) + 1;
+      }
+    });
+    setDocsPendientes(pendingCounts);
+    setDocsTotal(totalCounts);
+  }, [localData.atenciones, localData.atencionExamenes, localData.atencionDocumentos, localData.isLoaded, isToday, boxes]);
 
   // OPTIMIZACIÓN v0.0.2: Realtime inteligente - actualiza solo lo necesario
   const handleRealtimeAtencionChange = async (payload: any) => {
@@ -178,37 +296,29 @@ const Flujo = () => {
   }, [boxes, examenes]);
 
   useEffect(() => {
-    loadData();
-    
-    const channel = supabase
-      .channel("atenciones-changes-v2")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "atenciones" },
-        handleRealtimeAtencionChange
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "atencion_examenes" },
-        handleRealtimeExamenChange
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "pacientes" },
-        () => loadData() // Pacientes cambian poco, recarga completa está bien
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [selectedDate]);
-
-  // OPTIMIZACIÓN v0.0.2: Auto-refresh cada 30 segundos (realtime maneja cambios frecuentes)
-  useEffect(() => {
-    const interval = setInterval(() => {
+    // For today, local cache is populated by useLocalSync;
+    // for other dates, we still need cloud queries
+    if (!isToday) {
       loadData();
-    }, 30000);
+    }
+    
+    // Realtime channels only needed for non-today views (today uses sync engine)
+    if (!isToday) {
+      const channel = supabase
+        .channel("atenciones-changes-v2")
+        .on("postgres_changes", { event: "*", schema: "public", table: "atenciones" }, handleRealtimeAtencionChange)
+        .on("postgres_changes", { event: "*", schema: "public", table: "atencion_examenes" }, handleRealtimeExamenChange)
+        .on("postgres_changes", { event: "*", schema: "public", table: "pacientes" }, () => loadData())
+        .subscribe();
+
+      return () => { supabase.removeChannel(channel); };
+    }
+  }, [selectedDate, isToday]);
+
+  // Auto-refresh only for non-today views
+  useEffect(() => {
+    if (isToday) return; // Today uses sync engine
+    const interval = setInterval(() => { loadData(); }, 30000);
 
     return () => clearInterval(interval);
   }, [selectedDate]);
@@ -587,12 +697,16 @@ const Flujo = () => {
 
   const handleCambiarEstadoFicha = async (atencionId: string, nuevoEstado: string) => {
     try {
-      const { error } = await supabase
-        .from("atenciones")
-        .update({ estado_ficha: nuevoEstado as 'pendiente' | 'en_mano_paciente' | 'completada' })
-        .eq("id", atencionId);
-
-      if (error) throw error;
+      // Non-critical: use local + outbox when viewing today
+      if (isToday) {
+        await localData.updateEstadoFicha(atencionId, nuevoEstado);
+      } else {
+        const { error } = await supabase
+          .from("atenciones")
+          .update({ estado_ficha: nuevoEstado as 'pendiente' | 'en_mano_paciente' | 'completada' })
+          .eq("id", atencionId);
+        if (error) throw error;
+      }
       
       const mensajes = {
         'en_mano_paciente': 'Ficha entregada al paciente',
@@ -600,7 +714,7 @@ const Flujo = () => {
       };
       
       toast.success(mensajes[nuevoEstado as keyof typeof mensajes] || 'Estado actualizado');
-      await loadData();
+      if (!isToday) await loadData();
     } catch (error: any) {
       console.error("Error:", error);
       toast.error("Error al actualizar estado de ficha");

@@ -10,7 +10,7 @@ import CodigoDelDia from "@/components/CodigoDelDia";
 import { useGenerateDocumentosFromBateria } from "@/hooks/useAtencionDocumentos";
 import CopiarExamenesPaciente from "@/components/CopiarExamenesPaciente";
 import { supabase } from "@/integrations/supabase/client";
-import { useEmpresas, useExamenes, usePaquetes } from "@/hooks/useReferenceData";
+import { useEmpresas, useExamenes, usePaquetes, useFaenas, useBateriaFaenas } from "@/hooks/useReferenceData";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import { format } from "date-fns";
@@ -152,10 +152,14 @@ const Pacientes = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [documentosPendientes, setDocumentosPendientes] = useState<{[patientId: string]: number}>({});
   
-  // Estados para faenas
+  // Estados para faenas (now from cache)
   const [faenasEmpresa, setFaenasEmpresa] = useState<Faena[]>([]);
   const [bateriasDisponibles, setBateriasDisponibles] = useState<string[]>([]);
   const [loadingFaenas, setLoadingFaenas] = useState(false);
+  
+  // Cached reference data for faenas and baterias
+  const { data: cachedFaenas = [] } = useFaenas();
+  const { data: cachedBateriaFaenas = [] } = useBateriaFaenas();
   
   // Estados para filtro de baterías por faena (como en cotizaciones)
   const [allFaenas, setAllFaenas] = useState<Faena[]>([]);
@@ -200,11 +204,7 @@ const Pacientes = () => {
   });
 
   useEffect(() => {
-    // empresas, examenes, paquetes now come from React Query cache
-    Promise.all([
-      loadAllFaenasAndBateriaFaenas(),
-      loadDocumentosDisponibles(),
-    ]);
+    loadDocumentosDisponibles();
 
     // Auto-refresh patients every 15 seconds
     const interval = setInterval(() => {
@@ -213,6 +213,21 @@ const Pacientes = () => {
 
     return () => clearInterval(interval);
   }, [selectedDate]);
+
+  // Populate faenas and bateria map from cache
+  useEffect(() => {
+    if (cachedFaenas.length > 0) {
+      setAllFaenas(cachedFaenas as Faena[]);
+    }
+    if (cachedBateriaFaenas.length > 0) {
+      const map: PaqueteFaenaMap = {};
+      cachedBateriaFaenas.forEach((bf: any) => {
+        if (!map[bf.paquete_id]) map[bf.paquete_id] = [];
+        map[bf.paquete_id].push(bf.faena_id);
+      });
+      setPaqueteFaenasMap(map);
+    }
+  }, [cachedFaenas, cachedBateriaFaenas]);
 
   // Load patients separately since it depends on selectedDate
   useEffect(() => {

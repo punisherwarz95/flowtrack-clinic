@@ -5,6 +5,8 @@ import { useAuthContext } from "@/contexts/AuthContext";
 import { useTheme } from "@/hooks/useTheme";
 import { Button } from "@/components/ui/button";
 import ChangeOwnPassword from "@/components/ChangeOwnPassword";
+import SyncStatusBadge from "@/components/SyncStatusBadge";
+import { useSyncContext } from "@/contexts/SyncContext";
 import { logActivity } from "@/lib/activityLog";
 
 const Navigation = () => {
@@ -12,6 +14,7 @@ const Navigation = () => {
   const { user, signOut } = useAuth();
   const { hasPermission } = useAuthContext();
   const { theme, toggleTheme } = useTheme();
+  const syncCtx = useSyncContext();
 
   const allLinks = [
     { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -81,6 +84,7 @@ const Navigation = () => {
           </div>
           
           <div className="flex items-center gap-2 shrink-0">
+            <SyncStatusBadge syncState={syncCtx} onForceSync={syncCtx.forcePush} />
             <span className="text-sm font-medium text-foreground bg-muted px-2.5 py-1 rounded-md">
               {user?.email?.replace("@mediflow.local", "") ?? ""}
             </span>
