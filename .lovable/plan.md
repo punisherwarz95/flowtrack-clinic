@@ -1,66 +1,125 @@
 
 
-# Diagnostico: Por que algunos usuarios cargan lento y otros no
+# Plan: Capa Offline-First Híbrida para Flujo, MiBox y Pacientes
 
-## Hallazgo clave
+## Resumen
 
-El archivo `src/hooks/useReferenceData.ts` **no existe** a pesar de estar documentado en la memoria del proyecto. Esto significa que el cache global de datos de referencia **nunca fue implementado**. Cada pagina (Dashboard, Flujo, MiBox, Pacientes) hace queries independientes cada vez que se abre.
+Implementar una capa de cache local con IndexedDB (Dexie.js) que precargue los datos del día y permita trabajar de forma instantánea. Las acciones críticas (llamar/liberar paciente) van directo al cloud para evitar conflictos. Las acciones no-críticas (marcar exámenes, cambiar ficha, etc.) se aplican localmente de inmediato y se envían al cloud en una cola de operaciones en background.
 
-## Por que "operaciones" carga rapido y Gerardo/Ornella no
+## Reglas de negocio
 
-La diferencia no es de internet — es una combinacion de:
+```text
+ACCIÓN                          → EJECUCIÓN
+────────────────────────────────────────────
+Llamar paciente (asignar box)   → CLOUD DIRECTO (ya tiene protección atómica)
+Liberar paciente (completar)    → CLOUD DIRECTO (cambia estado global)
+Marcar examen completado/inc.   → LOCAL + COLA
+Cambiar estado ficha            → LOCAL + COLA  
+Cerrar visita box               → LOCAL + COLA
+Leer atenciones/examenes        → DESDE CACHE LOCAL
+Crear paciente (módulo Pacientes)→ CLOUD DIRECTO + actualizar cache
+Cargar empresas/baterias/boxes  → DESDE CACHE LOCAL (React Query + IndexedDB)
+```
 
-1. **Rol y permisos**: Si "operaciones" es admin, sus permisos se cachean en sessionStorage tras el primer login. Si Gerardo/Ornella son no-admin, la query de `menu_permissions` puede ser mas lenta dependiendo de cuantos registros tengan.
+## Arquitectura
 
-2. **Dispositivo**: Un PC con menos RAM o CPU mas lento procesa el rendering de React significativamente mas lento. Chrome con muchas pestanas abiertas consume memoria y ralentiza todo.
+```text
+┌─────────────────────────────────────┐
+│  UI (Flujo / MiBox / Pacientes)     │
+│  Lee de: cache local (instantáneo)  │
+│  Escribe a: cache local + outbox    │
+└──────────┬──────────────────────────┘
+           │
+     ┌─────▼─────┐
+     │ IndexedDB  │  ← atenciones, atencion_examenes del día
+     │ (Dexie)    │  ← outbox de operaciones pendientes
+     │            │  ← referencia: empresas, boxes, examenes, paquetes
+     └─────┬──────┘
+           │
+     ┌─────▼──────────┐
+     │ SyncEngine     │  ← cada 10-15s: push outbox + pull cambios
+     │ (background)   │  ← Realtime channel como trigger de sync
+     └─────┬──────────┘
+           │
+     ┌─────▼──────┐
+     │ Supabase   │  ← fuente de verdad
+     │ Cloud      │
+     └────────────┘
+```
 
-3. **Cold start del backend**: El primer usuario que accede tras inactividad "paga" el cold start (~250ms-1s extra). Los siguientes usuarios se benefician de la instancia ya caliente.
+## Archivos a crear
 
-4. **Sin cache entre modulos**: Al navegar de Dashboard a Flujo, se re-consultan boxes, examenes, empresas — datos identicos que ya estaban cargados.
+### 1. `src/lib/localDb.ts` — Base de datos IndexedDB con Dexie
+- Tablas: `atenciones`, `atencionExamenes`, `atencionBoxVisitas`, `outbox`
+- Tablas de referencia: `empresas`, `boxes`, `examenes`, `paquetes`, `faenas`, `bateriaFaenas`
+- Funciones CRUD locales: `getLocalAtenciones()`, `upsertLocalAtencion()`, `getLocalAtencionExamenes()`, `upsertLocalAtencionExamen()`, `addToOutbox()`, `getOutbox()`, `removeFromOutbox()`
 
-## Requisitos para conexion optima
+### 2. `src/hooks/useLocalSync.ts` — Motor de sincronización
+- **Pull**: cada 15s, consulta atenciones del día desde Supabase y actualiza IndexedDB
+- **Push**: cada 5s, procesa outbox y envía operaciones al cloud en orden
+- **Realtime trigger**: cuando llega un evento realtime, dispara un pull inmediato
+- **Precarga inicial**: al montar, carga todo el día en IndexedDB de una vez
+- **Referencia**: sincroniza empresas/boxes/examenes/paquetes/faenas al iniciar (y los mantiene en IndexedDB para que persistan entre recargas de página)
+- Expone: `{ isOnline, pendingOps, lastSyncAt, forcePull, forcePush }`
 
-### Dispositivo
-- **RAM minima**: 8 GB (Chrome consume ~500MB-1GB con la app abierta)
-- **Navegador**: Chrome o Edge actualizado (no Firefox, no Safari)
-- **Pestanas**: Maximo 5-8 pestanas abiertas simultaneamente
-- **Cache del navegador**: No usar modo incognito (pierde sessionStorage cache)
-- **Disco**: SSD preferido sobre HDD (afecta cache del navegador)
+### 3. `src/hooks/useLocalAtenciones.ts` — Hook para Flujo y MiBox
+- Lee atenciones y exámenes desde IndexedDB (instantáneo)
+- Para escrituras no-críticas (marcar examen, cambiar ficha): actualiza IndexedDB + agrega a outbox
+- Para escrituras críticas (llamar/liberar paciente): llama a Supabase directo, luego actualiza cache local
+- API compatible con la interfaz actual para minimizar cambios en los componentes
 
-### Internet
-- **Latencia**: Menos de 50ms al servidor (mas importante que velocidad). Probar con `ping szqnsuxmbvxxdzlbdglz.supabase.co`
-- **Velocidad**: 10 Mbps es suficiente (los 250 Mbps que tienen estan bien)
-- **Estabilidad**: WiFi 5GHz preferido sobre 2.4GHz. Cable ethernet es ideal
-- **VPN/Proxy**: Desactivar si hay — agrega latencia
+### 4. `src/components/SyncStatusBadge.tsx` — Indicador visual
+- Muestra: "✓ Sincronizado", "↑ 3 pendientes", "⟳ Sincronizando...", "⚠ Sin conexión"
+- Color verde/amarillo/rojo según estado
 
-### Navegador
-- **Extensiones**: Desactivar ad-blockers y extensiones innecesarias (pueden interceptar requests)
-- **Cache**: No limpiar cache frecuentemente (destruye el sessionStorage de permisos)
+## Archivos a modificar
 
-## Solucion tecnica: Implementar el cache que falta
+### 5. `src/pages/Flujo.tsx`
+- Reemplazar `loadData()` y queries directas por `useLocalAtenciones()`
+- Mantener `handleIniciarAtencion` como cloud-directo (ya tiene protección atómica `.eq("estado", "en_espera").is("box_id", null)`)
+- `handleCompletarAtencion`: cloud-directo para el cambio de estado de atención; las actualizaciones de exámenes van por cola
+- Eliminar polling de 30s (el sync engine lo reemplaza)
+- Mantener realtime como trigger de sync, no como fuente de datos
 
-### 1. Crear `src/hooks/useReferenceData.ts`
-- Hooks `useBoxes()`, `useExamenes()`, `useEmpresas()` usando React Query
-- `staleTime: 5 min`, `gcTime: 10 min` — datos cargados una vez sirven para toda la sesion
-- Exportar tipos compartidos
+### 6. `src/pages/MiBox.tsx`
+- Mismo patrón: leer de cache local, escribir exámenes a cola
+- `handleLlamarPaciente`: mantener cloud-directo (ya tiene protección atómica)
+- `handleCompletarAtencion`: cloud-directo para estado + cola para exámenes
+- Eliminar `setInterval` de 10s y polling redundante
 
-### 2. Actualizar `src/pages/Flujo.tsx`
-- Reemplazar queries directas de `boxes` y `examenes` en `loadData()` por `useBoxes()` y `useExamenes()`
-- Solo consultar `atenciones` (dato que cambia) en cada carga
+### 7. `src/pages/Pacientes.tsx`
+- Empresas, exámenes, paquetes ya vienen de React Query; agregar persistencia en IndexedDB para que la primera carga sea instantánea
+- `loadAllFaenasAndBateriaFaenas()`: leer de cache local, sync en background
+- `handleSubmit` (crear paciente): cloud-directo + actualizar cache
 
-### 3. Actualizar `src/pages/Dashboard.tsx`
-- Usar `useBoxes()` en vez de queries independientes para box_examenes
-- Eliminar queries duplicadas entre `loadDailyStats` y `loadMonthlyStats`
+### 8. `src/hooks/useReferenceData.ts`
+- Agregar `initialData` desde IndexedDB para que React Query tenga datos inmediatos antes de que el fetch al cloud responda
+- Agregar `useFaenas()` y `useBateriaFaenas()` para que Pacientes también use cache centralizada
 
-### 4. Actualizar `src/pages/MiBox.tsx`
-- Reemplazar `loadBoxes()` por `useBoxes()`
-- Usar cache para examenes
+### 9. `src/components/Navigation.tsx`
+- Agregar `SyncStatusBadge` junto al nombre del usuario
 
-### 5. Actualizar `src/pages/Pacientes.tsx`
-- Usar hooks cacheados para examenes, empresas, paquetes
+## Dependencia nueva
+- `dexie` (~15KB gzipped) — wrapper de IndexedDB
+
+## Flujo de una acción típica
+
+### Marcar examen como completado (no-crítica):
+1. Usuario hace click → IndexedDB se actualiza → UI refleja cambio (< 10ms)
+2. Operación se agrega al outbox
+3. En 5-10s, sync engine envía al cloud
+4. Si falla, reintenta con backoff
+
+### Llamar paciente (crítica):
+1. Usuario hace click → optimistic UI (ya existente)
+2. Query atómica a Supabase `.eq("estado", "en_espera").is("box_id", null)`
+3. Si otro box lo llamó primero → revert + error (ya implementado)
+4. Si éxito → actualizar cache local + continuar trabajando offline-first
 
 ## Resultado esperado
-- Primera carga: similar (las queries se hacen 1 vez)
-- **Navegacion entre modulos**: de 1-3s a **instantanea** para datos de referencia
-- Menos queries al backend = menos probabilidad de cold start
+- **Carga inicial**: datos desde IndexedDB en < 50ms, sync con cloud en background
+- **Acciones sobre paciente en atención**: instantáneas (< 10ms)
+- **Acciones críticas**: misma latencia que ahora pero sin bloquear la UI
+- **Creación de pacientes**: empresas/baterias cargan instantáneamente desde cache
+- **Pérdida temporal de conexión**: módulos siguen operativos, outbox acumula operaciones
 
