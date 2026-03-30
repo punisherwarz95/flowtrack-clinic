@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { EmpresaAuthProvider } from "@/contexts/EmpresaAuthContext";
+import { SyncProvider } from "@/contexts/SyncContext";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Flujo from "./pages/Flujo";
