@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, ClipboardCheck, Calendar as CalendarIcon, Users, Check, Building2, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import { usePresionTimers } from "@/hooks/usePresionTimers";
 import PresionTimerBadge from "@/components/PresionTimerBadge";
 import BusquedaPacientesHistorial from "@/components/empresa/BusquedaPacientesHistorial";
 import { useBoxExamenesMap, usePrestadorExamenesMap } from "@/hooks/useReferenceData";
+import { useLocalAtenciones } from "@/hooks/useLocalAtenciones";
 
 interface AtencionIngresada {
   id: string;
@@ -56,6 +57,14 @@ const Dashboard = () => {
   const { loading: authLoading } = useAuth();
   const { data: boxExamenesMapCached } = useBoxExamenesMap();
   const { data: prestadorExamenesMapCached } = usePrestadorExamenesMap();
+  const { atenciones: localAtenciones, atencionExamenes: localAtencionExamenes, isLoaded: localLoaded } = useLocalAtenciones();
+
+  // Helper to check if a date is today
+  const isToday = (date: Date | undefined) => {
+    if (!date) return true;
+    const today = new Date();
+    return date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate();
+  };
   
   // Filtro diario (sección 1)
   const [selectedDateDaily, setSelectedDateDaily] = useState<Date | undefined>(new Date());
@@ -115,27 +124,114 @@ const Dashboard = () => {
   const { timerByAtencion } = usePresionTimers(atencionesConTemporizador);
 
   useEffect(() => {
-    loadDailyStats();
-  }, [selectedDateDaily]);
+    if (isToday(selectedDateDaily) && localLoaded) {
+      computeDailyStatsFromLocal();
+    } else if (!isToday(selectedDateDaily)) {
+      loadDailyStats();
+    }
+  }, [selectedDateDaily, localAtenciones, localAtencionExamenes, localLoaded]);
 
   useEffect(() => {
     loadMonthlyStats();
   }, [selectedMonth]);
 
   useEffect(() => {
-    loadTableData();
-  }, [selectedDateTable]);
+    if (isToday(selectedDateTable) && localLoaded) {
+      computeTableDataFromLocal();
+    } else if (!isToday(selectedDateTable)) {
+      loadTableData();
+    }
+  }, [selectedDateTable, localAtenciones, localAtencionExamenes, localLoaded]);
 
-  // Auto-refresh every 30 seconds
+  // Auto-refresh only for monthly stats (daily + table use local cache for today)
   useEffect(() => {
     const interval = setInterval(() => {
-      loadDailyStats();
       loadMonthlyStats();
-      loadTableData();
+      if (!isToday(selectedDateDaily)) loadDailyStats();
+      if (!isToday(selectedDateTable)) loadTableData();
     }, 30000);
     
     return () => clearInterval(interval);
   }, [selectedDateDaily, selectedMonth, selectedDateTable]);
+
+  // ── Compute daily stats from local cache (today only) ────────────────
+  const computeDailyStatsFromLocal = () => {
+    const examenBoxMap = new Map<string, string>();
+    if (boxExamenesMapCached) {
+      boxExamenesMapCached.forEach((val, key) => {
+        examenBoxMap.set(key, val.boxNombre);
+      });
+    }
+
+    const enEsperaData = localAtenciones.filter(a => a.estado === "en_espera");
+    const enAtencionData = localAtenciones.filter(a => a.estado === "en_atencion");
+    const completadosData = localAtenciones.filter(a => a.estado === "completado");
+
+    const conteoExamenes: Record<string, { asignados: number; completados: number }> = {};
+    const conteoPorBox: Record<string, Record<string, { asignados: number; completados: number }>> = {};
+    localAtencionExamenes.forEach(ae => {
+      const nombreExamen = ae.examen_nombre || "Sin nombre";
+      const boxNombre = examenBoxMap.get(ae.examen_id) || "Sin Box";
+      if (!conteoExamenes[nombreExamen]) conteoExamenes[nombreExamen] = { asignados: 0, completados: 0 };
+      conteoExamenes[nombreExamen].asignados += 1;
+      if (ae.estado === "completado") conteoExamenes[nombreExamen].completados += 1;
+      if (!conteoPorBox[boxNombre]) conteoPorBox[boxNombre] = {};
+      if (!conteoPorBox[boxNombre][nombreExamen]) conteoPorBox[boxNombre][nombreExamen] = { asignados: 0, completados: 0 };
+      conteoPorBox[boxNombre][nombreExamen].asignados += 1;
+      if (ae.estado === "completado") conteoPorBox[boxNombre][nombreExamen].completados += 1;
+    });
+
+    setExamenesConteoDiario(conteoExamenes);
+    setExamenesConteoDiarioPorBox(conteoPorBox);
+    setStatsDaily({
+      enEspera: enEsperaData.length,
+      enAtencion: enAtencionData.length,
+      completados: completadosData.length,
+      totalExamenes: 0,
+      examenesRealizadosHoy: localAtencionExamenes.length,
+      enEsperaDistribucion: {
+        workmed: enEsperaData.filter(a => a.paciente_tipo_servicio === "workmed").length,
+        jenner: enEsperaData.filter(a => a.paciente_tipo_servicio === "jenner").length,
+      },
+      enAtencionDistribucion: {
+        workmed: enAtencionData.filter(a => a.paciente_tipo_servicio === "workmed").length,
+        jenner: enAtencionData.filter(a => a.paciente_tipo_servicio === "jenner").length,
+      },
+      completadosDistribucion: {
+        workmed: completadosData.filter(a => a.paciente_tipo_servicio === "workmed").length,
+        jenner: completadosData.filter(a => a.paciente_tipo_servicio === "jenner").length,
+      },
+    });
+  };
+
+  // ── Compute table data from local cache (today only) ─────────────────
+  const computeTableDataFromLocal = () => {
+    const mapped: AtencionIngresada[] = localAtenciones
+      .sort((a, b) => (a.numero_ingreso || 0) - (b.numero_ingreso || 0))
+      .map(a => {
+        const examenes = localAtencionExamenes
+          .filter(ae => ae.atencion_id === a.id)
+          .map(ae => ({
+            estado: ae.estado,
+            examenes: { id: ae.examen_id, nombre: ae.examen_nombre || "" },
+          }));
+        return {
+          id: a.id,
+          numero_ingreso: a.numero_ingreso || 0,
+          estado: a.estado,
+          boxes: a.box_nombre ? { nombre: a.box_nombre } : null,
+          pacientes: {
+            nombre: a.paciente_nombre || "",
+            tipo_servicio: a.paciente_tipo_servicio || "",
+            empresas: a.paciente_empresa_id ? { id: a.paciente_empresa_id, nombre: a.paciente_empresa_nombre || "" } : null,
+          },
+          atencion_examenes: examenes,
+        } as unknown as AtencionIngresada;
+      });
+
+    setAtencionesIngresadas(mapped);
+    if (boxExamenesMapCached) setBoxExamenesMap(boxExamenesMapCached);
+  };
 
   // Shared filter function that can skip a specific filter for dropdown options
   const applyFilters = (skipFilter?: string) => {

@@ -46,6 +46,8 @@ import MargenesConfig from "@/components/cotizacion/MargenesConfig";
 import { format, startOfDay, endOfDay, isWithinInterval } from "date-fns";
 import { es } from "date-fns/locale";
 import { logActivity } from "@/lib/activityLog";
+import { localDb, type LocalCotizacion, type LocalCotizacionSolicitud } from "@/lib/localDb";
+import { liveQuery } from "dexie";
 
 interface Cotizacion {
   id: string;
@@ -122,9 +124,48 @@ const Cotizaciones = () => {
 
   // Get unique empresas for filter
   const empresasUnicas = Array.from(new Set(cotizaciones.map(c => c.empresa_nombre).filter(Boolean))) as string[];
+
+  // ── Load from local cache first (instant), then background refresh ──
   useEffect(() => {
+    // Load from IndexedDB immediately
+    const sub = liveQuery(() => localDb.cotizaciones.orderBy('numero_cotizacion').reverse().toArray()).subscribe({
+      next: (data) => {
+        if (data.length > 0) {
+          setCotizaciones(data as Cotizacion[]);
+          setLoading(false);
+        }
+      },
+      error: (err) => console.error('[Cotizaciones] local load error:', err),
+    });
+
+    const subSol = liveQuery(() => localDb.cotizacionSolicitudes.toArray()).subscribe({
+      next: (data) => {
+        if (data.length > 0) {
+          const mapped: SolicitudCotizacion[] = data.map(s => ({
+            id: s.id,
+            titulo: s.titulo,
+            descripcion: s.descripcion,
+            estado: s.estado,
+            created_at: s.created_at || '',
+            empresa: s.empresa_id ? { id: s.empresa_id, nombre: s.empresa_nombre || '' } : null,
+            faena: s.faena_id ? { id: s.faena_id, nombre: s.faena_nombre || '' } : null,
+            items: JSON.parse(s.items_json || '[]'),
+          }));
+          setSolicitudes(mapped);
+          setLoadingSolicitudes(false);
+        }
+      },
+      error: (err) => console.error('[Cotizaciones] local solicitudes error:', err),
+    });
+
+    // Also fetch from cloud in background to ensure freshness
     loadCotizaciones();
     loadSolicitudes();
+
+    return () => {
+      sub.unsubscribe();
+      subSol.unsubscribe();
+    };
   }, []);
 
   const loadSolicitudes = async () => {
