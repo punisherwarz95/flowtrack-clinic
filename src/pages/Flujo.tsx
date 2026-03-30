@@ -91,6 +91,13 @@ const Flujo = () => {
   const boxesRef = useRef<Box[]>([]);
   const examenesRef = useRef<Examen[]>([]);
 
+  // ── Offline-first: read from local cache ──────────────────────────
+  const localData = useLocalAtenciones();
+  const syncCtx = useSyncContext();
+  const isToday = selectedDate ? (
+    selectedDate.toDateString() === new Date().toDateString()
+  ) : true;
+
   const atencionIdsConTemporizador = useMemo(() => atenciones.map((a) => a.id), [atenciones]);
   const { timerByAtencion } = usePresionTimers(atencionIdsConTemporizador);
 
