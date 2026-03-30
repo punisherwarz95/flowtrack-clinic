@@ -118,6 +118,11 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
   const [observaciones, setObservaciones] = useState("");
   const [afectoIva, setAfectoIva] = useState(true);
 
+  // Descuento global
+  const [descuentoActivo, setDescuentoActivo] = useState(false);
+  const [descuentoPorcentaje, setDescuentoPorcentaje] = useState<number>(0);
+  const [descuentoPesos, setDescuentoPesos] = useState<number>(0);
+
   // Add item state
   const [tipoItem, setTipoItem] = useState<"paquete" | "examen">("paquete");
   const [selectedItemId, setSelectedItemId] = useState<string>("");
