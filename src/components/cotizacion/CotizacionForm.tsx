@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Trash2, Building2, Package, ClipboardList, ChevronDown, ChevronUp, FileDown, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Building2, Package, ClipboardList, ChevronDown, ChevronUp, FileDown, AlertTriangle, Percent, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { generateCotizacionPDF } from "./CotizacionPDF";
@@ -117,6 +117,11 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
   const [items, setItems] = useState<CotizacionItem[]>([]);
   const [observaciones, setObservaciones] = useState("");
   const [afectoIva, setAfectoIva] = useState(true);
+
+  // Descuento global
+  const [descuentoActivo, setDescuentoActivo] = useState(false);
+  const [descuentoPorcentaje, setDescuentoPorcentaje] = useState<number>(0);
+  const [descuentoPesos, setDescuentoPesos] = useState<number>(0);
 
   // Add item state
   const [tipoItem, setTipoItem] = useState<"paquete" | "examen">("paquete");
@@ -639,9 +644,11 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
     const totalConIva = items.reduce((sum, item) => sum + item.valor_con_iva, 0);
     const totalMargenes = items.reduce((sum, item) => sum + item.valor_margen, 0);
     const totalFinal = items.reduce((sum, item) => sum + item.valor_final, 0);
+    const descuento = descuentoActivo ? Math.round(descuentoPesos) : 0;
+    const totalConDescuento = totalFinal - descuento;
 
-    return { subtotalNeto, totalIva, totalConIva, totalMargenes, totalFinal };
-  }, [items]);
+    return { subtotalNeto, totalIva, totalConIva, totalMargenes, totalFinal, descuento, totalConDescuento };
+  }, [items, descuentoActivo, descuentoPesos]);
 
   const handleSave = async (estado: string = "borrador", generatePdf: boolean = false) => {
     // Validar campos requeridos
@@ -736,7 +743,7 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
         subtotal_neto: Math.round(totals.subtotalNeto),
         total_iva: Math.round(totals.totalIva),
         total_con_iva: Math.round(totals.totalConIva),
-        total_con_margen: Math.round(totals.totalFinal),
+        total_con_margen: Math.round(totals.totalConDescuento),
         estado,
         observaciones: observaciones || null,
         afecto_iva: afectoIva,
@@ -837,8 +844,10 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
           subtotal_neto: totals.subtotalNeto,
           total_iva: totals.totalIva,
           total_con_iva: totals.totalConIva,
-          total_con_margen: totals.totalFinal,
+          total_con_margen: totals.totalConDescuento,
           afecto_iva: afectoIva,
+          descuento: totals.descuento,
+          descuento_porcentaje: descuentoActivo ? descuentoPorcentaje : 0,
         });
         toast.success("PDF generado exitosamente");
       }
@@ -1264,10 +1273,16 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
                   <span className="text-muted-foreground">Márgenes aplicados:</span>
                   <span className="font-mono">{formatCurrency(totals.totalMargenes)}</span>
                 </div>
+                {descuentoActivo && totals.descuento > 0 && (
+                  <div className="flex justify-between text-sm text-destructive">
+                    <span>Descuento ({descuentoPorcentaje}%):</span>
+                    <span className="font-mono">-{formatCurrency(totals.descuento)}</span>
+                  </div>
+                )}
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
                   <span>TOTAL COTIZACIÓN:</span>
-                  <span className="font-mono text-primary">{formatCurrency(totals.totalFinal)}</span>
+                  <span className="font-mono text-primary">{formatCurrency(totals.totalConDescuento)}</span>
                 </div>
               </div>
             </div>
@@ -1275,9 +1290,9 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
         </Card>
       )}
 
-      {/* IVA Toggle */}
+      {/* IVA Toggle & Descuento Global */}
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="pt-6 space-y-6">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label className="text-base font-medium">Documento Afecto a IVA</Label>
@@ -1291,6 +1306,82 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
               checked={afectoIva}
               onCheckedChange={setAfectoIva}
             />
+          </div>
+
+          <Separator />
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-base font-medium flex items-center gap-2">
+                  <Percent className="h-4 w-4" />
+                  Descuento Global
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  {descuentoActivo 
+                    ? "Se aplicará un descuento al total de la cotización" 
+                    : "Sin descuento aplicado"}
+                </p>
+              </div>
+              <Switch
+                checked={descuentoActivo}
+                onCheckedChange={(checked) => {
+                  setDescuentoActivo(checked);
+                  if (!checked) {
+                    setDescuentoPorcentaje(0);
+                    setDescuentoPesos(0);
+                  }
+                }}
+              />
+            </div>
+
+            {descuentoActivo && (
+              <div className="flex items-end gap-4 p-4 rounded-lg border border-dashed border-primary/30 bg-primary/5">
+                <div className="flex-1">
+                  <Label className="flex items-center gap-1 text-sm">
+                    <Percent className="h-3.5 w-3.5" />
+                    Porcentaje
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={descuentoPorcentaje || ""}
+                    placeholder="0"
+                    onChange={(e) => {
+                      const pct = parseFloat(e.target.value) || 0;
+                      setDescuentoPorcentaje(pct);
+                      const totalBase = items.reduce((sum, item) => sum + item.valor_final, 0);
+                      setDescuentoPesos(Math.round(totalBase * (pct / 100)));
+                    }}
+                    className="font-mono"
+                  />
+                </div>
+                <div className="flex-1">
+                  <Label className="flex items-center gap-1 text-sm">
+                    <DollarSign className="h-3.5 w-3.5" />
+                    Monto (CLP)
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={descuentoPesos || ""}
+                    placeholder="0"
+                    onChange={(e) => {
+                      const pesos = parseFloat(e.target.value) || 0;
+                      setDescuentoPesos(pesos);
+                      const totalBase = items.reduce((sum, item) => sum + item.valor_final, 0);
+                      setDescuentoPorcentaje(totalBase > 0 ? Math.round((pesos / totalBase) * 10000) / 100 : 0);
+                    }}
+                    className="font-mono"
+                  />
+                </div>
+                <div className="text-sm text-muted-foreground whitespace-nowrap pb-2">
+                  = {formatCurrency(Math.round(descuentoPesos))} de descuento
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

@@ -25,6 +25,8 @@ interface CotizacionData {
   total_con_iva: number;
   total_con_margen: number;
   afecto_iva?: boolean;
+  descuento?: number;
+  descuento_porcentaje?: number;
 }
 
 const formatCurrency = (value: number) => {
@@ -156,6 +158,17 @@ export const generateCotizacionPDF = (data: CotizacionData) => {
       doc.setFont("helvetica", "italic");
       doc.text("(Documento Exento de IVA)", rightCol, currentY);
       doc.setFont("helvetica", "normal");
+      currentY += 7;
+    }
+
+    // Descuento global
+    if (data.descuento && data.descuento > 0) {
+      doc.setTextColor(200, 50, 50);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.text(`Descuento (${data.descuento_porcentaje || 0}%):`, rightCol, currentY);
+      doc.text(`-${formatCurrency(data.descuento)}`, valueCol, currentY, { align: "right" });
+      doc.setTextColor(...COLORS.text);
       currentY += 7;
     }
 
