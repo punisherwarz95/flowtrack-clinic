@@ -80,8 +80,6 @@ export function useLocalAtenciones() {
 
   // ── Non-critical write: close box visit (local + outbox) ────────────
   const closeBoxVisit = useCallback(async (atencionId: string, boxId: string) => {
-    // This needs a special outbox entry since we can't easily mirror atencion_box_visitas
-    // We'll send it as a raw operation the push engine handles
     await addToOutbox('atencion_box_visitas', 'update', `${atencionId}_${boxId}`, {
       _custom: 'close_visit',
       atencion_id: atencionId,
@@ -89,6 +87,136 @@ export function useLocalAtenciones() {
       fecha_salida: new Date().toISOString(),
     });
   }, []);
+
+  // ── Offline-first: completar atención desde MiBox ──────────────────
+  const completarAtencionMiBox = useCallback(async (
+    atencionId: string,
+    estado: 'completado' | 'incompleto',
+    boxId: string,
+    boxExamIds: string[],
+    userId?: string | null,
+  ) => {
+    const now = new Date().toISOString();
+
+    // 1) Mark box exams as completed/incompleto locally + queue
+    if (estado === 'completado' && boxExamIds.length > 0) {
+      const toUpdate = atencionExamenes.filter(
+        ae => ae.atencion_id === atencionId && boxExamIds.includes(ae.examen_id) &&
+          (ae.estado === 'pendiente' || ae.estado === 'incompleto'),
+      );
+      for (const ae of toUpdate) {
+        await localDb.atencionExamenes.update(ae.id, { estado: 'completado', fecha_realizacion: now, realizado_por: userId || null });
+        await addToOutbox('atencion_examenes', 'update', ae.id, { estado: 'completado', fecha_realizacion: now, realizado_por: userId || null });
+      }
+    }
+
+    // 2) Close box visit
+    await addToOutbox('atencion_box_visitas', 'update', `${atencionId}_${boxId}`, {
+      _custom: 'close_visit', atencion_id: atencionId, box_id: boxId, fecha_salida: now,
+    });
+
+    // 3) Check remaining pending exams locally
+    const remaining = atencionExamenes.filter(
+      ae => ae.atencion_id === atencionId &&
+        (ae.estado === 'pendiente' || ae.estado === 'incompleto') &&
+        !(estado === 'completado' && boxExamIds.includes(ae.examen_id)),
+    );
+
+    if (remaining.length > 0) {
+      // Return to espera
+      await localDb.atenciones.update(atencionId, { estado: 'en_espera', box_id: null });
+      await addToOutbox('atenciones', 'update', atencionId, { estado: 'en_espera', box_id: null });
+      return 'devuelto_espera';
+    } else {
+      // Clear box assignment (ready to finalize in Flujo)
+      await localDb.atenciones.update(atencionId, { box_id: null });
+      await addToOutbox('atenciones', 'update', atencionId, { box_id: null });
+      return 'listo_finalizar';
+    }
+  }, [atencionExamenes]);
+
+  // ── Offline-first: completar atención desde Flujo ──────────────────
+  const completarAtencionFlujo = useCallback(async (
+    atencionId: string,
+    estado: 'completado' | 'incompleto',
+    boxId: string | null,
+    boxExamIds: string[],
+    selectedExamIds: Set<string>,
+    userId?: string | null,
+    fechaInicioAtencion?: string | null,
+  ) => {
+    const now = new Date().toISOString();
+
+    if (boxId && boxExamIds.length > 0) {
+      // Get pending exams for this box
+      const examsDelBox = atencionExamenes.filter(
+        ae => ae.atencion_id === atencionId && boxExamIds.includes(ae.examen_id) &&
+          (ae.estado === 'pendiente' || ae.estado === 'incompleto'),
+      );
+
+      if (estado === 'completado') {
+        // Mark ALL box exams as completed
+        for (const ae of examsDelBox) {
+          await localDb.atencionExamenes.update(ae.id, { estado: 'completado', fecha_realizacion: now, realizado_por: userId || null });
+          await addToOutbox('atencion_examenes', 'update', ae.id, { estado: 'completado', fecha_realizacion: now, realizado_por: userId || null });
+        }
+      } else {
+        // Parcial: selected → completado, rest → incompleto
+        for (const ae of examsDelBox) {
+          const nuevoEstado = selectedExamIds.has(ae.id) ? 'completado' : 'incompleto';
+          const payload: Record<string, any> = {
+            estado: nuevoEstado,
+            fecha_realizacion: nuevoEstado === 'completado' ? now : null,
+          };
+          if (nuevoEstado === 'completado') payload.realizado_por = userId || null;
+          await localDb.atencionExamenes.update(ae.id, payload);
+          await addToOutbox('atencion_examenes', 'update', ae.id, payload);
+        }
+      }
+
+      // Close box visit
+      await addToOutbox('atencion_box_visitas', 'update', `${atencionId}_${boxId}`, {
+        _custom: 'close_visit', atencion_id: atencionId, box_id: boxId, fecha_salida: now,
+      });
+    }
+
+    // Check remaining pending exams locally (after our updates)
+    const allExams = atencionExamenes.filter(ae => ae.atencion_id === atencionId);
+    const updatedExams = allExams.map(ae => {
+      if (boxId && boxExamIds.includes(ae.examen_id) && (ae.estado === 'pendiente' || ae.estado === 'incompleto')) {
+        if (estado === 'completado') return { ...ae, estado: 'completado' };
+        return { ...ae, estado: selectedExamIds.has(ae.id) ? 'completado' : 'incompleto' };
+      }
+      return ae;
+    });
+    const remaining = updatedExams.filter(ae => ae.estado === 'pendiente' || ae.estado === 'incompleto');
+
+    if (remaining.length > 0 && boxId) {
+      // Return to espera
+      await localDb.atenciones.update(atencionId, { estado: 'en_espera', box_id: null });
+      await addToOutbox('atenciones', 'update', atencionId, { estado: 'en_espera', box_id: null });
+      return 'devuelto_espera';
+    } else if (boxId) {
+      // Clear box (ready to finalize)
+      await localDb.atenciones.update(atencionId, { box_id: null });
+      await addToOutbox('atenciones', 'update', atencionId, { box_id: null });
+      return 'listo_finalizar';
+    } else {
+      // Finalize directly
+      const payload: Partial<LocalAtencion> = {
+        estado: estado,
+        fecha_fin_atencion: now,
+        fecha_inicio_atencion: fechaInicioAtencion || now,
+        box_id: null,
+      };
+      await localDb.atenciones.update(atencionId, payload);
+      await addToOutbox('atenciones', 'update', atencionId, {
+        estado, fecha_fin_atencion: now,
+        fecha_inicio_atencion: fechaInicioAtencion || now,
+      });
+      return 'finalizado';
+    }
+  }, [atencionExamenes]);
 
   // ── After a critical cloud write succeeds, update local cache ───────
   const updateLocalAtencion = useCallback(async (atencionId: string, changes: Partial<LocalAtencion>) => {
@@ -114,6 +242,8 @@ export function useLocalAtenciones() {
     batchUpdateExamenEstado,
     updateEstadoFicha,
     closeBoxVisit,
+    completarAtencionMiBox,
+    completarAtencionFlujo,
     updateLocalAtencion,
     getExamenesForAtencion,
     getDocsForAtencion,
