@@ -296,37 +296,29 @@ const Flujo = () => {
   }, [boxes, examenes]);
 
   useEffect(() => {
-    loadData();
-    
-    const channel = supabase
-      .channel("atenciones-changes-v2")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "atenciones" },
-        handleRealtimeAtencionChange
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "atencion_examenes" },
-        handleRealtimeExamenChange
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "pacientes" },
-        () => loadData() // Pacientes cambian poco, recarga completa está bien
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [selectedDate]);
-
-  // OPTIMIZACIÓN v0.0.2: Auto-refresh cada 30 segundos (realtime maneja cambios frecuentes)
-  useEffect(() => {
-    const interval = setInterval(() => {
+    // For today, local cache is populated by useLocalSync;
+    // for other dates, we still need cloud queries
+    if (!isToday) {
       loadData();
-    }, 30000);
+    }
+    
+    // Realtime channels only needed for non-today views (today uses sync engine)
+    if (!isToday) {
+      const channel = supabase
+        .channel("atenciones-changes-v2")
+        .on("postgres_changes", { event: "*", schema: "public", table: "atenciones" }, handleRealtimeAtencionChange)
+        .on("postgres_changes", { event: "*", schema: "public", table: "atencion_examenes" }, handleRealtimeExamenChange)
+        .on("postgres_changes", { event: "*", schema: "public", table: "pacientes" }, () => loadData())
+        .subscribe();
+
+      return () => { supabase.removeChannel(channel); };
+    }
+  }, [selectedDate, isToday]);
+
+  // Auto-refresh only for non-today views
+  useEffect(() => {
+    if (isToday) return; // Today uses sync engine
+    const interval = setInterval(() => { loadData(); }, 30000);
 
     return () => clearInterval(interval);
   }, [selectedDate]);
