@@ -727,17 +727,51 @@ const Flujo = () => {
       const currentBoxId = atencionActual?.box_id;
       const seleccionados = examenesSeleccionados[atencionId] || new Set<string>();
 
+      // Offline-first for today
+      if (isToday) {
+        const box = currentBoxId ? boxes.find((b) => b.id === currentBoxId) : null;
+        const boxExamIds = box?.box_examenes.map((be) => be.examen_id) || [];
+
+        if (currentBoxId && boxExamIds.length === 0) {
+          toast.error("Este box no tiene exámenes asociados");
+          return;
+        }
+
+        const result = await localData.completarAtencionFlujo(
+          atencionId, estado, currentBoxId || null, boxExamIds,
+          seleccionados, user?.id, atencionActual?.fecha_inicio_atencion,
+        );
+
+        // Clean local selection
+        setExamenesSeleccionados(prev => {
+          const newState = { ...prev };
+          delete newState[atencionId];
+          return newState;
+        });
+
+        if (result === 'devuelto_espera') {
+          toast.success("Paciente devuelto a espera - tiene exámenes pendientes");
+          await logActivity("devolver_espera", { atencion_id: atencionId }, "/flujo");
+        } else if (result === 'listo_finalizar') {
+          toast.success("Exámenes completados - paciente listo para finalizar");
+          await logActivity("cambiar_estado_examen", { atencion_id: atencionId, estado: "completado_box" }, "/flujo");
+        } else {
+          toast.success(estado === "completado" ? "Atención completada" : "Atención marcada como incompleta");
+          await logActivity(estado === "completado" ? "completar_atencion" : "incompleto_atencion", { atencion_id: atencionId, paciente: atencionActual?.pacientes.nombre }, "/flujo");
+        }
+        return;
+      }
+
+      // Cloud-direct for non-today dates
       if (currentBoxId) {
         const box = boxes.find((b) => b.id === currentBoxId);
         const boxExamIds = box?.box_examenes.map((be) => be.examen_id) || [];
         
-        // Si no hay exámenes asociados al box, no hay nada que hacer
         if (boxExamIds.length === 0) {
           toast.error("Este box no tiene exámenes asociados");
           return;
         }
         
-        // Obtener exámenes pendientes/incompletos del box directamente de la BD
         const { data: examenesDelBoxDB, error: fetchError } = await supabase
           .from("atencion_examenes")
           .select("id, examen_id, estado")
@@ -746,90 +780,53 @@ const Flujo = () => {
           .in("examen_id", boxExamIds);
 
         if (fetchError) throw fetchError;
-        
         const examenesDelBox = examenesDelBoxDB || [];
 
         if (estado === "completado") {
-          // Completar: marcar TODOS los exámenes del box como completados
           if (examenesDelBox.length > 0) {
             const idsToComplete = examenesDelBox.map(ae => ae.id);
             const { error: updateExamsError } = await supabase
               .from("atencion_examenes")
-              .update({ 
-                estado: "completado", 
-                fecha_realizacion: new Date().toISOString(),
-                realizado_por: user?.id || null
-              })
+              .update({ estado: "completado", fecha_realizacion: new Date().toISOString(), realizado_por: user?.id || null })
               .in("id", idsToComplete);
             if (updateExamsError) throw updateExamsError;
           }
         } else {
-          // Parcial: marcar solo los seleccionados como completados, el resto como incompleto
           for (const ae of examenesDelBox) {
             const nuevoEstado = seleccionados.has(ae.id) ? "completado" : "incompleto";
-            const updateData: any = { 
-              estado: nuevoEstado, 
-              fecha_realizacion: nuevoEstado === "completado" ? new Date().toISOString() : null 
-            };
-            if (nuevoEstado === "completado") {
-              updateData.realizado_por = user?.id || null;
-            }
-            const { error } = await supabase
-              .from("atencion_examenes")
-              .update(updateData)
-              .eq("id", ae.id);
+            const updateData: any = { estado: nuevoEstado, fecha_realizacion: nuevoEstado === "completado" ? new Date().toISOString() : null };
+            if (nuevoEstado === "completado") updateData.realizado_por = user?.id || null;
+            const { error } = await supabase.from("atencion_examenes").update(updateData).eq("id", ae.id);
             if (error) throw error;
           }
         }
+
+        if (currentBoxId) {
+          await supabase.from("atencion_box_visitas")
+            .update({ fecha_salida: new Date().toISOString() })
+            .eq("atencion_id", atencionId).eq("box_id", currentBoxId).is("fecha_salida", null);
+        }
       }
 
-      // Cerrar visita al box (registrar fecha_salida)
-      if (currentBoxId) {
-        await supabase
-          .from("atencion_box_visitas")
-          .update({ fecha_salida: new Date().toISOString() })
-          .eq("atencion_id", atencionId)
-          .eq("box_id", currentBoxId)
-          .is("fecha_salida", null);
-      }
+      setExamenesSeleccionados(prev => { const s = { ...prev }; delete s[atencionId]; return s; });
 
-      // Limpiar selección local
-      setExamenesSeleccionados(prev => {
-        const newState = { ...prev };
-        delete newState[atencionId];
-        return newState;
-      });
-
-      // Verificar si quedan exámenes pendientes o incompletos
       const { data: examenesPendientesData, error: examenesError } = await supabase
-        .from("atencion_examenes")
-        .select("id")
-        .eq("atencion_id", atencionId)
-        .in("estado", ["pendiente", "incompleto"]);
-
+        .from("atencion_examenes").select("id")
+        .eq("atencion_id", atencionId).in("estado", ["pendiente", "incompleto"]);
       if (examenesError) throw examenesError;
 
-      // Actualizar el estado de la atención
       if (examenesPendientesData && examenesPendientesData.length > 0) {
-        const { error } = await supabase
-          .from("atenciones")
-          .update({ estado: "en_espera", box_id: null })
-          .eq("id", atencionId);
+        const { error } = await supabase.from("atenciones").update({ estado: "en_espera", box_id: null }).eq("id", atencionId);
         if (error) throw error;
         toast.success("Paciente devuelto a espera - tiene exámenes pendientes");
         await logActivity("devolver_espera", { atencion_id: atencionId }, "/flujo");
       } else if (currentBoxId) {
-        const { error } = await supabase
-          .from("atenciones")
-          .update({ box_id: null })
-          .eq("id", atencionId);
+        const { error } = await supabase.from("atenciones").update({ box_id: null }).eq("id", atencionId);
         if (error) throw error;
         toast.success("Exámenes completados - paciente listo para finalizar");
         await logActivity("cambiar_estado_examen", { atencion_id: atencionId, estado: "completado_box" }, "/flujo");
       } else {
-        // Finalizar directamente (puede venir de en_espera o en_atencion sin box)
-        const { error } = await supabase
-          .from("atenciones")
+        const { error } = await supabase.from("atenciones")
           .update({ estado, fecha_fin_atencion: new Date().toISOString(), fecha_inicio_atencion: atencionActual?.fecha_inicio_atencion || new Date().toISOString() })
           .eq("id", atencionId);
         if (error) throw error;

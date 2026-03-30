@@ -489,40 +489,22 @@ const MiBox = () => {
       const currentBox = boxes.find((b) => b.id === selectedBoxId);
       const boxExamIds = currentBox?.box_examenes.map((be) => be.examen_id) || [];
 
-      if (estado === "completado" && boxExamIds.length > 0) {
-        await supabase
-          .from("atencion_examenes")
-          .update({ estado: "completado", fecha_realizacion: new Date().toISOString(), realizado_por: user?.id || null })
-          .eq("atencion_id", atencionId).in("examen_id", boxExamIds).in("estado", ["pendiente", "incompleto"]);
-      }
+      // Offline-first: update local + queue for cloud sync
+      const result = await localData.completarAtencionMiBox(
+        atencionId, estado, selectedBoxId!, boxExamIds, user?.id,
+      );
 
-      if (selectedBoxId) {
-        await supabase
-          .from("atencion_box_visitas")
-          .update({ fecha_salida: new Date().toISOString() })
-          .eq("atencion_id", atencionId).eq("box_id", selectedBoxId).is("fecha_salida", null);
-      }
-
-      const { data: examenesPendientesData } = await supabase
-        .from("atencion_examenes").select("id")
-        .eq("atencion_id", atencionId).in("estado", ["pendiente", "incompleto"]);
-
-      if (examenesPendientesData && examenesPendientesData.length > 0) {
-        await supabase.from("atenciones").update({ estado: "en_espera", box_id: null }).eq("id", atencionId);
+      if (result === 'devuelto_espera') {
         toast.success("Paciente devuelto a espera - tiene exámenes pendientes");
         logActivity("devolver_espera_box", { atencion_id: atencionId }, "/mi-box");
       } else {
-        await supabase.from("atenciones").update({ box_id: null }).eq("id", atencionId);
         toast.success("Exámenes completados - paciente listo para finalizar en Flujo");
         logActivity("completar_box", { atencion_id: atencionId }, "/mi-box");
       }
-
-      // Background refresh
-      loadData();
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al completar atención");
-      loadData(); // Revert
+      syncCtx.forcePull(); // Resync on error
     }
   };
 
