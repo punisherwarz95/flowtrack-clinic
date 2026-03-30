@@ -10,7 +10,7 @@ import CodigoDelDia from "@/components/CodigoDelDia";
 import { useGenerateDocumentosFromBateria } from "@/hooks/useAtencionDocumentos";
 import CopiarExamenesPaciente from "@/components/CopiarExamenesPaciente";
 import { supabase } from "@/integrations/supabase/client";
-import { useEmpresas, useExamenes, usePaquetes } from "@/hooks/useReferenceData";
+import { useEmpresas, useExamenes, usePaquetes, useFaenas, useBateriaFaenas } from "@/hooks/useReferenceData";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import { format } from "date-fns";
