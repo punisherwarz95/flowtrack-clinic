@@ -113,6 +113,115 @@ const Flujo = () => {
     examenesRef.current = examenes;
   }, [examenes]);
 
+  // ── Populate from local cache when viewing today ──────────────────
+  useEffect(() => {
+    if (!isToday || !localData.isLoaded) return;
+    
+    // Map local cache data to Atencion[] format
+    const localAtenciones: Atencion[] = localData.atenciones
+      .filter(a => a.estado === 'en_espera' || a.estado === 'en_atencion')
+      .sort((a, b) => (a.numero_ingreso || 0) - (b.numero_ingreso || 0))
+      .map(la => ({
+        id: la.id,
+        estado: la.estado,
+        fecha_ingreso: la.fecha_ingreso,
+        fecha_inicio_atencion: la.fecha_inicio_atencion,
+        numero_ingreso: la.numero_ingreso || 0,
+        box_id: la.box_id,
+        estado_ficha: la.estado_ficha,
+        pacientes: {
+          id: la.paciente_id,
+          nombre: la.paciente_nombre || '',
+          rut: la.paciente_rut || '',
+          tipo_servicio: la.paciente_tipo_servicio || '',
+        },
+        boxes: la.box_nombre ? { nombre: la.box_nombre } : null,
+      }));
+
+    setAtenciones(localAtenciones);
+    atencionesRef.current = localAtenciones;
+
+    // Compute derived data from local cache
+    const atencionIds = localAtenciones.map(a => a.id);
+    
+    // Examenes pendientes
+    const newExamenesPendientes: {[id: string]: string[]} = {};
+    const newTotalExamenes: {[id: string]: number} = {};
+    const newAtencionExamenes: {[id: string]: AtencionExamen[]} = {};
+    const newPendingBoxes: {[id: string]: string[]} = {};
+    
+    atencionIds.forEach(id => {
+      newExamenesPendientes[id] = [];
+      newTotalExamenes[id] = 0;
+      newAtencionExamenes[id] = [];
+      newPendingBoxes[id] = [];
+    });
+
+    const allLocalExamenes = localData.atencionExamenes.filter(ae => atencionIds.includes(ae.atencion_id));
+    
+    allLocalExamenes.forEach(ae => {
+      newTotalExamenes[ae.atencion_id] = (newTotalExamenes[ae.atencion_id] || 0) + 1;
+      
+      if (ae.estado === 'pendiente' || ae.estado === 'incompleto') {
+        const nombre = ae.examen_nombre || '';
+        if (nombre) {
+          const nombreConEstado = ae.estado === 'incompleto' ? `${nombre} (I)` : nombre;
+          newExamenesPendientes[ae.atencion_id]?.push(nombreConEstado);
+        }
+        
+        // Atencion examenes for box filtering
+        const atencion = localAtenciones.find(a => a.id === ae.atencion_id);
+        if (atencion?.estado === 'en_atencion' && atencion.box_id) {
+          const box = boxes.find(b => b.id === atencion.box_id);
+          const boxExamIds = box?.box_examenes.map(be => be.examen_id) || [];
+          if (boxExamIds.includes(ae.examen_id)) {
+            newAtencionExamenes[ae.atencion_id].push({
+              id: ae.id,
+              examen_id: ae.examen_id,
+              estado: ae.estado,
+              examenes: { nombre: ae.examen_nombre || '' },
+            });
+          }
+        } else {
+          newAtencionExamenes[ae.atencion_id].push({
+            id: ae.id,
+            examen_id: ae.examen_id,
+            estado: ae.estado,
+            examenes: { nombre: ae.examen_nombre || '' },
+          });
+        }
+
+        // Pending boxes
+        const examenId = ae.examen_id;
+        boxes.forEach(box => {
+          if (box.box_examenes.some(be => be.examen_id === examenId)) {
+            if (!newPendingBoxes[ae.atencion_id]?.includes(box.nombre)) {
+              newPendingBoxes[ae.atencion_id]?.push(box.nombre);
+            }
+          }
+        });
+      }
+    });
+
+    setExamenesPendientes(newExamenesPendientes);
+    setTotalExamenesPorAtencion(newTotalExamenes);
+    setAtencionExamenes(newAtencionExamenes);
+    setPendingBoxes(newPendingBoxes);
+
+    // Docs counts from local cache
+    const allLocalDocs = localData.atencionDocumentos.filter(d => atencionIds.includes(d.atencion_id));
+    const pendingCounts: {[id: string]: number} = {};
+    const totalCounts: {[id: string]: number} = {};
+    allLocalDocs.forEach(d => {
+      totalCounts[d.atencion_id] = (totalCounts[d.atencion_id] || 0) + 1;
+      if (d.estado === 'pendiente') {
+        pendingCounts[d.atencion_id] = (pendingCounts[d.atencion_id] || 0) + 1;
+      }
+    });
+    setDocsPendientes(pendingCounts);
+    setDocsTotal(totalCounts);
+  }, [localData.atenciones, localData.atencionExamenes, localData.atencionDocumentos, localData.isLoaded, isToday, boxes]);
+
   // OPTIMIZACIÓN v0.0.2: Realtime inteligente - actualiza solo lo necesario
   const handleRealtimeAtencionChange = async (payload: any) => {
     const { eventType, new: newRecord, old: oldRecord } = payload;
