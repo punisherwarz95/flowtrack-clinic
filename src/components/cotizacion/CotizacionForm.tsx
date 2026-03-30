@@ -644,9 +644,11 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
     const totalConIva = items.reduce((sum, item) => sum + item.valor_con_iva, 0);
     const totalMargenes = items.reduce((sum, item) => sum + item.valor_margen, 0);
     const totalFinal = items.reduce((sum, item) => sum + item.valor_final, 0);
+    const descuento = descuentoActivo ? Math.round(descuentoPesos) : 0;
+    const totalConDescuento = totalFinal - descuento;
 
-    return { subtotalNeto, totalIva, totalConIva, totalMargenes, totalFinal };
-  }, [items]);
+    return { subtotalNeto, totalIva, totalConIva, totalMargenes, totalFinal, descuento, totalConDescuento };
+  }, [items, descuentoActivo, descuentoPesos]);
 
   const handleSave = async (estado: string = "borrador", generatePdf: boolean = false) => {
     // Validar campos requeridos
