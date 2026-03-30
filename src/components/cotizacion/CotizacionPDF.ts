@@ -161,6 +161,17 @@ export const generateCotizacionPDF = (data: CotizacionData) => {
       currentY += 7;
     }
 
+    // Descuento global
+    if (data.descuento && data.descuento > 0) {
+      doc.setTextColor(200, 50, 50);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.text(`Descuento (${data.descuento_porcentaje || 0}%):`, rightCol, currentY);
+      doc.text(`-${formatCurrency(data.descuento)}`, valueCol, currentY, { align: "right" });
+      doc.setTextColor(...COLORS.text);
+      currentY += 7;
+    }
+
     // Recuadro del total final
     doc.setFillColor(...COLORS.primary);
     doc.rect(rightCol - 4, currentY + 1, 62, 10, "F");
