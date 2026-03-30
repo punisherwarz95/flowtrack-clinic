@@ -9,6 +9,8 @@ import {
   type LocalAtencion,
   type LocalAtencionExamen,
   type LocalAtencionDocumento,
+  type LocalCotizacion,
+  type LocalCotizacionSolicitud,
 } from '@/lib/localDb';
 
 const PULL_INTERVAL = 15_000; // 15s
