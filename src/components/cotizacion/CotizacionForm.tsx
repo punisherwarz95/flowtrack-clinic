@@ -1282,9 +1282,9 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
         </Card>
       )}
 
-      {/* IVA Toggle */}
+      {/* IVA Toggle & Descuento Global */}
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="pt-6 space-y-6">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label className="text-base font-medium">Documento Afecto a IVA</Label>
@@ -1298,6 +1298,82 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
               checked={afectoIva}
               onCheckedChange={setAfectoIva}
             />
+          </div>
+
+          <Separator />
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-base font-medium flex items-center gap-2">
+                  <Percent className="h-4 w-4" />
+                  Descuento Global
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  {descuentoActivo 
+                    ? "Se aplicará un descuento al total de la cotización" 
+                    : "Sin descuento aplicado"}
+                </p>
+              </div>
+              <Switch
+                checked={descuentoActivo}
+                onCheckedChange={(checked) => {
+                  setDescuentoActivo(checked);
+                  if (!checked) {
+                    setDescuentoPorcentaje(0);
+                    setDescuentoPesos(0);
+                  }
+                }}
+              />
+            </div>
+
+            {descuentoActivo && (
+              <div className="flex items-end gap-4 p-4 rounded-lg border border-dashed border-primary/30 bg-primary/5">
+                <div className="flex-1">
+                  <Label className="flex items-center gap-1 text-sm">
+                    <Percent className="h-3.5 w-3.5" />
+                    Porcentaje
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={descuentoPorcentaje || ""}
+                    placeholder="0"
+                    onChange={(e) => {
+                      const pct = parseFloat(e.target.value) || 0;
+                      setDescuentoPorcentaje(pct);
+                      const totalBase = items.reduce((sum, item) => sum + item.valor_final, 0);
+                      setDescuentoPesos(Math.round(totalBase * (pct / 100)));
+                    }}
+                    className="font-mono"
+                  />
+                </div>
+                <div className="flex-1">
+                  <Label className="flex items-center gap-1 text-sm">
+                    <DollarSign className="h-3.5 w-3.5" />
+                    Monto (CLP)
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={descuentoPesos || ""}
+                    placeholder="0"
+                    onChange={(e) => {
+                      const pesos = parseFloat(e.target.value) || 0;
+                      setDescuentoPesos(pesos);
+                      const totalBase = items.reduce((sum, item) => sum + item.valor_final, 0);
+                      setDescuentoPorcentaje(totalBase > 0 ? Math.round((pesos / totalBase) * 10000) / 100 : 0);
+                    }}
+                    className="font-mono"
+                  />
+                </div>
+                <div className="text-sm text-muted-foreground whitespace-nowrap pb-2">
+                  = {formatCurrency(Math.round(descuentoPesos))} de descuento
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
