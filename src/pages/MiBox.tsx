@@ -117,26 +117,145 @@ const MiBox = () => {
     pendingCount: documentosPendientes,
   } = useAtencionDocumentos(selectedAtencionForDocs);
 
+  // ── Offline-first data ──────────────────────────────────────────────
+  const localData = useLocalAtenciones();
+  const syncCtx = useSyncContext();
+
   useEffect(() => {
     const savedBox = localStorage.getItem(STORAGE_KEY);
     if (savedBox) setSelectedBoxId(savedBox);
     else setShowBoxSelector(true);
-    // boxes come from useBoxes() cache, no need to loadBoxes()
   }, []);
+
+  // ── Populate from local cache ─────────────────────────────────────
+  useEffect(() => {
+    if (!selectedBoxId || !localData.isLoaded || boxes.length === 0) return;
+
+    const cachedBox = boxes.find(b => b.id === selectedBoxId);
+    const boxExamIds = cachedBox?.box_examenes?.map(be => be.examen_id) || [];
+
+    // En atencion: assigned to this box
+    const enAtencionLocal = localData.atenciones
+      .filter(a => a.estado === 'en_atencion' && a.box_id === selectedBoxId)
+      .sort((a, b) => (a.numero_ingreso || 0) - (b.numero_ingreso || 0))
+      .map(la => ({
+        id: la.id,
+        estado: la.estado,
+        fecha_ingreso: la.fecha_ingreso,
+        numero_ingreso: la.numero_ingreso || 0,
+        box_id: la.box_id,
+        estado_ficha: la.estado_ficha,
+        pacientes: {
+          id: la.paciente_id,
+          nombre: la.paciente_nombre || '',
+          rut: la.paciente_rut || '',
+          tipo_servicio: la.paciente_tipo_servicio || '',
+          fecha_nacimiento: la.paciente_fecha_nacimiento,
+          email: la.paciente_email,
+          telefono: la.paciente_telefono,
+          direccion: la.paciente_direccion,
+          empresa_id: la.paciente_empresa_id,
+          empresas: la.paciente_empresa_nombre ? { nombre: la.paciente_empresa_nombre } : null,
+        },
+      } as Atencion));
+    setPacientesEnAtencion(enAtencionLocal);
+
+    if (boxExamIds.length === 0) {
+      setPacientesEnEspera([]);
+      setPacientesEnOtrosBoxes(0);
+      setPacientesCompletados([]);
+      return;
+    }
+
+    // En espera: have pending exams for this box
+    const enEsperaLocal: AtencionConExamenes[] = [];
+    const completadosLocal: AtencionConExamenes[] = [];
+    let otrosBoxesCount = 0;
+
+    localData.atenciones.forEach(la => {
+      const exams = localData.atencionExamenes.filter(ae => 
+        ae.atencion_id === la.id && boxExamIds.includes(ae.examen_id)
+      );
+
+      const atencionMapped: any = {
+        id: la.id,
+        estado: la.estado,
+        fecha_ingreso: la.fecha_ingreso,
+        numero_ingreso: la.numero_ingreso || 0,
+        box_id: la.box_id,
+        estado_ficha: la.estado_ficha,
+        pacientes: {
+          id: la.paciente_id,
+          nombre: la.paciente_nombre || '',
+          rut: la.paciente_rut || '',
+          tipo_servicio: la.paciente_tipo_servicio || '',
+          fecha_nacimiento: la.paciente_fecha_nacimiento,
+          email: la.paciente_email,
+          telefono: la.paciente_telefono,
+          direccion: la.paciente_direccion,
+          empresa_id: la.paciente_empresa_id,
+          empresas: la.paciente_empresa_nombre ? { nombre: la.paciente_empresa_nombre } : null,
+        },
+      };
+
+      if (la.estado === 'en_espera') {
+        const pending = exams.filter(e => e.estado === 'pendiente' || e.estado === 'incompleto');
+        if (pending.length > 0) {
+          enEsperaLocal.push({
+            ...atencionMapped,
+            examenesPendientes: pending.map(e => e.examen_nombre || ''),
+          });
+        }
+      }
+
+      // Completados
+      const completed = exams.filter(e => e.estado === 'completado' || e.estado === 'muestra_tomada');
+      if (completed.length > 0) {
+        completadosLocal.push({
+          ...atencionMapped,
+          examenesRealizados: completed.map(e => e.examen_nombre || ''),
+        });
+      }
+
+      // Otros boxes
+      if (la.estado === 'en_atencion' && la.box_id && la.box_id !== selectedBoxId) {
+        const pendingInOtherBox = exams.filter(e => e.estado === 'pendiente' || e.estado === 'incompleto');
+        if (pendingInOtherBox.length > 0) otrosBoxesCount++;
+      }
+    });
+
+    enEsperaLocal.sort((a, b) => (a.numero_ingreso || 0) - (b.numero_ingreso || 0));
+    setPacientesEnEspera(enEsperaLocal);
+    setPacientesCompletados(completadosLocal);
+    setPacientesEnOtrosBoxes(otrosBoxesCount);
+
+    // Atencion examenes for detail view
+    const newAE: Record<string, AtencionExamen[]> = {};
+    enAtencionLocal.forEach(a => {
+      newAE[a.id] = localData.atencionExamenes
+        .filter(ae => ae.atencion_id === a.id && boxExamIds.includes(ae.examen_id))
+        .map(ae => ({
+          id: ae.id,
+          examen_id: ae.examen_id,
+          estado: ae.estado,
+          examenes: { nombre: ae.examen_nombre || '' },
+        }));
+    });
+    setAtencionExamenes(prev => ({ ...prev, ...newAE }));
+  }, [localData.atenciones, localData.atencionExamenes, localData.isLoaded, selectedBoxId, boxes]);
 
   useEffect(() => {
     if (selectedBoxId) {
+      // Still do an initial cloud load as fallback + for data not in cache
       loadData();
+      // Realtime as sync trigger (sync engine also handles this)
       const channel = supabase
         .channel("mibox-changes")
-        .on("postgres_changes", { event: "*", schema: "public", table: "atenciones" }, () => loadData())
-        .on("postgres_changes", { event: "*", schema: "public", table: "atencion_examenes" }, () => loadData())
+        .on("postgres_changes", { event: "*", schema: "public", table: "atenciones" }, () => syncCtx.forcePull())
+        .on("postgres_changes", { event: "*", schema: "public", table: "atencion_examenes" }, () => syncCtx.forcePull())
         .subscribe();
-      const interval = setInterval(() => loadData(), 10000);
-      return () => {
-        supabase.removeChannel(channel);
-        clearInterval(interval);
-      };
+      // Remove the 10s polling - sync engine handles it
+      return () => { supabase.removeChannel(channel); };
     }
   }, [selectedBoxId]);
 
