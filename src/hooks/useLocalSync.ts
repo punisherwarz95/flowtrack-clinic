@@ -285,7 +285,16 @@ export function useLocalSync() {
 
       for (const op of ops) {
         try {
-          if (op.operation === 'update') {
+          // Handle custom close_visit operation
+          if (op.table === 'atencion_box_visitas' && op.payload._custom === 'close_visit') {
+            const { error } = await supabase
+              .from('atencion_box_visitas')
+              .update({ fecha_salida: op.payload.fecha_salida })
+              .eq('atencion_id', op.payload.atencion_id)
+              .eq('box_id', op.payload.box_id)
+              .is('fecha_salida', null);
+            if (error) throw error;
+          } else if (op.operation === 'update') {
             const { error } = await supabase
               .from(op.table as any)
               .update(op.payload)
