@@ -56,6 +56,7 @@ const App = () => (
         <VersionChecker />
         <BrowserRouter>
           <AuthProvider>
+            <SyncProvider>
             <EmpresaAuthProvider>
               <Routes>
                 {/* Staff routes */}
