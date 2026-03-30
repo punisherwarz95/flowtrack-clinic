@@ -844,8 +844,10 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
           subtotal_neto: totals.subtotalNeto,
           total_iva: totals.totalIva,
           total_con_iva: totals.totalConIva,
-          total_con_margen: totals.totalFinal,
+          total_con_margen: totals.totalConDescuento,
           afecto_iva: afectoIva,
+          descuento: totals.descuento,
+          descuento_porcentaje: descuentoActivo ? descuentoPorcentaje : 0,
         });
         toast.success("PDF generado exitosamente");
       }
