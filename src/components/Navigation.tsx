@@ -14,6 +14,7 @@ const Navigation = () => {
   const { user, signOut } = useAuth();
   const { hasPermission } = useAuthContext();
   const { theme, toggleTheme } = useTheme();
+  const syncCtx = useSyncContext();
 
   const allLinks = [
     { to: "/", icon: LayoutDashboard, label: "Dashboard" },
