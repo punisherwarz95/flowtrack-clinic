@@ -186,6 +186,10 @@ class MediFlowLocalDB extends Dexie {
   faenas!: Table<LocalFaena, string>;
   bateriaFaenas!: Table<LocalBateriaFaena, string>;
 
+  // Cotizaciones
+  cotizaciones!: Table<LocalCotizacion, string>;
+  cotizacionSolicitudes!: Table<LocalCotizacionSolicitud, string>;
+
   // Sync
   outbox!: Table<OutboxOperation, number>;
   syncMeta!: Table<SyncMeta, string>;
@@ -207,6 +211,28 @@ class MediFlowLocalDB extends Dexie {
       paqueteExamenItems: 'id, paquete_id, examen_id',
       faenas: 'id, empresa_id',
       bateriaFaenas: 'id, paquete_id, faena_id',
+
+      outbox: '++id, table, createdAt',
+      syncMeta: 'key',
+    });
+
+    this.version(2).stores({
+      atenciones: 'id, estado, fecha_ingreso, box_id, paciente_id',
+      atencionExamenes: 'id, atencion_id, examen_id, estado',
+      atencionDocumentos: 'id, atencion_id, estado',
+      pacientes: 'id, rut, empresa_id',
+
+      empresas: 'id',
+      boxes: 'id',
+      boxExamenes: 'id, box_id, examen_id',
+      examenes: 'id',
+      paquetes: 'id',
+      paqueteExamenItems: 'id, paquete_id, examen_id',
+      faenas: 'id, empresa_id',
+      bateriaFaenas: 'id, paquete_id, faena_id',
+
+      cotizaciones: 'id, numero_cotizacion, estado',
+      cotizacionSolicitudes: 'id, estado',
 
       outbox: '++id, table, createdAt',
       syncMeta: 'key',
