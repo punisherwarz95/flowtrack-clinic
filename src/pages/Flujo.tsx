@@ -705,12 +705,16 @@ const Flujo = () => {
 
   const handleCambiarEstadoFicha = async (atencionId: string, nuevoEstado: string) => {
     try {
-      const { error } = await supabase
-        .from("atenciones")
-        .update({ estado_ficha: nuevoEstado as 'pendiente' | 'en_mano_paciente' | 'completada' })
-        .eq("id", atencionId);
-
-      if (error) throw error;
+      // Non-critical: use local + outbox when viewing today
+      if (isToday) {
+        await localData.updateEstadoFicha(atencionId, nuevoEstado);
+      } else {
+        const { error } = await supabase
+          .from("atenciones")
+          .update({ estado_ficha: nuevoEstado as 'pendiente' | 'en_mano_paciente' | 'completada' })
+          .eq("id", atencionId);
+        if (error) throw error;
+      }
       
       const mensajes = {
         'en_mano_paciente': 'Ficha entregada al paciente',
@@ -718,7 +722,7 @@ const Flujo = () => {
       };
       
       toast.success(mensajes[nuevoEstado as keyof typeof mensajes] || 'Estado actualizado');
-      await loadData();
+      if (!isToday) await loadData();
     } catch (error: any) {
       console.error("Error:", error);
       toast.error("Error al actualizar estado de ficha");
