@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, ClipboardCheck, Calendar as CalendarIcon, Users, Check, Building2, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import { usePresionTimers } from "@/hooks/usePresionTimers";
 import PresionTimerBadge from "@/components/PresionTimerBadge";
 import BusquedaPacientesHistorial from "@/components/empresa/BusquedaPacientesHistorial";
 import { useBoxExamenesMap, usePrestadorExamenesMap } from "@/hooks/useReferenceData";
+import { useLocalAtenciones } from "@/hooks/useLocalAtenciones";
 
 interface AtencionIngresada {
   id: string;
