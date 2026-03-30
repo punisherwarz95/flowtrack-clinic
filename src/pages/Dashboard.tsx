@@ -57,6 +57,14 @@ const Dashboard = () => {
   const { loading: authLoading } = useAuth();
   const { data: boxExamenesMapCached } = useBoxExamenesMap();
   const { data: prestadorExamenesMapCached } = usePrestadorExamenesMap();
+  const { atenciones: localAtenciones, atencionExamenes: localAtencionExamenes, isLoaded: localLoaded } = useLocalAtenciones();
+
+  // Helper to check if a date is today
+  const isToday = (date: Date | undefined) => {
+    if (!date) return true;
+    const today = new Date();
+    return date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate();
+  };
   
   // Filtro diario (sección 1)
   const [selectedDateDaily, setSelectedDateDaily] = useState<Date | undefined>(new Date());
