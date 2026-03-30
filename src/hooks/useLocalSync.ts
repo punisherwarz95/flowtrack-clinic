@@ -13,8 +13,8 @@ import {
   type LocalCotizacionSolicitud,
 } from '@/lib/localDb';
 
-const PULL_INTERVAL = 15_000; // 15s
-const PUSH_INTERVAL = 5_000;  // 5s
+const PULL_INTERVAL = 30_000; // 30s (reduced from 15s to lower DB pressure)
+const PUSH_INTERVAL = 8_000;  // 8s (reduced from 5s to lower DB pressure)
 
 export interface SyncState {
   isOnline: boolean;
