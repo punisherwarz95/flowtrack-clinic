@@ -1271,10 +1271,16 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
                   <span className="text-muted-foreground">Márgenes aplicados:</span>
                   <span className="font-mono">{formatCurrency(totals.totalMargenes)}</span>
                 </div>
+                {descuentoActivo && totals.descuento > 0 && (
+                  <div className="flex justify-between text-sm text-destructive">
+                    <span>Descuento ({descuentoPorcentaje}%):</span>
+                    <span className="font-mono">-{formatCurrency(totals.descuento)}</span>
+                  </div>
+                )}
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
                   <span>TOTAL COTIZACIÓN:</span>
-                  <span className="font-mono text-primary">{formatCurrency(totals.totalFinal)}</span>
+                  <span className="font-mono text-primary">{formatCurrency(totals.totalConDescuento)}</span>
                 </div>
               </div>
             </div>
