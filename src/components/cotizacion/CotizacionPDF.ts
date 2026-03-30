@@ -25,6 +25,8 @@ interface CotizacionData {
   total_con_iva: number;
   total_con_margen: number;
   afecto_iva?: boolean;
+  descuento?: number;
+  descuento_porcentaje?: number;
 }
 
 const formatCurrency = (value: number) => {
