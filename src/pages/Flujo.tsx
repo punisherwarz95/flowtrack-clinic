@@ -21,6 +21,8 @@ import { usePresionTimers } from "@/hooks/usePresionTimers";
 import PresionTimerBadge from "@/components/PresionTimerBadge";
 import { logActivity } from "@/lib/activityLog";
 import { useBoxes, useExamenes } from "@/hooks/useReferenceData";
+import { useLocalAtenciones } from "@/hooks/useLocalAtenciones";
+import { useSyncContext } from "@/contexts/SyncContext";
 
 interface Atencion {
   id: string;
