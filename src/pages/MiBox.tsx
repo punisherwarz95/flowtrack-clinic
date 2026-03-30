@@ -27,6 +27,8 @@ import ExamenPrestadorGroup from "@/components/ExamenPrestadorGroup";
 import PresionTimerBadge from "@/components/PresionTimerBadge";
 import PresionRetakeForm from "@/components/PresionRetakeForm";
 import { useBoxes } from "@/hooks/useReferenceData";
+import { useLocalAtenciones } from "@/hooks/useLocalAtenciones";
+import { useSyncContext } from "@/contexts/SyncContext";
 
 interface Atencion {
   id: string;
