@@ -203,6 +203,73 @@ export function useLocalSync() {
     }
   }, []);
 
+  // ── Pull cotizaciones ───────────────────────────────────────────────
+  const pullCotizaciones = useCallback(async () => {
+    if (!navigator.onLine) return;
+
+    try {
+      const [cotRes, solRes] = await Promise.all([
+        supabase
+          .from('cotizaciones')
+          .select('id, numero_cotizacion, fecha_cotizacion, empresa_id, empresa_nombre, empresa_rut, empresa_razon_social, subtotal_neto, total_iva, total_con_iva, total_con_margen, estado, created_at, observaciones, afecto_iva')
+          .order('numero_cotizacion', { ascending: false }),
+        supabase
+          .from('cotizacion_solicitudes')
+          .select(`
+            id, titulo, descripcion, estado, created_at,
+            empresa:empresas(id, nombre),
+            faena:faenas(id, nombre),
+            items:cotizacion_solicitud_items(id, cantidad_estimada, paquete:paquetes_examenes(id, nombre), examen:examenes(id, nombre))
+          `)
+          .eq('estado', 'pendiente')
+          .order('created_at', { ascending: false }),
+      ]);
+
+      if (cotRes.data) {
+        const cotizaciones: LocalCotizacion[] = cotRes.data.map((c: any) => ({
+          id: c.id,
+          numero_cotizacion: c.numero_cotizacion,
+          fecha_cotizacion: c.fecha_cotizacion,
+          empresa_id: c.empresa_id,
+          empresa_nombre: c.empresa_nombre,
+          empresa_rut: c.empresa_rut,
+          empresa_razon_social: c.empresa_razon_social,
+          subtotal_neto: c.subtotal_neto || 0,
+          total_iva: c.total_iva || 0,
+          total_con_iva: c.total_con_iva || 0,
+          total_con_margen: c.total_con_margen || 0,
+          estado: c.estado || 'borrador',
+          created_at: c.created_at,
+          observaciones: c.observaciones,
+          afecto_iva: c.afecto_iva ?? true,
+        }));
+        await localDb.cotizaciones.clear();
+        if (cotizaciones.length > 0) await localDb.cotizaciones.bulkPut(cotizaciones);
+      }
+
+      if (solRes.data) {
+        const solicitudes: LocalCotizacionSolicitud[] = solRes.data.map((s: any) => ({
+          id: s.id,
+          titulo: s.titulo,
+          descripcion: s.descripcion,
+          estado: s.estado,
+          created_at: s.created_at,
+          empresa_nombre: s.empresa?.nombre || null,
+          empresa_id: s.empresa?.id || null,
+          faena_nombre: s.faena?.nombre || null,
+          faena_id: s.faena?.id || null,
+          items_json: JSON.stringify(s.items || []),
+        }));
+        await localDb.cotizacionSolicitudes.clear();
+        if (solicitudes.length > 0) await localDb.cotizacionSolicitudes.bulkPut(solicitudes);
+      }
+
+      await setSyncMeta('lastCotPull', new Date().toISOString());
+    } catch (err) {
+      console.error('[LocalSync] Cotizaciones pull error:', err);
+    }
+  }, []);
+
   // ── Push: send outbox operations to cloud ────────────────────────────
   const pushOutbox = useCallback(async () => {
     if (pushInProgress.current || !navigator.onLine) return;
