@@ -342,6 +342,7 @@ export function useLocalSync() {
     // Initial load
     pullReferenceData();
     pullData();
+    pullCotizaciones();
 
     // Set up intervals
     const pullTimer = setInterval(pullData, PULL_INTERVAL);
@@ -350,6 +351,9 @@ export function useLocalSync() {
 
     // Reference data refresh every 5 min
     const refTimer = setInterval(pullReferenceData, 5 * 60 * 1000);
+
+    // Cotizaciones refresh every 2 min
+    const cotTimer = setInterval(pullCotizaciones, 2 * 60 * 1000);
 
     // Realtime channel as sync trigger
     const channel = supabase
