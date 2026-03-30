@@ -204,11 +204,7 @@ const Pacientes = () => {
   });
 
   useEffect(() => {
-    // empresas, examenes, paquetes now come from React Query cache
-    Promise.all([
-      loadAllFaenasAndBateriaFaenas(),
-      loadDocumentosDisponibles(),
-    ]);
+    loadDocumentosDisponibles();
 
     // Auto-refresh patients every 15 seconds
     const interval = setInterval(() => {
@@ -217,6 +213,21 @@ const Pacientes = () => {
 
     return () => clearInterval(interval);
   }, [selectedDate]);
+
+  // Populate faenas and bateria map from cache
+  useEffect(() => {
+    if (cachedFaenas.length > 0) {
+      setAllFaenas(cachedFaenas as Faena[]);
+    }
+    if (cachedBateriaFaenas.length > 0) {
+      const map: PaqueteFaenaMap = {};
+      cachedBateriaFaenas.forEach((bf: any) => {
+        if (!map[bf.paquete_id]) map[bf.paquete_id] = [];
+        map[bf.paquete_id].push(bf.faena_id);
+      });
+      setPaqueteFaenasMap(map);
+    }
+  }, [cachedFaenas, cachedBateriaFaenas]);
 
   // Load patients separately since it depends on selectedDate
   useEffect(() => {
