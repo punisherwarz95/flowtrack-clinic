@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface PresionTimerInfo {
@@ -14,6 +14,8 @@ interface TimerSeed {
 }
 
 const TIMER_SECONDS = 30 * 60;
+const LOAD_DEBOUNCE_MS = 3_000; // debounce loads by 3s
+const POLL_INTERVAL_MS = 60_000; // poll every 60s instead of realtime
 
 const parseNumber = (value: unknown): number | null => {
   const parsed = parseFloat(String(value ?? ""));
@@ -34,8 +36,8 @@ const getRetomaStatus = (raw: Record<string, unknown>): { nextToma: 2 | 3; timer
 
   if (toma3Completa) return null;
 
-  const toma1Alta = toma1Completa && (toma1S > 139 || toma1D > 89);
-  const toma2Alta = toma2Completa && (toma2S > 139 || toma2D > 89);
+  const toma1Alta = toma1Completa && (toma1S! > 139 || toma1D! > 89);
+  const toma2Alta = toma2Completa && (toma2S! > 139 || toma2D! > 89);
 
   if (toma2Completa) {
     if (!toma2Alta) return null;
@@ -55,87 +57,109 @@ const getRetomaStatus = (raw: Record<string, unknown>): { nextToma: 2 | 3; timer
 export const usePresionTimers = (atencionIds: string[]) => {
   const [timerSeeds, setTimerSeeds] = useState<Record<string, TimerSeed>>({});
   const [nowMs, setNowMs] = useState<number>(Date.now());
+  const loadingRef = useRef(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const idsKey = useMemo(() => [...new Set(atencionIds)].sort().join(","), [atencionIds]);
 
-  const loadTimers = useCallback(async () => {
+  const loadTimersImmediate = useCallback(async () => {
     const uniqueIds = [...new Set(atencionIds)];
     if (uniqueIds.length === 0) {
       setTimerSeeds({});
       return;
     }
 
-    const { data, error } = await supabase
-      .from("examen_resultados")
-      .select(`
-        valor,
-        atencion_examenes!inner(atencion_id),
-        examen_formulario_campos!inner(tipo_campo)
-      `)
-      .eq("examen_formulario_campos.tipo_campo", "antropometria")
-      .in("atencion_examenes.atencion_id", uniqueIds);
+    // Guard against concurrent loads
+    if (loadingRef.current) return;
+    loadingRef.current = true;
 
-    if (error) {
-      console.error("Error loading pressure timers:", error);
-      return;
-    }
+    try {
+      // Process in chunks of 50 to keep queries small
+      const allData: any[] = [];
+      for (let i = 0; i < uniqueIds.length; i += 50) {
+        const chunk = uniqueIds.slice(i, i + 50);
+        const { data, error } = await supabase
+          .from("examen_resultados")
+          .select(`
+            valor,
+            atencion_examenes!inner(atencion_id),
+            examen_formulario_campos!inner(tipo_campo)
+          `)
+          .eq("examen_formulario_campos.tipo_campo", "antropometria")
+          .in("atencion_examenes.atencion_id", chunk);
 
-    const nextSeeds: Record<string, TimerSeed> = {};
-
-    (data || []).forEach((row: any) => {
-      const atencionId = row.atencion_examenes?.atencion_id as string | undefined;
-      if (!atencionId) return;
-
-      const raw = typeof row.valor === "string" ? (() => {
-        try { return JSON.parse(row.valor); } catch { return null; }
-      })() : row.valor;
-
-      if (!raw || typeof raw !== "object") return;
-
-      const status = getRetomaStatus(raw as Record<string, unknown>);
-      if (!status) return;
-
-      const startedAtMs = new Date(status.timerStart).getTime();
-      if (Number.isNaN(startedAtMs)) return;
-
-      const current = nextSeeds[atencionId];
-      if (!current || startedAtMs > current.startedAtMs) {
-        nextSeeds[atencionId] = {
-          atencionId,
-          startedAtMs,
-          nextToma: status.nextToma,
-        };
+        if (error) {
+          console.error("Error loading pressure timers:", error);
+          return;
+        }
+        if (data) allData.push(...data);
       }
-    });
 
-    setTimerSeeds(nextSeeds);
+      const nextSeeds: Record<string, TimerSeed> = {};
+
+      allData.forEach((row: any) => {
+        const atencionId = row.atencion_examenes?.atencion_id as string | undefined;
+        if (!atencionId) return;
+
+        const raw = typeof row.valor === "string" ? (() => {
+          try { return JSON.parse(row.valor); } catch { return null; }
+        })() : row.valor;
+
+        if (!raw || typeof raw !== "object") return;
+
+        const status = getRetomaStatus(raw as Record<string, unknown>);
+        if (!status) return;
+
+        const startedAtMs = new Date(status.timerStart).getTime();
+        if (Number.isNaN(startedAtMs)) return;
+
+        const current = nextSeeds[atencionId];
+        if (!current || startedAtMs > current.startedAtMs) {
+          nextSeeds[atencionId] = {
+            atencionId,
+            startedAtMs,
+            nextToma: status.nextToma,
+          };
+        }
+      });
+
+      setTimerSeeds(nextSeeds);
+    } finally {
+      loadingRef.current = false;
+    }
   }, [atencionIds]);
 
-  useEffect(() => {
-    loadTimers();
-  }, [loadTimers, idsKey]);
+  // Debounced version to prevent rapid-fire calls
+  const loadTimers = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      loadTimersImmediate();
+    }, LOAD_DEBOUNCE_MS);
+  }, [loadTimersImmediate]);
 
+  // Load on ID change
   useEffect(() => {
-    const interval = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, []);
+    if (!idsKey) {
+      setTimerSeeds({});
+      return;
+    }
+    loadTimersImmediate();
+  }, [idsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Poll instead of realtime (saves connection pool)
   useEffect(() => {
     if (!idsKey) return;
+    const interval = setInterval(loadTimersImmediate, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [idsKey, loadTimersImmediate]);
 
-    const channel = supabase
-      .channel(`presion-timers-${idsKey}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "examen_resultados" },
-        () => loadTimers()
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [idsKey, loadTimers]);
+  // Tick every second for countdown display
+  useEffect(() => {
+    const hasActiveTimers = Object.keys(timerSeeds).length > 0;
+    if (!hasActiveTimers) return;
+    const interval = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [timerSeeds]);
 
   const timerByAtencion = useMemo<Record<string, PresionTimerInfo>>(() => {
     const result: Record<string, PresionTimerInfo> = {};
