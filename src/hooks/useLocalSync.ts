@@ -373,9 +373,10 @@ export function useLocalSync() {
       clearInterval(pushTimer);
       clearInterval(countTimer);
       clearInterval(refTimer);
+      clearInterval(cotTimer);
       supabase.removeChannel(channel);
     };
-  }, [pullData, pushOutbox, pullReferenceData, refreshPendingCount]);
+  }, [pullData, pushOutbox, pullReferenceData, pullCotizaciones, refreshPendingCount]);
 
   return {
     ...syncState,
