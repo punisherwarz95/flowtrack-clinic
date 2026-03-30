@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Trash2, Building2, Package, ClipboardList, ChevronDown, ChevronUp, FileDown, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Building2, Package, ClipboardList, ChevronDown, ChevronUp, FileDown, AlertTriangle, Percent, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { generateCotizacionPDF } from "./CotizacionPDF";
