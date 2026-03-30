@@ -121,6 +121,37 @@ export interface LocalBateriaFaena {
   activo: boolean | null;
 }
 
+export interface LocalCotizacion {
+  id: string;
+  numero_cotizacion: number;
+  fecha_cotizacion: string;
+  empresa_id: string | null;
+  empresa_nombre: string | null;
+  empresa_rut: string | null;
+  empresa_razon_social: string | null;
+  subtotal_neto: number;
+  total_iva: number;
+  total_con_iva: number;
+  total_con_margen: number;
+  estado: string;
+  created_at: string | null;
+  observaciones: string | null;
+  afecto_iva: boolean;
+}
+
+export interface LocalCotizacionSolicitud {
+  id: string;
+  titulo: string;
+  descripcion: string | null;
+  estado: string;
+  created_at: string | null;
+  empresa_nombre: string | null;
+  empresa_id: string | null;
+  faena_nombre: string | null;
+  faena_id: string | null;
+  items_json: string; // JSON stringified items
+}
+
 // ── Outbox ──────────────────────────────────────────────────────────────
 export interface OutboxOperation {
   id?: number; // auto-increment
