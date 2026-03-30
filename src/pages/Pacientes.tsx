@@ -152,10 +152,14 @@ const Pacientes = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [documentosPendientes, setDocumentosPendientes] = useState<{[patientId: string]: number}>({});
   
-  // Estados para faenas
+  // Estados para faenas (now from cache)
   const [faenasEmpresa, setFaenasEmpresa] = useState<Faena[]>([]);
   const [bateriasDisponibles, setBateriasDisponibles] = useState<string[]>([]);
   const [loadingFaenas, setLoadingFaenas] = useState(false);
+  
+  // Cached reference data for faenas and baterias
+  const { data: cachedFaenas = [] } = useFaenas();
+  const { data: cachedBateriaFaenas = [] } = useBateriaFaenas();
   
   // Estados para filtro de baterías por faena (como en cotizaciones)
   const [allFaenas, setAllFaenas] = useState<Faena[]>([]);
