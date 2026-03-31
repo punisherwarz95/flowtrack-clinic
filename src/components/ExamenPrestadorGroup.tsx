@@ -36,9 +36,10 @@ interface Props {
   atencionExamenes: AtencionExamen[];
   onComplete?: () => void;
   fechaNacimiento?: string | null;
+  tipoServicio?: string;
 }
 
-const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaNacimiento }: Props) => {
+const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaNacimiento, tipoServicio }: Props) => {
   const [prestadorExamenes, setPrestadorExamenes] = useState<Record<string, string>>({});
   const [prestadores, setPrestadores] = useState<Record<string, string>>({});
   const [prestadorTipos, setPrestadorTipos] = useState<Record<string, string>>({});
@@ -60,6 +61,11 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
   // Bulk muestra tomada state: groupKey -> Set of selected atencion_examen IDs
   const [bulkSelections, setBulkSelections] = useState<Record<string, Set<string>>>({});
   const [savingBulk, setSavingBulk] = useState<string | null>(null);
+
+  // Workmed: track exams that have antropometria fields (keep full form for those)
+  const [antropometriaExamIds, setAntropometriaExamIds] = useState<Set<string>>(new Set());
+  const [workmedCompleting, setWorkmedCompleting] = useState<string | null>(null);
+  const isWorkmed = tipoServicio === "workmed";
 
   // Only reload prestador data when atencionId changes or examen IDs actually change
   useEffect(() => {
@@ -136,6 +142,44 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
       console.error("Error loading prestador data:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // For workmed: load which exams have antropometria fields
+  useEffect(() => {
+    if (!isWorkmed) return;
+    const examenIds = atencionExamenes.map(ae => ae.examen_id);
+    if (examenIds.length === 0) return;
+    supabase
+      .from("examen_formulario_campos")
+      .select("examen_id")
+      .in("examen_id", examenIds)
+      .eq("tipo_campo", "antropometria")
+      .then(({ data }) => {
+        setAntropometriaExamIds(new Set((data || []).map((d: any) => d.examen_id)));
+      });
+  }, [isWorkmed, atencionExamenes]);
+
+  // Workmed quick-complete: mark exam as completado with a checkbox
+  const handleWorkmedComplete = async (atencionExamenId: string, checked: boolean) => {
+    setWorkmedCompleting(atencionExamenId);
+    try {
+      const newEstado = checked ? "completado" : "pendiente";
+      const { error } = await supabase
+        .from("atencion_examenes")
+        .update({
+          estado: newEstado as any,
+          fecha_realizacion: checked ? new Date().toISOString() : null,
+        })
+        .eq("id", atencionExamenId);
+      if (error) throw error;
+      toast.success(checked ? "Examen marcado como completado" : "Examen desmarcado");
+      onComplete?.();
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al actualizar estado");
+    } finally {
+      setWorkmedCompleting(null);
     }
   };
 
@@ -404,10 +448,86 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
     }
   };
 
+  // Render a workmed simple checkbox item
+  const renderWorkmedCheckbox = (examen: AtencionExamen) => {
+    const hasAntropometria = antropometriaExamIds.has(examen.examen_id);
+    const isCompleted = examen.estado === "completado" || examen.estado === "muestra_tomada";
+    const isDisabled = workmedCompleting === examen.id;
+
+    // If this exam has antropometria fields, render full form (for pressure tracking)
+    if (hasAntropometria) {
+      return (
+        <Collapsible
+          key={examen.id}
+          open={expandedExamen === examen.id}
+          onOpenChange={(open) => setExpandedExamen(open ? examen.id : null)}
+        >
+          <CollapsibleTrigger className="w-full">
+            <div className="flex items-center justify-between border rounded-lg p-3 hover:bg-accent/30 transition-colors">
+              <div className="flex items-center gap-2">
+                {expandedExamen === examen.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                <span className="font-medium text-sm">{examen.examenes.nombre}</span>
+              </div>
+              <Badge
+                variant={isCompleted ? "default" : "outline"}
+                className={`text-xs ${examen.estado === "muestra_tomada" ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" : ""}`}
+              >
+                {examen.estado === "muestra_tomada" ? "Muestra tomada" : examen.estado}
+              </Badge>
+            </div>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="border border-t-0 rounded-b-lg p-4">
+            <ExamenFormulario
+              ref={getFormRef(examen.id)}
+              atencionExamenId={examen.id}
+              examenId={examen.examen_id}
+              examenNombre={examen.examenes.nombre}
+              onComplete={onComplete}
+              fechaNacimiento={fechaNacimiento}
+              hideSaveButton
+            />
+          </CollapsibleContent>
+        </Collapsible>
+      );
+    }
+
+    // Simple checkbox for workmed
+    return (
+      <div key={examen.id} className="flex items-center justify-between border rounded-lg p-3 hover:bg-accent/30 transition-colors">
+        <div className="flex items-center gap-3">
+          <Checkbox
+            checked={isCompleted}
+            disabled={isDisabled}
+            onCheckedChange={(checked) => handleWorkmedComplete(examen.id, !!checked)}
+          />
+          <span className={`font-medium text-sm ${isCompleted ? "line-through text-muted-foreground" : ""}`}>
+            {examen.examenes.nombre}
+          </span>
+        </div>
+        <Badge
+          variant={isCompleted ? "default" : "outline"}
+          className="text-xs"
+        >
+          {isCompleted ? "Realizado" : "Pendiente"}
+        </Badge>
+      </div>
+    );
+  };
+
   // If only one group and it's "sin prestador", render flat list
   if (groups.length === 1 && !groups[0].prestadorId) {
     const flatGroup = groups[0];
     const flatGroupKey = "__sin_prestador__";
+
+    // Workmed: simplified view
+    if (isWorkmed) {
+      return (
+        <div className="space-y-2">
+          {flatGroup.examenes.map(renderWorkmedCheckbox)}
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-2">
         {flatGroup.examenes.map((examen) => (
@@ -626,78 +746,85 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
                     return null;
                   })()}
 
-                  {/* All exams rendered inline - no extra collapsibles */}
-                  {group.examenes.map((examen) => {
-                    const bulkActive = !!bulkSelections[groupKey];
-                    const isPendiente = examen.estado === "pendiente" || examen.estado === "incompleto";
-                    const isSelected = bulkSelections[groupKey]?.has(examen.id) || false;
+                  {/* All exams rendered inline */}
+                  {isWorkmed ? (
+                    // Workmed: simple checkboxes (except antropometria)
+                    group.examenes.map(renderWorkmedCheckbox)
+                  ) : (
+                    group.examenes.map((examen) => {
+                      const bulkActive = !!bulkSelections[groupKey];
+                      const isPendiente = examen.estado === "pendiente" || examen.estado === "incompleto";
+                      const isSelected = bulkSelections[groupKey]?.has(examen.id) || false;
 
-                    return (
-                      <div key={examen.id} className={`border rounded-lg p-4 space-y-2 ${bulkActive && isSelected ? "border-primary bg-primary/5" : ""}`}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            {bulkActive && isPendiente && (
-                              <Checkbox
-                                checked={isSelected}
-                                onCheckedChange={() => handleToggleBulkExamen(groupKey, examen.id)}
-                              />
-                            )}
-                            <span className="font-medium text-sm">{examen.examenes.nombre}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {!bulkActive && isPendiente && group.prestadorTipo === "externo" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-1 h-6 text-xs"
-                                onClick={() => handleMuestraTomada(examen.id)}
+                      return (
+                        <div key={examen.id} className={`border rounded-lg p-4 space-y-2 ${bulkActive && isSelected ? "border-primary bg-primary/5" : ""}`}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              {bulkActive && isPendiente && (
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={() => handleToggleBulkExamen(groupKey, examen.id)}
+                                />
+                              )}
+                              <span className="font-medium text-sm">{examen.examenes.nombre}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {!bulkActive && isPendiente && group.prestadorTipo === "externo" && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1 h-6 text-xs"
+                                  onClick={() => handleMuestraTomada(examen.id)}
+                                >
+                                  <FlaskConical className="h-3 w-3" />
+                                  Muestra Tomada
+                                </Button>
+                              )}
+                              <Badge
+                                variant={examen.estado === "completado" ? "default" : examen.estado === "muestra_tomada" ? "secondary" : examen.estado === "incompleto" ? "secondary" : "outline"}
+                                className={`text-xs ${examen.estado === "muestra_tomada" ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" : ""}`}
                               >
-                                <FlaskConical className="h-3 w-3" />
-                                Muestra Tomada
-                              </Button>
-                            )}
-                            <Badge
-                              variant={examen.estado === "completado" ? "default" : examen.estado === "muestra_tomada" ? "secondary" : examen.estado === "incompleto" ? "secondary" : "outline"}
-                              className={`text-xs ${examen.estado === "muestra_tomada" ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" : ""}`}
-                            >
-                              {examen.estado === "muestra_tomada" ? "Muestra tomada" : examen.estado}
-                            </Badge>
+                                {examen.estado === "muestra_tomada" ? "Muestra tomada" : examen.estado}
+                              </Badge>
+                            </div>
                           </div>
+                          <ExamenFormulario
+                            ref={getFormRef(examen.id)}
+                            atencionExamenId={examen.id}
+                            examenId={examen.examen_id}
+                            examenNombre={examen.examenes.nombre}
+                            fechaNacimiento={fechaNacimiento}
+                            esExterno={group.prestadorTipo === "externo"}
+                            hideSaveButton
+                            atencionId={atencionId}
+                            archivosVinculados={group.archivosCompartidos.map(a => ({
+                              nombre_archivo: a.nombre_archivo,
+                              archivo_url: a.archivo_url,
+                            }))}
+                            onComplete={() => {
+                              onComplete?.();
+                              loadPrestadorData();
+                            }}
+                          />
                         </div>
-                        <ExamenFormulario
-                          ref={getFormRef(examen.id)}
-                          atencionExamenId={examen.id}
-                          examenId={examen.examen_id}
-                          examenNombre={examen.examenes.nombre}
-                          fechaNacimiento={fechaNacimiento}
-                          esExterno={group.prestadorTipo === "externo"}
-                          hideSaveButton
-                          atencionId={atencionId}
-                          archivosVinculados={group.archivosCompartidos.map(a => ({
-                            nombre_archivo: a.nombre_archivo,
-                            archivo_url: a.archivo_url,
-                          }))}
-                          onComplete={() => {
-                            onComplete?.();
-                            loadPrestadorData();
-                          }}
-                        />
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
 
-                  {/* Global save button per group */}
-                  <div className="flex justify-end pt-1">
-                    <Button
-                      size="sm"
-                      onClick={() => handleSaveGroup(groupKey, group.examenes)}
-                      disabled={savingGroup === groupKey}
-                      className="gap-2"
-                    >
-                      {savingGroup === groupKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                      Guardar Todo
-                    </Button>
-                  </div>
+                  {/* Global save button per group - hide for workmed */}
+                  {!isWorkmed && (
+                    <div className="flex justify-end pt-1">
+                      <Button
+                        size="sm"
+                        onClick={() => handleSaveGroup(groupKey, group.examenes)}
+                        disabled={savingGroup === groupKey}
+                        className="gap-2"
+                      >
+                        {savingGroup === groupKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                        Guardar Todo
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </CollapsibleContent>
             </Collapsible>
