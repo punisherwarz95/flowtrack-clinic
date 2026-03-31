@@ -168,24 +168,14 @@ const CodigoDelDia = ({ className }: CodigoDelDiaProps) => {
     try {
       const today = getChileDateString();
       
-      // Obtener el siguiente índice de secuencia
-      const { data: maxData } = await supabase
-        .from("codigos_diarios")
-        .select("indice_secuencia")
-        .order("indice_secuencia", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      const siguienteIndice = (maxData?.indice_secuencia || 0) + 1;
-      const nuevoCodigo = generarCodigoPorIndice(siguienteIndice);
+      const nuevoCodigo = generarCodigoAleatorio();
       
       // Intentar insertar o actualizar (upsert)
       const { error } = await supabase
         .from("codigos_diarios")
         .upsert({ 
           fecha: today, 
-          codigo: nuevoCodigo,
-          indice_secuencia: siguienteIndice
+          codigo: nuevoCodigo
         }, { 
           onConflict: 'fecha' 
         });
