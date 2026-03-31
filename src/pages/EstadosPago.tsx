@@ -296,7 +296,7 @@ const EstadosPago = () => {
             paciente:pacientes(nombre, rut, empresa:empresas(nombre))
           )
         `)
-        .eq("estado", "completado")
+        .in("estado", ["completado", "muestra_tomada"])
         .gte("fecha_realizacion", `${prestadorFechaDesde}T00:00:00`)
         .lte("fecha_realizacion", `${prestadorFechaHasta}T23:59:59`);
 
