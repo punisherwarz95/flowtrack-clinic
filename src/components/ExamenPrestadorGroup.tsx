@@ -36,6 +36,7 @@ interface Props {
   atencionExamenes: AtencionExamen[];
   onComplete?: () => void;
   fechaNacimiento?: string | null;
+  tipoServicio?: string;
 }
 
 const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaNacimiento }: Props) => {
