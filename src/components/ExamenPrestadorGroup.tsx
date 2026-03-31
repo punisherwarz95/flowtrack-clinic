@@ -746,78 +746,85 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
                     return null;
                   })()}
 
-                  {/* All exams rendered inline - no extra collapsibles */}
-                  {group.examenes.map((examen) => {
-                    const bulkActive = !!bulkSelections[groupKey];
-                    const isPendiente = examen.estado === "pendiente" || examen.estado === "incompleto";
-                    const isSelected = bulkSelections[groupKey]?.has(examen.id) || false;
+                  {/* All exams rendered inline */}
+                  {isWorkmed ? (
+                    // Workmed: simple checkboxes (except antropometria)
+                    group.examenes.map(renderWorkmedCheckbox)
+                  ) : (
+                    group.examenes.map((examen) => {
+                      const bulkActive = !!bulkSelections[groupKey];
+                      const isPendiente = examen.estado === "pendiente" || examen.estado === "incompleto";
+                      const isSelected = bulkSelections[groupKey]?.has(examen.id) || false;
 
-                    return (
-                      <div key={examen.id} className={`border rounded-lg p-4 space-y-2 ${bulkActive && isSelected ? "border-primary bg-primary/5" : ""}`}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            {bulkActive && isPendiente && (
-                              <Checkbox
-                                checked={isSelected}
-                                onCheckedChange={() => handleToggleBulkExamen(groupKey, examen.id)}
-                              />
-                            )}
-                            <span className="font-medium text-sm">{examen.examenes.nombre}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {!bulkActive && isPendiente && group.prestadorTipo === "externo" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-1 h-6 text-xs"
-                                onClick={() => handleMuestraTomada(examen.id)}
+                      return (
+                        <div key={examen.id} className={`border rounded-lg p-4 space-y-2 ${bulkActive && isSelected ? "border-primary bg-primary/5" : ""}`}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              {bulkActive && isPendiente && (
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={() => handleToggleBulkExamen(groupKey, examen.id)}
+                                />
+                              )}
+                              <span className="font-medium text-sm">{examen.examenes.nombre}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {!bulkActive && isPendiente && group.prestadorTipo === "externo" && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1 h-6 text-xs"
+                                  onClick={() => handleMuestraTomada(examen.id)}
+                                >
+                                  <FlaskConical className="h-3 w-3" />
+                                  Muestra Tomada
+                                </Button>
+                              )}
+                              <Badge
+                                variant={examen.estado === "completado" ? "default" : examen.estado === "muestra_tomada" ? "secondary" : examen.estado === "incompleto" ? "secondary" : "outline"}
+                                className={`text-xs ${examen.estado === "muestra_tomada" ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" : ""}`}
                               >
-                                <FlaskConical className="h-3 w-3" />
-                                Muestra Tomada
-                              </Button>
-                            )}
-                            <Badge
-                              variant={examen.estado === "completado" ? "default" : examen.estado === "muestra_tomada" ? "secondary" : examen.estado === "incompleto" ? "secondary" : "outline"}
-                              className={`text-xs ${examen.estado === "muestra_tomada" ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" : ""}`}
-                            >
-                              {examen.estado === "muestra_tomada" ? "Muestra tomada" : examen.estado}
-                            </Badge>
+                                {examen.estado === "muestra_tomada" ? "Muestra tomada" : examen.estado}
+                              </Badge>
+                            </div>
                           </div>
+                          <ExamenFormulario
+                            ref={getFormRef(examen.id)}
+                            atencionExamenId={examen.id}
+                            examenId={examen.examen_id}
+                            examenNombre={examen.examenes.nombre}
+                            fechaNacimiento={fechaNacimiento}
+                            esExterno={group.prestadorTipo === "externo"}
+                            hideSaveButton
+                            atencionId={atencionId}
+                            archivosVinculados={group.archivosCompartidos.map(a => ({
+                              nombre_archivo: a.nombre_archivo,
+                              archivo_url: a.archivo_url,
+                            }))}
+                            onComplete={() => {
+                              onComplete?.();
+                              loadPrestadorData();
+                            }}
+                          />
                         </div>
-                        <ExamenFormulario
-                          ref={getFormRef(examen.id)}
-                          atencionExamenId={examen.id}
-                          examenId={examen.examen_id}
-                          examenNombre={examen.examenes.nombre}
-                          fechaNacimiento={fechaNacimiento}
-                          esExterno={group.prestadorTipo === "externo"}
-                          hideSaveButton
-                          atencionId={atencionId}
-                          archivosVinculados={group.archivosCompartidos.map(a => ({
-                            nombre_archivo: a.nombre_archivo,
-                            archivo_url: a.archivo_url,
-                          }))}
-                          onComplete={() => {
-                            onComplete?.();
-                            loadPrestadorData();
-                          }}
-                        />
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
 
-                  {/* Global save button per group */}
-                  <div className="flex justify-end pt-1">
-                    <Button
-                      size="sm"
-                      onClick={() => handleSaveGroup(groupKey, group.examenes)}
-                      disabled={savingGroup === groupKey}
-                      className="gap-2"
-                    >
-                      {savingGroup === groupKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                      Guardar Todo
-                    </Button>
-                  </div>
+                  {/* Global save button per group - hide for workmed */}
+                  {!isWorkmed && (
+                    <div className="flex justify-end pt-1">
+                      <Button
+                        size="sm"
+                        onClick={() => handleSaveGroup(groupKey, group.examenes)}
+                        disabled={savingGroup === groupKey}
+                        className="gap-2"
+                      >
+                        {savingGroup === groupKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                        Guardar Todo
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </CollapsibleContent>
             </Collapsible>
