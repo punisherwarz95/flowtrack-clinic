@@ -803,28 +803,30 @@ const MiBox = () => {
                                 <EstadoFichaCheckboxes atencionId={selectedAtencion.id} estadoFicha={selectedAtencion.estado_ficha} onUpdate={loadData} prefix="aten-" />
                               </div>
                             <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedAtencionForDocs(selectedAtencion.id);
-                                  setSelectedPacienteContext({
-                                    paciente: {
-                                      nombre: selectedAtencion.pacientes.nombre,
-                                      rut: selectedAtencion.pacientes.rut || undefined,
-                                      fecha_nacimiento: selectedAtencion.pacientes.fecha_nacimiento || undefined,
-                                      email: selectedAtencion.pacientes.email || undefined,
-                                      telefono: selectedAtencion.pacientes.telefono || undefined,
-                                      direccion: selectedAtencion.pacientes.direccion || undefined,
-                                    },
-                                    empresa: selectedAtencion.pacientes.empresas?.nombre,
-                                    numero_ingreso: selectedAtencion.numero_ingreso,
-                                  });
-                                  setDocumentosDialogOpen(true);
-                                }}
-                              >
-                                <ClipboardList className="h-4 w-4 mr-2" /> Documentos
-                              </Button>
+                              {selectedAtencion.pacientes.tipo_servicio !== "workmed" && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedAtencionForDocs(selectedAtencion.id);
+                                    setSelectedPacienteContext({
+                                      paciente: {
+                                        nombre: selectedAtencion.pacientes.nombre,
+                                        rut: selectedAtencion.pacientes.rut || undefined,
+                                        fecha_nacimiento: selectedAtencion.pacientes.fecha_nacimiento || undefined,
+                                        email: selectedAtencion.pacientes.email || undefined,
+                                        telefono: selectedAtencion.pacientes.telefono || undefined,
+                                        direccion: selectedAtencion.pacientes.direccion || undefined,
+                                      },
+                                      empresa: selectedAtencion.pacientes.empresas?.nombre,
+                                      numero_ingreso: selectedAtencion.numero_ingreso,
+                                    });
+                                    setDocumentosDialogOpen(true);
+                                  }}
+                                >
+                                  <ClipboardList className="h-4 w-4 mr-2" /> Documentos
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </CardContent>
