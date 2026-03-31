@@ -145,6 +145,44 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
     }
   };
 
+  // For workmed: load which exams have antropometria fields
+  useEffect(() => {
+    if (!isWorkmed) return;
+    const examenIds = atencionExamenes.map(ae => ae.examen_id);
+    if (examenIds.length === 0) return;
+    supabase
+      .from("examen_formulario_campos")
+      .select("examen_id")
+      .in("examen_id", examenIds)
+      .eq("tipo_campo", "antropometria")
+      .then(({ data }) => {
+        setAntropometriaExamIds(new Set((data || []).map((d: any) => d.examen_id)));
+      });
+  }, [isWorkmed, atencionExamenes]);
+
+  // Workmed quick-complete: mark exam as completado with a checkbox
+  const handleWorkmedComplete = async (atencionExamenId: string, checked: boolean) => {
+    setWorkmedCompleting(atencionExamenId);
+    try {
+      const newEstado = checked ? "completado" : "pendiente";
+      const { error } = await supabase
+        .from("atencion_examenes")
+        .update({
+          estado: newEstado as any,
+          fecha_realizacion: checked ? new Date().toISOString() : null,
+        })
+        .eq("id", atencionExamenId);
+      if (error) throw error;
+      toast.success(checked ? "Examen marcado como completado" : "Examen desmarcado");
+      onComplete?.();
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al actualizar estado");
+    } finally {
+      setWorkmedCompleting(null);
+    }
+  };
+
   // Group exams by prestador
   const groups: PrestadorGroup[] = useMemo(() => {
     const groupMap: Record<string, PrestadorGroup> = {};
