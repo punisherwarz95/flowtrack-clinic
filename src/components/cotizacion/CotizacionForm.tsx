@@ -605,6 +605,17 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
     );
   };
 
+  const handleMoveItem = (itemId: string, direction: "up" | "down") => {
+    setItems((prev) => {
+      const idx = prev.findIndex((i) => i.id === itemId);
+      if ((direction === "up" && idx <= 0) || (direction === "down" && idx >= prev.length - 1)) return prev;
+      const newItems = [...prev];
+      const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+      [newItems[idx], newItems[swapIdx]] = [newItems[swapIdx], newItems[idx]];
+      return newItems.map((item, i) => ({ ...item, item_numero: i + 1 }));
+    });
+  };
+
   const handleRemoveItem = (itemId: string) => {
     setItems((prev) =>
       prev
