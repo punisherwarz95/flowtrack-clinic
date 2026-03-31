@@ -178,7 +178,7 @@ const Dashboard = () => {
       if (!conteoPorBox[boxNombre]) conteoPorBox[boxNombre] = {};
       if (!conteoPorBox[boxNombre][nombreExamen]) conteoPorBox[boxNombre][nombreExamen] = { asignados: 0, completados: 0 };
       conteoPorBox[boxNombre][nombreExamen].asignados += 1;
-      if (ae.estado === "completado") conteoPorBox[boxNombre][nombreExamen].completados += 1;
+      if (ae.estado === "completado" || ae.estado === "muestra_tomada") conteoPorBox[boxNombre][nombreExamen].completados += 1;
     });
 
     setExamenesConteoDiario(conteoExamenes);
