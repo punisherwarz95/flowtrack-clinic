@@ -21,23 +21,15 @@ const NUMEROS = '23456789';
 // Total de combinaciones posibles: 24^3 * 8 * 7 = 774,144 combinaciones
 const TOTAL_COMBINACIONES = LETRAS.length ** 3 * NUMEROS.length * (NUMEROS.length - 1);
 
-// Generar código con índice específico usando un algoritmo determinista
-const generarCodigoPorIndice = (indice: number): string => {
-  // Normalizar el índice al rango de combinaciones
-  const idx = indice % TOTAL_COMBINACIONES;
-  
-  // Calcular letras (24^3 = 13824 combinaciones)
-  const letra1 = Math.floor(idx / (LETRAS.length * LETRAS.length * NUMEROS.length * (NUMEROS.length - 1))) % LETRAS.length;
-  const letra2 = Math.floor(idx / (LETRAS.length * NUMEROS.length * (NUMEROS.length - 1))) % LETRAS.length;
-  const letra3 = Math.floor(idx / (NUMEROS.length * (NUMEROS.length - 1))) % LETRAS.length;
-  
-  // Calcular números (no repetidos)
-  const numIdx = idx % (NUMEROS.length * (NUMEROS.length - 1));
-  const num1Idx = Math.floor(numIdx / (NUMEROS.length - 1));
-  let num2Idx = numIdx % (NUMEROS.length - 1);
-  if (num2Idx >= num1Idx) num2Idx++; // Saltar el número usado en num1
-  
-  return LETRAS[letra1] + LETRAS[letra2] + LETRAS[letra3] + NUMEROS[num1Idx] + NUMEROS[num2Idx];
+// Generar código aleatorio
+const generarCodigoAleatorio = (): string => {
+  const letra1 = LETRAS[Math.floor(Math.random() * LETRAS.length)];
+  const letra2 = LETRAS[Math.floor(Math.random() * LETRAS.length)];
+  const letra3 = LETRAS[Math.floor(Math.random() * LETRAS.length)];
+  const num1Idx = Math.floor(Math.random() * NUMEROS.length);
+  let num2Idx = Math.floor(Math.random() * (NUMEROS.length - 1));
+  if (num2Idx >= num1Idx) num2Idx++;
+  return letra1 + letra2 + letra3 + NUMEROS[num1Idx] + NUMEROS[num2Idx];
 };
 
 // Función para obtener la hora actual en Chile
