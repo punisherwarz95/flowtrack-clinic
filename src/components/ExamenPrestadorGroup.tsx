@@ -39,7 +39,7 @@ interface Props {
   tipoServicio?: string;
 }
 
-const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaNacimiento }: Props) => {
+const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaNacimiento, tipoServicio }: Props) => {
   const [prestadorExamenes, setPrestadorExamenes] = useState<Record<string, string>>({});
   const [prestadores, setPrestadores] = useState<Record<string, string>>({});
   const [prestadorTipos, setPrestadorTipos] = useState<Record<string, string>>({});
