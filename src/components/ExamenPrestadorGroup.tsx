@@ -448,10 +448,86 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
     }
   };
 
+  // Render a workmed simple checkbox item
+  const renderWorkmedCheckbox = (examen: AtencionExamen) => {
+    const hasAntropometria = antropometriaExamIds.has(examen.examen_id);
+    const isCompleted = examen.estado === "completado" || examen.estado === "muestra_tomada";
+    const isDisabled = workmedCompleting === examen.id;
+
+    // If this exam has antropometria fields, render full form (for pressure tracking)
+    if (hasAntropometria) {
+      return (
+        <Collapsible
+          key={examen.id}
+          open={expandedExamen === examen.id}
+          onOpenChange={(open) => setExpandedExamen(open ? examen.id : null)}
+        >
+          <CollapsibleTrigger className="w-full">
+            <div className="flex items-center justify-between border rounded-lg p-3 hover:bg-accent/30 transition-colors">
+              <div className="flex items-center gap-2">
+                {expandedExamen === examen.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                <span className="font-medium text-sm">{examen.examenes.nombre}</span>
+              </div>
+              <Badge
+                variant={isCompleted ? "default" : "outline"}
+                className={`text-xs ${examen.estado === "muestra_tomada" ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" : ""}`}
+              >
+                {examen.estado === "muestra_tomada" ? "Muestra tomada" : examen.estado}
+              </Badge>
+            </div>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="border border-t-0 rounded-b-lg p-4">
+            <ExamenFormulario
+              ref={getFormRef(examen.id)}
+              atencionExamenId={examen.id}
+              examenId={examen.examen_id}
+              examenNombre={examen.examenes.nombre}
+              onComplete={onComplete}
+              fechaNacimiento={fechaNacimiento}
+              hideSaveButton
+            />
+          </CollapsibleContent>
+        </Collapsible>
+      );
+    }
+
+    // Simple checkbox for workmed
+    return (
+      <div key={examen.id} className="flex items-center justify-between border rounded-lg p-3 hover:bg-accent/30 transition-colors">
+        <div className="flex items-center gap-3">
+          <Checkbox
+            checked={isCompleted}
+            disabled={isDisabled}
+            onCheckedChange={(checked) => handleWorkmedComplete(examen.id, !!checked)}
+          />
+          <span className={`font-medium text-sm ${isCompleted ? "line-through text-muted-foreground" : ""}`}>
+            {examen.examenes.nombre}
+          </span>
+        </div>
+        <Badge
+          variant={isCompleted ? "default" : "outline"}
+          className="text-xs"
+        >
+          {isCompleted ? "Realizado" : "Pendiente"}
+        </Badge>
+      </div>
+    );
+  };
+
   // If only one group and it's "sin prestador", render flat list
   if (groups.length === 1 && !groups[0].prestadorId) {
     const flatGroup = groups[0];
     const flatGroupKey = "__sin_prestador__";
+
+    // Workmed: simplified view
+    if (isWorkmed) {
+      return (
+        <div className="space-y-2">
+          {flatGroup.examenes.map(renderWorkmedCheckbox)}
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-2">
         {flatGroup.examenes.map((examen) => (
