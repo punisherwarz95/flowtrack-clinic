@@ -62,6 +62,11 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
   const [bulkSelections, setBulkSelections] = useState<Record<string, Set<string>>>({});
   const [savingBulk, setSavingBulk] = useState<string | null>(null);
 
+  // Workmed: track exams that have antropometria fields (keep full form for those)
+  const [antropometriaExamIds, setAntropometriaExamIds] = useState<Set<string>>(new Set());
+  const [workmedCompleting, setWorkmedCompleting] = useState<string | null>(null);
+  const isWorkmed = tipoServicio === "workmed";
+
   // Only reload prestador data when atencionId changes or examen IDs actually change
   useEffect(() => {
     const examenIdsKey = atencionExamenes.map(ae => ae.id).sort().join(",");
