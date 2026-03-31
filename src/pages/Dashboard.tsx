@@ -174,11 +174,11 @@ const Dashboard = () => {
       const boxNombre = examenBoxMap.get(ae.examen_id) || "Sin Box";
       if (!conteoExamenes[nombreExamen]) conteoExamenes[nombreExamen] = { asignados: 0, completados: 0 };
       conteoExamenes[nombreExamen].asignados += 1;
-      if (ae.estado === "completado") conteoExamenes[nombreExamen].completados += 1;
+      if (ae.estado === "completado" || ae.estado === "muestra_tomada") conteoExamenes[nombreExamen].completados += 1;
       if (!conteoPorBox[boxNombre]) conteoPorBox[boxNombre] = {};
       if (!conteoPorBox[boxNombre][nombreExamen]) conteoPorBox[boxNombre][nombreExamen] = { asignados: 0, completados: 0 };
       conteoPorBox[boxNombre][nombreExamen].asignados += 1;
-      if (ae.estado === "completado") conteoPorBox[boxNombre][nombreExamen].completados += 1;
+      if (ae.estado === "completado" || ae.estado === "muestra_tomada") conteoPorBox[boxNombre][nombreExamen].completados += 1;
     });
 
     setExamenesConteoDiario(conteoExamenes);
@@ -377,7 +377,7 @@ const Dashboard = () => {
           conteoExamenes[nombreExamen] = { asignados: 0, completados: 0 };
         }
         conteoExamenes[nombreExamen].asignados += 1;
-        if (ae.estado === "completado") {
+        if (ae.estado === "completado" || ae.estado === "muestra_tomada") {
           conteoExamenes[nombreExamen].completados += 1;
         }
         
@@ -389,7 +389,7 @@ const Dashboard = () => {
           conteoPorBox[boxNombre][nombreExamen] = { asignados: 0, completados: 0 };
         }
         conteoPorBox[boxNombre][nombreExamen].asignados += 1;
-        if (ae.estado === "completado") {
+        if (ae.estado === "completado" || ae.estado === "muestra_tomada") {
           conteoPorBox[boxNombre][nombreExamen].completados += 1;
         }
       });
@@ -482,7 +482,7 @@ const Dashboard = () => {
           conteoExamenes[nombreExamen] = { asignados: 0, completados: 0 };
         }
         conteoExamenes[nombreExamen].asignados += 1;
-        if (ae.estado === "completado") {
+        if (ae.estado === "completado" || ae.estado === "muestra_tomada") {
           conteoExamenes[nombreExamen].completados += 1;
         }
         
@@ -494,7 +494,7 @@ const Dashboard = () => {
           conteoPorPrestador[prestadorNombre][nombreExamen] = { asignados: 0, completados: 0 };
         }
         conteoPorPrestador[prestadorNombre][nombreExamen].asignados += 1;
-        if (ae.estado === "completado") {
+        if (ae.estado === "completado" || ae.estado === "muestra_tomada") {
           conteoPorPrestador[prestadorNombre][nombreExamen].completados += 1;
         }
 
@@ -506,7 +506,7 @@ const Dashboard = () => {
           conteoPorBox[boxNombre][nombreExamen] = { asignados: 0, completados: 0 };
         }
         conteoPorBox[boxNombre][nombreExamen].asignados += 1;
-        if (ae.estado === "completado") {
+        if (ae.estado === "completado" || ae.estado === "muestra_tomada") {
           conteoPorBox[boxNombre][nombreExamen].completados += 1;
         }
       });
