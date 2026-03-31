@@ -174,7 +174,7 @@ const Dashboard = () => {
       const boxNombre = examenBoxMap.get(ae.examen_id) || "Sin Box";
       if (!conteoExamenes[nombreExamen]) conteoExamenes[nombreExamen] = { asignados: 0, completados: 0 };
       conteoExamenes[nombreExamen].asignados += 1;
-      if (ae.estado === "completado") conteoExamenes[nombreExamen].completados += 1;
+      if (ae.estado === "completado" || ae.estado === "muestra_tomada") conteoExamenes[nombreExamen].completados += 1;
       if (!conteoPorBox[boxNombre]) conteoPorBox[boxNombre] = {};
       if (!conteoPorBox[boxNombre][nombreExamen]) conteoPorBox[boxNombre][nombreExamen] = { asignados: 0, completados: 0 };
       conteoPorBox[boxNombre][nombreExamen].asignados += 1;
