@@ -325,7 +325,7 @@ const EstadosPago = () => {
         from += pageSize;
       }
 
-      const details: PrestadorExamenDetail[] = (aeData || []).map((ae: any) => ({
+      const details: PrestadorExamenDetail[] = (allAeData || []).map((ae: any) => ({
         atencion_examen_id: ae.id,
         examen_nombre: ae.examen?.nombre || "Examen",
         paciente_nombre: ae.atencion?.paciente?.nombre || "-",
