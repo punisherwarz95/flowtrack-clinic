@@ -312,11 +312,20 @@ const EstadosPago = () => {
         return;
       }
 
-      const { data: aeData, error } = await query;
+      // Paginate to avoid 1000-row limit
+      let allAeData: any[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data: page, error: pageError } = await query.range(from, from + pageSize - 1);
+        if (pageError) throw pageError;
+        if (!page || page.length === 0) break;
+        allAeData = allAeData.concat(page);
+        if (page.length < pageSize) break;
+        from += pageSize;
+      }
 
-      if (error) throw error;
-
-      const details: PrestadorExamenDetail[] = (aeData || []).map((ae: any) => ({
+      const details: PrestadorExamenDetail[] = (allAeData || []).map((ae: any) => ({
         atencion_examen_id: ae.id,
         examen_nombre: ae.examen?.nombre || "Examen",
         paciente_nombre: ae.atencion?.paciente?.nombre || "-",
