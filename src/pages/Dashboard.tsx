@@ -482,7 +482,7 @@ const Dashboard = () => {
           conteoExamenes[nombreExamen] = { asignados: 0, completados: 0 };
         }
         conteoExamenes[nombreExamen].asignados += 1;
-        if (ae.estado === "completado") {
+        if (ae.estado === "completado" || ae.estado === "muestra_tomada") {
           conteoExamenes[nombreExamen].completados += 1;
         }
         
