@@ -1128,7 +1128,27 @@ const CotizacionForm = ({ cotizacionId, solicitudId, onSuccess, onCancel }: Coti
                 <div key={item.id} className="border rounded-lg overflow-hidden">
                   {/* Item Header */}
                   <div className="bg-muted/50 p-4 flex items-center gap-4">
-                    <div className="flex items-center gap-2 font-medium w-16">
+                    <div className="flex items-center gap-1 font-medium">
+                      <div className="flex flex-col -my-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 p-0"
+                          onClick={() => handleMoveItem(item.id, "up")}
+                          disabled={item.item_numero === 1}
+                        >
+                          <ArrowUp className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 p-0"
+                          onClick={() => handleMoveItem(item.id, "down")}
+                          disabled={item.item_numero === items.length}
+                        >
+                          <ArrowDown className="h-3 w-3" />
+                        </Button>
+                      </div>
                       <Badge variant="outline">{item.item_numero}</Badge>
                     </div>
                     <div className="flex-1">
