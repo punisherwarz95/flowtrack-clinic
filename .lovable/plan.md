@@ -1,125 +1,76 @@
 
 
-# Plan: Capa Offline-First Híbrida para Flujo, MiBox y Pacientes
+# Análisis de Cuellos de Botella en MediFlow
 
-## Resumen
+## Hallazgos
 
-Implementar una capa de cache local con IndexedDB (Dexie.js) que precargue los datos del día y permita trabajar de forma instantánea. Las acciones críticas (llamar/liberar paciente) van directo al cloud para evitar conflictos. Las acciones no-críticas (marcar exámenes, cambiar ficha, etc.) se aplican localmente de inmediato y se envían al cloud en una cola de operaciones en background.
+### 1. Portal Paciente — Polling agresivo cada 3 segundos (CRÍTICO)
+- **Archivo**: `src/pages/PortalPaciente.tsx` (línea 926)
+- **Problema**: Hace 2 queries a Supabase (atenciones + atencion_examenes) cada 3 segundos por cada paciente con el portal abierto. Con 20 pacientes simultáneos = 40 queries cada 3s = **800 queries/minuto** solo del portal.
+- **Además**: Tiene otro polling de documentos cada 5 segundos (mencionado en el summary).
+- **Solución**: Reemplazar polling por Realtime channels (como ya hace Flujo/MiBox). Usar `postgres_changes` en `atenciones` y `atencion_examenes` filtrado por `atencion_id`. Reducir polling de documentos a 15-30s como fallback.
 
-## Reglas de negocio
+### 2. MiBox — Doble carga de datos: local cache + cloud redundante (MEDIO)
+- **Archivo**: `src/pages/MiBox.tsx` (líneas 247-260)
+- **Problema**: Al montar, carga datos desde el cache local (useEffect línea 131) Y también ejecuta `loadData()` que hace 4+ queries pesadas al cloud (línea 264). La carga local ya provee datos instantáneos; la cloud debería ser el sync engine, no una carga paralela.
+- **Solución**: Eliminar `loadData()` al montar cuando el cache local está cargado. El sync engine (pull cada 30s + realtime trigger) ya mantiene el cache actualizado.
 
-```text
-ACCIÓN                          → EJECUCIÓN
-────────────────────────────────────────────
-Llamar paciente (asignar box)   → CLOUD DIRECTO (ya tiene protección atómica)
-Liberar paciente (completar)    → CLOUD DIRECTO (cambia estado global)
-Marcar examen completado/inc.   → LOCAL + COLA
-Cambiar estado ficha            → LOCAL + COLA  
-Cerrar visita box               → LOCAL + COLA
-Leer atenciones/examenes        → DESDE CACHE LOCAL
-Crear paciente (módulo Pacientes)→ CLOUD DIRECTO + actualizar cache
-Cargar empresas/baterias/boxes  → DESDE CACHE LOCAL (React Query + IndexedDB)
-```
+### 3. MiBox — Query de "otros boxes" innecesariamente compleja (MEDIO)
+- **Archivo**: `src/pages/MiBox.tsx` (líneas 357-386)
+- **Problema**: Hace una query extra para contar pacientes en otros boxes, luego itera con más queries en chunks. Todo esto ya está disponible en el cache local.
+- **Solución**: Calcular `pacientesEnOtrosBoxes` directamente desde `localData.atenciones` (ya se hace parcialmente en líneas 221-224 pero `loadData` lo sobreescribe).
 
-## Arquitectura
+### 4. Flujo — Re-renders masivos por dependencias amplias en useEffect (MEDIO)
+- **Archivo**: `src/pages/Flujo.tsx` (línea 223)
+- **Problema**: El useEffect que procesa datos locales depende de `localData.atenciones`, `localData.atencionExamenes`, `localData.atencionDocumentos`. Cada cambio en cualquier examen de cualquier paciente recalcula TODO: pending boxes, examenes pendientes, docs counts para todas las atenciones.
+- **Solución**: Usar `useMemo` en lugar de `useEffect` + `setState` para datos derivados. Esto evita el ciclo render → setState → re-render. Calcular solo los deltas cuando sea posible.
 
-```text
-┌─────────────────────────────────────┐
-│  UI (Flujo / MiBox / Pacientes)     │
-│  Lee de: cache local (instantáneo)  │
-│  Escribe a: cache local + outbox    │
-└──────────┬──────────────────────────┘
-           │
-     ┌─────▼─────┐
-     │ IndexedDB  │  ← atenciones, atencion_examenes del día
-     │ (Dexie)    │  ← outbox de operaciones pendientes
-     │            │  ← referencia: empresas, boxes, examenes, paquetes
-     └─────┬──────┘
-           │
-     ┌─────▼──────────┐
-     │ SyncEngine     │  ← cada 10-15s: push outbox + pull cambios
-     │ (background)   │  ← Realtime channel como trigger de sync
-     └─────┬──────────┘
-           │
-     ┌─────▼──────┐
-     │ Supabase   │  ← fuente de verdad
-     │ Cloud      │
-     └────────────┘
-```
+### 5. Sync Engine — Clear + BulkPut en cada pull (BAJO-MEDIO)
+- **Archivo**: `src/hooks/useLocalSync.ts` (líneas 141-148)
+- **Problema**: Cada 30 segundos hace `clear()` + `bulkPut()` en 3 tablas de IndexedDB. Esto invalida todas las live queries de Dexie, causando re-renders en TODOS los componentes que usan `useLocalAtenciones()` (Flujo, MiBox, Dashboard), incluso si los datos no cambiaron.
+- **Solución**: Comparar datos antes de escribir (hash o timestamp). Solo hacer upsert de registros que realmente cambiaron. Alternativamente, usar `bulkPut` sin `clear` y eliminar registros que ya no existen.
 
-## Archivos a crear
+### 6. Auth Context — Failsafe de 8 segundos visible en logs (BAJO)
+- **Archivo**: `src/contexts/AuthContext.tsx` (líneas 118-123)
+- **Problema**: El console warning `[Auth] Failsafe: auth loading timeout` aparece en los logs actuales, indicando que `getSession()` tarda más de 8s o hay una race condition con `onAuthStateChange`. Esto bloquea toda la app durante la carga.
+- **Solución**: Investigar por qué el failsafe se activa. Podría ser latencia del servidor (ya en instancia Small). Considerar mostrar la UI con skeleton mientras auth resuelve.
 
-### 1. `src/lib/localDb.ts` — Base de datos IndexedDB con Dexie
-- Tablas: `atenciones`, `atencionExamenes`, `atencionBoxVisitas`, `outbox`
-- Tablas de referencia: `empresas`, `boxes`, `examenes`, `paquetes`, `faenas`, `bateriaFaenas`
-- Funciones CRUD locales: `getLocalAtenciones()`, `upsertLocalAtencion()`, `getLocalAtencionExamenes()`, `upsertLocalAtencionExamen()`, `addToOutbox()`, `getOutbox()`, `removeFromOutbox()`
+### 7. Dashboard — Cálculos pesados sin memoización (BAJO)
+- **Archivo**: `src/pages/Dashboard.tsx`
+- **Problema**: `computeDailyStatsFromLocal()` y `computeTableDataFromLocal()` iteran sobre todas las atenciones y exámenes del día en cada render. Con 200+ pacientes y 2000+ exámenes, esto puede ser lento.
+- **Solución**: Envolver en `useMemo` con dependencias específicas.
 
-### 2. `src/hooks/useLocalSync.ts` — Motor de sincronización
-- **Pull**: cada 15s, consulta atenciones del día desde Supabase y actualiza IndexedDB
-- **Push**: cada 5s, procesa outbox y envía operaciones al cloud en orden
-- **Realtime trigger**: cuando llega un evento realtime, dispara un pull inmediato
-- **Precarga inicial**: al montar, carga todo el día en IndexedDB de una vez
-- **Referencia**: sincroniza empresas/boxes/examenes/paquetes/faenas al iniciar (y los mantiene en IndexedDB para que persistan entre recargas de página)
-- Expone: `{ isOnline, pendingOps, lastSyncAt, forcePull, forcePush }`
+## Plan de implementación (priorizado por impacto)
 
-### 3. `src/hooks/useLocalAtenciones.ts` — Hook para Flujo y MiBox
-- Lee atenciones y exámenes desde IndexedDB (instantáneo)
-- Para escrituras no-críticas (marcar examen, cambiar ficha): actualiza IndexedDB + agrega a outbox
-- Para escrituras críticas (llamar/liberar paciente): llama a Supabase directo, luego actualiza cache local
-- API compatible con la interfaz actual para minimizar cambios en los componentes
+### Paso 1: Portal Paciente — Reemplazar polling 3s por Realtime
+- Suscribir a `postgres_changes` en `atenciones` y `atencion_examenes` filtrado por `atencion_id`
+- Mantener un polling de fallback cada 30s (no 3s)
+- Reducir polling de documentos de 5s a 15s
 
-### 4. `src/components/SyncStatusBadge.tsx` — Indicador visual
-- Muestra: "✓ Sincronizado", "↑ 3 pendientes", "⟳ Sincronizando...", "⚠ Sin conexión"
-- Color verde/amarillo/rojo según estado
+### Paso 2: Sync Engine — Escritura inteligente (diff antes de clear)
+- En `pullData()`, comparar hash de datos actuales vs nuevos antes de escribir a IndexedDB
+- Si no hay cambios, skip la escritura y evitar re-renders en cascada
+- Esto reduce re-renders innecesarios en Flujo, MiBox, y Dashboard simultáneamente
 
-## Archivos a modificar
+### Paso 3: MiBox — Eliminar loadData() redundante
+- Cuando `localData.isLoaded` es true, no llamar a `loadData()` al montar
+- Confiar en el sync engine para mantener datos actualizados
+- Mantener `loadData()` solo como fallback manual (botón refresh)
 
-### 5. `src/pages/Flujo.tsx`
-- Reemplazar `loadData()` y queries directas por `useLocalAtenciones()`
-- Mantener `handleIniciarAtencion` como cloud-directo (ya tiene protección atómica `.eq("estado", "en_espera").is("box_id", null)`)
-- `handleCompletarAtencion`: cloud-directo para el cambio de estado de atención; las actualizaciones de exámenes van por cola
-- Eliminar polling de 30s (el sync engine lo reemplaza)
-- Mantener realtime como trigger de sync, no como fuente de datos
+### Paso 4: Flujo — Convertir useEffect+setState a useMemo
+- Reemplazar el useEffect de línea 117-223 por `useMemo` que retorne los datos derivados directamente
+- Eliminar los 6 estados intermedios (`examenesPendientes`, `pendingBoxes`, etc.) y calcularlos como valores derivados
 
-### 6. `src/pages/MiBox.tsx`
-- Mismo patrón: leer de cache local, escribir exámenes a cola
-- `handleLlamarPaciente`: mantener cloud-directo (ya tiene protección atómica)
-- `handleCompletarAtencion`: cloud-directo para estado + cola para exámenes
-- Eliminar `setInterval` de 10s y polling redundante
+### Paso 5: Dashboard — Memoizar cálculos pesados
+- Envolver `computeDailyStatsFromLocal` y `computeTableDataFromLocal` en `useMemo`
 
-### 7. `src/pages/Pacientes.tsx`
-- Empresas, exámenes, paquetes ya vienen de React Query; agregar persistencia en IndexedDB para que la primera carga sea instantánea
-- `loadAllFaenasAndBateriaFaenas()`: leer de cache local, sync en background
-- `handleSubmit` (crear paciente): cloud-directo + actualizar cache
+## Detalle técnico
 
-### 8. `src/hooks/useReferenceData.ts`
-- Agregar `initialData` desde IndexedDB para que React Query tenga datos inmediatos antes de que el fetch al cloud responda
-- Agregar `useFaenas()` y `useBateriaFaenas()` para que Pacientes también use cache centralizada
+**Impacto estimado del Portal Paciente (Paso 1):**
+- De ~800 queries/min → ~5-10 queries/min (solo por eventos reales)
+- Reducción de ~98% de carga al backend desde el portal
 
-### 9. `src/components/Navigation.tsx`
-- Agregar `SyncStatusBadge` junto al nombre del usuario
-
-## Dependencia nueva
-- `dexie` (~15KB gzipped) — wrapper de IndexedDB
-
-## Flujo de una acción típica
-
-### Marcar examen como completado (no-crítica):
-1. Usuario hace click → IndexedDB se actualiza → UI refleja cambio (< 10ms)
-2. Operación se agrega al outbox
-3. En 5-10s, sync engine envía al cloud
-4. Si falla, reintenta con backoff
-
-### Llamar paciente (crítica):
-1. Usuario hace click → optimistic UI (ya existente)
-2. Query atómica a Supabase `.eq("estado", "en_espera").is("box_id", null)`
-3. Si otro box lo llamó primero → revert + error (ya implementado)
-4. Si éxito → actualizar cache local + continuar trabajando offline-first
-
-## Resultado esperado
-- **Carga inicial**: datos desde IndexedDB en < 50ms, sync con cloud en background
-- **Acciones sobre paciente en atención**: instantáneas (< 10ms)
-- **Acciones críticas**: misma latencia que ahora pero sin bloquear la UI
-- **Creación de pacientes**: empresas/baterias cargan instantáneamente desde cache
-- **Pérdida temporal de conexión**: módulos siguen operativos, outbox acumula operaciones
+**Impacto estimado del Sync Engine (Paso 2):**
+- Elimina ~90% de escrituras innecesarias a IndexedDB
+- Reduce re-renders en 3 páginas simultáneamente
 
