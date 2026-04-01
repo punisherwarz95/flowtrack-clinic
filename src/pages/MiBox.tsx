@@ -246,18 +246,19 @@ const MiBox = () => {
 
   useEffect(() => {
     if (selectedBoxId) {
-      // Still do an initial cloud load as fallback + for data not in cache
-      loadData();
+      // Only load from cloud if local cache is not yet populated
+      if (!localData.isLoaded) {
+        loadData();
+      }
       // Realtime as sync trigger (sync engine also handles this)
       const channel = supabase
         .channel("mibox-changes")
         .on("postgres_changes", { event: "*", schema: "public", table: "atenciones" }, () => syncCtx.forcePull())
         .on("postgres_changes", { event: "*", schema: "public", table: "atencion_examenes" }, () => syncCtx.forcePull())
         .subscribe();
-      // Remove the 10s polling - sync engine handles it
       return () => { supabase.removeChannel(channel); };
     }
-  }, [selectedBoxId]);
+  }, [selectedBoxId, localData.isLoaded]);
 
   // loadBoxes is no longer needed - boxes come from useBoxes() cache
 
