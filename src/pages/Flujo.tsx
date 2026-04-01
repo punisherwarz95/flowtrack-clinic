@@ -113,11 +113,10 @@ const Flujo = () => {
     examenesRef.current = examenes;
   }, [examenes]);
 
-  // ── Populate from local cache when viewing today ──────────────────
-  useEffect(() => {
-    if (!isToday || !localData.isLoaded) return;
+  // ── Derive data from local cache using useMemo (no setState cycles) ──
+  const localDerived = useMemo(() => {
+    if (!isToday || !localData.isLoaded) return null;
     
-    // Map local cache data to Atencion[] format
     const localAtenciones: Atencion[] = localData.atenciones
       .filter(a => a.estado === 'en_espera' || a.estado === 'en_atencion')
       .sort((a, b) => (a.numero_ingreso || 0) - (b.numero_ingreso || 0))
@@ -138,13 +137,7 @@ const Flujo = () => {
         boxes: la.box_nombre ? { nombre: la.box_nombre } : null,
       }));
 
-    setAtenciones(localAtenciones);
-    atencionesRef.current = localAtenciones;
-
-    // Compute derived data from local cache
     const atencionIds = localAtenciones.map(a => a.id);
-    
-    // Examenes pendientes
     const newExamenesPendientes: {[id: string]: string[]} = {};
     const newTotalExamenes: {[id: string]: number} = {};
     const newAtencionExamenes: {[id: string]: AtencionExamen[]} = {};
@@ -169,7 +162,6 @@ const Flujo = () => {
           newExamenesPendientes[ae.atencion_id]?.push(nombreConEstado);
         }
         
-        // Atencion examenes for box filtering
         const atencion = localAtenciones.find(a => a.id === ae.atencion_id);
         if (atencion?.estado === 'en_atencion' && atencion.box_id) {
           const box = boxes.find(b => b.id === atencion.box_id);
@@ -191,7 +183,6 @@ const Flujo = () => {
           });
         }
 
-        // Pending boxes
         const examenId = ae.examen_id;
         boxes.forEach(box => {
           if (box.box_examenes.some(be => be.examen_id === examenId)) {
@@ -203,11 +194,6 @@ const Flujo = () => {
       }
     });
 
-    setExamenesPendientes(newExamenesPendientes);
-    setTotalExamenesPorAtencion(newTotalExamenes);
-    setAtencionExamenes(newAtencionExamenes);
-    setPendingBoxes(newPendingBoxes);
-
     // Docs counts from local cache
     const allLocalDocs = localData.atencionDocumentos.filter(d => atencionIds.includes(d.atencion_id));
     const pendingCounts: {[id: string]: number} = {};
@@ -218,9 +204,30 @@ const Flujo = () => {
         pendingCounts[d.atencion_id] = (pendingCounts[d.atencion_id] || 0) + 1;
       }
     });
-    setDocsPendientes(pendingCounts);
-    setDocsTotal(totalCounts);
+
+    return {
+      atenciones: localAtenciones,
+      examenesPendientes: newExamenesPendientes,
+      totalExamenes: newTotalExamenes,
+      atencionExamenes: newAtencionExamenes,
+      pendingBoxes: newPendingBoxes,
+      docsPendientes: pendingCounts,
+      docsTotal: totalCounts,
+    };
   }, [localData.atenciones, localData.atencionExamenes, localData.atencionDocumentos, localData.isLoaded, isToday, boxes]);
+
+  // Apply derived data to state only when it changes
+  useEffect(() => {
+    if (!localDerived) return;
+    setAtenciones(localDerived.atenciones);
+    atencionesRef.current = localDerived.atenciones;
+    setExamenesPendientes(localDerived.examenesPendientes);
+    setTotalExamenesPorAtencion(localDerived.totalExamenes);
+    setAtencionExamenes(localDerived.atencionExamenes);
+    setPendingBoxes(localDerived.pendingBoxes);
+    setDocsPendientes(localDerived.docsPendientes);
+    setDocsTotal(localDerived.docsTotal);
+  }, [localDerived]);
 
   // OPTIMIZACIÓN v0.0.2: Realtime inteligente - actualiza solo lo necesario
   const handleRealtimeAtencionChange = async (payload: any) => {

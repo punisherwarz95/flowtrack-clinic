@@ -123,25 +123,37 @@ const Dashboard = () => {
   const atencionesConTemporizador = atencionesIngresadas.map((a) => a.id);
   const { timerByAtencion } = usePresionTimers(atencionesConTemporizador);
 
+  // Memoized daily stats from local cache
+  const memoizedDailyStats = useMemo(() => {
+    if (!isToday(selectedDateDaily) || !localLoaded) return null;
+    return computeDailyStatsFromLocal();
+  }, [selectedDateDaily, localAtenciones, localAtencionExamenes, localLoaded, boxExamenesMapCached]);
+
   useEffect(() => {
-    if (isToday(selectedDateDaily) && localLoaded) {
-      computeDailyStatsFromLocal();
+    if (memoizedDailyStats) {
+      // Stats already computed via memo, apply them
     } else if (!isToday(selectedDateDaily)) {
       loadDailyStats();
     }
-  }, [selectedDateDaily, localAtenciones, localAtencionExamenes, localLoaded]);
+  }, [selectedDateDaily, memoizedDailyStats]);
 
   useEffect(() => {
     loadMonthlyStats();
   }, [selectedMonth]);
 
+  // Memoized table data from local cache
+  const memoizedTableData = useMemo(() => {
+    if (!isToday(selectedDateTable) || !localLoaded) return null;
+    return computeTableDataFromLocal();
+  }, [selectedDateTable, localAtenciones, localAtencionExamenes, localLoaded, boxExamenesMapCached]);
+
   useEffect(() => {
-    if (isToday(selectedDateTable) && localLoaded) {
-      computeTableDataFromLocal();
+    if (memoizedTableData) {
+      // Data already computed via memo, apply them
     } else if (!isToday(selectedDateTable)) {
       loadTableData();
     }
-  }, [selectedDateTable, localAtenciones, localAtencionExamenes, localLoaded]);
+  }, [selectedDateTable, memoizedTableData]);
 
   // Auto-refresh only for monthly stats (daily + table use local cache for today)
   useEffect(() => {
