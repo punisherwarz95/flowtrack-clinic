@@ -923,8 +923,47 @@ export default function PortalPaciente() {
     };
 
     cargarDatos();
-    const interval = setInterval(cargarDatos, 3000);
-    return () => clearInterval(interval);
+    // Fallback polling every 30s instead of 3s
+    const interval = setInterval(cargarDatos, 30000);
+
+    // Realtime channels to replace aggressive polling
+    let atencionChannel: any = null;
+    const setupRealtime = async () => {
+      if (!paciente?.id) return;
+      // Get today's atencion ID for filtering
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).toISOString();
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).toISOString();
+      
+      const { data: atencionCheck } = await supabase
+        .from("atenciones")
+        .select("id")
+        .eq("paciente_id", paciente.id)
+        .gte("fecha_ingreso", startOfDay)
+        .lte("fecha_ingreso", endOfDay)
+        .order("fecha_ingreso", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const channelFilters: any[] = [
+        { event: "*", schema: "public", table: "atenciones", filter: `paciente_id=eq.${paciente.id}` },
+      ];
+      if (atencionCheck?.id) {
+        channelFilters.push({ event: "*", schema: "public", table: "atencion_examenes", filter: `atencion_id=eq.${atencionCheck.id}` });
+      }
+
+      atencionChannel = supabase.channel(`portal-${paciente.id}`);
+      channelFilters.forEach(f => {
+        atencionChannel = atencionChannel.on("postgres_changes", f, () => cargarDatos());
+      });
+      atencionChannel.subscribe();
+    };
+    setupRealtime();
+
+    return () => {
+      clearInterval(interval);
+      if (atencionChannel) supabase.removeChannel(atencionChannel);
+    };
   }, [paciente?.id, step]);
 
   // Refrescar manual

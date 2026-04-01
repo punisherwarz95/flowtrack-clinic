@@ -137,14 +137,54 @@ export function useLocalSync() {
         estado: d.estado,
       }));
 
-      // Write to IndexedDB in a transaction
+      // Smart write: diff before writing to avoid unnecessary re-renders
       await localDb.transaction('rw', [localDb.atenciones, localDb.atencionExamenes, localDb.atencionDocumentos], async () => {
-        await localDb.atenciones.clear();
-        await localDb.atencionExamenes.clear();
-        await localDb.atencionDocumentos.clear();
-        if (atenciones.length > 0) await localDb.atenciones.bulkPut(atenciones);
-        if (atencionExamenes.length > 0) await localDb.atencionExamenes.bulkPut(atencionExamenes);
-        if (atencionDocumentos.length > 0) await localDb.atencionDocumentos.bulkPut(atencionDocumentos);
+        // Diff atenciones
+        const existingAtenciones = await localDb.atenciones.toArray();
+        const existingAtencionIds = new Set(existingAtenciones.map(a => a.id));
+        const newAtencionIds = new Set(atenciones.map(a => a.id));
+        const toDeleteAtenciones = existingAtenciones.filter(a => !newAtencionIds.has(a.id));
+        if (toDeleteAtenciones.length > 0) await localDb.atenciones.bulkDelete(toDeleteAtenciones.map(a => a.id));
+        
+        // Only put records that changed
+        const existingAtencionMap = new Map(existingAtenciones.map(a => [a.id, a]));
+        const changedAtenciones = atenciones.filter(a => {
+          const existing = existingAtencionMap.get(a.id);
+          if (!existing) return true;
+          return existing.estado !== a.estado || existing.box_id !== a.box_id || 
+                 existing.estado_ficha !== a.estado_ficha || existing.observaciones !== a.observaciones ||
+                 existing.fecha_inicio_atencion !== a.fecha_inicio_atencion || existing.fecha_fin_atencion !== a.fecha_fin_atencion;
+        });
+        if (changedAtenciones.length > 0) await localDb.atenciones.bulkPut(changedAtenciones);
+
+        // Diff atencion_examenes
+        const existingExamenes = await localDb.atencionExamenes.toArray();
+        const newExamenIds = new Set(atencionExamenes.map(ae => ae.id));
+        const toDeleteExamenes = existingExamenes.filter(ae => !newExamenIds.has(ae.id));
+        if (toDeleteExamenes.length > 0) await localDb.atencionExamenes.bulkDelete(toDeleteExamenes.map(ae => ae.id));
+        
+        const existingExamenMap = new Map(existingExamenes.map(ae => [ae.id, ae]));
+        const changedExamenes = atencionExamenes.filter(ae => {
+          const existing = existingExamenMap.get(ae.id);
+          if (!existing) return true;
+          return existing.estado !== ae.estado || existing.fecha_realizacion !== ae.fecha_realizacion ||
+                 existing.realizado_por !== ae.realizado_por || existing.observaciones !== ae.observaciones;
+        });
+        if (changedExamenes.length > 0) await localDb.atencionExamenes.bulkPut(changedExamenes);
+
+        // Diff atencion_documentos
+        const existingDocs = await localDb.atencionDocumentos.toArray();
+        const newDocIds = new Set(atencionDocumentos.map(d => d.id));
+        const toDeleteDocs = existingDocs.filter(d => !newDocIds.has(d.id));
+        if (toDeleteDocs.length > 0) await localDb.atencionDocumentos.bulkDelete(toDeleteDocs.map(d => d.id));
+        
+        const existingDocMap = new Map(existingDocs.map(d => [d.id, d]));
+        const changedDocs = atencionDocumentos.filter(d => {
+          const existing = existingDocMap.get(d.id);
+          if (!existing) return true;
+          return existing.estado !== d.estado;
+        });
+        if (changedDocs.length > 0) await localDb.atencionDocumentos.bulkPut(changedDocs);
       });
 
       await setSyncMeta('lastPull', new Date().toISOString());

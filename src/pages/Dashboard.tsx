@@ -129,7 +129,7 @@ const Dashboard = () => {
     } else if (!isToday(selectedDateDaily)) {
       loadDailyStats();
     }
-  }, [selectedDateDaily, localAtenciones, localAtencionExamenes, localLoaded]);
+  }, [selectedDateDaily, localAtenciones, localAtencionExamenes, localLoaded, boxExamenesMapCached]);
 
   useEffect(() => {
     loadMonthlyStats();
@@ -141,7 +141,7 @@ const Dashboard = () => {
     } else if (!isToday(selectedDateTable)) {
       loadTableData();
     }
-  }, [selectedDateTable, localAtenciones, localAtencionExamenes, localLoaded]);
+  }, [selectedDateTable, localAtenciones, localAtencionExamenes, localLoaded, boxExamenesMapCached]);
 
   // Auto-refresh only for monthly stats (daily + table use local cache for today)
   useEffect(() => {
