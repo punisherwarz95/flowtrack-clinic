@@ -74,6 +74,9 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
   const [workmedCompleting, setWorkmedCompleting] = useState<string | null>(null);
   const isWorkmed = tipoServicio === "workmed";
 
+  // Trazabilidad cache: keyed by sorted examen IDs (same for all patients in same box)
+  const trazCacheKeyRef = useRef<string>("");
+
   // Only reload prestador data when atencionId changes or examen IDs actually change
   useEffect(() => {
     const examenIdsKey = atencionExamenes.map(ae => ae.id).sort().join(",");
