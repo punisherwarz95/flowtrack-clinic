@@ -138,17 +138,23 @@ export function useLocalSync() {
       }));
 
       // Smart write: diff before writing to avoid unnecessary re-renders
+      // Also skip overwriting records that have pending outbox operations (not yet pushed to cloud)
+      const pendingOps = await localDb.outbox.toArray();
+      const pendingAtencionIds = new Set(pendingOps.filter(op => op.table === 'atenciones').map(op => op.recordId));
+      const pendingExamenIds = new Set(pendingOps.filter(op => op.table === 'atencion_examenes').map(op => op.recordId));
+
       await localDb.transaction('rw', [localDb.atenciones, localDb.atencionExamenes, localDb.atencionDocumentos], async () => {
         // Diff atenciones
         const existingAtenciones = await localDb.atenciones.toArray();
         const existingAtencionIds = new Set(existingAtenciones.map(a => a.id));
         const newAtencionIds = new Set(atenciones.map(a => a.id));
-        const toDeleteAtenciones = existingAtenciones.filter(a => !newAtencionIds.has(a.id));
+        const toDeleteAtenciones = existingAtenciones.filter(a => !newAtencionIds.has(a.id) && !pendingAtencionIds.has(a.id));
         if (toDeleteAtenciones.length > 0) await localDb.atenciones.bulkDelete(toDeleteAtenciones.map(a => a.id));
         
-        // Only put records that changed
+        // Only put records that changed AND don't have pending outbox ops
         const existingAtencionMap = new Map(existingAtenciones.map(a => [a.id, a]));
         const changedAtenciones = atenciones.filter(a => {
+          if (pendingAtencionIds.has(a.id)) return false; // Don't overwrite pending local changes
           const existing = existingAtencionMap.get(a.id);
           if (!existing) return true;
           return existing.estado !== a.estado || existing.box_id !== a.box_id || 
