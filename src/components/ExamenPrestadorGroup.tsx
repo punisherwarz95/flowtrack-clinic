@@ -46,7 +46,7 @@ interface Props {
   prestadorCache?: PrestadorCache | null;
 }
 
-const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaNacimiento, tipoServicio }: Props) => {
+const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaNacimiento, tipoServicio, prestadorCache }: Props) => {
   const [prestadorExamenes, setPrestadorExamenes] = useState<Record<string, string>>({});
   const [prestadores, setPrestadores] = useState<Record<string, string>>({});
   const [prestadorTipos, setPrestadorTipos] = useState<Record<string, string>>({});
