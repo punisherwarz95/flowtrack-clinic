@@ -149,40 +149,24 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
       } else {
         const [archRes, vincRes, trazRes] = await Promise.all([archPromise, vincPromise, trazPromise]);
 
-      if (!prestadorCache && results[3]) {
-        const peRes = results[3];
-        const peMap: Record<string, string> = {};
-        const pNames: Record<string, string> = {};
-        const pTipos: Record<string, string> = {};
-        (peRes.data || []).forEach((pe: any) => {
-          peMap[pe.examen_id] = pe.prestador_id;
-          if (pe.prestadores?.nombre) {
-            pNames[pe.prestador_id] = pe.prestadores.nombre;
-            pTipos[pe.prestador_id] = pe.prestadores.tipo || "interno";
-          }
+        setArchivosCompartidos(archRes.data || []);
+
+        const vincMap: Record<string, string[]> = {};
+        (vincRes.data || []).forEach((v: any) => {
+          if (!vincMap[v.archivo_compartido_id]) vincMap[v.archivo_compartido_id] = [];
+          vincMap[v.archivo_compartido_id].push(v.examen_id);
         });
-        setPrestadorExamenes(peMap);
-        setPrestadores(pNames);
-        setPrestadorTipos(pTipos);
+        setArchivoVinculos(vincMap);
+
+        const trazMap: Record<string, string[]> = {};
+        (trazRes.data || []).forEach((t: any) => {
+          if (!trazMap[t.examen_id_a]) trazMap[t.examen_id_a] = [];
+          if (!trazMap[t.examen_id_b]) trazMap[t.examen_id_b] = [];
+          if (!trazMap[t.examen_id_a].includes(t.examen_id_b)) trazMap[t.examen_id_a].push(t.examen_id_b);
+          if (!trazMap[t.examen_id_b].includes(t.examen_id_a)) trazMap[t.examen_id_b].push(t.examen_id_a);
+        });
+        setTrazabilidadMap(trazMap);
       }
-
-      setArchivosCompartidos(archRes.data || []);
-
-      const vincMap: Record<string, string[]> = {};
-      (vincRes.data || []).forEach((v: any) => {
-        if (!vincMap[v.archivo_compartido_id]) vincMap[v.archivo_compartido_id] = [];
-        vincMap[v.archivo_compartido_id].push(v.examen_id);
-      });
-      setArchivoVinculos(vincMap);
-
-      const trazMap: Record<string, string[]> = {};
-      (trazRes.data || []).forEach((t: any) => {
-        if (!trazMap[t.examen_id_a]) trazMap[t.examen_id_a] = [];
-        if (!trazMap[t.examen_id_b]) trazMap[t.examen_id_b] = [];
-        if (!trazMap[t.examen_id_a].includes(t.examen_id_b)) trazMap[t.examen_id_a].push(t.examen_id_b);
-        if (!trazMap[t.examen_id_b].includes(t.examen_id_a)) trazMap[t.examen_id_b].push(t.examen_id_a);
-      });
-      setTrazabilidadMap(trazMap);
     } catch (error) {
       console.error("Error loading prestador data:", error);
     } finally {
