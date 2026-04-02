@@ -324,15 +324,16 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
 
   const handleMuestraTomada = async (atencionExamenId: string) => {
     try {
-      const { error } = await supabase
-        .from("atencion_examenes")
-        .update({ estado: "muestra_tomada" as any, fecha_realizacion: new Date().toISOString() })
-        .eq("id", atencionExamenId);
+      const now = new Date().toISOString();
+      const payload = { estado: "muestra_tomada", fecha_realizacion: now };
 
-      if (error) throw error;
+      // Offline-first: update local + enqueue for cloud sync
+      const { localDb, addToOutbox } = await import("@/lib/localDb");
+      await localDb.atencionExamenes.update(atencionExamenId, payload);
+      await addToOutbox('atencion_examenes', 'update', atencionExamenId, payload);
+
       toast.success("Muestra tomada registrada");
       onComplete?.();
-      await loadPrestadorData();
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al registrar muestra tomada");
