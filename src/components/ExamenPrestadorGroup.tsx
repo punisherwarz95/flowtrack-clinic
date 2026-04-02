@@ -114,7 +114,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
         .select("archivo_compartido_id, examen_id").in("examen_id", examenIds).then(r => r);
 
       if (!prestadorCache) {
-        const promises: Promise<any>[] = [archPromise, vincPromise];
+        const promises: PromiseLike<any>[] = [archPromise, vincPromise];
         if (!trazAlreadyCached) {
           promises.push(supabase.from("examen_trazabilidad")
             .select("*").or(examenIds.map(id => `examen_id_a.eq.${id},examen_id_b.eq.${id}`).join(",")).then(r => r));
