@@ -882,10 +882,10 @@ const MiBox = () => {
                             atencionExamenes={atencionExamenes[selectedAtencion.id] || []}
                             fechaNacimiento={selectedAtencion.pacientes.fecha_nacimiento}
                             tipoServicio={selectedAtencion.pacientes.tipo_servicio}
+                            prestadorCache={prestadorCache}
                             onComplete={() => {
-                              loadData();
-                              const boxExamIds = currentBox?.box_examenes.map(be => be.examen_id) || [];
-                              loadAtencionExamenes(selectedAtencion.id, boxExamIds);
+                              // No cloud fetch needed - offline-first updates reflect via live queries
+                              syncCtx.forcePush();
                             }}
                           />
                         </CardContent>
