@@ -135,7 +135,8 @@ const MiBox = () => {
     const cachedBox = boxes.find(b => b.id === selectedBoxId);
     const boxExamIds = cachedBox?.box_examenes?.map(be => be.examen_id) || [];
 
-    // En atencion: assigned to this box
+    // En atencion: assigned to this box AND still actually en_atencion
+    // (filter out patients already released locally via completarAtencionMiBox)
     const enAtencionLocal = localData.atenciones
       .filter(a => a.estado === 'en_atencion' && a.box_id === selectedBoxId)
       .sort((a, b) => (a.numero_ingreso || 0) - (b.numero_ingreso || 0))
@@ -788,16 +789,26 @@ const MiBox = () => {
                 {/* Patient selector if multiple in atencion */}
                 {pacientesEnAtencion.length > 1 && (
                   <div className="flex gap-2 flex-wrap">
-                    {pacientesEnAtencion.map((p) => (
-                      <Button
-                        key={p.id}
-                        variant={selectedAtencion?.id === p.id ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => { setSelectedAtencion(p); setExpandedExamen(null); }}
-                      >
-                        #{p.numero_ingreso} {p.pacientes.nombre}
-                      </Button>
-                    ))}
+                    {pacientesEnAtencion.map((p) => {
+                      const exams = atencionExamenes[p.id] || [];
+                      const done = exams.filter(e => e.estado === "completado" || e.estado === "muestra_tomada").length;
+                      const total = exams.length;
+                      return (
+                        <Button
+                          key={p.id}
+                          variant={selectedAtencion?.id === p.id ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => { setSelectedAtencion(p); setExpandedExamen(null); }}
+                        >
+                          #{p.numero_ingreso} {p.pacientes.nombre}
+                          {total > 0 && (
+                            <Badge variant={done === total ? "secondary" : "outline"} className="ml-2 text-xs">
+                              {done}/{total}
+                            </Badge>
+                          )}
+                        </Button>
+                      );
+                    })}
                   </div>
                 )}
 
@@ -874,7 +885,20 @@ const MiBox = () => {
                       {/* Exams grouped by prestador */}
                       <Card>
                         <CardHeader className="pb-3">
-                          <CardTitle className="text-lg">Exámenes de este Box</CardTitle>
+                          <CardTitle className="text-lg flex items-center gap-2">
+                            Exámenes de este Box
+                            {(() => {
+                              const exams = atencionExamenes[selectedAtencion.id] || [];
+                              const done = exams.filter(e => e.estado === "completado" || e.estado === "muestra_tomada").length;
+                              const total = exams.length;
+                              if (total === 0) return null;
+                              return (
+                                <Badge variant={done === total ? "secondary" : "outline"}>
+                                  {done}/{total} realizados
+                                </Badge>
+                              );
+                            })()}
+                          </CardTitle>
                         </CardHeader>
                         <CardContent>
                           <ExamenPrestadorGroup

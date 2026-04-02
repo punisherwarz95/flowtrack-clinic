@@ -74,6 +74,9 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
   const [workmedCompleting, setWorkmedCompleting] = useState<string | null>(null);
   const isWorkmed = tipoServicio === "workmed";
 
+  // Trazabilidad cache: keyed by sorted examen IDs (same for all patients in same box)
+  const trazCacheKeyRef = useRef<string>("");
+
   // Only reload prestador data when atencionId changes or examen IDs actually change
   useEffect(() => {
     const examenIdsKey = atencionExamenes.map(ae => ae.id).sort().join(",");
@@ -100,22 +103,46 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
         setPrestadorTipos(prestadorCache.prestadorTipos);
       }
 
-      // Fetch per-atencion data + prestador if no cache
+      // Trazabilidad only changes per box (same examen set), cache it
+      const trazKey = examenIds.slice().sort().join(",");
+      const trazAlreadyCached = trazKey === trazCacheKeyRef.current;
+
+      // Fetch per-atencion data (archivos/vinculos change per patient)
       const archPromise = supabase.from("examen_archivos_compartidos")
-        .select("*").eq("atencion_id", atencionId).order("created_at", { ascending: false });
+        .select("*").eq("atencion_id", atencionId).order("created_at", { ascending: false }).then(r => r);
       const vincPromise = supabase.from("examen_archivo_vinculos")
-        .select("archivo_compartido_id, examen_id").in("examen_id", examenIds);
-      const trazPromise = supabase.from("examen_trazabilidad")
-        .select("*").or(examenIds.map(id => `examen_id_a.eq.${id},examen_id_b.eq.${id}`).join(","));
+        .select("archivo_compartido_id, examen_id").in("examen_id", examenIds).then(r => r);
 
       if (!prestadorCache) {
-        const [archRes, vincRes, trazRes, peRes] = await Promise.all([
-          archPromise, vincPromise, trazPromise,
-          supabase.from("prestador_examenes")
-            .select("examen_id, prestador_id, prestadores(nombre, tipo)")
-            .in("examen_id", examenIds),
-        ]);
+        const promises: PromiseLike<any>[] = [archPromise, vincPromise];
+        if (!trazAlreadyCached) {
+          promises.push(supabase.from("examen_trazabilidad")
+            .select("*").or(examenIds.map(id => `examen_id_a.eq.${id},examen_id_b.eq.${id}`).join(",")).then(r => r));
+        }
+        promises.push(supabase.from("prestador_examenes")
+          .select("examen_id, prestador_id, prestadores(nombre, tipo)")
+          .in("examen_id", examenIds).then(r => r));
 
+        const results = await Promise.all(promises);
+        const archRes = results[0];
+        const vincRes = results[1];
+        let trazIdx = 2;
+        
+        if (!trazAlreadyCached) {
+          const trazRes = results[trazIdx];
+          trazIdx++;
+          const trazMap: Record<string, string[]> = {};
+          (trazRes.data || []).forEach((t: any) => {
+            if (!trazMap[t.examen_id_a]) trazMap[t.examen_id_a] = [];
+            if (!trazMap[t.examen_id_b]) trazMap[t.examen_id_b] = [];
+            if (!trazMap[t.examen_id_a].includes(t.examen_id_b)) trazMap[t.examen_id_a].push(t.examen_id_b);
+            if (!trazMap[t.examen_id_b].includes(t.examen_id_a)) trazMap[t.examen_id_b].push(t.examen_id_a);
+          });
+          setTrazabilidadMap(trazMap);
+          trazCacheKeyRef.current = trazKey;
+        }
+
+        const peRes = results[trazIdx];
         const peMap: Record<string, string> = {};
         const pNames: Record<string, string> = {};
         const pTipos: Record<string, string> = {};
@@ -137,35 +164,35 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
           vincMap[v.archivo_compartido_id].push(v.examen_id);
         });
         setArchivoVinculos(vincMap);
-
-        const trazMap: Record<string, string[]> = {};
-        (trazRes.data || []).forEach((t: any) => {
-          if (!trazMap[t.examen_id_a]) trazMap[t.examen_id_a] = [];
-          if (!trazMap[t.examen_id_b]) trazMap[t.examen_id_b] = [];
-          if (!trazMap[t.examen_id_a].includes(t.examen_id_b)) trazMap[t.examen_id_a].push(t.examen_id_b);
-          if (!trazMap[t.examen_id_b].includes(t.examen_id_a)) trazMap[t.examen_id_b].push(t.examen_id_a);
-        });
-        setTrazabilidadMap(trazMap);
       } else {
-        const [archRes, vincRes, trazRes] = await Promise.all([archPromise, vincPromise, trazPromise]);
+        // With prestador cache, only fetch archivos, vinculos, and trazabilidad if needed
+        const promises: PromiseLike<any>[] = [archPromise, vincPromise];
+        if (!trazAlreadyCached) {
+          promises.push(supabase.from("examen_trazabilidad")
+            .select("*").or(examenIds.map(id => `examen_id_a.eq.${id},examen_id_b.eq.${id}`).join(",")).then(r => r));
+        }
 
-        setArchivosCompartidos(archRes.data || []);
+        const results = await Promise.all(promises);
+        setArchivosCompartidos(results[0].data || []);
 
         const vincMap: Record<string, string[]> = {};
-        (vincRes.data || []).forEach((v: any) => {
+        (results[1].data || []).forEach((v: any) => {
           if (!vincMap[v.archivo_compartido_id]) vincMap[v.archivo_compartido_id] = [];
           vincMap[v.archivo_compartido_id].push(v.examen_id);
         });
         setArchivoVinculos(vincMap);
 
-        const trazMap: Record<string, string[]> = {};
-        (trazRes.data || []).forEach((t: any) => {
-          if (!trazMap[t.examen_id_a]) trazMap[t.examen_id_a] = [];
-          if (!trazMap[t.examen_id_b]) trazMap[t.examen_id_b] = [];
-          if (!trazMap[t.examen_id_a].includes(t.examen_id_b)) trazMap[t.examen_id_a].push(t.examen_id_b);
-          if (!trazMap[t.examen_id_b].includes(t.examen_id_a)) trazMap[t.examen_id_b].push(t.examen_id_a);
-        });
-        setTrazabilidadMap(trazMap);
+        if (!trazAlreadyCached && results[2]) {
+          const trazMap: Record<string, string[]> = {};
+          (results[2].data || []).forEach((t: any) => {
+            if (!trazMap[t.examen_id_a]) trazMap[t.examen_id_a] = [];
+            if (!trazMap[t.examen_id_b]) trazMap[t.examen_id_b] = [];
+            if (!trazMap[t.examen_id_a].includes(t.examen_id_b)) trazMap[t.examen_id_a].push(t.examen_id_b);
+            if (!trazMap[t.examen_id_b].includes(t.examen_id_a)) trazMap[t.examen_id_b].push(t.examen_id_a);
+          });
+          setTrazabilidadMap(trazMap);
+          trazCacheKeyRef.current = trazKey;
+        }
       }
     } catch (error) {
       console.error("Error loading prestador data:", error);
