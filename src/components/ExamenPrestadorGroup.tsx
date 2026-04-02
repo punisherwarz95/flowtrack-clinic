@@ -166,10 +166,10 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
         setArchivoVinculos(vincMap);
       } else {
         // With prestador cache, only fetch archivos, vinculos, and trazabilidad if needed
-        const promises: Promise<any>[] = [archPromise, vincPromise];
+        const promises: PromiseLike<any>[] = [archPromise, vincPromise];
         if (!trazAlreadyCached) {
           promises.push(supabase.from("examen_trazabilidad")
-            .select("*").or(examenIds.map(id => `examen_id_a.eq.${id},examen_id_b.eq.${id}`).join(",")));
+            .select("*").or(examenIds.map(id => `examen_id_a.eq.${id},examen_id_b.eq.${id}`).join(",")).then(r => r));
         }
 
         const results = await Promise.all(promises);
