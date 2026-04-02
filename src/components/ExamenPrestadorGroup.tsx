@@ -109,19 +109,19 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
 
       // Fetch per-atencion data (archivos/vinculos change per patient)
       const archPromise = supabase.from("examen_archivos_compartidos")
-        .select("*").eq("atencion_id", atencionId).order("created_at", { ascending: false });
+        .select("*").eq("atencion_id", atencionId).order("created_at", { ascending: false }).then(r => r);
       const vincPromise = supabase.from("examen_archivo_vinculos")
-        .select("archivo_compartido_id, examen_id").in("examen_id", examenIds);
+        .select("archivo_compartido_id, examen_id").in("examen_id", examenIds).then(r => r);
 
       if (!prestadorCache) {
         const promises: Promise<any>[] = [archPromise, vincPromise];
         if (!trazAlreadyCached) {
           promises.push(supabase.from("examen_trazabilidad")
-            .select("*").or(examenIds.map(id => `examen_id_a.eq.${id},examen_id_b.eq.${id}`).join(",")));
+            .select("*").or(examenIds.map(id => `examen_id_a.eq.${id},examen_id_b.eq.${id}`).join(",")).then(r => r));
         }
         promises.push(supabase.from("prestador_examenes")
           .select("examen_id, prestador_id, prestadores(nombre, tipo)")
-          .in("examen_id", examenIds));
+          .in("examen_id", examenIds).then(r => r));
 
         const results = await Promise.all(promises);
         const archRes = results[0];
