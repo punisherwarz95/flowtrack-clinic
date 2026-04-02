@@ -166,11 +166,12 @@ export function useLocalSync() {
         // Diff atencion_examenes
         const existingExamenes = await localDb.atencionExamenes.toArray();
         const newExamenIds = new Set(atencionExamenes.map(ae => ae.id));
-        const toDeleteExamenes = existingExamenes.filter(ae => !newExamenIds.has(ae.id));
+        const toDeleteExamenes = existingExamenes.filter(ae => !newExamenIds.has(ae.id) && !pendingExamenIds.has(ae.id));
         if (toDeleteExamenes.length > 0) await localDb.atencionExamenes.bulkDelete(toDeleteExamenes.map(ae => ae.id));
         
         const existingExamenMap = new Map(existingExamenes.map(ae => [ae.id, ae]));
         const changedExamenes = atencionExamenes.filter(ae => {
+          if (pendingExamenIds.has(ae.id)) return false; // Don't overwrite pending local changes
           const existing = existingExamenMap.get(ae.id);
           if (!existing) return true;
           return existing.estado !== ae.estado || existing.fecha_realizacion !== ae.fecha_realizacion ||
