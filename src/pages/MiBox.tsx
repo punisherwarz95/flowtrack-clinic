@@ -23,7 +23,7 @@ import { useAtencionDocumentos } from "@/hooks/useAtencionDocumentos";
 import { usePresionTimers } from "@/hooks/usePresionTimers";
 import { DocumentoFormViewer, DocumentoContextData } from "@/components/DocumentoFormViewer";
 import ExamenResultadosOtrosBoxes from "@/components/ExamenResultadosOtrosBoxes";
-import ExamenPrestadorGroup from "@/components/ExamenPrestadorGroup";
+import ExamenPrestadorGroup, { type PrestadorCache } from "@/components/ExamenPrestadorGroup";
 import PresionTimerBadge from "@/components/PresionTimerBadge";
 import PresionRetakeForm from "@/components/PresionRetakeForm";
 import { useBoxes } from "@/hooks/useReferenceData";
@@ -94,6 +94,7 @@ const MiBox = () => {
   const [confirmCompletarDialog, setConfirmCompletarDialog] = useState<{ open: boolean; atencionId: string | null }>({ open: false, atencionId: null });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showErrorOverlay, setShowErrorOverlay] = useState(false);
+  const [prestadorCache, setPrestadorCache] = useState<PrestadorCache | null>(null);
 
   // Paciente seleccionado para atención
   const [selectedAtencion, setSelectedAtencion] = useState<Atencion | null>(null);
@@ -259,6 +260,31 @@ const MiBox = () => {
       return () => { supabase.removeChannel(channel); };
     }
   }, [selectedBoxId, localData.isLoaded]);
+
+  // ── Preload prestador cache for box exams (once per box selection) ──
+  useEffect(() => {
+    if (!selectedBoxId || boxes.length === 0) return;
+    const cachedBox = boxes.find(b => b.id === selectedBoxId);
+    const boxExamIds = cachedBox?.box_examenes?.map(be => be.examen_id) || [];
+    if (boxExamIds.length === 0) return;
+
+    supabase.from("prestador_examenes")
+      .select("examen_id, prestador_id, prestadores(nombre, tipo)")
+      .in("examen_id", boxExamIds)
+      .then(({ data }) => {
+        const peMap: Record<string, string> = {};
+        const pNames: Record<string, string> = {};
+        const pTipos: Record<string, string> = {};
+        (data || []).forEach((pe: any) => {
+          peMap[pe.examen_id] = pe.prestador_id;
+          if (pe.prestadores?.nombre) {
+            pNames[pe.prestador_id] = pe.prestadores.nombre;
+            pTipos[pe.prestador_id] = pe.prestadores.tipo || "interno";
+          }
+        });
+        setPrestadorCache({ prestadorExamenes: peMap, prestadores: pNames, prestadorTipos: pTipos });
+      });
+  }, [selectedBoxId, boxes]);
 
   // loadBoxes is no longer needed - boxes come from useBoxes() cache
 
@@ -856,10 +882,10 @@ const MiBox = () => {
                             atencionExamenes={atencionExamenes[selectedAtencion.id] || []}
                             fechaNacimiento={selectedAtencion.pacientes.fecha_nacimiento}
                             tipoServicio={selectedAtencion.pacientes.tipo_servicio}
+                            prestadorCache={prestadorCache}
                             onComplete={() => {
-                              loadData();
-                              const boxExamIds = currentBox?.box_examenes.map(be => be.examen_id) || [];
-                              loadAtencionExamenes(selectedAtencion.id, boxExamIds);
+                              // No cloud fetch needed - offline-first updates reflect via live queries
+                              syncCtx.forcePush();
                             }}
                           />
                         </CardContent>

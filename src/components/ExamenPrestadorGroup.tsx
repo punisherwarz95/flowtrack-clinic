@@ -31,15 +31,22 @@ interface ArchivoCompartido {
   created_at: string;
 }
 
+export interface PrestadorCache {
+  prestadorExamenes: Record<string, string>; // examen_id -> prestador_id
+  prestadores: Record<string, string>; // prestador_id -> nombre
+  prestadorTipos: Record<string, string>; // prestador_id -> tipo
+}
+
 interface Props {
   atencionId: string;
   atencionExamenes: AtencionExamen[];
   onComplete?: () => void;
   fechaNacimiento?: string | null;
   tipoServicio?: string;
+  prestadorCache?: PrestadorCache | null;
 }
 
-const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaNacimiento, tipoServicio }: Props) => {
+const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaNacimiento, tipoServicio, prestadorCache }: Props) => {
   const [prestadorExamenes, setPrestadorExamenes] = useState<Record<string, string>>({});
   const [prestadores, setPrestadores] = useState<Record<string, string>>({});
   const [prestadorTipos, setPrestadorTipos] = useState<Record<string, string>>({});
@@ -86,58 +93,80 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
       const examenIds = atencionExamenes.map(ae => ae.examen_id);
       if (examenIds.length === 0) { setLoading(false); return; }
 
-      // Fetch prestador_examenes + shared files + vinculos + trazabilidad in parallel
-      const [peRes, archRes, vincRes, trazRes] = await Promise.all([
-        supabase.from("prestador_examenes")
-          .select("examen_id, prestador_id, prestadores(nombre, tipo)")
-          .in("examen_id", examenIds),
-        supabase.from("examen_archivos_compartidos")
-          .select("*")
-          .eq("atencion_id", atencionId)
-          .order("created_at", { ascending: false }),
-        supabase.from("examen_archivo_vinculos")
-          .select("archivo_compartido_id, examen_id")
-          .in("examen_id", examenIds),
-        // Load trazabilidad links for all exams in this atencion
-        supabase.from("examen_trazabilidad")
-          .select("*")
-          .or(examenIds.map(id => `examen_id_a.eq.${id},examen_id_b.eq.${id}`).join(",")),
-      ]);
+      // Use pre-loaded cache for prestador mappings if available
+      if (prestadorCache) {
+        setPrestadorExamenes(prestadorCache.prestadorExamenes);
+        setPrestadores(prestadorCache.prestadores);
+        setPrestadorTipos(prestadorCache.prestadorTipos);
+      }
 
-      // Map examen_id -> prestador_id
-      const peMap: Record<string, string> = {};
-      const pNames: Record<string, string> = {};
-      const pTipos: Record<string, string> = {};
-      (peRes.data || []).forEach((pe: any) => {
-        peMap[pe.examen_id] = pe.prestador_id;
-        if (pe.prestadores?.nombre) {
-          pNames[pe.prestador_id] = pe.prestadores.nombre;
-          pTipos[pe.prestador_id] = pe.prestadores.tipo || "interno";
-        }
-      });
-      setPrestadorExamenes(peMap);
-      setPrestadores(pNames);
-      setPrestadorTipos(pTipos);
+      // Fetch per-atencion data + prestador if no cache
+      const archPromise = supabase.from("examen_archivos_compartidos")
+        .select("*").eq("atencion_id", atencionId).order("created_at", { ascending: false });
+      const vincPromise = supabase.from("examen_archivo_vinculos")
+        .select("archivo_compartido_id, examen_id").in("examen_id", examenIds);
+      const trazPromise = supabase.from("examen_trazabilidad")
+        .select("*").or(examenIds.map(id => `examen_id_a.eq.${id},examen_id_b.eq.${id}`).join(","));
 
-      setArchivosCompartidos(archRes.data || []);
+      if (!prestadorCache) {
+        const [archRes, vincRes, trazRes, peRes] = await Promise.all([
+          archPromise, vincPromise, trazPromise,
+          supabase.from("prestador_examenes")
+            .select("examen_id, prestador_id, prestadores(nombre, tipo)")
+            .in("examen_id", examenIds),
+        ]);
 
-      // Map archivo_compartido_id -> [examen_id]
-      const vincMap: Record<string, string[]> = {};
-      (vincRes.data || []).forEach((v: any) => {
-        if (!vincMap[v.archivo_compartido_id]) vincMap[v.archivo_compartido_id] = [];
-        vincMap[v.archivo_compartido_id].push(v.examen_id);
-      });
-      setArchivoVinculos(vincMap);
+        const peMap: Record<string, string> = {};
+        const pNames: Record<string, string> = {};
+        const pTipos: Record<string, string> = {};
+        (peRes.data || []).forEach((pe: any) => {
+          peMap[pe.examen_id] = pe.prestador_id;
+          if (pe.prestadores?.nombre) {
+            pNames[pe.prestador_id] = pe.prestadores.nombre;
+            pTipos[pe.prestador_id] = pe.prestadores.tipo || "interno";
+          }
+        });
+        setPrestadorExamenes(peMap);
+        setPrestadores(pNames);
+        setPrestadorTipos(pTipos);
 
-      // Build trazabilidad map: examen_id -> [linked_examen_ids]
-      const trazMap: Record<string, string[]> = {};
-      (trazRes.data || []).forEach((t: any) => {
-        if (!trazMap[t.examen_id_a]) trazMap[t.examen_id_a] = [];
-        if (!trazMap[t.examen_id_b]) trazMap[t.examen_id_b] = [];
-        if (!trazMap[t.examen_id_a].includes(t.examen_id_b)) trazMap[t.examen_id_a].push(t.examen_id_b);
-        if (!trazMap[t.examen_id_b].includes(t.examen_id_a)) trazMap[t.examen_id_b].push(t.examen_id_a);
-      });
-      setTrazabilidadMap(trazMap);
+        setArchivosCompartidos(archRes.data || []);
+        const vincMap: Record<string, string[]> = {};
+        (vincRes.data || []).forEach((v: any) => {
+          if (!vincMap[v.archivo_compartido_id]) vincMap[v.archivo_compartido_id] = [];
+          vincMap[v.archivo_compartido_id].push(v.examen_id);
+        });
+        setArchivoVinculos(vincMap);
+
+        const trazMap: Record<string, string[]> = {};
+        (trazRes.data || []).forEach((t: any) => {
+          if (!trazMap[t.examen_id_a]) trazMap[t.examen_id_a] = [];
+          if (!trazMap[t.examen_id_b]) trazMap[t.examen_id_b] = [];
+          if (!trazMap[t.examen_id_a].includes(t.examen_id_b)) trazMap[t.examen_id_a].push(t.examen_id_b);
+          if (!trazMap[t.examen_id_b].includes(t.examen_id_a)) trazMap[t.examen_id_b].push(t.examen_id_a);
+        });
+        setTrazabilidadMap(trazMap);
+      } else {
+        const [archRes, vincRes, trazRes] = await Promise.all([archPromise, vincPromise, trazPromise]);
+
+        setArchivosCompartidos(archRes.data || []);
+
+        const vincMap: Record<string, string[]> = {};
+        (vincRes.data || []).forEach((v: any) => {
+          if (!vincMap[v.archivo_compartido_id]) vincMap[v.archivo_compartido_id] = [];
+          vincMap[v.archivo_compartido_id].push(v.examen_id);
+        });
+        setArchivoVinculos(vincMap);
+
+        const trazMap: Record<string, string[]> = {};
+        (trazRes.data || []).forEach((t: any) => {
+          if (!trazMap[t.examen_id_a]) trazMap[t.examen_id_a] = [];
+          if (!trazMap[t.examen_id_b]) trazMap[t.examen_id_b] = [];
+          if (!trazMap[t.examen_id_a].includes(t.examen_id_b)) trazMap[t.examen_id_a].push(t.examen_id_b);
+          if (!trazMap[t.examen_id_b].includes(t.examen_id_a)) trazMap[t.examen_id_b].push(t.examen_id_a);
+        });
+        setTrazabilidadMap(trazMap);
+      }
     } catch (error) {
       console.error("Error loading prestador data:", error);
     } finally {
@@ -166,25 +195,15 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
     try {
       const newEstado = checked ? "completado" : "pendiente";
       const now = new Date().toISOString();
+      const payload = {
+        estado: newEstado,
+        fecha_realizacion: checked ? now : null,
+      };
 
-      // Update Supabase
-      const { error } = await supabase
-        .from("atencion_examenes")
-        .update({
-          estado: newEstado as any,
-          fecha_realizacion: checked ? now : null,
-        })
-        .eq("id", atencionExamenId);
-      if (error) throw error;
-
-      // Also update local IndexedDB so cache stays in sync
-      try {
-        const { localDb } = await import("@/lib/localDb");
-        await localDb.atencionExamenes.update(atencionExamenId, {
-          estado: newEstado,
-          fecha_realizacion: checked ? now : null,
-        });
-      } catch (_) { /* local db update is best-effort */ }
+      // Offline-first: update local IndexedDB + enqueue for cloud sync
+      const { localDb, addToOutbox } = await import("@/lib/localDb");
+      await localDb.atencionExamenes.update(atencionExamenId, payload);
+      await addToOutbox('atencion_examenes', 'update', atencionExamenId, payload);
 
       toast.success(checked ? "Examen marcado como completado" : "Examen desmarcado");
       onComplete?.();
@@ -334,15 +353,16 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
 
   const handleMuestraTomada = async (atencionExamenId: string) => {
     try {
-      const { error } = await supabase
-        .from("atencion_examenes")
-        .update({ estado: "muestra_tomada" as any, fecha_realizacion: new Date().toISOString() })
-        .eq("id", atencionExamenId);
+      const now = new Date().toISOString();
+      const payload = { estado: "muestra_tomada", fecha_realizacion: now };
 
-      if (error) throw error;
+      // Offline-first: update local + enqueue for cloud sync
+      const { localDb, addToOutbox } = await import("@/lib/localDb");
+      await localDb.atencionExamenes.update(atencionExamenId, payload);
+      await addToOutbox('atencion_examenes', 'update', atencionExamenId, payload);
+
       toast.success("Muestra tomada registrada");
       onComplete?.();
-      await loadPrestadorData();
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al registrar muestra tomada");
@@ -386,6 +406,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
     setSavingBulk(groupKey);
     try {
       const ids = Array.from(selected);
+      const now = new Date().toISOString();
 
       // Persistir cambios de formularios (incluye archivos cargados) antes de marcar muestra tomada
       await Promise.all(
@@ -397,16 +418,17 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
         })
       );
 
-      const { error } = await supabase
-        .from("atencion_examenes")
-        .update({ estado: "muestra_tomada" as any, fecha_realizacion: new Date().toISOString() })
-        .in("id", ids);
+      // Offline-first: update local + enqueue for cloud sync
+      const { localDb, addToOutbox } = await import("@/lib/localDb");
+      for (const id of ids) {
+        const payload = { estado: "muestra_tomada", fecha_realizacion: now };
+        await localDb.atencionExamenes.update(id, payload);
+        await addToOutbox('atencion_examenes', 'update', id, payload);
+      }
 
-      if (error) throw error;
       toast.success(`${ids.length} muestra(s) tomada(s) registrada(s)`);
       handleClearBulkSelection(groupKey);
       onComplete?.();
-      await loadPrestadorData();
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al registrar muestras tomadas");
