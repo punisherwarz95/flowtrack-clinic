@@ -35,6 +35,8 @@ export interface PrestadorCache {
   prestadorExamenes: Record<string, string>; // examen_id -> prestador_id
   prestadores: Record<string, string>; // prestador_id -> nombre
   prestadorTipos: Record<string, string>; // prestador_id -> tipo
+  trazabilidadMap: Record<string, string[]>; // examen_id -> linked examen_ids
+  antropometriaExamIds: Set<string>; // examen_ids with antropometria fields
 }
 
 interface Props {
