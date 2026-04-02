@@ -269,22 +269,47 @@ const MiBox = () => {
     const boxExamIds = cachedBox?.box_examenes?.map(be => be.examen_id) || [];
     if (boxExamIds.length === 0) return;
 
-    supabase.from("prestador_examenes")
-      .select("examen_id, prestador_id, prestadores(nombre, tipo)")
-      .in("examen_id", boxExamIds)
-      .then(({ data }) => {
-        const peMap: Record<string, string> = {};
-        const pNames: Record<string, string> = {};
-        const pTipos: Record<string, string> = {};
-        (data || []).forEach((pe: any) => {
-          peMap[pe.examen_id] = pe.prestador_id;
-          if (pe.prestadores?.nombre) {
-            pNames[pe.prestador_id] = pe.prestadores.nombre;
-            pTipos[pe.prestador_id] = pe.prestadores.tipo || "interno";
-          }
-        });
-        setPrestadorCache({ prestadorExamenes: peMap, prestadores: pNames, prestadorTipos: pTipos });
+    Promise.all([
+      supabase.from("prestador_examenes")
+        .select("examen_id, prestador_id, prestadores(nombre, tipo)")
+        .in("examen_id", boxExamIds),
+      supabase.from("examen_trazabilidad")
+        .select("*")
+        .or(boxExamIds.map(id => `examen_id_a.eq.${id},examen_id_b.eq.${id}`).join(",")),
+      supabase.from("examen_formulario_campos")
+        .select("examen_id")
+        .in("examen_id", boxExamIds)
+        .eq("tipo_campo", "antropometria"),
+    ]).then(([peRes, trazRes, antropRes]) => {
+      const peMap: Record<string, string> = {};
+      const pNames: Record<string, string> = {};
+      const pTipos: Record<string, string> = {};
+      (peRes.data || []).forEach((pe: any) => {
+        peMap[pe.examen_id] = pe.prestador_id;
+        if (pe.prestadores?.nombre) {
+          pNames[pe.prestador_id] = pe.prestadores.nombre;
+          pTipos[pe.prestador_id] = pe.prestadores.tipo || "interno";
+        }
       });
+
+      const trazMap: Record<string, string[]> = {};
+      (trazRes.data || []).forEach((t: any) => {
+        if (!trazMap[t.examen_id_a]) trazMap[t.examen_id_a] = [];
+        if (!trazMap[t.examen_id_b]) trazMap[t.examen_id_b] = [];
+        if (!trazMap[t.examen_id_a].includes(t.examen_id_b)) trazMap[t.examen_id_a].push(t.examen_id_b);
+        if (!trazMap[t.examen_id_b].includes(t.examen_id_a)) trazMap[t.examen_id_b].push(t.examen_id_a);
+      });
+
+      const antropIds = new Set((antropRes.data || []).map((d: any) => d.examen_id));
+
+      setPrestadorCache({
+        prestadorExamenes: peMap,
+        prestadores: pNames,
+        prestadorTipos: pTipos,
+        trazabilidadMap: trazMap,
+        antropometriaExamIds: antropIds,
+      });
+    });
   }, [selectedBoxId, boxes]);
 
   // loadBoxes is no longer needed - boxes come from useBoxes() cache
