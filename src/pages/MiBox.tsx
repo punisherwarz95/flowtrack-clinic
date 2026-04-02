@@ -261,6 +261,31 @@ const MiBox = () => {
     }
   }, [selectedBoxId, localData.isLoaded]);
 
+  // ── Preload prestador cache for box exams (once per box selection) ──
+  useEffect(() => {
+    if (!selectedBoxId || boxes.length === 0) return;
+    const cachedBox = boxes.find(b => b.id === selectedBoxId);
+    const boxExamIds = cachedBox?.box_examenes?.map(be => be.examen_id) || [];
+    if (boxExamIds.length === 0) return;
+
+    supabase.from("prestador_examenes")
+      .select("examen_id, prestador_id, prestadores(nombre, tipo)")
+      .in("examen_id", boxExamIds)
+      .then(({ data }) => {
+        const peMap: Record<string, string> = {};
+        const pNames: Record<string, string> = {};
+        const pTipos: Record<string, string> = {};
+        (data || []).forEach((pe: any) => {
+          peMap[pe.examen_id] = pe.prestador_id;
+          if (pe.prestadores?.nombre) {
+            pNames[pe.prestador_id] = pe.prestadores.nombre;
+            pTipos[pe.prestador_id] = pe.prestadores.tipo || "interno";
+          }
+        });
+        setPrestadorCache({ prestadorExamenes: peMap, prestadores: pNames, prestadorTipos: pTipos });
+      });
+  }, [selectedBoxId, boxes]);
+
   // loadBoxes is no longer needed - boxes come from useBoxes() cache
 
   const loadData = async () => {
