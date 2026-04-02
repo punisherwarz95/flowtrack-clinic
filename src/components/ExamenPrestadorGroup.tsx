@@ -100,31 +100,54 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
         setPrestadorTipos(prestadorCache.prestadorTipos);
       }
 
-      // Only fetch per-atencion data (archivos, vinculos, trazabilidad) + prestador if no cache
-      const queries: Promise<any>[] = [
-        supabase.from("examen_archivos_compartidos")
-          .select("*")
-          .eq("atencion_id", atencionId)
-          .order("created_at", { ascending: false }),
-        supabase.from("examen_archivo_vinculos")
-          .select("archivo_compartido_id, examen_id")
-          .in("examen_id", examenIds),
-        supabase.from("examen_trazabilidad")
-          .select("*")
-          .or(examenIds.map(id => `examen_id_a.eq.${id},examen_id_b.eq.${id}`).join(",")),
-      ];
+      // Fetch per-atencion data + prestador if no cache
+      const archPromise = supabase.from("examen_archivos_compartidos")
+        .select("*").eq("atencion_id", atencionId).order("created_at", { ascending: false });
+      const vincPromise = supabase.from("examen_archivo_vinculos")
+        .select("archivo_compartido_id, examen_id").in("examen_id", examenIds);
+      const trazPromise = supabase.from("examen_trazabilidad")
+        .select("*").or(examenIds.map(id => `examen_id_a.eq.${id},examen_id_b.eq.${id}`).join(","));
 
-      // Only fetch prestador data if no cache provided
       if (!prestadorCache) {
-        queries.push(
+        const [archRes, vincRes, trazRes, peRes] = await Promise.all([
+          archPromise, vincPromise, trazPromise,
           supabase.from("prestador_examenes")
             .select("examen_id, prestador_id, prestadores(nombre, tipo)")
-            .in("examen_id", examenIds)
-        );
-      }
+            .in("examen_id", examenIds),
+        ]);
 
-      const results = await Promise.all(queries);
-      const [archRes, vincRes, trazRes] = results;
+        const peMap: Record<string, string> = {};
+        const pNames: Record<string, string> = {};
+        const pTipos: Record<string, string> = {};
+        (peRes.data || []).forEach((pe: any) => {
+          peMap[pe.examen_id] = pe.prestador_id;
+          if (pe.prestadores?.nombre) {
+            pNames[pe.prestador_id] = pe.prestadores.nombre;
+            pTipos[pe.prestador_id] = pe.prestadores.tipo || "interno";
+          }
+        });
+        setPrestadorExamenes(peMap);
+        setPrestadores(pNames);
+        setPrestadorTipos(pTipos);
+
+        setArchivosCompartidos(archRes.data || []);
+        const vincMap: Record<string, string[]> = {};
+        (vincRes.data || []).forEach((v: any) => {
+          if (!vincMap[v.archivo_compartido_id]) vincMap[v.archivo_compartido_id] = [];
+          vincMap[v.archivo_compartido_id].push(v.examen_id);
+        });
+        setArchivoVinculos(vincMap);
+
+        const trazMap: Record<string, string[]> = {};
+        (trazRes.data || []).forEach((t: any) => {
+          if (!trazMap[t.examen_id_a]) trazMap[t.examen_id_a] = [];
+          if (!trazMap[t.examen_id_b]) trazMap[t.examen_id_b] = [];
+          if (!trazMap[t.examen_id_a].includes(t.examen_id_b)) trazMap[t.examen_id_a].push(t.examen_id_b);
+          if (!trazMap[t.examen_id_b].includes(t.examen_id_a)) trazMap[t.examen_id_b].push(t.examen_id_a);
+        });
+        setTrazabilidadMap(trazMap);
+      } else {
+        const [archRes, vincRes, trazRes] = await Promise.all([archPromise, vincPromise, trazPromise]);
 
       if (!prestadorCache && results[3]) {
         const peRes = results[3];
