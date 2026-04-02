@@ -885,7 +885,20 @@ const MiBox = () => {
                       {/* Exams grouped by prestador */}
                       <Card>
                         <CardHeader className="pb-3">
-                          <CardTitle className="text-lg">Exámenes de este Box</CardTitle>
+                          <CardTitle className="text-lg flex items-center gap-2">
+                            Exámenes de este Box
+                            {(() => {
+                              const exams = atencionExamenes[selectedAtencion.id] || [];
+                              const done = exams.filter(e => e.estado === "completado" || e.estado === "muestra_tomada").length;
+                              const total = exams.length;
+                              if (total === 0) return null;
+                              return (
+                                <Badge variant={done === total ? "secondary" : "outline"}>
+                                  {done}/{total} realizados
+                                </Badge>
+                              );
+                            })()}
+                          </CardTitle>
                         </CardHeader>
                         <CardContent>
                           <ExamenPrestadorGroup
