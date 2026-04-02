@@ -651,6 +651,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
         const completedCount = group.examenes.filter(e => e.estado === "completado").length;
         const totalCount = group.examenes.length;
         const allCompleted = completedCount === totalCount;
+        const hasAntroExams = group.examenes.some(e => antropometriaExamIds.has(e.examen_id));
 
         return (
           <Card key={groupKey} className="overflow-hidden">
@@ -875,8 +876,8 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
                     })
                   )}
 
-                  {/* Global save button per group - hide for workmed */}
-                  {!isWorkmed && (
+                  {/* Global save button per group */}
+                  {(!isWorkmed || hasAntroExams) && (
                     <div className="flex justify-end pt-1">
                       <Button
                         size="sm"
