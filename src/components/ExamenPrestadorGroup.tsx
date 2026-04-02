@@ -103,53 +103,60 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
       const examenIds = atencionExamenes.map(ae => ae.examen_id);
       if (examenIds.length === 0) { setLoading(false); return; }
 
-      // Use pre-loaded cache for prestador mappings if available
+      // Use pre-loaded cache for prestador mappings + trazabilidad + antropometria
       if (prestadorCache) {
         setPrestadorExamenes(prestadorCache.prestadorExamenes);
         setPrestadores(prestadorCache.prestadores);
         setPrestadorTipos(prestadorCache.prestadorTipos);
-      }
+        setTrazabilidadMap(prestadorCache.trazabilidadMap);
+        setAntropometriaExamIds(prestadorCache.antropometriaExamIds);
 
-      // Trazabilidad only changes per box (same examen set), cache it
-      const trazKey = examenIds.slice().sort().join(",");
-      const trazAlreadyCached = trazKey === trazCacheKeyRef.current;
+        // Only fetch per-patient data (archivos) in background - no spinner
+        const [archRes, vincRes] = await Promise.all([
+          supabase.from("examen_archivos_compartidos")
+            .select("*").eq("atencion_id", atencionId).order("created_at", { ascending: false }),
+          supabase.from("examen_archivo_vinculos")
+            .select("archivo_compartido_id, examen_id").in("examen_id", examenIds),
+        ]);
 
-      // Fetch per-atencion data (archivos/vinculos change per patient)
-      const archPromise = supabase.from("examen_archivos_compartidos")
-        .select("*").eq("atencion_id", atencionId).order("created_at", { ascending: false }).then(r => r);
-      const vincPromise = supabase.from("examen_archivo_vinculos")
-        .select("archivo_compartido_id, examen_id").in("examen_id", examenIds).then(r => r);
+        setArchivosCompartidos(archRes.data || []);
+        const vincMap: Record<string, string[]> = {};
+        (vincRes.data || []).forEach((v: any) => {
+          if (!vincMap[v.archivo_compartido_id]) vincMap[v.archivo_compartido_id] = [];
+          vincMap[v.archivo_compartido_id].push(v.examen_id);
+        });
+        setArchivoVinculos(vincMap);
+      } else {
+        // No cache: fetch everything from cloud
+        const trazKey = examenIds.slice().sort().join(",");
+        const trazAlreadyCached = trazKey === trazCacheKeyRef.current;
 
-      if (!prestadorCache) {
-        const promises: PromiseLike<any>[] = [archPromise, vincPromise];
+        const promises: PromiseLike<any>[] = [
+          supabase.from("examen_archivos_compartidos")
+            .select("*").eq("atencion_id", atencionId).order("created_at", { ascending: false }),
+          supabase.from("examen_archivo_vinculos")
+            .select("archivo_compartido_id, examen_id").in("examen_id", examenIds),
+          supabase.from("prestador_examenes")
+            .select("examen_id, prestador_id, prestadores(nombre, tipo)")
+            .in("examen_id", examenIds),
+        ];
         if (!trazAlreadyCached) {
           promises.push(supabase.from("examen_trazabilidad")
-            .select("*").or(examenIds.map(id => `examen_id_a.eq.${id},examen_id_b.eq.${id}`).join(",")).then(r => r));
+            .select("*").or(examenIds.map(id => `examen_id_a.eq.${id},examen_id_b.eq.${id}`).join(",")));
         }
-        promises.push(supabase.from("prestador_examenes")
-          .select("examen_id, prestador_id, prestadores(nombre, tipo)")
-          .in("examen_id", examenIds).then(r => r));
 
         const results = await Promise.all(promises);
-        const archRes = results[0];
-        const vincRes = results[1];
-        let trazIdx = 2;
         
-        if (!trazAlreadyCached) {
-          const trazRes = results[trazIdx];
-          trazIdx++;
-          const trazMap: Record<string, string[]> = {};
-          (trazRes.data || []).forEach((t: any) => {
-            if (!trazMap[t.examen_id_a]) trazMap[t.examen_id_a] = [];
-            if (!trazMap[t.examen_id_b]) trazMap[t.examen_id_b] = [];
-            if (!trazMap[t.examen_id_a].includes(t.examen_id_b)) trazMap[t.examen_id_a].push(t.examen_id_b);
-            if (!trazMap[t.examen_id_b].includes(t.examen_id_a)) trazMap[t.examen_id_b].push(t.examen_id_a);
-          });
-          setTrazabilidadMap(trazMap);
-          trazCacheKeyRef.current = trazKey;
-        }
+        setArchivosCompartidos(results[0].data || []);
+        
+        const vincMap: Record<string, string[]> = {};
+        (results[1].data || []).forEach((v: any) => {
+          if (!vincMap[v.archivo_compartido_id]) vincMap[v.archivo_compartido_id] = [];
+          vincMap[v.archivo_compartido_id].push(v.examen_id);
+        });
+        setArchivoVinculos(vincMap);
 
-        const peRes = results[trazIdx];
+        const peRes = results[2];
         const peMap: Record<string, string> = {};
         const pNames: Record<string, string> = {};
         const pTipos: Record<string, string> = {};
@@ -164,34 +171,9 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
         setPrestadores(pNames);
         setPrestadorTipos(pTipos);
 
-        setArchivosCompartidos(archRes.data || []);
-        const vincMap: Record<string, string[]> = {};
-        (vincRes.data || []).forEach((v: any) => {
-          if (!vincMap[v.archivo_compartido_id]) vincMap[v.archivo_compartido_id] = [];
-          vincMap[v.archivo_compartido_id].push(v.examen_id);
-        });
-        setArchivoVinculos(vincMap);
-      } else {
-        // With prestador cache, only fetch archivos, vinculos, and trazabilidad if needed
-        const promises: PromiseLike<any>[] = [archPromise, vincPromise];
-        if (!trazAlreadyCached) {
-          promises.push(supabase.from("examen_trazabilidad")
-            .select("*").or(examenIds.map(id => `examen_id_a.eq.${id},examen_id_b.eq.${id}`).join(",")).then(r => r));
-        }
-
-        const results = await Promise.all(promises);
-        setArchivosCompartidos(results[0].data || []);
-
-        const vincMap: Record<string, string[]> = {};
-        (results[1].data || []).forEach((v: any) => {
-          if (!vincMap[v.archivo_compartido_id]) vincMap[v.archivo_compartido_id] = [];
-          vincMap[v.archivo_compartido_id].push(v.examen_id);
-        });
-        setArchivoVinculos(vincMap);
-
-        if (!trazAlreadyCached && results[2]) {
+        if (!trazAlreadyCached && results[3]) {
           const trazMap: Record<string, string[]> = {};
-          (results[2].data || []).forEach((t: any) => {
+          (results[3].data || []).forEach((t: any) => {
             if (!trazMap[t.examen_id_a]) trazMap[t.examen_id_a] = [];
             if (!trazMap[t.examen_id_b]) trazMap[t.examen_id_b] = [];
             if (!trazMap[t.examen_id_a].includes(t.examen_id_b)) trazMap[t.examen_id_a].push(t.examen_id_b);
@@ -208,9 +190,9 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
     }
   };
 
-  // For workmed: load which exams have antropometria fields
+  // For workmed: use cached antropometria if available, otherwise fetch
   useEffect(() => {
-    if (!isWorkmed) return;
+    if (!isWorkmed || prestadorCache) return;
     const examenIds = atencionExamenes.map(ae => ae.examen_id);
     if (examenIds.length === 0) return;
     supabase
@@ -221,7 +203,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
       .then(({ data }) => {
         setAntropometriaExamIds(new Set((data || []).map((d: any) => d.examen_id)));
       });
-  }, [isWorkmed, atencionExamenes]);
+  }, [isWorkmed, atencionExamenes, prestadorCache]);
 
   // Workmed quick-complete: mark exam as completado with a checkbox
   const handleWorkmedComplete = async (atencionExamenId: string, checked: boolean) => {
