@@ -135,7 +135,8 @@ const MiBox = () => {
     const cachedBox = boxes.find(b => b.id === selectedBoxId);
     const boxExamIds = cachedBox?.box_examenes?.map(be => be.examen_id) || [];
 
-    // En atencion: assigned to this box
+    // En atencion: assigned to this box AND still actually en_atencion
+    // (filter out patients already released locally via completarAtencionMiBox)
     const enAtencionLocal = localData.atenciones
       .filter(a => a.estado === 'en_atencion' && a.box_id === selectedBoxId)
       .sort((a, b) => (a.numero_ingreso || 0) - (b.numero_ingreso || 0))
