@@ -377,6 +377,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
     setSavingBulk(groupKey);
     try {
       const ids = Array.from(selected);
+      const now = new Date().toISOString();
 
       // Persistir cambios de formularios (incluye archivos cargados) antes de marcar muestra tomada
       await Promise.all(
@@ -388,16 +389,17 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
         })
       );
 
-      const { error } = await supabase
-        .from("atencion_examenes")
-        .update({ estado: "muestra_tomada" as any, fecha_realizacion: new Date().toISOString() })
-        .in("id", ids);
+      // Offline-first: update local + enqueue for cloud sync
+      const { localDb, addToOutbox } = await import("@/lib/localDb");
+      for (const id of ids) {
+        const payload = { estado: "muestra_tomada", fecha_realizacion: now };
+        await localDb.atencionExamenes.update(id, payload);
+        await addToOutbox('atencion_examenes', 'update', id, payload);
+      }
 
-      if (error) throw error;
       toast.success(`${ids.length} muestra(s) tomada(s) registrada(s)`);
       handleClearBulkSelection(groupKey);
       onComplete?.();
-      await loadPrestadorData();
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al registrar muestras tomadas");
