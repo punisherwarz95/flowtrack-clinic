@@ -74,7 +74,9 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
   const [savingBulk, setSavingBulk] = useState<string | null>(null);
 
   // Workmed: track exams that have antropometria fields (keep full form for those)
-  const [antropometriaExamIds, setAntropometriaExamIds] = useState<Set<string>>(new Set());
+  const [antropometriaExamIds, setAntropometriaExamIds] = useState<Set<string>>(
+    prestadorCache?.antropometriaExamIds || new Set()
+  );
   const [workmedCompleting, setWorkmedCompleting] = useState<string | null>(null);
   const isWorkmed = tipoServicio === "workmed";
 
