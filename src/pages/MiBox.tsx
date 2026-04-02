@@ -23,7 +23,7 @@ import { useAtencionDocumentos } from "@/hooks/useAtencionDocumentos";
 import { usePresionTimers } from "@/hooks/usePresionTimers";
 import { DocumentoFormViewer, DocumentoContextData } from "@/components/DocumentoFormViewer";
 import ExamenResultadosOtrosBoxes from "@/components/ExamenResultadosOtrosBoxes";
-import ExamenPrestadorGroup from "@/components/ExamenPrestadorGroup";
+import ExamenPrestadorGroup, { type PrestadorCache } from "@/components/ExamenPrestadorGroup";
 import PresionTimerBadge from "@/components/PresionTimerBadge";
 import PresionRetakeForm from "@/components/PresionRetakeForm";
 import { useBoxes } from "@/hooks/useReferenceData";
