@@ -31,12 +31,19 @@ interface ArchivoCompartido {
   created_at: string;
 }
 
+export interface PrestadorCache {
+  prestadorExamenes: Record<string, string>; // examen_id -> prestador_id
+  prestadores: Record<string, string>; // prestador_id -> nombre
+  prestadorTipos: Record<string, string>; // prestador_id -> tipo
+}
+
 interface Props {
   atencionId: string;
   atencionExamenes: AtencionExamen[];
   onComplete?: () => void;
   fechaNacimiento?: string | null;
   tipoServicio?: string;
+  prestadorCache?: PrestadorCache | null;
 }
 
 const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaNacimiento, tipoServicio }: Props) => {
