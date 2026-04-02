@@ -572,9 +572,22 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
 
     // Workmed: simplified view
     if (isWorkmed) {
+      const hasAntroExams = flatGroup.examenes.some(e => antropometriaExamIds.has(e.examen_id));
       return (
         <div className="space-y-2">
           {flatGroup.examenes.map(renderWorkmedCheckbox)}
+          {hasAntroExams && (
+            <div className="flex justify-end pt-2">
+              <Button
+                onClick={() => handleSaveGroup(flatGroupKey, flatGroup.examenes)}
+                disabled={savingGroup === flatGroupKey}
+                className="gap-2"
+              >
+                {savingGroup === flatGroupKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Guardar Todo
+              </Button>
+            </div>
+          )}
         </div>
       );
     }
