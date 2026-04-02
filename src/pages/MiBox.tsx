@@ -788,16 +788,26 @@ const MiBox = () => {
                 {/* Patient selector if multiple in atencion */}
                 {pacientesEnAtencion.length > 1 && (
                   <div className="flex gap-2 flex-wrap">
-                    {pacientesEnAtencion.map((p) => (
-                      <Button
-                        key={p.id}
-                        variant={selectedAtencion?.id === p.id ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => { setSelectedAtencion(p); setExpandedExamen(null); }}
-                      >
-                        #{p.numero_ingreso} {p.pacientes.nombre}
-                      </Button>
-                    ))}
+                    {pacientesEnAtencion.map((p) => {
+                      const exams = atencionExamenes[p.id] || [];
+                      const done = exams.filter(e => e.estado === "completado" || e.estado === "muestra_tomada").length;
+                      const total = exams.length;
+                      return (
+                        <Button
+                          key={p.id}
+                          variant={selectedAtencion?.id === p.id ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => { setSelectedAtencion(p); setExpandedExamen(null); }}
+                        >
+                          #{p.numero_ingreso} {p.pacientes.nombre}
+                          {total > 0 && (
+                            <Badge variant={done === total ? "secondary" : "outline"} className="ml-2 text-xs">
+                              {done}/{total}
+                            </Badge>
+                          )}
+                        </Button>
+                      );
+                    })}
                   </div>
                 )}
 
