@@ -83,7 +83,7 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
   // Trazabilidad cache: keyed by sorted examen IDs (same for all patients in same box)
   const trazCacheKeyRef = useRef<string>("");
 
-  // Only reload prestador data when atencionId changes or examen IDs actually change
+  // Only reload data when atencionId changes or examen IDs actually change
   useEffect(() => {
     const examenIdsKey = atencionExamenes.map(ae => ae.id).sort().join(",");
     const isNewAtencion = atencionId !== prevAtencionIdRef.current;
@@ -92,7 +92,8 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
     if (isNewAtencion || examenesChanged) {
       prevAtencionIdRef.current = atencionId;
       prevExamenIdsRef.current = examenIdsKey;
-      loadPrestadorData(isNewAtencion);
+      // Only show loading spinner on first load (no cache yet)
+      loadPrestadorData(!prestadorCache);
     }
   }, [atencionId, atencionExamenes]);
 
