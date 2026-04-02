@@ -55,7 +55,9 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
   const [archivosCompartidos, setArchivosCompartidos] = useState<ArchivoCompartido[]>([]);
   const [archivoVinculos, setArchivoVinculos] = useState<Record<string, string[]>>({});
   const [expandedExamen, setExpandedExamen] = useState<string | null>(null);
-  const [trazabilidadMap, setTrazabilidadMap] = useState<Record<string, string[]>>({});
+  const [trazabilidadMap, setTrazabilidadMap] = useState<Record<string, string[]>>(
+    prestadorCache?.trazabilidadMap || {}
+  );
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
   const [dragOverGroup, setDragOverGroup] = useState<string | null>(null);
