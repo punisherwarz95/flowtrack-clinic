@@ -94,6 +94,7 @@ const MiBox = () => {
   const [confirmCompletarDialog, setConfirmCompletarDialog] = useState<{ open: boolean; atencionId: string | null }>({ open: false, atencionId: null });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showErrorOverlay, setShowErrorOverlay] = useState(false);
+  const [prestadorCache, setPrestadorCache] = useState<PrestadorCache | null>(null);
 
   // Paciente seleccionado para atención
   const [selectedAtencion, setSelectedAtencion] = useState<Atencion | null>(null);
