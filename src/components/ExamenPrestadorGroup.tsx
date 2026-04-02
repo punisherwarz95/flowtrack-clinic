@@ -165,14 +165,27 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
     setWorkmedCompleting(atencionExamenId);
     try {
       const newEstado = checked ? "completado" : "pendiente";
+      const now = new Date().toISOString();
+
+      // Update Supabase
       const { error } = await supabase
         .from("atencion_examenes")
         .update({
           estado: newEstado as any,
-          fecha_realizacion: checked ? new Date().toISOString() : null,
+          fecha_realizacion: checked ? now : null,
         })
         .eq("id", atencionExamenId);
       if (error) throw error;
+
+      // Also update local IndexedDB so cache stays in sync
+      try {
+        const { localDb } = await import("@/lib/localDb");
+        await localDb.atencionExamenes.update(atencionExamenId, {
+          estado: newEstado,
+          fecha_realizacion: checked ? now : null,
+        });
+      } catch (_) { /* local db update is best-effort */ }
+
       toast.success(checked ? "Examen marcado como completado" : "Examen desmarcado");
       onComplete?.();
     } catch (error) {
