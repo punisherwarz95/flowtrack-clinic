@@ -93,11 +93,15 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
       const examenIds = atencionExamenes.map(ae => ae.examen_id);
       if (examenIds.length === 0) { setLoading(false); return; }
 
-      // Fetch prestador_examenes + shared files + vinculos + trazabilidad in parallel
-      const [peRes, archRes, vincRes, trazRes] = await Promise.all([
-        supabase.from("prestador_examenes")
-          .select("examen_id, prestador_id, prestadores(nombre, tipo)")
-          .in("examen_id", examenIds),
+      // Use pre-loaded cache for prestador mappings if available
+      if (prestadorCache) {
+        setPrestadorExamenes(prestadorCache.prestadorExamenes);
+        setPrestadores(prestadorCache.prestadores);
+        setPrestadorTipos(prestadorCache.prestadorTipos);
+      }
+
+      // Only fetch per-atencion data (archivos, vinculos, trazabilidad) + prestador if no cache
+      const queries: Promise<any>[] = [
         supabase.from("examen_archivos_compartidos")
           .select("*")
           .eq("atencion_id", atencionId)
@@ -105,30 +109,42 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
         supabase.from("examen_archivo_vinculos")
           .select("archivo_compartido_id, examen_id")
           .in("examen_id", examenIds),
-        // Load trazabilidad links for all exams in this atencion
         supabase.from("examen_trazabilidad")
           .select("*")
           .or(examenIds.map(id => `examen_id_a.eq.${id},examen_id_b.eq.${id}`).join(",")),
-      ]);
+      ];
 
-      // Map examen_id -> prestador_id
-      const peMap: Record<string, string> = {};
-      const pNames: Record<string, string> = {};
-      const pTipos: Record<string, string> = {};
-      (peRes.data || []).forEach((pe: any) => {
-        peMap[pe.examen_id] = pe.prestador_id;
-        if (pe.prestadores?.nombre) {
-          pNames[pe.prestador_id] = pe.prestadores.nombre;
-          pTipos[pe.prestador_id] = pe.prestadores.tipo || "interno";
-        }
-      });
-      setPrestadorExamenes(peMap);
-      setPrestadores(pNames);
-      setPrestadorTipos(pTipos);
+      // Only fetch prestador data if no cache provided
+      if (!prestadorCache) {
+        queries.push(
+          supabase.from("prestador_examenes")
+            .select("examen_id, prestador_id, prestadores(nombre, tipo)")
+            .in("examen_id", examenIds)
+        );
+      }
+
+      const results = await Promise.all(queries);
+      const [archRes, vincRes, trazRes] = results;
+
+      if (!prestadorCache && results[3]) {
+        const peRes = results[3];
+        const peMap: Record<string, string> = {};
+        const pNames: Record<string, string> = {};
+        const pTipos: Record<string, string> = {};
+        (peRes.data || []).forEach((pe: any) => {
+          peMap[pe.examen_id] = pe.prestador_id;
+          if (pe.prestadores?.nombre) {
+            pNames[pe.prestador_id] = pe.prestadores.nombre;
+            pTipos[pe.prestador_id] = pe.prestadores.tipo || "interno";
+          }
+        });
+        setPrestadorExamenes(peMap);
+        setPrestadores(pNames);
+        setPrestadorTipos(pTipos);
+      }
 
       setArchivosCompartidos(archRes.data || []);
 
-      // Map archivo_compartido_id -> [examen_id]
       const vincMap: Record<string, string[]> = {};
       (vincRes.data || []).forEach((v: any) => {
         if (!vincMap[v.archivo_compartido_id]) vincMap[v.archivo_compartido_id] = [];
@@ -136,7 +152,6 @@ const ExamenPrestadorGroup = ({ atencionId, atencionExamenes, onComplete, fechaN
       });
       setArchivoVinculos(vincMap);
 
-      // Build trazabilidad map: examen_id -> [linked_examen_ids]
       const trazMap: Record<string, string[]> = {};
       (trazRes.data || []).forEach((t: any) => {
         if (!trazMap[t.examen_id_a]) trazMap[t.examen_id_a] = [];
