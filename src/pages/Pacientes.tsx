@@ -518,7 +518,7 @@ const Pacientes = () => {
       const atencion = localAtenciones.find(a => a.paciente_id === patient.id);
       if (atencion) {
         const exams = localAtencionExamenes
-          .filter(ae => ae.atencion_id === atencion.id && ae.estado === 'pendiente')
+          .filter(ae => ae.atencion_id === atencion.id)
           .map(ae => ae.examen_id);
         const docs = localAtencionDocumentos
           .filter(d => d.atencion_id === atencion.id)

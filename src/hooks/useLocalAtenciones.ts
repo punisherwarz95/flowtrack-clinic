@@ -125,9 +125,7 @@ export function useLocalAtenciones() {
     });
 
     const remaining = projectedExamenes.filter(
-      ae => ae.atencion_id === atencionId &&
-        (ae.estado === 'pendiente' || ae.estado === 'incompleto') &&
-        !(estado === 'completado' && boxExamIds.includes(ae.examen_id)),
+      ae => ae.estado === 'pendiente' || ae.estado === 'incompleto',
     );
 
     if (remaining.length > 0) {
