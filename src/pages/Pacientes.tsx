@@ -219,7 +219,7 @@ const Pacientes = () => {
   useEffect(() => {
     if (isToday && localDataLoaded) {
       // Use local IndexedDB data for today (instant)
-      const activeAtenciones = localAtenciones.filter(a => a.estado !== 'completado' && a.estado !== 'incompleto' || true);
+      const activeAtenciones = localAtenciones; // Show all patients of the day
       const patientMap = new Map<string, Patient>();
       activeAtenciones.forEach(a => {
         if (!patientMap.has(a.paciente_id)) {
