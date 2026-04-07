@@ -153,13 +153,18 @@ export function useLocalSync() {
         
         // Only put records that changed AND don't have pending outbox ops
         const existingAtencionMap = new Map(existingAtenciones.map(a => [a.id, a]));
-        const changedAtenciones = atenciones.filter(a => {
+      const changedAtenciones = atenciones.filter(a => {
           if (pendingAtencionIds.has(a.id)) return false; // Don't overwrite pending local changes
           const existing = existingAtencionMap.get(a.id);
           if (!existing) return true;
           return existing.estado !== a.estado || existing.box_id !== a.box_id || 
                  existing.estado_ficha !== a.estado_ficha || existing.observaciones !== a.observaciones ||
-                 existing.fecha_inicio_atencion !== a.fecha_inicio_atencion || existing.fecha_fin_atencion !== a.fecha_fin_atencion;
+                 existing.fecha_inicio_atencion !== a.fecha_inicio_atencion || existing.fecha_fin_atencion !== a.fecha_fin_atencion ||
+                 existing.paciente_nombre !== a.paciente_nombre || existing.paciente_rut !== a.paciente_rut ||
+                 existing.paciente_tipo_servicio !== a.paciente_tipo_servicio || existing.paciente_empresa_id !== a.paciente_empresa_id ||
+                 existing.paciente_empresa_nombre !== a.paciente_empresa_nombre ||
+                 existing.paciente_fecha_nacimiento !== a.paciente_fecha_nacimiento ||
+                 existing.paciente_email !== a.paciente_email || existing.paciente_telefono !== a.paciente_telefono;
         });
         if (changedAtenciones.length > 0) await localDb.atenciones.bulkPut(changedAtenciones);
 
