@@ -274,3 +274,71 @@ export const usePrestadorExamenesMap = () => {
     gcTime: GC_TIME,
   });
 };
+
+export const useEmpresaFaenas = () => {
+  return useQuery({
+    queryKey: ["reference", "empresa_faenas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("empresa_faenas")
+        .select("id, empresa_id, faena_id, activo")
+        .eq("activo", true);
+      if (error) throw error;
+      return (data || []) as CachedEmpresaFaena[];
+    },
+    staleTime: STALE_TIME,
+    gcTime: GC_TIME,
+  });
+};
+
+export const useFaenaExamenes = () => {
+  return useQuery({
+    queryKey: ["reference", "faena_examenes"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("faena_examenes")
+        .select("id, faena_id, examen_id, valor_venta, activo")
+        .eq("activo", true);
+      if (error) throw error;
+      return (data || []) as CachedFaenaExamen[];
+    },
+    staleTime: STALE_TIME,
+    gcTime: GC_TIME,
+  });
+};
+
+export const useDocumentosFormularios = () => {
+  return useQuery({
+    queryKey: ["reference", "documentos_formularios"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("documentos_formularios")
+        .select("id, nombre, descripcion, tipo, activo")
+        .eq("activo", true)
+        .order("nombre");
+      if (error) throw error;
+      return (data || []) as CachedDocumentoFormulario[];
+    },
+    staleTime: STALE_TIME,
+    gcTime: GC_TIME,
+  });
+};
+
+export const usePrestadorExamenesMap = () => {
+  return useQuery({
+    queryKey: ["reference", "prestador_examenes_map"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("prestador_examenes")
+        .select("examen_id, prestadores(nombre)");
+      if (error) throw error;
+      const map = new Map<string, string>();
+      (data || []).forEach((pe: any) => {
+        map.set(pe.examen_id, pe.prestadores?.nombre || "Sin Prestador");
+      });
+      return map;
+    },
+    staleTime: STALE_TIME,
+    gcTime: GC_TIME,
+  });
+};
