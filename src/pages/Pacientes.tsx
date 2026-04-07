@@ -618,8 +618,10 @@ const Pacientes = () => {
 
         // Buscar atención del día (cualquier estado)
         const dateToUse = selectedDate || new Date();
-        const startOfDay = new Date(dateToUse.setHours(0, 0, 0, 0)).toISOString();
-        const endOfDay = new Date(dateToUse.setHours(23, 59, 59, 999)).toISOString();
+        const startCopy = new Date(dateToUse);
+        const endCopy = new Date(dateToUse);
+        const startOfDay = new Date(startCopy.setHours(0, 0, 0, 0)).toISOString();
+        const endOfDay = new Date(endCopy.setHours(23, 59, 59, 999)).toISOString();
 
         const { data: atencionData, error: atencionError } = await supabase
           .from("atenciones")
