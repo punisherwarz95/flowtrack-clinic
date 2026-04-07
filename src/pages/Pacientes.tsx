@@ -334,38 +334,18 @@ const Pacientes = () => {
     }
   };
 
-  // Real-time updates for atenciones table
+  // Real-time updates — only trigger cloud reload for non-today dates
   useEffect(() => {
+    if (isToday) return; // Local cache handles today via SyncContext
+
     const channel = supabase
       .channel('pacientes-atenciones-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'atenciones'
-        },
-        () => {
-          loadPatients();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'pacientes'
-        },
-        () => {
-          loadPatients();
-        }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'atenciones' }, () => loadPatients())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pacientes' }, () => loadPatients())
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [selectedDate]);
+    return () => { supabase.removeChannel(channel); };
+  }, [selectedDate, isToday]);
 
   const loadPatients = async () => {
     try {
