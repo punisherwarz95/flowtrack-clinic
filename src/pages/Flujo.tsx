@@ -372,11 +372,9 @@ const Flujo = () => {
       boxesRef.current = currentBoxes;
       examenesRef.current = currentExamenes;
 
-      // Cargar datos optimizados en paralelo (v0.0.1)
+      // Cargar datos optimizados en paralelo (consolidated single query)
       await Promise.all([
-        loadPendingBoxesOptimized(atencionesRes.data || [], currentBoxes),
-        loadAtencionExamenesOptimized(atencionesRes.data || [], currentBoxes),
-        loadExamenesPendientesOptimized(atencionesRes.data || [], currentExamenes),
+        loadAllExamDataOptimized(atencionesRes.data || [], currentBoxes, currentExamenes),
         loadDocsPendientesCount(atencionesRes.data || []),
         loadTotalExamenesPorAtencion(atencionesRes.data || [])
       ]);
