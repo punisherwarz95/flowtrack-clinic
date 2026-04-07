@@ -24,6 +24,8 @@ export interface LocalAtencion {
   paciente_direccion?: string | null;
   paciente_empresa_id?: string | null;
   paciente_empresa_nombre?: string | null;
+  paciente_faena_id?: string | null;
+  paciente_cargo?: string | null;
   box_nombre?: string | null;
 }
 
