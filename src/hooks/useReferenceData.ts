@@ -324,21 +324,3 @@ export const useDocumentosFormularios = () => {
   });
 };
 
-export const usePrestadorExamenesMap = () => {
-  return useQuery({
-    queryKey: ["reference", "prestador_examenes_map"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("prestador_examenes")
-        .select("examen_id, prestadores(nombre)");
-      if (error) throw error;
-      const map = new Map<string, string>();
-      (data || []).forEach((pe: any) => {
-        map.set(pe.examen_id, pe.prestadores?.nombre || "Sin Prestador");
-      });
-      return map;
-    },
-    staleTime: STALE_TIME,
-    gcTime: GC_TIME,
-  });
-};
