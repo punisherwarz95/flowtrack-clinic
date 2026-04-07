@@ -286,32 +286,7 @@ const Pacientes = () => {
     if (!isToday) loadPatients();
   }, [selectedDate, isToday]);
 
-  // Cargar todas las faenas y mapeo bateria-faena
-  const loadAllFaenasAndBateriaFaenas = async () => {
-    try {
-      const [faenasRes, bateriaFaenasRes] = await Promise.all([
-        supabase.from("faenas").select("id, nombre, direccion").eq("activo", true).order("nombre"),
-        supabase.from("bateria_faenas").select("paquete_id, faena_id").eq("activo", true)
-      ]);
-
-      if (faenasRes.error) throw faenasRes.error;
-      if (bateriaFaenasRes.error) throw bateriaFaenasRes.error;
-
-      setAllFaenas(faenasRes.data || []);
-
-      // Crear mapa de paquete -> faenas
-      const map: PaqueteFaenaMap = {};
-      (bateriaFaenasRes.data || []).forEach((bf: any) => {
-        if (!map[bf.paquete_id]) {
-          map[bf.paquete_id] = [];
-        }
-        map[bf.paquete_id].push(bf.faena_id);
-      });
-      setPaqueteFaenasMap(map);
-    } catch (error) {
-      console.error("Error loading faenas and bateria_faenas:", error);
-    }
-  };
+  // loadAllFaenasAndBateriaFaenas removed — data comes from cache hooks
 
   // Load document counts for patients
   const loadDocumentCounts = async (patientIds: string[]) => {
