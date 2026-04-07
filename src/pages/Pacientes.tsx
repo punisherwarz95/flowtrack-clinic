@@ -233,7 +233,7 @@ const Pacientes = () => {
             direccion: a.paciente_direccion || null,
             tipo_servicio: (a.paciente_tipo_servicio as 'workmed' | 'jenner') || null,
             empresa_id: a.paciente_empresa_id || null,
-            faena_id: null, // will be enriched below
+            faena_id: a.paciente_faena_id || null,
             empresas: a.paciente_empresa_nombre ? { id: a.paciente_empresa_id || '', nombre: a.paciente_empresa_nombre } : null,
             atencion_actual: {
               numero_ingreso: a.numero_ingreso || 0,
