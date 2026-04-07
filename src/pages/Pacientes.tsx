@@ -806,7 +806,7 @@ const Pacientes = () => {
 
         // Write exam records to local
         const examRecords = selectedExamenes.map(examenId => {
-          const localExamen = localExamenesRef.find(e => e.id === examenId);
+          const localExamen = examenes.find(e => e.id === examenId);
           return {
             id: crypto.randomUUID(),
             atencion_id: atencionId,
