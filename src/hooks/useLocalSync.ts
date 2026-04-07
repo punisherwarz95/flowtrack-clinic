@@ -89,6 +89,8 @@ export function useLocalSync() {
         paciente_direccion: a.pacientes?.direccion,
         paciente_empresa_id: a.pacientes?.empresa_id,
         paciente_empresa_nombre: a.pacientes?.empresas?.nombre,
+        paciente_faena_id: a.pacientes?.faena_id,
+        paciente_cargo: a.pacientes?.cargo,
         box_nombre: a.boxes?.nombre,
       }));
 
