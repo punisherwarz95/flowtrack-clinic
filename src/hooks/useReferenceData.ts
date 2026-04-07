@@ -55,6 +55,29 @@ export interface CachedBateriaFaena {
   activo: boolean | null;
 }
 
+export interface CachedEmpresaFaena {
+  id: string;
+  empresa_id: string;
+  faena_id: string;
+  activo: boolean | null;
+}
+
+export interface CachedFaenaExamen {
+  id: string;
+  faena_id: string;
+  examen_id: string;
+  valor_venta: number;
+  activo: boolean | null;
+}
+
+export interface CachedDocumentoFormulario {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  tipo: string;
+  activo: boolean;
+}
+
 // ── Helper: get initial data from IndexedDB ─────────────────────────────
 async function getLocalBoxes(): Promise<CachedBox[] | undefined> {
   try {
