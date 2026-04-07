@@ -173,6 +173,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => {
       isMounted = false;
+      permsFetchRef.current = null;
       window.clearTimeout(loadingFailsafe);
       subscription.unsubscribe();
     };
