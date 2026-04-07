@@ -15,6 +15,9 @@ import AudiometriaForm from "@/components/AudiometriaForm";
 import AntropometriaForm from "@/components/AntropometriaForm";
 import CuestionarioRenderer from "@/components/CuestionarioRenderer";
 
+// In-memory cache for campo definitions (per examen, not per patient)
+const camposCache = new Map<string, CampoFormulario[]>();
+
 interface CampoFormulario {
   id: string;
   etiqueta: string;
