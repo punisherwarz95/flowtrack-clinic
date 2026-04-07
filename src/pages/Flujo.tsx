@@ -292,11 +292,7 @@ const Flujo = () => {
   // Re-run dependent calculations when cached reference data arrives
   useEffect(() => {
     if (boxes.length > 0 && examenes.length > 0 && atencionesRef.current.length > 0) {
-      Promise.all([
-        loadPendingBoxesOptimized(atencionesRef.current, boxes),
-        loadAtencionExamenesOptimized(atencionesRef.current, boxes),
-        loadExamenesPendientesOptimized(atencionesRef.current, examenes),
-      ]);
+      loadAllExamDataOptimized(atencionesRef.current, boxes, examenes);
     }
   }, [boxes, examenes]);
 
