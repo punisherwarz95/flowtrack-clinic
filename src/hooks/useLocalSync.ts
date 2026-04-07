@@ -23,7 +23,7 @@ export interface SyncState {
   isSyncing: boolean;
 }
 
-export function useLocalSync() {
+export function useLocalSync(enabled = true) {
   const [syncState, setSyncState] = useState<SyncState>({
     isOnline: navigator.onLine,
     pendingOps: 0,
@@ -49,7 +49,7 @@ export function useLocalSync() {
 
   // ── Pull: download today's data from cloud ───────────────────────────
   const pullData = useCallback(async () => {
-    if (pullInProgress.current || !navigator.onLine) return;
+    if (!enabled || pullInProgress.current || !navigator.onLine) return;
     pullInProgress.current = true;
     setSyncState(s => ({ ...s, isSyncing: true }));
 
@@ -219,11 +219,11 @@ export function useLocalSync() {
     } finally {
       pullInProgress.current = false;
     }
-  }, []);
+  }, [enabled]);
 
   // ── Pull reference data (runs once on mount + every 5 min) ──────────
   const pullReferenceData = useCallback(async () => {
-    if (!navigator.onLine) return;
+    if (!enabled || !navigator.onLine) return;
 
     try {
       const [empresasRes, boxesRes, boxExamenesRes, examenesRes, paquetesRes, paqItemsRes, faenasRes, bfRes, efRes, feRes, docRes] = await Promise.all([
@@ -263,11 +263,11 @@ export function useLocalSync() {
     } catch (err) {
       console.error('[LocalSync] Reference pull error:', err);
     }
-  }, []);
+  }, [enabled]);
 
   // ── Pull cotizaciones ───────────────────────────────────────────────
   const pullCotizaciones = useCallback(async () => {
-    if (!navigator.onLine) return;
+    if (!enabled || !navigator.onLine) return;
 
     try {
       const [cotRes, solRes] = await Promise.all([
@@ -330,11 +330,11 @@ export function useLocalSync() {
     } catch (err) {
       console.error('[LocalSync] Cotizaciones pull error:', err);
     }
-  }, []);
+  }, [enabled]);
 
   // ── Push: send outbox operations to cloud ────────────────────────────
   const pushOutbox = useCallback(async () => {
-    if (pushInProgress.current || !navigator.onLine) return;
+    if (!enabled || pushInProgress.current || !navigator.onLine) return;
     pushInProgress.current = true;
 
     try {
@@ -389,7 +389,7 @@ export function useLocalSync() {
     } finally {
       pushInProgress.current = false;
     }
-  }, []);
+  }, [enabled]);
 
   // ── Force sync ───────────────────────────────────────────────────────
   const forcePull = useCallback(async () => {
@@ -409,6 +409,13 @@ export function useLocalSync() {
   // ── Main effect: setup intervals + realtime + initial load ───────────
   useEffect(() => {
     mountedRef.current = true;
+
+    if (!enabled) {
+      setSyncState(s => ({ ...s, isSyncing: false, pendingOps: 0 }));
+      return () => {
+        mountedRef.current = false;
+      };
+    }
 
     // Initial load
     pullReferenceData();
@@ -444,7 +451,7 @@ export function useLocalSync() {
       clearInterval(cotTimer);
       supabase.removeChannel(channel);
     };
-  }, [pullData, pushOutbox, pullReferenceData, pullCotizaciones, refreshPendingCount]);
+  }, [enabled, pullData, pushOutbox, pullReferenceData, pullCotizaciones, refreshPendingCount]);
 
   return {
     ...syncState,

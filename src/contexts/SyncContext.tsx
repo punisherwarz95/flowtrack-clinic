@@ -1,4 +1,5 @@
 import React, { createContext, useContext } from 'react';
+import { useAuthContext } from '@/contexts/AuthContext';
 import { useLocalSync, type SyncState } from '@/hooks/useLocalSync';
 
 interface SyncContextValue extends SyncState {
@@ -9,7 +10,9 @@ interface SyncContextValue extends SyncState {
 const SyncContext = createContext<SyncContextValue | null>(null);
 
 export function SyncProvider({ children }: { children: React.ReactNode }) {
-  const sync = useLocalSync();
+  const { user, loading } = useAuthContext();
+  const userTipo = (user?.user_metadata as any)?.tipo;
+  const sync = useLocalSync(!loading && !!user && userTipo !== 'empresa');
 
   return (
     <SyncContext.Provider value={sync}>

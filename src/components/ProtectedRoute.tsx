@@ -7,9 +7,10 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ children, path }: ProtectedRouteProps) => {
-  const { user, loading: authLoading, hasPermission, permissionsLoading } = useAuthContext();
+  const { user, loading: authLoading, hasPermission, permissionsLoading, permissions, isAdmin } = useAuthContext();
 
   const userTipo = (user?.user_metadata as any)?.tipo;
+  const fallbackPath = isAdmin ? "/" : permissions[0] ?? null;
 
   if (authLoading || permissionsLoading) {
     return (
@@ -28,6 +29,10 @@ const ProtectedRoute = ({ children, path }: ProtectedRouteProps) => {
   }
 
   if (!hasPermission(path)) {
+    if (fallbackPath && fallbackPath !== path) {
+      return <Navigate to={fallbackPath} replace />;
+    }
+
     return <Navigate to="/login" replace />;
   }
 
