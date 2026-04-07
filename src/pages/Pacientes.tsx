@@ -549,60 +549,74 @@ const Pacientes = () => {
       direccion: patient.direccion || "",
     });
     
-    // Cargar faenas de la empresa si existe
+    // Load faenas from cache (instant)
     if (patient.empresa_id) {
-      await loadFaenasDeEmpresa(patient.empresa_id);
+      loadFaenasDeEmpresa(patient.empresa_id);
       if ((patient as any).faena_id) {
-        await Promise.all([
-          loadBateriasDisponibles((patient as any).faena_id),
-          loadFaenaExamenes((patient as any).faena_id),
-        ]);
+        loadBateriasDisponibles((patient as any).faena_id);
+        loadFaenaExamenes((patient as any).faena_id);
       }
     }
 
-    // Cargar exámenes de la última atención (cualquier estado)
-    try {
-      const dateToUse = selectedDate || new Date();
-      const startOfDay = new Date(dateToUse.setHours(0, 0, 0, 0)).toISOString();
-      const endOfDay = new Date(dateToUse.setHours(23, 59, 59, 999)).toISOString();
-
-      const { data: atencionData, error: atencionError } = await supabase
-        .from("atenciones")
-        .select("id, estado")
-        .eq("paciente_id", patient.id)
-        .gte("fecha_ingreso", startOfDay)
-        .lte("fecha_ingreso", endOfDay)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (atencionError) throw atencionError;
-
-      if (atencionData) {
-        // Cargar exámenes pendientes y documentos existentes en paralelo
-        const [examenesRes, docsRes] = await Promise.all([
-          supabase
-            .from("atencion_examenes")
-            .select("examen_id")
-            .eq("atencion_id", atencionData.id)
-            .eq("estado", "pendiente"),
-          supabase
-            .from("atencion_documentos")
-            .select("documento_id")
-            .eq("atencion_id", atencionData.id),
-        ]);
-
-        if (examenesRes.error) throw examenesRes.error;
-        setSelectedExamenes(examenesRes.data?.map(e => e.examen_id) || []);
-        setSelectedDocumentos(docsRes.data?.map(d => d.documento_id) || []);
+    // Load exams from local cache for today, cloud for other dates
+    if (isToday) {
+      const atencion = localAtenciones.find(a => a.paciente_id === patient.id);
+      if (atencion) {
+        const exams = localAtencionExamenes
+          .filter(ae => ae.atencion_id === atencion.id && ae.estado === 'pendiente')
+          .map(ae => ae.examen_id);
+        const docs = localAtencionDocumentos
+          .filter(d => d.atencion_id === atencion.id)
+          .map(d => d.documento_id);
+        setSelectedExamenes(exams);
+        setSelectedDocumentos(docs);
       } else {
         setSelectedExamenes([]);
         setSelectedDocumentos([]);
       }
-    } catch (error) {
-      console.error("Error loading exams:", error);
-      setSelectedExamenes([]);
-      setSelectedDocumentos([]);
+    } else {
+      try {
+        const dateToUse = selectedDate || new Date();
+        const startOfDay = new Date(new Date(dateToUse).getFullYear(), new Date(dateToUse).getMonth(), new Date(dateToUse).getDate(), 0, 0, 0, 0).toISOString();
+        const endOfDay = new Date(new Date(dateToUse).getFullYear(), new Date(dateToUse).getMonth(), new Date(dateToUse).getDate(), 23, 59, 59, 999).toISOString();
+
+        const { data: atencionData, error: atencionError } = await supabase
+          .from("atenciones")
+          .select("id, estado")
+          .eq("paciente_id", patient.id)
+          .gte("fecha_ingreso", startOfDay)
+          .lte("fecha_ingreso", endOfDay)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (atencionError) throw atencionError;
+
+        if (atencionData) {
+          const [examenesRes, docsRes] = await Promise.all([
+            supabase
+              .from("atencion_examenes")
+              .select("examen_id")
+              .eq("atencion_id", atencionData.id)
+              .eq("estado", "pendiente"),
+            supabase
+              .from("atencion_documentos")
+              .select("documento_id")
+              .eq("atencion_id", atencionData.id),
+          ]);
+
+          if (examenesRes.error) throw examenesRes.error;
+          setSelectedExamenes(examenesRes.data?.map(e => e.examen_id) || []);
+          setSelectedDocumentos(docsRes.data?.map(d => d.documento_id) || []);
+        } else {
+          setSelectedExamenes([]);
+          setSelectedDocumentos([]);
+        }
+      } catch (error) {
+        console.error("Error loading exams:", error);
+        setSelectedExamenes([]);
+        setSelectedDocumentos([]);
+      }
     }
 
     setActiveMainTab("nuevo");
