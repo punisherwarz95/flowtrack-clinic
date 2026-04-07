@@ -143,16 +143,22 @@ export const useBoxes = () => {
         .eq("activo", true)
         .order("nombre");
       if (error) throw error;
-      return (data || []) as CachedBox[];
+      const result = (data || []) as CachedBox[];
+      // Persist to IndexedDB for next session
+      try {
+        await localDb.boxes.clear();
+        await localDb.boxes.bulkPut(result.map(b => ({ id: b.id, nombre: b.nombre, descripcion: b.descripcion, activo: b.activo })));
+        await localDb.boxExamenes.clear();
+        const allBE = result.flatMap(b => b.box_examenes.map((be, i) => ({ id: `${b.id}_${be.examen_id}`, box_id: b.id, examen_id: be.examen_id })));
+        if (allBE.length > 0) await localDb.boxExamenes.bulkPut(allBE);
+      } catch {}
+      return result;
     },
     staleTime: STALE_TIME,
     gcTime: GC_TIME,
     initialDataUpdatedAt: 0,
     initialData: undefined,
-    placeholderData: () => {
-      // Sync initial data from IndexedDB (non-blocking)
-      return undefined;
-    },
+    placeholderData: () => undefined,
   });
 };
 
@@ -165,7 +171,9 @@ export const useExamenes = () => {
         .select("id, nombre, descripcion, codigo")
         .order("nombre");
       if (error) throw error;
-      return (data || []) as CachedExamen[];
+      const result = (data || []) as CachedExamen[];
+      try { await localDb.examenes.clear(); await localDb.examenes.bulkPut(result); } catch {}
+      return result;
     },
     staleTime: STALE_TIME,
     gcTime: GC_TIME,
@@ -181,7 +189,9 @@ export const useEmpresas = () => {
         .select("*")
         .order("nombre");
       if (error) throw error;
-      return (data || []) as CachedEmpresa[];
+      const result = (data || []) as CachedEmpresa[];
+      try { await localDb.empresas.clear(); await localDb.empresas.bulkPut(result as any); } catch {}
+      return result;
     },
     staleTime: STALE_TIME,
     gcTime: GC_TIME,

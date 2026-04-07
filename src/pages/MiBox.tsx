@@ -246,11 +246,9 @@ const MiBox = () => {
     setAtencionExamenes(prev => ({ ...prev, ...newAE }));
   }, [localData.atenciones, localData.atencionExamenes, localData.isLoaded, selectedBoxId, boxes]);
 
-  useEffect(() => {
-    if (selectedBoxId && !localData.isLoaded) {
-      loadData();
-    }
-  }, [selectedBoxId, localData.isLoaded]);
+  // Removed loadData() fallback — local cache is the single source of truth.
+  // If localData is not yet loaded, the UI shows a loading state instead of
+  // fetching from cloud into parallel state that conflicts with the cache.
 
   // ── Preload prestador cache for box exams (once per box selection) ──
   useEffect(() => {

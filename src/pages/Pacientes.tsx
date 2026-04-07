@@ -12,6 +12,7 @@ import CopiarExamenesPaciente from "@/components/CopiarExamenesPaciente";
 import { supabase } from "@/integrations/supabase/client";
 import { useEmpresas, useExamenes, usePaquetes, useFaenas, useBateriaFaenas, useEmpresaFaenas, useFaenaExamenes, useDocumentosFormularios } from "@/hooks/useReferenceData";
 import { useLocalAtenciones } from "@/hooks/useLocalAtenciones";
+import { useSyncContext } from "@/contexts/SyncContext";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import { format } from "date-fns";
@@ -167,6 +168,7 @@ const Pacientes = () => {
 
   // Local offline data
   const { atenciones: localAtenciones, atencionExamenes: localAtencionExamenes, atencionDocumentos: localAtencionDocumentos, isLoaded: localDataLoaded } = useLocalAtenciones();
+  const syncCtx = useSyncContext();
   
   // Estados para filtro de baterías por faena (como en cotizaciones)
   const [allFaenas, setAllFaenas] = useState<Faena[]>([]);
@@ -518,7 +520,7 @@ const Pacientes = () => {
       const atencion = localAtenciones.find(a => a.paciente_id === patient.id);
       if (atencion) {
         const exams = localAtencionExamenes
-          .filter(ae => ae.atencion_id === atencion.id && ae.estado === 'pendiente')
+          .filter(ae => ae.atencion_id === atencion.id)
           .map(ae => ae.examen_id);
         const docs = localAtencionDocumentos
           .filter(d => d.atencion_id === atencion.id)
@@ -618,8 +620,10 @@ const Pacientes = () => {
 
         // Buscar atención del día (cualquier estado)
         const dateToUse = selectedDate || new Date();
-        const startOfDay = new Date(dateToUse.setHours(0, 0, 0, 0)).toISOString();
-        const endOfDay = new Date(dateToUse.setHours(23, 59, 59, 999)).toISOString();
+        const startCopy = new Date(dateToUse);
+        const endCopy = new Date(dateToUse);
+        const startOfDay = new Date(startCopy.setHours(0, 0, 0, 0)).toISOString();
+        const endOfDay = new Date(endCopy.setHours(23, 59, 59, 999)).toISOString();
 
         const { data: atencionData, error: atencionError } = await supabase
           .from("atenciones")
@@ -858,6 +862,10 @@ const Pacientes = () => {
       setBateriaFilter("");
       setFiltroFaenaIdBateria("__all__");
       loadPatients();
+      // Force sync pull so local cache reflects the new patient immediately
+      if (isToday) {
+        try { syncCtx.forcePull(); } catch {}
+      }
     } catch (error: any) {
       console.error("Error:", error);
       toast.error(error.message || "Error al procesar paciente");

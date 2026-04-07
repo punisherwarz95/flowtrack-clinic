@@ -15,6 +15,9 @@ import AudiometriaForm from "@/components/AudiometriaForm";
 import AntropometriaForm from "@/components/AntropometriaForm";
 import CuestionarioRenderer from "@/components/CuestionarioRenderer";
 
+// In-memory cache for campo definitions (per examen, not per patient)
+const camposCache = new Map<string, CampoFormulario[]>();
+
 interface CampoFormulario {
   id: string;
   etiqueta: string;
@@ -121,15 +124,20 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
   const loadCamposYResultados = async () => {
     setLoading(true);
     try {
-      // Load campo definitions
-      const { data: camposData, error: camposError } = await supabase
-        .from("examen_formulario_campos")
-        .select("*")
-        .eq("examen_id", examenId)
-        .order("orden");
-
-      if (camposError) throw camposError;
-      const camposDef = camposData || [];
+      // Load campo definitions (cached per examen — they don't change per patient)
+      let camposDef: CampoFormulario[];
+      if (camposCache.has(examenId)) {
+        camposDef = camposCache.get(examenId)!;
+      } else {
+        const { data: camposData, error: camposError } = await supabase
+          .from("examen_formulario_campos")
+          .select("*")
+          .eq("examen_id", examenId)
+          .order("orden");
+        if (camposError) throw camposError;
+        camposDef = camposData || [];
+        camposCache.set(examenId, camposDef);
+      }
       setCampos(camposDef);
 
       // Load existing results

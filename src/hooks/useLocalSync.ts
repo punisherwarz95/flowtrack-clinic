@@ -167,7 +167,7 @@ export function useLocalSync() {
                  existing.paciente_empresa_nombre !== a.paciente_empresa_nombre ||
                  existing.paciente_fecha_nacimiento !== a.paciente_fecha_nacimiento ||
                  existing.paciente_email !== a.paciente_email || existing.paciente_telefono !== a.paciente_telefono ||
-                 existing.paciente_faena_id !== a.paciente_faena_id;
+                 existing.paciente_faena_id !== a.paciente_faena_id || existing.paciente_cargo !== a.paciente_cargo;
         });
         if (changedAtenciones.length > 0) await localDb.atenciones.bulkPut(changedAtenciones);
 
