@@ -15,23 +15,59 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuthContext();
+  const {
+    user,
+    loading: authLoading,
+    permissions,
+    isAdmin,
+    permissionsLoading,
+  } = useAuthContext();
+  const userTipo = (user?.user_metadata as any)?.tipo;
+
+  const getDefaultStaffRoute = () => {
+    if (isAdmin) return "/";
+
+    const preferredRoutes = [
+      "/",
+      "/flujo",
+      "/pacientes",
+      "/mi-box",
+      "/completados",
+      "/incompletos",
+      "/empresas",
+      "/boxes",
+      "/examenes",
+      "/cotizaciones",
+      "/prestadores",
+      "/documentos",
+      "/usuarios",
+      "/configuracion",
+      "/actividad",
+      "/evaluacion-medica",
+      "/estados-pago",
+      "/pantalla",
+    ];
+
+    return preferredRoutes.find((route) => permissions.includes(route)) ?? null;
+  };
 
   // Redirigir si ya está autenticado
   useEffect(() => {
     if (authLoading) return;
 
     if (user) {
-      // Si es usuario de empresa, enviarlo a su portal
-      const tipo = (user.user_metadata as any)?.tipo;
-      if (tipo === "empresa") {
+      if (userTipo === "empresa") {
         navigate("/empresa", { replace: true });
       } else {
-        // Usuario de staff: ir al dashboard
-        navigate("/", { replace: true });
+        if (permissionsLoading) return;
+
+        const nextRoute = getDefaultStaffRoute();
+        if (nextRoute) {
+          navigate(nextRoute, { replace: true });
+        }
       }
     }
-  }, [authLoading, user, navigate]);
+  }, [authLoading, user, userTipo, permissionsLoading, permissions, isAdmin, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,7 +99,7 @@ const Login = () => {
     }
   };
 
-  if (authLoading) {
+  if (authLoading || (!!user && userTipo !== "empresa" && permissionsLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
