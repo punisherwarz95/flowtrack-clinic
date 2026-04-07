@@ -210,16 +210,61 @@ const Pacientes = () => {
     direccion: "",
   });
 
+  // Build patients list from local cache when viewing today, cloud for other dates
+  const isToday = selectedDate && 
+    selectedDate.getFullYear() === new Date().getFullYear() &&
+    selectedDate.getMonth() === new Date().getMonth() &&
+    selectedDate.getDate() === new Date().getDate();
+
   useEffect(() => {
-    loadDocumentosDisponibles();
+    if (isToday && localDataLoaded) {
+      // Use local IndexedDB data for today (instant)
+      const activeAtenciones = localAtenciones.filter(a => a.estado !== 'completado' && a.estado !== 'incompleto' || true);
+      const patientMap = new Map<string, Patient>();
+      activeAtenciones.forEach(a => {
+        if (!patientMap.has(a.paciente_id)) {
+          patientMap.set(a.paciente_id, {
+            id: a.paciente_id,
+            nombre: a.paciente_nombre || 'Sin nombre',
+            rut: a.paciente_rut || null,
+            email: a.paciente_email || null,
+            telefono: a.paciente_telefono || null,
+            fecha_nacimiento: a.paciente_fecha_nacimiento || null,
+            direccion: a.paciente_direccion || null,
+            tipo_servicio: (a.paciente_tipo_servicio as 'workmed' | 'jenner') || null,
+            empresa_id: a.paciente_empresa_id || null,
+            faena_id: null, // will be enriched below
+            empresas: a.paciente_empresa_nombre ? { id: a.paciente_empresa_id || '', nombre: a.paciente_empresa_nombre } : null,
+            atencion_actual: {
+              numero_ingreso: a.numero_ingreso || 0,
+              fecha_ingreso: a.fecha_ingreso,
+            },
+          });
+        }
+      });
+      setPatients(Array.from(patientMap.values()));
 
-    // Auto-refresh patients every 15 seconds
-    const interval = setInterval(() => {
+      // Compute document counts from local cache
+      const counts: {[patientId: string]: number} = {};
+      activeAtenciones.forEach(a => {
+        const pending = localAtencionDocumentos.filter(d => d.atencion_id === a.id && d.estado === 'pendiente').length;
+        if (pending > 0) {
+          counts[a.paciente_id] = (counts[a.paciente_id] || 0) + pending;
+        }
+      });
+      setDocumentosPendientes(counts);
+    } else if (!isToday) {
       loadPatients();
-    }, 15000);
+    }
+  }, [isToday, localDataLoaded, localAtenciones, localAtencionDocumentos, selectedDate]);
 
-    return () => clearInterval(interval);
-  }, [selectedDate]);
+  // For non-today dates, still use cloud
+  useEffect(() => {
+    if (!isToday) {
+      const interval = setInterval(() => loadPatients(), 15000);
+      return () => clearInterval(interval);
+    }
+  }, [isToday, selectedDate]);
 
   // Populate faenas and bateria map from cache
   useEffect(() => {
