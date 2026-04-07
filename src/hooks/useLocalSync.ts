@@ -223,7 +223,7 @@ export function useLocalSync() {
     if (!navigator.onLine) return;
 
     try {
-      const [empresasRes, boxesRes, boxExamenesRes, examenesRes, paquetesRes, paqItemsRes, faenasRes, bfRes] = await Promise.all([
+      const [empresasRes, boxesRes, boxExamenesRes, examenesRes, paquetesRes, paqItemsRes, faenasRes, bfRes, efRes, feRes, docRes] = await Promise.all([
         supabase.from('empresas').select('*').order('nombre'),
         supabase.from('boxes').select('*').eq('activo', true).order('nombre'),
         supabase.from('box_examenes').select('*'),
@@ -232,12 +232,16 @@ export function useLocalSync() {
         supabase.from('paquete_examen_items').select('*'),
         supabase.from('faenas').select('*').eq('activo', true).order('nombre'),
         supabase.from('bateria_faenas').select('*').eq('activo', true),
+        supabase.from('empresa_faenas').select('id, empresa_id, faena_id, activo').eq('activo', true),
+        supabase.from('faena_examenes').select('id, faena_id, examen_id, valor_venta, activo').eq('activo', true),
+        supabase.from('documentos_formularios').select('id, nombre, descripcion, tipo, activo').eq('activo', true).order('nombre'),
       ]);
 
       await localDb.transaction('rw', [
         localDb.empresas, localDb.boxes, localDb.boxExamenes,
         localDb.examenes, localDb.paquetes, localDb.paqueteExamenItems,
         localDb.faenas, localDb.bateriaFaenas,
+        localDb.empresaFaenas, localDb.faenaExamenes, localDb.documentosFormularios,
       ], async () => {
         if (empresasRes.data) { await localDb.empresas.clear(); await localDb.empresas.bulkPut(empresasRes.data as any); }
         if (boxesRes.data) { await localDb.boxes.clear(); await localDb.boxes.bulkPut(boxesRes.data as any); }
@@ -247,6 +251,9 @@ export function useLocalSync() {
         if (paqItemsRes.data) { await localDb.paqueteExamenItems.clear(); await localDb.paqueteExamenItems.bulkPut(paqItemsRes.data as any); }
         if (faenasRes.data) { await localDb.faenas.clear(); await localDb.faenas.bulkPut(faenasRes.data as any); }
         if (bfRes.data) { await localDb.bateriaFaenas.clear(); await localDb.bateriaFaenas.bulkPut(bfRes.data as any); }
+        if (efRes.data) { await localDb.empresaFaenas.clear(); await localDb.empresaFaenas.bulkPut(efRes.data as any); }
+        if (feRes.data) { await localDb.faenaExamenes.clear(); await localDb.faenaExamenes.bulkPut(feRes.data as any); }
+        if (docRes.data) { await localDb.documentosFormularios.clear(); await localDb.documentosFormularios.bulkPut(docRes.data as any); }
       });
 
       await setSyncMeta('lastRefPull', new Date().toISOString());
