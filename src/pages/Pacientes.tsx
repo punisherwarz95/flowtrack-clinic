@@ -912,6 +912,21 @@ const Pacientes = () => {
 
         // Fire and forget
         backgroundCloudWrite();
+      }
+
+      setActiveMainTab("pacientes");
+      setEditingPatient(null);
+      const workmedEmpresaReset = empresas.find(emp => emp.nombre.toUpperCase() === "WORKMED");
+      setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: workmedEmpresaReset?.id || "", faena_id: "", rut: "", email: "", telefono: "", fecha_nacimiento: "", direccion: "" });
+      setFaenasEmpresa([]);
+      setBateriasDisponibles([]);
+      setSelectedExamenes([]);
+      setSelectedPaquetes([]);
+      setSelectedDocumentos([]);
+      setDocumentoFilter("");
+      setBateriaFilter("");
+      setFiltroFaenaIdBateria("__all__");
+      loadPatients();
     } catch (error: any) {
       console.error("Error:", error);
       toast.error(error.message || "Error al procesar paciente");
