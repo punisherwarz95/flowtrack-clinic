@@ -171,7 +171,9 @@ export const useExamenes = () => {
         .select("id, nombre, descripcion, codigo")
         .order("nombre");
       if (error) throw error;
-      return (data || []) as CachedExamen[];
+      const result = (data || []) as CachedExamen[];
+      try { await localDb.examenes.clear(); await localDb.examenes.bulkPut(result); } catch {}
+      return result;
     },
     staleTime: STALE_TIME,
     gcTime: GC_TIME,
