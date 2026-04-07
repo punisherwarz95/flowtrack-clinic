@@ -168,6 +168,7 @@ const Pacientes = () => {
 
   // Local offline data
   const { atenciones: localAtenciones, atencionExamenes: localAtencionExamenes, atencionDocumentos: localAtencionDocumentos, isLoaded: localDataLoaded } = useLocalAtenciones();
+  const syncCtx = useSyncContext();
   
   // Estados para filtro de baterías por faena (como en cotizaciones)
   const [allFaenas, setAllFaenas] = useState<Faena[]>([]);
