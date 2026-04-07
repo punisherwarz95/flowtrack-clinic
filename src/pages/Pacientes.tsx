@@ -12,6 +12,7 @@ import CopiarExamenesPaciente from "@/components/CopiarExamenesPaciente";
 import { supabase } from "@/integrations/supabase/client";
 import { useEmpresas, useExamenes, usePaquetes, useFaenas, useBateriaFaenas, useEmpresaFaenas, useFaenaExamenes, useDocumentosFormularios } from "@/hooks/useReferenceData";
 import { useLocalAtenciones } from "@/hooks/useLocalAtenciones";
+import { useSyncContext } from "@/contexts/SyncContext";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import { format } from "date-fns";
