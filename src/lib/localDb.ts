@@ -121,6 +121,29 @@ export interface LocalBateriaFaena {
   activo: boolean | null;
 }
 
+export interface LocalEmpresaFaena {
+  id: string;
+  empresa_id: string;
+  faena_id: string;
+  activo: boolean | null;
+}
+
+export interface LocalFaenaExamen {
+  id: string;
+  faena_id: string;
+  examen_id: string;
+  valor_venta: number;
+  activo: boolean | null;
+}
+
+export interface LocalDocumentoFormulario {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  tipo: string;
+  activo: boolean;
+}
+
 export interface LocalCotizacion {
   id: string;
   numero_cotizacion: number;
