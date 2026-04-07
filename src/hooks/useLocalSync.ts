@@ -61,7 +61,7 @@ export function useLocalSync() {
       // Pull atenciones with joined patient and box data
       const { data: atencionesRaw, error: aErr } = await supabase
         .from('atenciones')
-        .select('*, pacientes(id, nombre, rut, tipo_servicio, fecha_nacimiento, email, telefono, direccion, empresa_id, empresas(nombre)), boxes(nombre)')
+        .select('*, pacientes(id, nombre, rut, tipo_servicio, fecha_nacimiento, email, telefono, direccion, empresa_id, faena_id, cargo, empresas(nombre)), boxes(nombre)')
         .gte('fecha_ingreso', startOfDay)
         .lte('fecha_ingreso', endOfDay);
 
