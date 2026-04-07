@@ -189,7 +189,9 @@ export const useEmpresas = () => {
         .select("*")
         .order("nombre");
       if (error) throw error;
-      return (data || []) as CachedEmpresa[];
+      const result = (data || []) as CachedEmpresa[];
+      try { await localDb.empresas.clear(); await localDb.empresas.bulkPut(result as any); } catch {}
+      return result;
     },
     staleTime: STALE_TIME,
     gcTime: GC_TIME,
