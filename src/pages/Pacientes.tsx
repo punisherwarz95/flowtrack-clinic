@@ -749,7 +749,9 @@ const Pacientes = () => {
           }
         }
       } else {
-        // Insertar paciente - convertir empresa_id y faena_id vacíos a null y formatear RUT
+        // ── NEW PATIENT: Background cloud write for instant UI ──
+        const pacienteId = crypto.randomUUID();
+        const atencionId = crypto.randomUUID();
         const insertData = {
           ...formData,
           tipo_servicio: formData.tipo_servicio as "workmed" | "jenner",
@@ -757,115 +759,159 @@ const Pacientes = () => {
           faena_id: formData.faena_id || null,
           rut: formData.rut.trim() ? formatRutStandard(formData.rut) : null,
         };
-        const { data: pacienteData, error: pacienteError } = await supabase
-          .from("pacientes")
-          .insert([insertData])
-          .select()
-          .single();
 
-        if (pacienteError) throw pacienteError;
+        // 1) Write to IndexedDB IMMEDIATELY for instant UI feedback
+        const empresaNombre = empresas.find(e => e.id === insertData.empresa_id)?.nombre || null;
+        await localDb.pacientes.put({
+          id: pacienteId,
+          nombre: insertData.nombre,
+          rut: insertData.rut,
+          email: insertData.email || null,
+          telefono: insertData.telefono || null,
+          fecha_nacimiento: insertData.fecha_nacimiento || null,
+          direccion: insertData.direccion || null,
+          tipo_servicio: insertData.tipo_servicio,
+          empresa_id: insertData.empresa_id,
+          faena_id: insertData.faena_id,
+          cargo: null,
+        });
 
-        // Crear atención para el paciente
-        const { data: atencionData, error: atencionError } = await supabase
-          .from("atenciones")
-          .insert([{
-            paciente_id: pacienteData.id,
-            estado: 'en_espera'
-          }])
-          .select()
-          .single();
+        const nowIso = new Date().toISOString();
+        await localDb.atenciones.put({
+          id: atencionId,
+          paciente_id: pacienteId,
+          box_id: null,
+          estado: 'en_espera',
+          fecha_ingreso: nowIso,
+          fecha_inicio_atencion: null,
+          fecha_fin_atencion: null,
+          created_at: nowIso,
+          numero_ingreso: null, // Will be assigned by DB trigger
+          estado_ficha: 'pendiente',
+          observaciones: null,
+          prereserva_id: null,
+          paciente_nombre: insertData.nombre,
+          paciente_rut: insertData.rut,
+          paciente_tipo_servicio: insertData.tipo_servicio,
+          paciente_fecha_nacimiento: insertData.fecha_nacimiento || null,
+          paciente_email: insertData.email || null,
+          paciente_telefono: insertData.telefono || null,
+          paciente_direccion: insertData.direccion || null,
+          paciente_empresa_id: insertData.empresa_id,
+          paciente_empresa_nombre: empresaNombre,
+          paciente_faena_id: insertData.faena_id,
+          paciente_cargo: null,
+          box_nombre: null,
+        });
 
-        if (atencionError) throw atencionError;
-
-        // Agregar exámenes a la atención solo si hay seleccionados
-        if (selectedExamenes.length > 0) {
-          const examenesData = selectedExamenes.map(examenId => ({
-            atencion_id: atencionData.id,
+        // Write exam records to local
+        const examRecords = selectedExamenes.map(examenId => {
+          const localExamen = localExamenesRef.find(e => e.id === examenId);
+          return {
+            id: crypto.randomUUID(),
+            atencion_id: atencionId,
             examen_id: examenId,
-            estado: 'pendiente' as 'pendiente' | 'completado' | 'incompleto'
-          }));
-
-          const { error: examenesError } = await supabase
-            .from("atencion_examenes")
-            .insert(examenesData);
-
-          if (examenesError) throw examenesError;
+            estado: 'pendiente',
+            fecha_realizacion: null,
+            created_at: nowIso,
+            realizado_por: null,
+            observaciones: null,
+            examen_nombre: localExamen?.nombre || undefined,
+          };
+        });
+        if (examRecords.length > 0) {
+          await localDb.atencionExamenes.bulkPut(examRecords);
         }
 
-        // Registrar baterías asignadas a la atención para trazabilidad
-        if (selectedPaquetes.length > 0) {
-          const bateriasData = selectedPaquetes.map(paqueteId => ({
-            atencion_id: atencionData.id,
-            paquete_id: paqueteId
-          }));
-
-          const { error: bateriasError } = await supabase
-            .from("atencion_baterias")
-            .insert(bateriasData);
-
-          if (bateriasError) {
-            console.error("Error registrando baterías:", bateriasError);
-            // No interrumpir el flujo, solo log
-          }
-        }
-
-        // FASE 6: Generate documents from selected batteries
-        if (selectedPaquetes.length > 0) {
-          console.log("[Pacientes] Generando documentos para nuevo paciente, paquetes:", selectedPaquetes);
-          const result = await generateDocuments(atencionData.id, selectedPaquetes);
-          if (result.success && result.count > 0) {
-            toast.success(`${result.count} documento(s) generado(s) desde baterías`);
-          } else if (!result.success) {
-            toast.error(`Error generando documentos: ${result.error}`);
-          }
-        }
-
-        // Agregar documentos seleccionados manualmente
-        if (selectedDocumentos.length > 0) {
-          const { data: existingDocs } = await supabase
-            .from("atencion_documentos")
-            .select("documento_id")
-            .eq("atencion_id", atencionData.id);
-
-          const existingDocIds = new Set((existingDocs || []).map(d => d.documento_id));
-          const newDocIds = selectedDocumentos.filter(id => !existingDocIds.has(id));
-
-          if (newDocIds.length > 0) {
-            const newDocs = newDocIds.map(documento_id => ({
-              atencion_id: atencionData.id,
-              documento_id,
-              respuestas: {},
-              estado: "pendiente",
-            }));
-            const { error: docError } = await supabase
-              .from("atencion_documentos")
-              .insert(newDocs);
-            if (docError) console.error("Error insertando documentos:", docError);
-            else toast.success(`${newDocIds.length} documento(s) agregado(s)`);
-          }
-        }
-
+        // 2) Show success toast IMMEDIATELY
         toast.success("Paciente agregado exitosamente");
-        await logActivity("crear_paciente", { nombre: formData.nombre, rut: formData.rut, paquetes: selectedPaquetes.length }, "/pacientes");
-      }
 
-      setActiveMainTab("pacientes");
-      setEditingPatient(null);
-      const workmedEmpresaReset = empresas.find(emp => emp.nombre.toUpperCase() === "WORKMED");
-      setFormData({ nombre: "", tipo_servicio: "workmed", empresa_id: workmedEmpresaReset?.id || "", faena_id: "", rut: "", email: "", telefono: "", fecha_nacimiento: "", direccion: "" });
-      setFaenasEmpresa([]);
-      setBateriasDisponibles([]);
-      setSelectedExamenes([]);
-      setSelectedPaquetes([]);
-      setSelectedDocumentos([]);
-      setDocumentoFilter("");
-      setBateriaFilter("");
-      setFiltroFaenaIdBateria("__all__");
-      loadPatients();
-      // Force sync pull so local cache reflects the new patient immediately
-      if (isToday) {
-        try { syncCtx.forcePull(); } catch {}
-      }
+        // 3) Fire cloud writes in BACKGROUND (non-blocking)
+        const bgSelectedPaquetes = [...selectedPaquetes];
+        const bgSelectedDocumentos = [...selectedDocumentos];
+        const bgExamRecords = examRecords.map(e => ({ atencion_id: e.atencion_id, examen_id: e.examen_id, estado: 'pendiente' as const }));
+        
+        const backgroundCloudWrite = async () => {
+          try {
+            // Insert patient
+            const { error: pacienteError } = await supabase
+              .from("pacientes")
+              .insert([{ id: pacienteId, ...insertData }]);
+            if (pacienteError) throw pacienteError;
+
+            // Create atencion
+            const { data: atencionData, error: atencionError } = await supabase
+              .from("atenciones")
+              .insert([{ id: atencionId, paciente_id: pacienteId, estado: 'en_espera' }])
+              .select()
+              .single();
+            if (atencionError) throw atencionError;
+
+            // Add exams
+            if (bgExamRecords.length > 0) {
+              const { error: examenesError } = await supabase
+                .from("atencion_examenes")
+                .insert(bgExamRecords.map(e => ({ ...e, atencion_id: atencionData.id })));
+              if (examenesError) console.error("Background: exam insert error:", examenesError);
+            }
+
+            // Add baterias
+            if (bgSelectedPaquetes.length > 0) {
+              const bateriasData = bgSelectedPaquetes.map(paqueteId => ({
+                atencion_id: atencionData.id,
+                paquete_id: paqueteId,
+              }));
+              const { error: bateriasError } = await supabase
+                .from("atencion_baterias")
+                .insert(bateriasData);
+              if (bateriasError) console.error("Background: baterias insert error:", bateriasError);
+            }
+
+            // Generate documents from batteries
+            if (bgSelectedPaquetes.length > 0) {
+              const result = await generateDocuments(atencionData.id, bgSelectedPaquetes);
+              if (result.success && result.count > 0) {
+                console.log(`[Background] ${result.count} documento(s) generados`);
+              }
+            }
+
+            // Add manually selected documents
+            if (bgSelectedDocumentos.length > 0) {
+              const { data: existingDocs } = await supabase
+                .from("atencion_documentos")
+                .select("documento_id")
+                .eq("atencion_id", atencionData.id);
+
+              const existingDocIds = new Set((existingDocs || []).map(d => d.documento_id));
+              const newDocIds = bgSelectedDocumentos.filter(id => !existingDocIds.has(id));
+
+              if (newDocIds.length > 0) {
+                const newDocs = newDocIds.map(documento_id => ({
+                  atencion_id: atencionData.id,
+                  documento_id,
+                  respuestas: {},
+                  estado: "pendiente",
+                }));
+                await supabase.from("atencion_documentos").insert(newDocs);
+              }
+            }
+
+            await logActivity("crear_paciente", { nombre: insertData.nombre, rut: insertData.rut, paquetes: bgSelectedPaquetes.length }, "/pacientes");
+
+            // Force sync pull to reconcile (get numero_ingreso from DB, etc.)
+            if (isToday) {
+              try { syncCtx.forcePull(); } catch {}
+            }
+
+            console.log("[Pacientes] Background cloud write completed successfully");
+          } catch (bgError) {
+            console.error("[Pacientes] Background cloud write failed:", bgError);
+            toast.error("Error sincronizando paciente con el servidor. Se reintentará automáticamente.");
+          }
+        };
+
+        // Fire and forget
+        backgroundCloudWrite();
     } catch (error: any) {
       console.error("Error:", error);
       toast.error(error.message || "Error al procesar paciente");
