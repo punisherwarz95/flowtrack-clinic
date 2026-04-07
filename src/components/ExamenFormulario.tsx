@@ -329,7 +329,7 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
       const resultadosParaGuardar = mergeSharedFilesIntoResults(campos, resultados, archivosVinculados);
       setResultados(resultadosParaGuardar);
 
-      // Upsert all results
+      // Upsert all results to cloud (keep blocking - this is primary data)
       for (const campo of campos) {
         const resultado = resultadosParaGuardar[campo.id];
         if (!resultado) continue;
@@ -366,9 +366,7 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
         return checkAntropometriaPresionPendiente(resultado?.valor || null);
       });
 
-      // Update atencion_examenes status
-      // If prestador is external, mark as muestra_tomada instead of completado
-      // If pressure retake is pending, force incompleto regardless of filled fields
+      // Determine new estado
       let nuevoEstado: string;
       if (presionPendiente) {
         nuevoEstado = "incompleto";
@@ -379,118 +377,13 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
       }
       const fechaRealizacion = (allRequiredFilled && !presionPendiente) ? new Date().toISOString() : null;
 
-      const { error: estadoError } = await supabase
-        .from("atencion_examenes")
-        .update({
-          estado: nuevoEstado as any,
-          fecha_realizacion: fechaRealizacion,
-        })
-        .eq("id", atencionExamenId);
-
-      if (estadoError) throw estadoError;
-
+      // 1) Update local IndexedDB IMMEDIATELY (instant UI feedback)
       await localDb.atencionExamenes.update(atencionExamenId, {
         estado: nuevoEstado,
         fecha_realizacion: fechaRealizacion,
       });
 
-      // Trazabilidad: share files and sync estado with linked exams
-      if (allRequiredFilled && (nuevoEstado === "completado" || nuevoEstado === "muestra_tomada")) {
-        try {
-          console.log("[TRAZABILIDAD] Iniciando sync - examenId:", examenId, "atencionExamenId:", atencionExamenId);
-          
-          // Get atencion_id from this atencion_examen
-          const { data: aeData } = await supabase
-            .from("atencion_examenes")
-            .select("atencion_id")
-            .eq("id", atencionExamenId)
-            .single();
-
-          if (aeData) {
-            const currentAtencionId = atencionId || aeData.atencion_id;
-
-            // Get trazabilidad links for this exam
-            const { data: trazData } = await supabase
-              .from("examen_trazabilidad")
-              .select("examen_id_a, examen_id_b")
-              .or(`examen_id_a.eq.${examenId},examen_id_b.eq.${examenId}`);
-
-            console.log("[TRAZABILIDAD] Links encontrados:", trazData);
-
-            if (trazData && trazData.length > 0) {
-              const linkedExamenIds = trazData.map(t => 
-                t.examen_id_a === examenId ? t.examen_id_b : t.examen_id_a
-              );
-              const allExamenIds = [examenId, ...linkedExamenIds];
-
-              // 1) Share uploaded PDF files with linked exams
-              const archivosSubidos = Object.values(resultadosParaGuardar).filter(r => r.archivo_url);
-              for (const archivo of archivosSubidos) {
-                // Check if this file is already shared
-                const { data: existingShared } = await supabase
-                  .from("examen_archivos_compartidos")
-                  .select("id")
-                  .eq("atencion_id", currentAtencionId)
-                  .eq("archivo_url", archivo.archivo_url)
-                  .maybeSingle();
-
-                if (!existingShared) {
-                  // Create shared file record
-                  const { data: sharedFile } = await supabase
-                    .from("examen_archivos_compartidos")
-                    .insert({
-                      atencion_id: currentAtencionId,
-                      nombre_archivo: archivo.valor || "Archivo compartido",
-                      archivo_url: archivo.archivo_url,
-                    })
-                    .select("id")
-                    .single();
-
-                  if (sharedFile) {
-                    // Create vinculos for all exams in the trazabilidad group
-                    const vinculos = allExamenIds.map(eid => ({
-                      archivo_compartido_id: sharedFile.id,
-                      examen_id: eid,
-                    }));
-                    await supabase.from("examen_archivo_vinculos").insert(vinculos);
-                    console.log("[TRAZABILIDAD] Archivo compartido creado para", allExamenIds.length, "exámenes");
-                  }
-                }
-              }
-
-              // 2) Update linked exams estado (use same estado as this exam)
-              const { data: updateResult } = await supabase
-                .from("atencion_examenes")
-                .update({ 
-                  estado: nuevoEstado as any, 
-                  fecha_realizacion: new Date().toISOString() 
-                })
-                .eq("atencion_id", currentAtencionId)
-                .in("examen_id", linkedExamenIds)
-                .in("estado", ["pendiente", "incompleto"])
-                .select();
-
-              await Promise.all(
-                (updateResult || []).map((linked: any) =>
-                  localDb.atencionExamenes.update(linked.id, {
-                    estado: nuevoEstado,
-                    fecha_realizacion: linked.fecha_realizacion,
-                  })
-                )
-              );
-              
-              console.log("[TRAZABILIDAD] Exámenes actualizados:", updateResult?.length || 0);
-            } else {
-              console.log("[TRAZABILIDAD] No hay links de trazabilidad para examen:", examenId);
-            }
-          }
-        } catch (trazError) {
-          console.error("[TRAZABILIDAD] Error en sync trazabilidad:", trazError);
-        }
-      } else {
-        console.log("[TRAZABILIDAD] No se ejecuta sync - allRequiredFilled:", allRequiredFilled, "nuevoEstado:", nuevoEstado);
-      }
-
+      // 2) Show success toast IMMEDIATELY
       toast.success(
         presionPendiente
           ? "Datos guardados — presión arterial elevada, requiere retoma"
@@ -498,6 +391,114 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
             ? (esExterno ? "Muestra tomada registrada y datos guardados" : "Examen completado y guardado")
             : "Datos guardados (parcial - faltan campos requeridos)"
       );
+
+      // 3) Fire cloud estado update + trazabilidad in BACKGROUND (non-blocking)
+      const backgroundWork = async () => {
+        try {
+          const { error: estadoError } = await supabase
+            .from("atencion_examenes")
+            .update({
+              estado: nuevoEstado as any,
+              fecha_realizacion: fechaRealizacion,
+            })
+            .eq("id", atencionExamenId);
+
+          if (estadoError) {
+            console.error("[ExamenFormulario] Background estado update failed:", estadoError);
+            // Add to outbox as fallback
+            await addToOutbox('atencion_examenes', 'update', atencionExamenId, {
+              estado: nuevoEstado,
+              fecha_realizacion: fechaRealizacion,
+            });
+          }
+
+          // Trazabilidad: share files and sync estado with linked exams
+          if (allRequiredFilled && (nuevoEstado === "completado" || nuevoEstado === "muestra_tomada")) {
+            console.log("[TRAZABILIDAD] Iniciando sync en background - examenId:", examenId);
+            
+            const { data: aeData } = await supabase
+              .from("atencion_examenes")
+              .select("atencion_id")
+              .eq("id", atencionExamenId)
+              .single();
+
+            if (aeData) {
+              const currentAtencionId = atencionId || aeData.atencion_id;
+
+              const { data: trazData } = await supabase
+                .from("examen_trazabilidad")
+                .select("examen_id_a, examen_id_b")
+                .or(`examen_id_a.eq.${examenId},examen_id_b.eq.${examenId}`);
+
+              if (trazData && trazData.length > 0) {
+                const linkedExamenIds = trazData.map(t => 
+                  t.examen_id_a === examenId ? t.examen_id_b : t.examen_id_a
+                );
+                const allExamenIds = [examenId, ...linkedExamenIds];
+
+                // Share uploaded PDF files with linked exams
+                const archivosSubidos = Object.values(resultadosParaGuardar).filter(r => r.archivo_url);
+                for (const archivo of archivosSubidos) {
+                  const { data: existingShared } = await supabase
+                    .from("examen_archivos_compartidos")
+                    .select("id")
+                    .eq("atencion_id", currentAtencionId)
+                    .eq("archivo_url", archivo.archivo_url)
+                    .maybeSingle();
+
+                  if (!existingShared) {
+                    const { data: sharedFile } = await supabase
+                      .from("examen_archivos_compartidos")
+                      .insert({
+                        atencion_id: currentAtencionId,
+                        nombre_archivo: archivo.valor || "Archivo compartido",
+                        archivo_url: archivo.archivo_url,
+                      })
+                      .select("id")
+                      .single();
+
+                    if (sharedFile) {
+                      const vinculos = allExamenIds.map(eid => ({
+                        archivo_compartido_id: sharedFile.id,
+                        examen_id: eid,
+                      }));
+                      await supabase.from("examen_archivo_vinculos").insert(vinculos);
+                    }
+                  }
+                }
+
+                // Update linked exams estado
+                const { data: updateResult } = await supabase
+                  .from("atencion_examenes")
+                  .update({ 
+                    estado: nuevoEstado as any, 
+                    fecha_realizacion: new Date().toISOString() 
+                  })
+                  .eq("atencion_id", currentAtencionId)
+                  .in("examen_id", linkedExamenIds)
+                  .in("estado", ["pendiente", "incompleto"])
+                  .select();
+
+                await Promise.all(
+                  (updateResult || []).map((linked: any) =>
+                    localDb.atencionExamenes.update(linked.id, {
+                      estado: nuevoEstado,
+                      fecha_realizacion: linked.fecha_realizacion,
+                    })
+                  )
+                );
+                
+                console.log("[TRAZABILIDAD] Background sync completado:", updateResult?.length || 0, "exámenes");
+              }
+            }
+          }
+        } catch (bgError) {
+          console.error("[ExamenFormulario] Background sync error:", bgError);
+        }
+      };
+
+      // Fire and forget - don't await
+      backgroundWork();
 
       onComplete?.();
     } catch (error: any) {
