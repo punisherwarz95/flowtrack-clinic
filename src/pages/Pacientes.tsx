@@ -136,7 +136,10 @@ const Pacientes = () => {
   const examenes = cachedExamenes as Examen[];
   const { data: cachedPaquetes = [] } = usePaquetes();
   const paquetes = cachedPaquetes as Paquete[];
-  const [documentosDisponibles, setDocumentosDisponibles] = useState<DocumentoFormulario[]>([]);
+  const { data: cachedEmpresaFaenas = [] } = useEmpresaFaenas();
+  const { data: cachedFaenaExamenes = [] } = useFaenaExamenes();
+  const { data: cachedDocumentosFormularios = [] } = useDocumentosFormularios();
+  const documentosDisponibles = cachedDocumentosFormularios as DocumentoFormulario[];
   const [selectedDocumentos, setSelectedDocumentos] = useState<string[]>([]);
   const [documentoFilter, setDocumentoFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -153,14 +156,17 @@ const Pacientes = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [documentosPendientes, setDocumentosPendientes] = useState<{[patientId: string]: number}>({});
   
-  // Estados para faenas (now from cache)
+  // Faenas computed from cache
   const [faenasEmpresa, setFaenasEmpresa] = useState<Faena[]>([]);
   const [bateriasDisponibles, setBateriasDisponibles] = useState<string[]>([]);
-  const [loadingFaenas, setLoadingFaenas] = useState(false);
+  const [loadingFaenas] = useState(false);
   
   // Cached reference data for faenas and baterias
   const { data: cachedFaenas = [] } = useFaenas();
   const { data: cachedBateriaFaenas = [] } = useBateriaFaenas();
+
+  // Local offline data
+  const { atenciones: localAtenciones, atencionExamenes: localAtencionExamenes, atencionDocumentos: localAtencionDocumentos, isLoaded: localDataLoaded } = useLocalAtenciones();
   
   // Estados para filtro de baterías por faena (como en cotizaciones)
   const [allFaenas, setAllFaenas] = useState<Faena[]>([]);
