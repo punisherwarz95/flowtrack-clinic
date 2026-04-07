@@ -281,9 +281,7 @@ const Flujo = () => {
     if (atencion) {
       // Recargar solo las funciones de exámenes
       await Promise.all([
-        loadPendingBoxesOptimized(currentAtenciones, currentBoxes),
-        loadAtencionExamenesOptimized(currentAtenciones, currentBoxes),
-        loadExamenesPendientesOptimized(currentAtenciones, currentExamenes),
+        loadAllExamDataOptimized(currentAtenciones, currentBoxes, currentExamenes),
         loadTotalExamenesPorAtencion(currentAtenciones)
       ]);
     } else {
