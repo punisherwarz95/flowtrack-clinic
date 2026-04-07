@@ -458,143 +458,81 @@ const Pacientes = () => {
 
   // loadEmpresas, loadExamenes, loadPaquetes removed — data comes from useReferenceData hooks
 
-  const loadDocumentosDisponibles = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("documentos_formularios")
-        .select("id, nombre, descripcion, tipo, activo")
-        .eq("activo", true)
-        .order("nombre");
-
-      if (error) throw error;
-      setDocumentosDisponibles(data || []);
-    } catch (error) {
-      console.error("Error:", error);
-    }
-  };
-
-  // Cargar faenas disponibles para una empresa
-  const loadFaenasDeEmpresa = async (empresaId: string) => {
+  // ── Cache-based: faenas for empresa (instant) ──────────────────────
+  const loadFaenasDeEmpresa = (empresaId: string) => {
     if (!empresaId) {
       setFaenasEmpresa([]);
       return;
     }
     
-    setLoadingFaenas(true);
-    try {
-      const { data, error } = await supabase
-        .from("empresa_faenas")
-        .select("faena_id, faenas:faena_id(id, nombre, direccion)")
-        .eq("empresa_id", empresaId)
-        .eq("activo", true);
-
-      if (error) throw error;
-      
-      const faenas = (data || [])
-        .map((ef: any) => ef.faenas)
-        .filter((f: any) => f !== null) as Faena[];
-      
-      setFaenasEmpresa(faenas);
-      
-      // Auto-asignar si solo hay una faena disponible
-      if (faenas.length === 1) {
-        setFormData(prev => ({ ...prev, faena_id: faenas[0].id }));
-        setFiltroFaenaIdBateria(faenas[0].id);
-        loadBateriasDisponibles(faenas[0].id);
-        loadFaenaExamenes(faenas[0].id);
-      }
-    } catch (error) {
-      console.error("Error loading faenas:", error);
-      setFaenasEmpresa([]);
-    } finally {
-      setLoadingFaenas(false);
+    // Read from cached empresa_faenas + cached faenas
+    const faenaIds = cachedEmpresaFaenas
+      .filter((ef: any) => ef.empresa_id === empresaId)
+      .map((ef: any) => ef.faena_id);
+    
+    const faenas = (cachedFaenas as Faena[]).filter(f => faenaIds.includes(f.id));
+    setFaenasEmpresa(faenas);
+    
+    // Auto-assign if only one faena
+    if (faenas.length === 1) {
+      setFormData(prev => ({ ...prev, faena_id: faenas[0].id }));
+      setFiltroFaenaIdBateria(faenas[0].id);
+      loadBateriasDisponibles(faenas[0].id);
+      loadFaenaExamenes(faenas[0].id);
     }
   };
 
-  // Cargar baterías disponibles para una faena
-  const loadBateriasDisponibles = async (faenaId: string) => {
+  // ── Cache-based: baterías for faena (instant) ─────────────────────
+  const loadBateriasDisponibles = (faenaId: string) => {
     if (!faenaId) {
       setBateriasDisponibles([]);
       return;
     }
-    
-    try {
-      const { data, error } = await supabase
-        .from("bateria_faenas")
-        .select("paquete_id")
-        .eq("faena_id", faenaId)
-        .eq("activo", true);
-
-      if (error) throw error;
-      
-      const paqueteIds = (data || []).map((bf: any) => bf.paquete_id);
-      setBateriasDisponibles(paqueteIds);
-    } catch (error) {
-      console.error("Error loading baterias:", error);
-      setBateriasDisponibles([]);
-    }
+    const paqueteIds = cachedBateriaFaenas
+      .filter((bf: any) => bf.faena_id === faenaId)
+      .map((bf: any) => bf.paquete_id);
+    setBateriasDisponibles(paqueteIds);
   };
 
   // Manejar cambio de empresa
-  const handleEmpresaChange = async (empresaId: string) => {
+  const handleEmpresaChange = (empresaId: string) => {
     setFormData(prev => ({ ...prev, empresa_id: empresaId, faena_id: "" }));
     setSelectedPaquetes([]);
     setBateriasDisponibles([]);
     setFaenaExamenesIds([]);
-    await loadFaenasDeEmpresa(empresaId);
+    loadFaenasDeEmpresa(empresaId);
   };
 
-  // Cargar exámenes vinculados a una faena (directos + los de baterías de la faena)
-  const loadFaenaExamenes = async (faenaId: string) => {
+  // ── Cache-based: exámenes for faena (instant) ─────────────────────
+  const loadFaenaExamenes = (faenaId: string) => {
     if (!faenaId) {
       setFaenaExamenesIds([]);
       return;
     }
-    try {
-      // 1. Exámenes directos de la faena
-      const { data: directos, error: errDirectos } = await supabase
-        .from("faena_examenes")
-        .select("examen_id")
-        .eq("faena_id", faenaId)
-        .eq("activo", true);
-      if (errDirectos) throw errDirectos;
+    // 1. Direct exams from faena
+    const directIds = cachedFaenaExamenes
+      .filter((fe: any) => fe.faena_id === faenaId)
+      .map((fe: any) => fe.examen_id);
 
-      // 2. Exámenes de las baterías vinculadas a esta faena
-      const { data: bateriasFaena, error: errBF } = await supabase
-        .from("bateria_faenas")
-        .select("paquete_id")
-        .eq("faena_id", faenaId)
-        .eq("activo", true);
-      if (errBF) throw errBF;
+    // 2. Exams from batteries linked to this faena
+    const pIds = cachedBateriaFaenas
+      .filter((bf: any) => bf.faena_id === faenaId)
+      .map((bf: any) => bf.paquete_id);
+    
+    const batExIds = paquetes
+      .filter(p => pIds.includes(p.id))
+      .flatMap(p => p.paquete_examen_items.map(item => item.examen_id));
 
-      let batExIds: string[] = [];
-      const pIds = (bateriasFaena || []).map((bf: any) => bf.paquete_id);
-      if (pIds.length > 0) {
-        const { data: pItems, error: errPI } = await supabase
-          .from("paquete_examen_items")
-          .select("examen_id")
-          .in("paquete_id", pIds);
-        if (errPI) throw errPI;
-        batExIds = (pItems || []).map((pi: any) => pi.examen_id);
-      }
-
-      const directIds = (directos || []).map((fe: any) => fe.examen_id);
-      setFaenaExamenesIds([...new Set([...directIds, ...batExIds])]);
-    } catch (error) {
-      console.error("Error loading faena_examenes:", error);
-      setFaenaExamenesIds([]);
-    }
+    setFaenaExamenesIds([...new Set([...directIds, ...batExIds])]);
   };
 
   // Manejar cambio de faena
-  const handleFaenaChange = async (faenaId: string) => {
+  const handleFaenaChange = (faenaId: string) => {
     setFormData(prev => ({ ...prev, faena_id: faenaId }));
     setFiltroFaenaIdBateria(faenaId || "__all__");
     setSelectedPaquetes([]);
-    await Promise.all([
-      loadBateriasDisponibles(faenaId),
-      loadFaenaExamenes(faenaId),
-    ]);
+    loadBateriasDisponibles(faenaId);
+    loadFaenaExamenes(faenaId);
   };
 
   const handleEdit = async (patient: Patient) => {
