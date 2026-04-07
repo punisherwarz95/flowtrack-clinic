@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { localDb } from "@/lib/localDb";
 import { toast } from "sonner";
 import { Save, Upload, FileText, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import AudiometriaForm from "@/components/AudiometriaForm";
@@ -201,7 +202,7 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
     if (!jsonStr) return false;
     try {
       const d = JSON.parse(jsonStr);
-      return !!d.pa_alerta;
+      return !!d.pa_alerta && !!d.pa_timer_inicio;
     } catch { return false; }
   };
 
@@ -368,13 +369,22 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
       } else {
         nuevoEstado = "incompleto";
       }
-      await supabase
+      const fechaRealizacion = (allRequiredFilled && !presionPendiente) ? new Date().toISOString() : null;
+
+      const { error: estadoError } = await supabase
         .from("atencion_examenes")
         .update({
           estado: nuevoEstado as any,
-          fecha_realizacion: (allRequiredFilled && !presionPendiente) ? new Date().toISOString() : null,
+          fecha_realizacion: fechaRealizacion,
         })
         .eq("id", atencionExamenId);
+
+      if (estadoError) throw estadoError;
+
+      await localDb.atencionExamenes.update(atencionExamenId, {
+        estado: nuevoEstado,
+        fecha_realizacion: fechaRealizacion,
+      });
 
       // Trazabilidad: share files and sync estado with linked exams
       if (allRequiredFilled && (nuevoEstado === "completado" || nuevoEstado === "muestra_tomada")) {
@@ -451,6 +461,15 @@ const ExamenFormulario = forwardRef<ExamenFormularioRef, Props>(({ atencionExame
                 .in("examen_id", linkedExamenIds)
                 .in("estado", ["pendiente", "incompleto"])
                 .select();
+
+              await Promise.all(
+                (updateResult || []).map((linked: any) =>
+                  localDb.atencionExamenes.update(linked.id, {
+                    estado: nuevoEstado,
+                    fecha_realizacion: linked.fecha_realizacion,
+                  })
+                )
+              );
               
               console.log("[TRAZABILIDAD] Exámenes actualizados:", updateResult?.length || 0);
             } else {

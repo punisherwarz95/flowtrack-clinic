@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { localDb } from "@/lib/localDb";
 import { toast } from "sonner";
 import { Activity, AlertTriangle, Save, Loader2 } from "lucide-react";
 import { PresionTimerInfo } from "@/hooks/usePresionTimers";
@@ -25,6 +26,7 @@ const PresionRetakeForm = ({ atencionId, timer, onSaved }: Props) => {
   const [saving, setSaving] = useState(false);
   const [antropometriaInfo, setAntropometriaInfo] = useState<{
     resultadoId: string;
+    atencionExamenId: string;
     campoId: string;
     data: Record<string, any>;
   } | null>(null);
@@ -39,7 +41,7 @@ const PresionRetakeForm = ({ atencionId, timer, onSaved }: Props) => {
       const { data, error } = await supabase
         .from("examen_resultados")
         .select(`
-          id, valor, campo_id,
+          id, valor, campo_id, atencion_examen_id,
           atencion_examenes!inner(atencion_id),
           examen_formulario_campos!inner(tipo_campo)
         `)
@@ -58,6 +60,7 @@ const PresionRetakeForm = ({ atencionId, timer, onSaved }: Props) => {
       if (parsed && typeof parsed === "object") {
         setAntropometriaInfo({
           resultadoId: row.id,
+          atencionExamenId: row.atencion_examen_id,
           campoId: row.campo_id,
           data: parsed,
         });
@@ -107,6 +110,22 @@ const PresionRetakeForm = ({ atencionId, timer, onSaved }: Props) => {
         .eq("id", antropometriaInfo.resultadoId);
 
       if (error) throw error;
+
+      const requiereNuevaRetoma = !!updated.pa_alerta && !!updated.pa_timer_inicio;
+      const nuevoEstado = requiereNuevaRetoma ? "incompleto" : "completado";
+      const fechaRealizacion = requiereNuevaRetoma ? null : new Date().toISOString();
+
+      const { error: examenError } = await supabase
+        .from("atencion_examenes")
+        .update({ estado: nuevoEstado as any, fecha_realizacion: fechaRealizacion })
+        .eq("id", antropometriaInfo.atencionExamenId);
+
+      if (examenError) throw examenError;
+
+      await localDb.atencionExamenes.update(antropometriaInfo.atencionExamenId, {
+        estado: nuevoEstado,
+        fecha_realizacion: fechaRealizacion,
+      });
 
       toast.success(`Toma ${toma} de presión registrada`);
       setSistolica("");

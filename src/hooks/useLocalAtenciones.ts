@@ -97,10 +97,11 @@ export function useLocalAtenciones() {
     userId?: string | null,
   ) => {
     const now = new Date().toISOString();
+    const currentExamenes = await localDb.atencionExamenes.where('atencion_id').equals(atencionId).toArray();
 
     // 1) Mark box exams as completed/incompleto locally + queue
     if (estado === 'completado' && boxExamIds.length > 0) {
-      const toUpdate = atencionExamenes.filter(
+      const toUpdate = currentExamenes.filter(
         ae => ae.atencion_id === atencionId && boxExamIds.includes(ae.examen_id) &&
           (ae.estado === 'pendiente' || ae.estado === 'incompleto'),
       );
@@ -116,7 +117,14 @@ export function useLocalAtenciones() {
     });
 
     // 3) Check remaining pending exams locally
-    const remaining = atencionExamenes.filter(
+    const projectedExamenes = currentExamenes.map((ae) => {
+      if (estado === 'completado' && boxExamIds.includes(ae.examen_id) && (ae.estado === 'pendiente' || ae.estado === 'incompleto')) {
+        return { ...ae, estado: 'completado' };
+      }
+      return ae;
+    });
+
+    const remaining = projectedExamenes.filter(
       ae => ae.atencion_id === atencionId &&
         (ae.estado === 'pendiente' || ae.estado === 'incompleto') &&
         !(estado === 'completado' && boxExamIds.includes(ae.examen_id)),
@@ -133,7 +141,7 @@ export function useLocalAtenciones() {
       await addToOutbox('atenciones', 'update', atencionId, { box_id: null });
       return 'listo_finalizar';
     }
-  }, [atencionExamenes]);
+  }, []);
 
   // ── Offline-first: completar atención desde Flujo ──────────────────
   const completarAtencionFlujo = useCallback(async (
@@ -146,10 +154,11 @@ export function useLocalAtenciones() {
     fechaInicioAtencion?: string | null,
   ) => {
     const now = new Date().toISOString();
+    const currentExamenes = await localDb.atencionExamenes.where('atencion_id').equals(atencionId).toArray();
 
     if (boxId && boxExamIds.length > 0) {
       // Get pending exams for this box
-      const examsDelBox = atencionExamenes.filter(
+      const examsDelBox = currentExamenes.filter(
         ae => ae.atencion_id === atencionId && boxExamIds.includes(ae.examen_id) &&
           (ae.estado === 'pendiente' || ae.estado === 'incompleto'),
       );
@@ -181,8 +190,7 @@ export function useLocalAtenciones() {
     }
 
     // Check remaining pending exams locally (after our updates)
-    const allExams = atencionExamenes.filter(ae => ae.atencion_id === atencionId);
-    const updatedExams = allExams.map(ae => {
+    const updatedExams = currentExamenes.map(ae => {
       if (boxId && boxExamIds.includes(ae.examen_id) && (ae.estado === 'pendiente' || ae.estado === 'incompleto')) {
         if (estado === 'completado') return { ...ae, estado: 'completado' };
         return { ...ae, estado: selectedExamIds.has(ae.id) ? 'completado' : 'incompleto' };
@@ -216,7 +224,7 @@ export function useLocalAtenciones() {
       });
       return 'finalizado';
     }
-  }, [atencionExamenes]);
+  }, []);
 
   // ── After a critical cloud write succeeds, update local cache ───────
   const updateLocalAtencion = useCallback(async (atencionId: string, changes: Partial<LocalAtencion>) => {
