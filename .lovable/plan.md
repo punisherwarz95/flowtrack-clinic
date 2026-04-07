@@ -1,76 +1,116 @@
 
 
-# Análisis de Cuellos de Botella en MediFlow
+# Audit: Bugs, Bottlenecks & Inconsistencies in Offline-First Architecture
 
-## Hallazgos
+## Critical Bugs Found
 
-### 1. Portal Paciente — Polling agresivo cada 3 segundos (CRÍTICO)
-- **Archivo**: `src/pages/PortalPaciente.tsx` (línea 926)
-- **Problema**: Hace 2 queries a Supabase (atenciones + atencion_examenes) cada 3 segundos por cada paciente con el portal abierto. Con 20 pacientes simultáneos = 40 queries cada 3s = **800 queries/minuto** solo del portal.
-- **Además**: Tiene otro polling de documentos cada 5 segundos (mencionado en el summary).
-- **Solución**: Reemplazar polling por Realtime channels (como ya hace Flujo/MiBox). Usar `postgres_changes` en `atenciones` y `atencion_examenes` filtrado por `atencion_id`. Reducir polling de documentos a 15-30s como fallback.
+### BUG 1: Pacientes module still writes directly to cloud (no outbox/offline queue)
+**File:** `src/pages/Pacientes.tsx` lines 580-867
+The `handleSubmit` function performs ALL operations (insert patient, create atencion, add exams, add documents, add baterias) directly against Supabase. If the network is slow, this blocks the UI. The 30s sync pull will overwrite local state before these cloud writes land, causing visual glitches. This contradicts the offline-first goal stated for this module.
 
-### 2. MiBox — Doble carga de datos: local cache + cloud redundante (MEDIO)
-- **Archivo**: `src/pages/MiBox.tsx` (líneas 247-260)
-- **Problema**: Al montar, carga datos desde el cache local (useEffect línea 131) Y también ejecuta `loadData()` que hace 4+ queries pesadas al cloud (línea 264). La carga local ya provee datos instantáneos; la cloud debería ser el sync engine, no una carga paralela.
-- **Solución**: Eliminar `loadData()` al montar cuando el cache local está cargado. El sync engine (pull cada 30s + realtime trigger) ya mantiene el cache actualizado.
+**Fix:** After `handleSubmit` succeeds in the cloud, force a sync pull so the local cache reflects the new patient immediately. For a true offline-first approach, the inserts should go through the outbox, but that requires `insert` support which currently only handles `update`. As a minimum, call `syncCtx.forcePull()` after successful submit.
 
-### 3. MiBox — Query de "otros boxes" innecesariamente compleja (MEDIO)
-- **Archivo**: `src/pages/MiBox.tsx` (líneas 357-386)
-- **Problema**: Hace una query extra para contar pacientes en otros boxes, luego itera con más queries en chunks. Todo esto ya está disponible en el cache local.
-- **Solución**: Calcular `pacientesEnOtrosBoxes` directamente desde `localData.atenciones` (ya se hace parcialmente en líneas 221-224 pero `loadData` lo sobreescribe).
+### BUG 2: `completarAtencionMiBox` has a redundant filter that double-excludes exams
+**File:** `src/hooks/useLocalAtenciones.ts` lines 120-131
+The `remaining` filter on line 127-131 has a double condition: it checks `ae.estado === 'pendiente' || ae.estado === 'incompleto'` AND also `!(estado === 'completado' && boxExamIds.includes(ae.examen_id))`. But `projectedExamenes` already projected those exams to 'completado' on line 121. So the second condition is redundant but harmless. However, the real bug is: exams with estado `muestra_tomada` are NOT excluded from `remaining`, so if a workmed exam was saved as `muestra_tomada` via `ExamenFormulario`, the patient could incorrectly be sent back to `en_espera`.
 
-### 4. Flujo — Re-renders masivos por dependencias amplias en useEffect (MEDIO)
-- **Archivo**: `src/pages/Flujo.tsx` (línea 223)
-- **Problema**: El useEffect que procesa datos locales depende de `localData.atenciones`, `localData.atencionExamenes`, `localData.atencionDocumentos`. Cada cambio en cualquier examen de cualquier paciente recalcula TODO: pending boxes, examenes pendientes, docs counts para todas las atenciones.
-- **Solución**: Usar `useMemo` en lugar de `useEffect` + `setState` para datos derivados. Esto evita el ciclo render → setState → re-render. Calcular solo los deltas cuando sea posible.
+**Fix:** Add `muestra_tomada` to the completed states filter:
+```typescript
+const remaining = projectedExamenes.filter(
+  ae => ae.estado === 'pendiente' || ae.estado === 'incompleto'
+);
+```
+(Remove the redundant second condition and ensure `muestra_tomada` is not counted as pending.)
 
-### 5. Sync Engine — Clear + BulkPut en cada pull (BAJO-MEDIO)
-- **Archivo**: `src/hooks/useLocalSync.ts` (líneas 141-148)
-- **Problema**: Cada 30 segundos hace `clear()` + `bulkPut()` en 3 tablas de IndexedDB. Esto invalida todas las live queries de Dexie, causando re-renders en TODOS los componentes que usan `useLocalAtenciones()` (Flujo, MiBox, Dashboard), incluso si los datos no cambiaron.
-- **Solución**: Comparar datos antes de escribir (hash o timestamp). Solo hacer upsert de registros que realmente cambiaron. Alternativamente, usar `bulkPut` sin `clear` y eliminar registros que ya no existen.
+### BUG 3: `completarAtencionFlujo` same `muestra_tomada` issue
+**File:** `src/hooks/useLocalAtenciones.ts` line 200
+Same problem: `muestra_tomada` exams count as remaining pending, causing patient to return to `en_espera` when all real exams are done.
 
-### 6. Auth Context — Failsafe de 8 segundos visible en logs (BAJO)
-- **Archivo**: `src/contexts/AuthContext.tsx` (líneas 118-123)
-- **Problema**: El console warning `[Auth] Failsafe: auth loading timeout` aparece en los logs actuales, indicando que `getSession()` tarda más de 8s o hay una race condition con `onAuthStateChange`. Esto bloquea toda la app durante la carga.
-- **Solución**: Investigar por qué el failsafe se activa. Podría ser latencia del servidor (ya en instancia Small). Considerar mostrar la UI con skeleton mientras auth resuelve.
+### BUG 4: ExamenFormulario saves to cloud but trazabilidad sync only updates localDb partially
+**File:** `src/components/ExamenFormulario.tsx` lines 390-481
+When trazabilidad updates linked exams in the cloud (line 454-463), it also updates `localDb` (lines 465-472). But the outbox is NOT involved, so if the cloud write succeeds but localDb update fails (or vice versa), states can diverge. More critically, the pull sync could overwrite these local changes within 30s if the cloud write hasn't fully propagated.
 
-### 7. Dashboard — Cálculos pesados sin memoización (BAJO)
-- **Archivo**: `src/pages/Dashboard.tsx`
-- **Problema**: `computeDailyStatsFromLocal()` y `computeTableDataFromLocal()` iteran sobre todas las atenciones y exámenes del día en cada render. Con 200+ pacientes y 2000+ exámenes, esto puede ser lento.
-- **Solución**: Envolver en `useMemo` con dependencias específicas.
+**Fix:** Add the trazabilidad-linked exam IDs to the outbox protection set, or simplify by relying on the dual-write pattern consistently.
 
-## Plan de implementación (priorizado por impacto)
+### BUG 5: Mi Box `loadData()` still called as fallback but duplicates local cache work
+**File:** `src/pages/MiBox.tsx` lines 250-253, 307-460
+When `localData.isLoaded` is false, `loadData()` is called which fetches everything from cloud. But this data is NOT written to IndexedDB, so it creates a parallel state that can conflict with the local cache once it loads. The `loadData()` function sets state directly (`setPacientesEnAtencion`, etc.) which then gets overwritten when the local cache effect runs on line 132.
 
-### Paso 1: Portal Paciente — Reemplazar polling 3s por Realtime
-- Suscribir a `postgres_changes` en `atenciones` y `atencion_examenes` filtrado por `atencion_id`
-- Mantener un polling de fallback cada 30s (no 3s)
-- Reducir polling de documentos de 5s a 15s
+**Fix:** Remove the `loadData()` fallback entirely, or ensure it writes to IndexedDB so the local cache effect picks it up consistently.
 
-### Paso 2: Sync Engine — Escritura inteligente (diff antes de clear)
-- En `pullData()`, comparar hash de datos actuales vs nuevos antes de escribir a IndexedDB
-- Si no hay cambios, skip la escritura y evitar re-renders en cascada
-- Esto reduce re-renders innecesarios en Flujo, MiBox, y Dashboard simultáneamente
+### BUG 6: Flujo `localDerived` useMemo triggers setState in useEffect (anti-pattern)
+**File:** `src/pages/Flujo.tsx` lines 117-230
+The `localDerived` useMemo computes all derived data, then a separate `useEffect` (line 220-230) copies it into 7 different state variables. This causes an extra render cycle on every sync update. More importantly, between the memo update and the effect running, there's a frame where the old state is displayed.
 
-### Paso 3: MiBox — Eliminar loadData() redundante
-- Cuando `localData.isLoaded` es true, no llamar a `loadData()` al montar
-- Confiar en el sync engine para mantener datos actualizados
-- Mantener `loadData()` solo como fallback manual (botón refresh)
+**Fix:** Use `localDerived` directly in the render instead of copying to state, or at minimum use `useSyncExternalStore` pattern.
 
-### Paso 4: Flujo — Convertir useEffect+setState a useMemo
-- Reemplazar el useEffect de línea 117-223 por `useMemo` que retorne los datos derivados directamente
-- Eliminar los 6 estados intermedios (`examenesPendientes`, `pendingBoxes`, etc.) y calcularlos como valores derivados
+### BUG 7: Pacientes `handleEdit` loads only pending exams for today's edit
+**File:** `src/pages/Pacientes.tsx` lines 517-531
+When editing a patient today, only exams with `estado === 'pendiente'` are loaded into `selectedExamenes`. This means completed/muestra_tomada exams disappear from the edit form, and if the user saves, those completed exams could be orphaned or duplicated.
 
-### Paso 5: Dashboard — Memoizar cálculos pesados
-- Envolver `computeDailyStatsFromLocal` y `computeTableDataFromLocal` en `useMemo`
+### BUG 8: Date mutation bug in `handleSubmit` and `handleDelete`
+**File:** `src/pages/Pacientes.tsx` lines 620-622
+```typescript
+const startOfDay = new Date(dateToUse.setHours(0, 0, 0, 0)).toISOString();
+const endOfDay = new Date(dateToUse.setHours(23, 59, 59, 999)).toISOString();
+```
+`dateToUse.setHours()` mutates the Date object, so `selectedDate` React state gets mutated. This can cause stale date comparisons in subsequent renders.
 
-## Detalle técnico
+**Fix:** Use `new Date(dateToUse)` copies before calling `setHours`.
 
-**Impacto estimado del Portal Paciente (Paso 1):**
-- De ~800 queries/min → ~5-10 queries/min (solo por eventos reales)
-- Reducción de ~98% de carga al backend desde el portal
+## Bottlenecks
 
-**Impacto estimado del Sync Engine (Paso 2):**
-- Elimina ~90% de escrituras innecesarias a IndexedDB
-- Reduce re-renders en 3 páginas simultáneamente
+### BOTTLENECK 1: ExamenFormulario loads campos from cloud every time patient switches
+**File:** `src/components/ExamenFormulario.tsx` lines 112-158
+Every time a patient is selected in Mi Box, `loadCamposYResultados` fires cloud queries for `examen_formulario_campos` and `examen_resultados`. Since campo definitions don't change per patient, they should be cached (e.g., in the prestadorCache).
+
+### BOTTLENECK 2: Flujo duplicate cloud queries for non-today
+**File:** `src/pages/Flujo.tsx` lines 280-302
+When `boxes`/`examenes` cache arrives, `loadPendingBoxesOptimized`, `loadAtencionExamenesOptimized`, and `loadExamenesPendientesOptimized` are called. But these make 3 separate queries to `atencion_examenes` for the same data. Should be a single query.
+
+### BOTTLENECK 3: Reference data hooks don't use IndexedDB as initialData
+**File:** `src/hooks/useReferenceData.ts`
+The `getLocalBoxes`, `getLocalExamenes` etc. functions exist but are never used as `initialData` in the React Query hooks (lines 150-155 show `initialData: undefined`). This means the first render always waits for a cloud fetch.
+
+**Fix:** Use the async local functions as `initialData` providers to show cached data instantly.
+
+## Inconsistencies
+
+### INCONSISTENCY 1: Mixed sync patterns across modules
+- **Mi Box**: Uses `useLocalAtenciones` + local cache for today
+- **Flujo**: Uses `localDerived` useMemo from local cache for today
+- **Pacientes**: Uses `useLocalAtenciones` for display but cloud-direct for writes
+- **Dashboard**: Mixed local + cloud
+- **Completados/BoxView**: Fully cloud-based, no offline support
+
+This means staff in Completados or BoxView modules experience a completely different (slower) UX.
+
+### INCONSISTENCY 2: outbox `close_visit` uses composite key pattern
+**File:** `src/hooks/useLocalAtenciones.ts` line 83
+The recordId is `${atencionId}_${boxId}` which doesn't match any real table ID. The push handler in `useLocalSync.ts` line 351 handles this with a custom `_custom` flag. This works but is fragile and could break if the outbox is extended.
+
+### INCONSISTENCY 3: `paciente_cargo` in diffing but not fully populated
+**File:** `src/hooks/useLocalSync.ts` line 170
+The diff compares `paciente_faena_id` but never compares `paciente_cargo`, even though it's stored in `LocalAtencion`. The pull maps it on line 93, but the diff skips it.
+
+## Proposed Fix Plan (Priority Order)
+
+1. **Fix muestra_tomada bug** (BUG 2 & 3) - Patients incorrectly returning to queue
+   - Update `completarAtencionMiBox` and `completarAtencionFlujo` remaining filter
+
+2. **Fix date mutation** (BUG 8) - Subtle rendering bugs in Pacientes
+
+3. **Add forcePull after Pacientes submit** (BUG 1) - Ensure new patients appear in local cache
+
+4. **Cache examen campo definitions** (BOTTLENECK 1) - Eliminate per-patient cloud queries in Mi Box
+
+5. **Use IndexedDB as initialData in useReferenceData hooks** (BOTTLENECK 3) - Instant first render
+
+6. **Remove loadData fallback in MiBox** (BUG 5) - Eliminate dual-state conflict
+
+7. **Eliminate redundant Flujo setState cycle** (BUG 6) - Use derived data directly
+
+8. **Consolidate Flujo cloud queries** (BOTTLENECK 2) - Single query instead of 3
+
+9. **Fix handleEdit to show all exam states** (BUG 7) - Prevent data loss on edit
 
