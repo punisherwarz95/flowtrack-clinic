@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { localDb } from "@/lib/localDb";
+import { localDb, addToOutbox } from "@/lib/localDb";
 import { toast } from "sonner";
 import { Save, Upload, FileText, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import AudiometriaForm from "@/components/AudiometriaForm";
