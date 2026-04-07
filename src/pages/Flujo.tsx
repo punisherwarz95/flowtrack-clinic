@@ -605,6 +605,7 @@ const Flujo = () => {
       // Obtener los exámenes filtrados por box ANTES de actualizar
       const box = boxes.find(b => b.id === boxId);
       const boxExamIds = box?.box_examenes.map(be => be.examen_id) || [];
+      const now = new Date().toISOString();
 
       // Intento atómico: solo pasar a en_atencion si sigue en espera y sin box
       const { data: updated, error: updateError } = await supabase
@@ -612,7 +613,7 @@ const Flujo = () => {
         .update({
           estado: "en_atencion",
           box_id: boxId,
-          fecha_inicio_atencion: new Date().toISOString(),
+          fecha_inicio_atencion: now,
         })
         .eq("id", atencionId)
         .eq("estado", "en_espera")
@@ -629,7 +630,8 @@ const Flujo = () => {
         setTimeout(() => setShowErrorOverlay(false), 1000);
         
         // Actualizar inmediatamente la vista
-        await loadData();
+        if (isToday) await syncCtx.forcePull();
+        else await loadData();
         
         const { data: current } = await supabase
           .from("atenciones")
@@ -679,8 +681,16 @@ const Flujo = () => {
         return newState;
       });
 
-      // Forzar recarga de datos para sincronizar con BD
-      await loadData();
+      if (isToday) {
+        await localData.updateLocalAtencion(atencionId, {
+          estado: "en_atencion",
+          box_id: boxId,
+          fecha_inicio_atencion: now,
+          box_nombre: boxNombre || null,
+        });
+      } else {
+        await loadData();
+      }
     } catch (error: any) {
       console.error("Error:", error);
       toast.error(error.message || "Error al iniciar atención");

@@ -433,9 +433,6 @@ export function useLocalSync() {
         // Debounce: wait 500ms then pull
         setTimeout(() => pullData(), 500);
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'atencion_examenes' }, () => {
-        setTimeout(() => pullData(), 500);
-      })
       .subscribe();
 
     return () => {

@@ -247,18 +247,8 @@ const MiBox = () => {
   }, [localData.atenciones, localData.atencionExamenes, localData.isLoaded, selectedBoxId, boxes]);
 
   useEffect(() => {
-    if (selectedBoxId) {
-      // Only load from cloud if local cache is not yet populated
-      if (!localData.isLoaded) {
-        loadData();
-      }
-      // Realtime as sync trigger (sync engine also handles this)
-      const channel = supabase
-        .channel("mibox-changes")
-        .on("postgres_changes", { event: "*", schema: "public", table: "atenciones" }, () => syncCtx.forcePull())
-        .on("postgres_changes", { event: "*", schema: "public", table: "atencion_examenes" }, () => syncCtx.forcePull())
-        .subscribe();
-      return () => { supabase.removeChannel(channel); };
+    if (selectedBoxId && !localData.isLoaded) {
+      loadData();
     }
   }, [selectedBoxId, localData.isLoaded]);
 
@@ -499,9 +489,10 @@ const MiBox = () => {
     }
 
     try {
+      const now = new Date().toISOString();
       const { data: updated, error } = await supabase
         .from("atenciones")
-        .update({ estado: "en_atencion", box_id: selectedBoxId, fecha_inicio_atencion: new Date().toISOString() })
+        .update({ estado: "en_atencion", box_id: selectedBoxId, fecha_inicio_atencion: now })
         .eq("id", atencionId).eq("estado", "en_espera").is("box_id", null)
         .select("id").maybeSingle();
       if (error) throw error;
@@ -510,23 +501,26 @@ const MiBox = () => {
         setTimeout(() => setShowErrorOverlay(false), 1000);
         toast.error("Este paciente ya fue llamado por otro box");
         // Revert optimistic update
-        await loadData();
+        await syncCtx.forcePull();
         return;
       }
       await supabase.from("atencion_box_visitas").insert({ atencion_id: atencionId, box_id: selectedBoxId! });
+      await localData.updateLocalAtencion(atencionId, {
+        estado: "en_atencion",
+        box_id: selectedBoxId,
+        fecha_inicio_atencion: now,
+        box_nombre: currentBox?.nombre || null,
+      });
       
       toast.success(`🔔 Paciente ${paciente?.pacientes.nombre} entró al box`, {
         duration: 5000,
         style: { fontSize: "18px", padding: "20px", fontWeight: "bold" },
       });
       logActivity("llamar_paciente", { paciente: paciente?.pacientes.nombre, atencion_id: atencionId, box: currentBox?.nombre }, "/mi-box");
-
-      // Background refresh to sync all data
-      loadData();
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al llamar paciente");
-      loadData(); // Revert on error
+      await syncCtx.forcePull();
     }
   };
 
@@ -902,7 +896,6 @@ const MiBox = () => {
                           timer={timerByAtencion[selectedAtencion.id]}
                           onSaved={() => {
                             reloadTimers();
-                            loadData();
                           }}
                         />
                       )}
