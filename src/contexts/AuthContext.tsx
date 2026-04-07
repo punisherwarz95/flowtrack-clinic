@@ -40,7 +40,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [permissions, setPermissions] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [permissionsLoading, setPermissionsLoading] = useState(true);
-  const initializedRef = useRef(false);
+  const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
   const permsFetchRef = useRef<string | null>(null);
 
   // Load permissions for a user
@@ -110,9 +110,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    if (initializedRef.current) return;
-    initializedRef.current = true;
-
     let isMounted = true;
 
     const loadingFailsafe = window.setTimeout(() => {
@@ -176,6 +173,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => {
       isMounted = false;
+      permsFetchRef.current = null;
       window.clearTimeout(loadingFailsafe);
       subscription.unsubscribe();
     };
