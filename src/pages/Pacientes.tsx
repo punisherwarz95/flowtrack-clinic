@@ -861,6 +861,10 @@ const Pacientes = () => {
       setBateriaFilter("");
       setFiltroFaenaIdBateria("__all__");
       loadPatients();
+      // Force sync pull so local cache reflects the new patient immediately
+      if (isToday) {
+        try { syncCtx.forcePull(); } catch {}
+      }
     } catch (error: any) {
       console.error("Error:", error);
       toast.error(error.message || "Error al procesar paciente");
