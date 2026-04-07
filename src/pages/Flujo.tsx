@@ -452,60 +452,19 @@ const Flujo = () => {
   };
 
 
-  const loadExamenesPendientesOptimized = async (atenciones: Atencion[], examenesList: Examen[]) => {
+  // CONSOLIDATED: Single query for all 3 exam-derived computations
+  const loadAllExamDataOptimized = async (atenciones: Atencion[], boxesList: Box[], examenesList: Examen[]) => {
     if (atenciones.length === 0) {
       setExamenesPendientes({});
-      return;
-    }
-
-    try {
-      const atencionIds = atenciones.map(a => a.id);
-      
-      // UNA sola consulta para todos los exámenes pendientes/incompletos
-      const { data: allExamenes, error } = await supabase
-        .from("atencion_examenes")
-        .select("atencion_id, examen_id, estado")
-        .in("atencion_id", atencionIds)
-        .in("estado", ["pendiente", "incompleto"]);
-
-      if (error) throw error;
-
-      // Agrupar en memoria
-      const newExamenesPendientes: {[atencionId: string]: string[]} = {};
-      
-      // Inicializar todos con array vacío
-      atencionIds.forEach(id => {
-        newExamenesPendientes[id] = [];
-      });
-
-      // Procesar resultados
-      (allExamenes || []).forEach(ae => {
-        const examen = examenesList.find(ex => ex.id === ae.examen_id);
-        const nombre = examen?.nombre || "";
-        if (nombre) {
-          const nombreConEstado = ae.estado === "incompleto" ? `${nombre} (I)` : nombre;
-          newExamenesPendientes[ae.atencion_id].push(nombreConEstado);
-        }
-      });
-
-      setExamenesPendientes(newExamenesPendientes);
-    } catch (error) {
-      console.error("Error loading examenes pendientes:", error);
-      setExamenesPendientes({});
-    }
-  };
-
-  // OPTIMIZACIÓN v0.0.1: Una sola consulta para todos los atencion_examenes
-  const loadAtencionExamenesOptimized = async (atenciones: Atencion[], boxesList: Box[]) => {
-    if (atenciones.length === 0) {
       setAtencionExamenes({});
+      setPendingBoxes({});
       return;
     }
 
     try {
       const atencionIds = atenciones.map(a => a.id);
       
-      // UNA sola consulta para todos los exámenes
+      // ONE single query for all pending/incomplete exams
       const { data: allExamenes, error } = await supabase
         .from("atencion_examenes")
         .select("id, atencion_id, examen_id, estado, examenes(nombre)")
@@ -514,85 +473,68 @@ const Flujo = () => {
 
       if (error) throw error;
 
-      // Agrupar y filtrar en memoria
-      const newAtencionExamenes: {[atencionId: string]: AtencionExamen[]} = {};
-      
-      // Inicializar todos con array vacío
+      const newExamenesPendientes: {[id: string]: string[]} = {};
+      const newAtencionExamenes: {[id: string]: AtencionExamen[]} = {};
+      const newPendingBoxes: {[id: string]: string[]} = {};
+      const examenesPorAtencion: {[id: string]: string[]} = {};
+
       atencionIds.forEach(id => {
+        newExamenesPendientes[id] = [];
         newAtencionExamenes[id] = [];
+        newPendingBoxes[id] = [];
+        examenesPorAtencion[id] = [];
       });
 
-      // Procesar resultados
       (allExamenes || []).forEach(ae => {
+        // For examenesPendientes
+        const examen = examenesList.find(ex => ex.id === ae.examen_id);
+        const nombre = examen?.nombre || (ae as any).examenes?.nombre || "";
+        if (nombre) {
+          const nombreConEstado = ae.estado === "incompleto" ? `${nombre} (I)` : nombre;
+          newExamenesPendientes[ae.atencion_id]?.push(nombreConEstado);
+        }
+
+        // For atencionExamenes (filtered by box for en_atencion)
         const atencion = atenciones.find(a => a.id === ae.atencion_id);
-        
-        // Si está en atención con box, filtrar por exámenes del box
         if (atencion?.estado === "en_atencion" && atencion.box_id) {
           const box = boxesList.find(b => b.id === atencion.box_id);
           const boxExamIds = box?.box_examenes.map(be => be.examen_id) || [];
-          
           if (boxExamIds.includes(ae.examen_id)) {
             newAtencionExamenes[ae.atencion_id].push(ae as AtencionExamen);
           }
         } else {
-          // Para pacientes en espera, incluir todos
-          newAtencionExamenes[ae.atencion_id].push(ae as AtencionExamen);
+          newAtencionExamenes[ae.atencion_id]?.push(ae as AtencionExamen);
         }
+
+        // For pendingBoxes
+        examenesPorAtencion[ae.atencion_id]?.push(ae.examen_id);
       });
 
-      setAtencionExamenes(newAtencionExamenes);
-    } catch (error) {
-      console.error("Error loading atencion examenes:", error);
-      setAtencionExamenes({});
-    }
-  };
-
-  // OPTIMIZACIÓN v0.0.1: Reutilizar datos de loadExamenesPendientes
-  const loadPendingBoxesOptimized = async (atenciones: Atencion[], boxesList: Box[]) => {
-    if (atenciones.length === 0) {
-      setPendingBoxes({});
-      return;
-    }
-
-    try {
-      const atencionIds = atenciones.map(a => a.id);
-      
-      // UNA sola consulta (podría compartir con loadExamenesPendientes si se refactoriza más)
-      const { data: allExamenes, error } = await supabase
-        .from("atencion_examenes")
-        .select("atencion_id, examen_id")
-        .in("atencion_id", atencionIds)
-        .in("estado", ["pendiente", "incompleto"]);
-
-      if (error) throw error;
-
-      // Agrupar exámenes por atención
-      const examenesPorAtencion: {[atencionId: string]: string[]} = {};
-      atencionIds.forEach(id => {
-        examenesPorAtencion[id] = [];
-      });
-      
-      (allExamenes || []).forEach(ae => {
-        examenesPorAtencion[ae.atencion_id].push(ae.examen_id);
-      });
-
-      // Calcular boxes pendientes en memoria
-      const newPendingBoxes: {[atencionId: string]: string[]} = {};
-      
+      // Calculate pending boxes from collected exam IDs
       atencionIds.forEach(atencionId => {
-        const examenesIds = examenesPorAtencion[atencionId];
+        const exIds = examenesPorAtencion[atencionId];
         const boxesConExamenes = boxesList.filter(box => 
-          box.box_examenes.some(be => examenesIds.includes(be.examen_id))
+          box.box_examenes.some(be => exIds.includes(be.examen_id))
         );
         newPendingBoxes[atencionId] = boxesConExamenes.map(b => b.nombre);
       });
 
+      setExamenesPendientes(newExamenesPendientes);
+      setAtencionExamenes(newAtencionExamenes);
       setPendingBoxes(newPendingBoxes);
     } catch (error) {
-      console.error("Error loading pending boxes:", error);
+      console.error("Error loading exam data:", error);
+      setExamenesPendientes({});
+      setAtencionExamenes({});
       setPendingBoxes({});
     }
   };
+
+  // Keep legacy names as wrappers for callers that need individual functions
+  const loadPendingBoxesOptimized = async (a: Atencion[], b: Box[]) => loadAllExamDataOptimized(a, b, examenesRef.current);
+  const loadAtencionExamenesOptimized = async (a: Atencion[], b: Box[]) => { /* handled by consolidated */ };
+  const loadExamenesPendientesOptimized = async (a: Atencion[], e: Examen[]) => { /* handled by consolidated */ };
+
 
   const handleIniciarAtencion = async (atencionId: string) => {
     const boxId = selectedBox[atencionId];
