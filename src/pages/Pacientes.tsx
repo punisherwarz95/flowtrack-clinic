@@ -10,7 +10,8 @@ import CodigoDelDia from "@/components/CodigoDelDia";
 import { useGenerateDocumentosFromBateria } from "@/hooks/useAtencionDocumentos";
 import CopiarExamenesPaciente from "@/components/CopiarExamenesPaciente";
 import { supabase } from "@/integrations/supabase/client";
-import { useEmpresas, useExamenes, usePaquetes, useFaenas, useBateriaFaenas } from "@/hooks/useReferenceData";
+import { useEmpresas, useExamenes, usePaquetes, useFaenas, useBateriaFaenas, useEmpresaFaenas, useFaenaExamenes, useDocumentosFormularios } from "@/hooks/useReferenceData";
+import { useLocalAtenciones } from "@/hooks/useLocalAtenciones";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import { format } from "date-fns";
@@ -135,7 +136,10 @@ const Pacientes = () => {
   const examenes = cachedExamenes as Examen[];
   const { data: cachedPaquetes = [] } = usePaquetes();
   const paquetes = cachedPaquetes as Paquete[];
-  const [documentosDisponibles, setDocumentosDisponibles] = useState<DocumentoFormulario[]>([]);
+  const { data: cachedEmpresaFaenas = [] } = useEmpresaFaenas();
+  const { data: cachedFaenaExamenes = [] } = useFaenaExamenes();
+  const { data: cachedDocumentosFormularios = [] } = useDocumentosFormularios();
+  const documentosDisponibles = cachedDocumentosFormularios as DocumentoFormulario[];
   const [selectedDocumentos, setSelectedDocumentos] = useState<string[]>([]);
   const [documentoFilter, setDocumentoFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -152,14 +156,17 @@ const Pacientes = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [documentosPendientes, setDocumentosPendientes] = useState<{[patientId: string]: number}>({});
   
-  // Estados para faenas (now from cache)
+  // Faenas computed from cache
   const [faenasEmpresa, setFaenasEmpresa] = useState<Faena[]>([]);
   const [bateriasDisponibles, setBateriasDisponibles] = useState<string[]>([]);
-  const [loadingFaenas, setLoadingFaenas] = useState(false);
+  const [loadingFaenas] = useState(false);
   
   // Cached reference data for faenas and baterias
   const { data: cachedFaenas = [] } = useFaenas();
   const { data: cachedBateriaFaenas = [] } = useBateriaFaenas();
+
+  // Local offline data
+  const { atenciones: localAtenciones, atencionExamenes: localAtencionExamenes, atencionDocumentos: localAtencionDocumentos, isLoaded: localDataLoaded } = useLocalAtenciones();
   
   // Estados para filtro de baterías por faena (como en cotizaciones)
   const [allFaenas, setAllFaenas] = useState<Faena[]>([]);
@@ -203,16 +210,61 @@ const Pacientes = () => {
     direccion: "",
   });
 
+  // Build patients list from local cache when viewing today, cloud for other dates
+  const isToday = selectedDate && 
+    selectedDate.getFullYear() === new Date().getFullYear() &&
+    selectedDate.getMonth() === new Date().getMonth() &&
+    selectedDate.getDate() === new Date().getDate();
+
   useEffect(() => {
-    loadDocumentosDisponibles();
+    if (isToday && localDataLoaded) {
+      // Use local IndexedDB data for today (instant)
+      const activeAtenciones = localAtenciones; // Show all patients of the day
+      const patientMap = new Map<string, Patient>();
+      activeAtenciones.forEach(a => {
+        if (!patientMap.has(a.paciente_id)) {
+          patientMap.set(a.paciente_id, {
+            id: a.paciente_id,
+            nombre: a.paciente_nombre || 'Sin nombre',
+            rut: a.paciente_rut || null,
+            email: a.paciente_email || null,
+            telefono: a.paciente_telefono || null,
+            fecha_nacimiento: a.paciente_fecha_nacimiento || null,
+            direccion: a.paciente_direccion || null,
+            tipo_servicio: (a.paciente_tipo_servicio as 'workmed' | 'jenner') || null,
+            empresa_id: a.paciente_empresa_id || null,
+            faena_id: a.paciente_faena_id || null,
+            empresas: a.paciente_empresa_nombre ? { id: a.paciente_empresa_id || '', nombre: a.paciente_empresa_nombre } : null,
+            atencion_actual: {
+              numero_ingreso: a.numero_ingreso || 0,
+              fecha_ingreso: a.fecha_ingreso,
+            },
+          });
+        }
+      });
+      setPatients(Array.from(patientMap.values()));
 
-    // Auto-refresh patients every 15 seconds
-    const interval = setInterval(() => {
+      // Compute document counts from local cache
+      const counts: {[patientId: string]: number} = {};
+      activeAtenciones.forEach(a => {
+        const pending = localAtencionDocumentos.filter(d => d.atencion_id === a.id && d.estado === 'pendiente').length;
+        if (pending > 0) {
+          counts[a.paciente_id] = (counts[a.paciente_id] || 0) + pending;
+        }
+      });
+      setDocumentosPendientes(counts);
+    } else if (!isToday) {
       loadPatients();
-    }, 15000);
+    }
+  }, [isToday, localDataLoaded, localAtenciones, localAtencionDocumentos, selectedDate]);
 
-    return () => clearInterval(interval);
-  }, [selectedDate]);
+  // For non-today dates, still use cloud
+  useEffect(() => {
+    if (!isToday) {
+      const interval = setInterval(() => loadPatients(), 15000);
+      return () => clearInterval(interval);
+    }
+  }, [isToday, selectedDate]);
 
   // Populate faenas and bateria map from cache
   useEffect(() => {
@@ -229,37 +281,12 @@ const Pacientes = () => {
     }
   }, [cachedFaenas, cachedBateriaFaenas]);
 
-  // Load patients separately since it depends on selectedDate
+  // Load patients for non-today dates
   useEffect(() => {
-    loadPatients();
-  }, [selectedDate]);
+    if (!isToday) loadPatients();
+  }, [selectedDate, isToday]);
 
-  // Cargar todas las faenas y mapeo bateria-faena
-  const loadAllFaenasAndBateriaFaenas = async () => {
-    try {
-      const [faenasRes, bateriaFaenasRes] = await Promise.all([
-        supabase.from("faenas").select("id, nombre, direccion").eq("activo", true).order("nombre"),
-        supabase.from("bateria_faenas").select("paquete_id, faena_id").eq("activo", true)
-      ]);
-
-      if (faenasRes.error) throw faenasRes.error;
-      if (bateriaFaenasRes.error) throw bateriaFaenasRes.error;
-
-      setAllFaenas(faenasRes.data || []);
-
-      // Crear mapa de paquete -> faenas
-      const map: PaqueteFaenaMap = {};
-      (bateriaFaenasRes.data || []).forEach((bf: any) => {
-        if (!map[bf.paquete_id]) {
-          map[bf.paquete_id] = [];
-        }
-        map[bf.paquete_id].push(bf.faena_id);
-      });
-      setPaqueteFaenasMap(map);
-    } catch (error) {
-      console.error("Error loading faenas and bateria_faenas:", error);
-    }
-  };
+  // loadAllFaenasAndBateriaFaenas removed — data comes from cache hooks
 
   // Load document counts for patients
   const loadDocumentCounts = async (patientIds: string[]) => {
@@ -307,38 +334,18 @@ const Pacientes = () => {
     }
   };
 
-  // Real-time updates for atenciones table
+  // Real-time updates — only trigger cloud reload for non-today dates
   useEffect(() => {
+    if (isToday) return; // Local cache handles today via SyncContext
+
     const channel = supabase
       .channel('pacientes-atenciones-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'atenciones'
-        },
-        () => {
-          loadPatients();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'pacientes'
-        },
-        () => {
-          loadPatients();
-        }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'atenciones' }, () => loadPatients())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pacientes' }, () => loadPatients())
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [selectedDate]);
+    return () => { supabase.removeChannel(channel); };
+  }, [selectedDate, isToday]);
 
   const loadPatients = async () => {
     try {
@@ -406,143 +413,81 @@ const Pacientes = () => {
 
   // loadEmpresas, loadExamenes, loadPaquetes removed — data comes from useReferenceData hooks
 
-  const loadDocumentosDisponibles = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("documentos_formularios")
-        .select("id, nombre, descripcion, tipo, activo")
-        .eq("activo", true)
-        .order("nombre");
-
-      if (error) throw error;
-      setDocumentosDisponibles(data || []);
-    } catch (error) {
-      console.error("Error:", error);
-    }
-  };
-
-  // Cargar faenas disponibles para una empresa
-  const loadFaenasDeEmpresa = async (empresaId: string) => {
+  // ── Cache-based: faenas for empresa (instant) ──────────────────────
+  const loadFaenasDeEmpresa = (empresaId: string) => {
     if (!empresaId) {
       setFaenasEmpresa([]);
       return;
     }
     
-    setLoadingFaenas(true);
-    try {
-      const { data, error } = await supabase
-        .from("empresa_faenas")
-        .select("faena_id, faenas:faena_id(id, nombre, direccion)")
-        .eq("empresa_id", empresaId)
-        .eq("activo", true);
-
-      if (error) throw error;
-      
-      const faenas = (data || [])
-        .map((ef: any) => ef.faenas)
-        .filter((f: any) => f !== null) as Faena[];
-      
-      setFaenasEmpresa(faenas);
-      
-      // Auto-asignar si solo hay una faena disponible
-      if (faenas.length === 1) {
-        setFormData(prev => ({ ...prev, faena_id: faenas[0].id }));
-        setFiltroFaenaIdBateria(faenas[0].id);
-        loadBateriasDisponibles(faenas[0].id);
-        loadFaenaExamenes(faenas[0].id);
-      }
-    } catch (error) {
-      console.error("Error loading faenas:", error);
-      setFaenasEmpresa([]);
-    } finally {
-      setLoadingFaenas(false);
+    // Read from cached empresa_faenas + cached faenas
+    const faenaIds = cachedEmpresaFaenas
+      .filter((ef: any) => ef.empresa_id === empresaId)
+      .map((ef: any) => ef.faena_id);
+    
+    const faenas = (cachedFaenas as Faena[]).filter(f => faenaIds.includes(f.id));
+    setFaenasEmpresa(faenas);
+    
+    // Auto-assign if only one faena
+    if (faenas.length === 1) {
+      setFormData(prev => ({ ...prev, faena_id: faenas[0].id }));
+      setFiltroFaenaIdBateria(faenas[0].id);
+      loadBateriasDisponibles(faenas[0].id);
+      loadFaenaExamenes(faenas[0].id);
     }
   };
 
-  // Cargar baterías disponibles para una faena
-  const loadBateriasDisponibles = async (faenaId: string) => {
+  // ── Cache-based: baterías for faena (instant) ─────────────────────
+  const loadBateriasDisponibles = (faenaId: string) => {
     if (!faenaId) {
       setBateriasDisponibles([]);
       return;
     }
-    
-    try {
-      const { data, error } = await supabase
-        .from("bateria_faenas")
-        .select("paquete_id")
-        .eq("faena_id", faenaId)
-        .eq("activo", true);
-
-      if (error) throw error;
-      
-      const paqueteIds = (data || []).map((bf: any) => bf.paquete_id);
-      setBateriasDisponibles(paqueteIds);
-    } catch (error) {
-      console.error("Error loading baterias:", error);
-      setBateriasDisponibles([]);
-    }
+    const paqueteIds = cachedBateriaFaenas
+      .filter((bf: any) => bf.faena_id === faenaId)
+      .map((bf: any) => bf.paquete_id);
+    setBateriasDisponibles(paqueteIds);
   };
 
   // Manejar cambio de empresa
-  const handleEmpresaChange = async (empresaId: string) => {
+  const handleEmpresaChange = (empresaId: string) => {
     setFormData(prev => ({ ...prev, empresa_id: empresaId, faena_id: "" }));
     setSelectedPaquetes([]);
     setBateriasDisponibles([]);
     setFaenaExamenesIds([]);
-    await loadFaenasDeEmpresa(empresaId);
+    loadFaenasDeEmpresa(empresaId);
   };
 
-  // Cargar exámenes vinculados a una faena (directos + los de baterías de la faena)
-  const loadFaenaExamenes = async (faenaId: string) => {
+  // ── Cache-based: exámenes for faena (instant) ─────────────────────
+  const loadFaenaExamenes = (faenaId: string) => {
     if (!faenaId) {
       setFaenaExamenesIds([]);
       return;
     }
-    try {
-      // 1. Exámenes directos de la faena
-      const { data: directos, error: errDirectos } = await supabase
-        .from("faena_examenes")
-        .select("examen_id")
-        .eq("faena_id", faenaId)
-        .eq("activo", true);
-      if (errDirectos) throw errDirectos;
+    // 1. Direct exams from faena
+    const directIds = cachedFaenaExamenes
+      .filter((fe: any) => fe.faena_id === faenaId)
+      .map((fe: any) => fe.examen_id);
 
-      // 2. Exámenes de las baterías vinculadas a esta faena
-      const { data: bateriasFaena, error: errBF } = await supabase
-        .from("bateria_faenas")
-        .select("paquete_id")
-        .eq("faena_id", faenaId)
-        .eq("activo", true);
-      if (errBF) throw errBF;
+    // 2. Exams from batteries linked to this faena
+    const pIds = cachedBateriaFaenas
+      .filter((bf: any) => bf.faena_id === faenaId)
+      .map((bf: any) => bf.paquete_id);
+    
+    const batExIds = paquetes
+      .filter(p => pIds.includes(p.id))
+      .flatMap(p => p.paquete_examen_items.map(item => item.examen_id));
 
-      let batExIds: string[] = [];
-      const pIds = (bateriasFaena || []).map((bf: any) => bf.paquete_id);
-      if (pIds.length > 0) {
-        const { data: pItems, error: errPI } = await supabase
-          .from("paquete_examen_items")
-          .select("examen_id")
-          .in("paquete_id", pIds);
-        if (errPI) throw errPI;
-        batExIds = (pItems || []).map((pi: any) => pi.examen_id);
-      }
-
-      const directIds = (directos || []).map((fe: any) => fe.examen_id);
-      setFaenaExamenesIds([...new Set([...directIds, ...batExIds])]);
-    } catch (error) {
-      console.error("Error loading faena_examenes:", error);
-      setFaenaExamenesIds([]);
-    }
+    setFaenaExamenesIds([...new Set([...directIds, ...batExIds])]);
   };
 
   // Manejar cambio de faena
-  const handleFaenaChange = async (faenaId: string) => {
+  const handleFaenaChange = (faenaId: string) => {
     setFormData(prev => ({ ...prev, faena_id: faenaId }));
     setFiltroFaenaIdBateria(faenaId || "__all__");
     setSelectedPaquetes([]);
-    await Promise.all([
-      loadBateriasDisponibles(faenaId),
-      loadFaenaExamenes(faenaId),
-    ]);
+    loadBateriasDisponibles(faenaId);
+    loadFaenaExamenes(faenaId);
   };
 
   const handleEdit = async (patient: Patient) => {
@@ -559,60 +504,74 @@ const Pacientes = () => {
       direccion: patient.direccion || "",
     });
     
-    // Cargar faenas de la empresa si existe
+    // Load faenas from cache (instant)
     if (patient.empresa_id) {
-      await loadFaenasDeEmpresa(patient.empresa_id);
+      loadFaenasDeEmpresa(patient.empresa_id);
       if ((patient as any).faena_id) {
-        await Promise.all([
-          loadBateriasDisponibles((patient as any).faena_id),
-          loadFaenaExamenes((patient as any).faena_id),
-        ]);
+        loadBateriasDisponibles((patient as any).faena_id);
+        loadFaenaExamenes((patient as any).faena_id);
       }
     }
 
-    // Cargar exámenes de la última atención (cualquier estado)
-    try {
-      const dateToUse = selectedDate || new Date();
-      const startOfDay = new Date(dateToUse.setHours(0, 0, 0, 0)).toISOString();
-      const endOfDay = new Date(dateToUse.setHours(23, 59, 59, 999)).toISOString();
-
-      const { data: atencionData, error: atencionError } = await supabase
-        .from("atenciones")
-        .select("id, estado")
-        .eq("paciente_id", patient.id)
-        .gte("fecha_ingreso", startOfDay)
-        .lte("fecha_ingreso", endOfDay)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (atencionError) throw atencionError;
-
-      if (atencionData) {
-        // Cargar exámenes pendientes y documentos existentes en paralelo
-        const [examenesRes, docsRes] = await Promise.all([
-          supabase
-            .from("atencion_examenes")
-            .select("examen_id")
-            .eq("atencion_id", atencionData.id)
-            .eq("estado", "pendiente"),
-          supabase
-            .from("atencion_documentos")
-            .select("documento_id")
-            .eq("atencion_id", atencionData.id),
-        ]);
-
-        if (examenesRes.error) throw examenesRes.error;
-        setSelectedExamenes(examenesRes.data?.map(e => e.examen_id) || []);
-        setSelectedDocumentos(docsRes.data?.map(d => d.documento_id) || []);
+    // Load exams from local cache for today, cloud for other dates
+    if (isToday) {
+      const atencion = localAtenciones.find(a => a.paciente_id === patient.id);
+      if (atencion) {
+        const exams = localAtencionExamenes
+          .filter(ae => ae.atencion_id === atencion.id && ae.estado === 'pendiente')
+          .map(ae => ae.examen_id);
+        const docs = localAtencionDocumentos
+          .filter(d => d.atencion_id === atencion.id)
+          .map(d => d.documento_id);
+        setSelectedExamenes(exams);
+        setSelectedDocumentos(docs);
       } else {
         setSelectedExamenes([]);
         setSelectedDocumentos([]);
       }
-    } catch (error) {
-      console.error("Error loading exams:", error);
-      setSelectedExamenes([]);
-      setSelectedDocumentos([]);
+    } else {
+      try {
+        const dateToUse = selectedDate || new Date();
+        const startOfDay = new Date(new Date(dateToUse).getFullYear(), new Date(dateToUse).getMonth(), new Date(dateToUse).getDate(), 0, 0, 0, 0).toISOString();
+        const endOfDay = new Date(new Date(dateToUse).getFullYear(), new Date(dateToUse).getMonth(), new Date(dateToUse).getDate(), 23, 59, 59, 999).toISOString();
+
+        const { data: atencionData, error: atencionError } = await supabase
+          .from("atenciones")
+          .select("id, estado")
+          .eq("paciente_id", patient.id)
+          .gte("fecha_ingreso", startOfDay)
+          .lte("fecha_ingreso", endOfDay)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (atencionError) throw atencionError;
+
+        if (atencionData) {
+          const [examenesRes, docsRes] = await Promise.all([
+            supabase
+              .from("atencion_examenes")
+              .select("examen_id")
+              .eq("atencion_id", atencionData.id)
+              .eq("estado", "pendiente"),
+            supabase
+              .from("atencion_documentos")
+              .select("documento_id")
+              .eq("atencion_id", atencionData.id),
+          ]);
+
+          if (examenesRes.error) throw examenesRes.error;
+          setSelectedExamenes(examenesRes.data?.map(e => e.examen_id) || []);
+          setSelectedDocumentos(docsRes.data?.map(d => d.documento_id) || []);
+        } else {
+          setSelectedExamenes([]);
+          setSelectedDocumentos([]);
+        }
+      } catch (error) {
+        console.error("Error loading exams:", error);
+        setSelectedExamenes([]);
+        setSelectedDocumentos([]);
+      }
     }
 
     setActiveMainTab("nuevo");

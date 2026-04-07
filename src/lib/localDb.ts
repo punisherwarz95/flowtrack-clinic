@@ -24,6 +24,8 @@ export interface LocalAtencion {
   paciente_direccion?: string | null;
   paciente_empresa_id?: string | null;
   paciente_empresa_nombre?: string | null;
+  paciente_faena_id?: string | null;
+  paciente_cargo?: string | null;
   box_nombre?: string | null;
 }
 
@@ -121,6 +123,29 @@ export interface LocalBateriaFaena {
   activo: boolean | null;
 }
 
+export interface LocalEmpresaFaena {
+  id: string;
+  empresa_id: string;
+  faena_id: string;
+  activo: boolean | null;
+}
+
+export interface LocalFaenaExamen {
+  id: string;
+  faena_id: string;
+  examen_id: string;
+  valor_venta: number;
+  activo: boolean | null;
+}
+
+export interface LocalDocumentoFormulario {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  tipo: string;
+  activo: boolean;
+}
+
 export interface LocalCotizacion {
   id: string;
   numero_cotizacion: number;
@@ -185,6 +210,9 @@ class MediFlowLocalDB extends Dexie {
   paqueteExamenItems!: Table<LocalPaqueteExamenItem, string>;
   faenas!: Table<LocalFaena, string>;
   bateriaFaenas!: Table<LocalBateriaFaena, string>;
+  empresaFaenas!: Table<LocalEmpresaFaena, string>;
+  faenaExamenes!: Table<LocalFaenaExamen, string>;
+  documentosFormularios!: Table<LocalDocumentoFormulario, string>;
 
   // Cotizaciones
   cotizaciones!: Table<LocalCotizacion, string>;
@@ -230,6 +258,31 @@ class MediFlowLocalDB extends Dexie {
       paqueteExamenItems: 'id, paquete_id, examen_id',
       faenas: 'id, empresa_id',
       bateriaFaenas: 'id, paquete_id, faena_id',
+
+      cotizaciones: 'id, numero_cotizacion, estado',
+      cotizacionSolicitudes: 'id, estado',
+
+      outbox: '++id, table, createdAt',
+      syncMeta: 'key',
+    });
+
+    this.version(3).stores({
+      atenciones: 'id, estado, fecha_ingreso, box_id, paciente_id',
+      atencionExamenes: 'id, atencion_id, examen_id, estado',
+      atencionDocumentos: 'id, atencion_id, estado',
+      pacientes: 'id, rut, empresa_id',
+
+      empresas: 'id',
+      boxes: 'id',
+      boxExamenes: 'id, box_id, examen_id',
+      examenes: 'id',
+      paquetes: 'id',
+      paqueteExamenItems: 'id, paquete_id, examen_id',
+      faenas: 'id, empresa_id',
+      bateriaFaenas: 'id, paquete_id, faena_id',
+      empresaFaenas: 'id, empresa_id, faena_id',
+      faenaExamenes: 'id, faena_id, examen_id',
+      documentosFormularios: 'id',
 
       cotizaciones: 'id, numero_cotizacion, estado',
       cotizacionSolicitudes: 'id, estado',

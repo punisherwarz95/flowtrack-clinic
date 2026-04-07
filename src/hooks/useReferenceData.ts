@@ -55,6 +55,29 @@ export interface CachedBateriaFaena {
   activo: boolean | null;
 }
 
+export interface CachedEmpresaFaena {
+  id: string;
+  empresa_id: string;
+  faena_id: string;
+  activo: boolean | null;
+}
+
+export interface CachedFaenaExamen {
+  id: string;
+  faena_id: string;
+  examen_id: string;
+  valor_venta: number;
+  activo: boolean | null;
+}
+
+export interface CachedDocumentoFormulario {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  tipo: string;
+  activo: boolean;
+}
+
 // ── Helper: get initial data from IndexedDB ─────────────────────────────
 async function getLocalBoxes(): Promise<CachedBox[] | undefined> {
   try {
@@ -251,3 +274,53 @@ export const usePrestadorExamenesMap = () => {
     gcTime: GC_TIME,
   });
 };
+
+export const useEmpresaFaenas = () => {
+  return useQuery({
+    queryKey: ["reference", "empresa_faenas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("empresa_faenas")
+        .select("id, empresa_id, faena_id, activo")
+        .eq("activo", true);
+      if (error) throw error;
+      return (data || []) as CachedEmpresaFaena[];
+    },
+    staleTime: STALE_TIME,
+    gcTime: GC_TIME,
+  });
+};
+
+export const useFaenaExamenes = () => {
+  return useQuery({
+    queryKey: ["reference", "faena_examenes"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("faena_examenes")
+        .select("id, faena_id, examen_id, valor_venta, activo")
+        .eq("activo", true);
+      if (error) throw error;
+      return (data || []) as CachedFaenaExamen[];
+    },
+    staleTime: STALE_TIME,
+    gcTime: GC_TIME,
+  });
+};
+
+export const useDocumentosFormularios = () => {
+  return useQuery({
+    queryKey: ["reference", "documentos_formularios"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("documentos_formularios")
+        .select("id, nombre, descripcion, tipo, activo")
+        .eq("activo", true)
+        .order("nombre");
+      if (error) throw error;
+      return (data || []) as CachedDocumentoFormulario[];
+    },
+    staleTime: STALE_TIME,
+    gcTime: GC_TIME,
+  });
+};
+
