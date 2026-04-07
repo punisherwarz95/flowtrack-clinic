@@ -110,9 +110,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    if (initializedRef.current) return;
-    initializedRef.current = true;
-
     let isMounted = true;
 
     const loadingFailsafe = window.setTimeout(() => {
