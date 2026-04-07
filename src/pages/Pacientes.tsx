@@ -281,10 +281,10 @@ const Pacientes = () => {
     }
   }, [cachedFaenas, cachedBateriaFaenas]);
 
-  // Load patients separately since it depends on selectedDate
+  // Load patients for non-today dates
   useEffect(() => {
-    loadPatients();
-  }, [selectedDate]);
+    if (!isToday) loadPatients();
+  }, [selectedDate, isToday]);
 
   // Cargar todas las faenas y mapeo bateria-faena
   const loadAllFaenasAndBateriaFaenas = async () => {
