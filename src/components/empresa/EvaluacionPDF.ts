@@ -248,6 +248,7 @@ export const generarEvaluacionPDF = async (data: EvaluacionPDFData) => {
 
   // === PAGE 2 ===
   doc.addPage();
+  addBackground();
   y = margin;
 
   // Logo again
