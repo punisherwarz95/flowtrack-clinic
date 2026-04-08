@@ -995,20 +995,23 @@ const MiBox = () => {
 
       <GlobalChat />
 
-      {/* Dialog documentos */}
-      <Dialog open={documentosDialogOpen} onOpenChange={setDocumentosDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ClipboardList className="h-5 w-5" /> Documentos del Paciente
-            </DialogTitle>
-            <DialogDescription>
-              {documentosPendientes > 0
-                ? `${documentosPendientes} documento(s) pendiente(s)`
-                : "Todos los documentos están completos"}
-            </DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="flex-1 pr-4">
+      {/* Documentos inline panel */}
+      {documentosDialogOpen && (
+        <Card className="fixed bottom-4 right-4 z-50 w-[600px] max-h-[70vh] flex flex-col shadow-xl border-2">
+          <CardHeader className="pb-2 flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <ClipboardList className="h-5 w-5" /> Documentos del Paciente
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                {documentosPendientes > 0
+                  ? `${documentosPendientes} documento(s) pendiente(s)`
+                  : "Todos los documentos están completos"}
+              </p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setDocumentosDialogOpen(false)}>✕</Button>
+          </CardHeader>
+          <CardContent className="flex-1 overflow-y-auto">
             <div className="space-y-4">
               {atencionDocumentos.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No hay documentos asignados</p>
@@ -1025,9 +1028,9 @@ const MiBox = () => {
                 ))
               )}
             </div>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

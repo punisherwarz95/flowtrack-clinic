@@ -411,30 +411,26 @@ const Incompletos = () => {
           </CardContent>
         </Card>
 
-        {/* Dialog para reactivar atención */}
-        <Dialog open={reactivateDialog.open} onOpenChange={(open) => {
-          if (!isLoading) {
-            setReactivateDialog({ open, atencion: open ? reactivateDialog.atencion : null });
-          }
-        }}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Reactivar Paciente</DialogTitle>
-              <DialogDescription>
+        {/* Inline panel para reactivar atención */}
+        {reactivateDialog.open && reactivateDialog.atencion && (
+          <Card className="border-2 border-amber-400">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Reactivar Paciente</CardTitle>
+              <p className="text-sm text-muted-foreground">
                 Se creará una nueva atención para el paciente{" "}
-                <span className="font-semibold">{reactivateDialog.atencion?.pacientes.nombre}</span>{" "}
+                <span className="font-semibold">{reactivateDialog.atencion.pacientes.nombre}</span>{" "}
                 con un nuevo número de ingreso, manteniendo solo los exámenes incompletos.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3 py-4">
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-3">
               <div className="text-sm">
-                <span className="font-medium">Atención original:</span> #{reactivateDialog.atencion?.numero_ingreso}
+                <span className="font-medium">Atención original:</span> #{reactivateDialog.atencion.numero_ingreso}
               </div>
               <div className="text-sm">
                 <span className="font-medium">Exámenes a incluir en la nueva atención:</span>
               </div>
               <div className="flex flex-wrap gap-2">
-                {reactivateDialog.atencion?.atencion_examenes
+                {reactivateDialog.atencion.atencion_examenes
                   .filter(ae => ae.estado === "incompleto")
                   .map((ae) => (
                     <Badge key={ae.id} variant="secondary" className="bg-amber-200 text-amber-800">
@@ -442,24 +438,24 @@ const Incompletos = () => {
                     </Badge>
                   ))}
               </div>
-              {reactivateDialog.atencion?.atencion_examenes.filter(ae => ae.estado === "incompleto").length === 0 && (
+              {reactivateDialog.atencion.atencion_examenes.filter(ae => ae.estado === "incompleto").length === 0 && (
                 <p className="text-muted-foreground text-sm">No hay exámenes incompletos para reactivar</p>
               )}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setReactivateDialog({ open: false, atencion: null })} disabled={isLoading}>
-                Cancelar
-              </Button>
-              <Button 
-                onClick={handleReactivateAtencion} 
-                disabled={isLoading || (reactivateDialog.atencion?.atencion_examenes.filter(ae => ae.estado === "incompleto").length || 0) === 0}
-                className="bg-amber-600 hover:bg-amber-700"
-              >
-                {isLoading ? "Reactivando..." : "Reactivar Paciente"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <div className="flex gap-2 justify-end pt-2">
+                <Button variant="outline" onClick={() => setReactivateDialog({ open: false, atencion: null })} disabled={isLoading}>
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={handleReactivateAtencion} 
+                  disabled={isLoading || (reactivateDialog.atencion.atencion_examenes.filter(ae => ae.estado === "incompleto").length || 0) === 0}
+                  className="bg-amber-600 hover:bg-amber-700"
+                >
+                  {isLoading ? "Reactivando..." : "Reactivar Paciente"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </main>
     </div>
   );

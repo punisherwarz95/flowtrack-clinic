@@ -1269,17 +1269,17 @@ const EvaluacionMedica = () => {
               </CardContent>
             </Card>
 
-            {/* Re-evaluation Dialog (kept for No Aptos tab) */}
-            <Dialog open={reEvalDialog.open} onOpenChange={(open) => !open && setReEvalDialog({ open: false, evaluacion: null, atencion: null })}>
-              <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>Re-evaluación</DialogTitle>
-                  <DialogDescription>
-                    {reEvalDialog.atencion?.pacientes.nombre} - {reEvalDialog.evaluacion?.paquetes_examenes.nombre}
-                    <br /><span className="text-xs">Evaluación original Folio #{reEvalDialog.evaluacion?.numero_informe}</span>
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
+            {/* Re-evaluation inline form */}
+            {reEvalDialog.open && reEvalDialog.evaluacion && reEvalDialog.atencion && (
+              <Card className="border-2 border-primary">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Re-evaluación</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    {reEvalDialog.atencion.pacientes.nombre} - {reEvalDialog.evaluacion.paquetes_examenes.nombre}
+                    <br /><span className="text-xs">Evaluación original Folio #{reEvalDialog.evaluacion.numero_informe}</span>
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <div>
                     <Label>Nuevo Resultado</Label>
                     <Select value={reEvalResultado} onValueChange={setReEvalResultado}>
@@ -1302,15 +1302,15 @@ const EvaluacionMedica = () => {
                       <Textarea value={reEvalRestricciones} onChange={(e) => setReEvalRestricciones(e.target.value)} placeholder="Detalle de restricciones..." rows={3} />
                     </div>
                   )}
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setReEvalDialog({ open: false, evaluacion: null, atencion: null })}>Cancelar</Button>
-                  <Button onClick={handleGuardarReEvaluacion} disabled={savingReEval || reEvalResultado === "pendiente"}>
-                    {savingReEval ? "Guardando..." : "Guardar Re-evaluación"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" onClick={() => setReEvalDialog({ open: false, evaluacion: null, atencion: null })}>Cancelar</Button>
+                    <Button onClick={handleGuardarReEvaluacion} disabled={savingReEval || reEvalResultado === "pendiente"}>
+                      {savingReEval ? "Guardando..." : "Guardar Re-evaluación"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
       </div>
