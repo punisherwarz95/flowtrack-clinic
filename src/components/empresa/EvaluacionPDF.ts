@@ -248,7 +248,7 @@ export const generarEvaluacionPDF = async (data: EvaluacionPDFData) => {
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
 
-  if (data.evaluacion.resultado === "aprobado") {
+  if (data.evaluacion.resultado === "apto" || data.evaluacion.resultado === "apto_con_restricciones") {
     doc.text(`PACIENTE APTO PARA ${data.evaluacion.paquete.nombre.toUpperCase()}`, margin, y);
   } else {
     doc.text(`PACIENTE NO APTO PARA ${data.evaluacion.paquete.nombre.toUpperCase()}`, margin, y);
