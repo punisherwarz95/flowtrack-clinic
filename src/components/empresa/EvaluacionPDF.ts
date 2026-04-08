@@ -187,13 +187,13 @@ export const generarEvaluacionPDF = async (data: EvaluacionPDFData) => {
   // Resultado grande
   doc.setFontSize(28);
   doc.setFont("helvetica", "bold");
-  const resultado = data.evaluacion.resultado === "aprobado" ? "APTO" : "NO APTO";
+  const resultado = data.evaluacion.resultado === "apto" || data.evaluacion.resultado === "apto_con_restricciones" ? "APTO" : "NO APTO";
   doc.text(resultado, pageW / 2, y, { align: "center" });
   y += 8;
 
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
-  if (data.evaluacion.resultado === "aprobado") {
+  if (data.evaluacion.resultado === "apto" || data.evaluacion.resultado === "apto_con_restricciones") {
     doc.text("El examen de salud realizado no demuestra alteraciones que impidan su desempeño", pageW / 2, y, { align: "center" });
   } else {
     doc.text("El examen de salud realizado demuestra alteraciones que impiden su desempeño", pageW / 2, y, { align: "center" });
