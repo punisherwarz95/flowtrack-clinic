@@ -1374,49 +1374,49 @@ const Pacientes = () => {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Diálogo de exámenes completados */}
-        <Dialog 
-          open={examenesCompletadosDialog.open} 
-          onOpenChange={(open) => setExamenesCompletadosDialog(prev => ({ ...prev, open }))}
-        >
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Exámenes de {examenesCompletadosDialog.patientName}</DialogTitle>
-            </DialogHeader>
-            <div className="max-h-[60vh] overflow-y-auto space-y-3 pr-2">
-              {examenesCompletadosDialog.examenes.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">
-                  No hay exámenes completados o incompletos para este paciente
-                </p>
-              ) : (
-                examenesCompletadosDialog.examenes.map((examen) => (
-                  <div 
-                    key={examen.id} 
-                    className="flex items-center justify-between p-3 border rounded-lg"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{examen.examenes.nombre}</span>
-                      <Badge 
-                        variant={examen.estado === "completado" ? "default" : "secondary"}
-                        className={examen.estado === "completado" ? "bg-green-500" : "bg-orange-500"}
-                      >
-                        {examen.estado === "completado" ? "Completado" : "Incompleto"}
-                      </Badge>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleRevertirExamen(examen.id)}
-                      className="text-warning border-warning hover:bg-warning/10"
+        {/* Panel inline de exámenes completados */}
+        {examenesCompletadosDialog.open && (
+          <Card className="border-2 border-primary">
+            <CardHeader className="pb-2 flex-row items-center justify-between">
+              <CardTitle className="text-base">Exámenes de {examenesCompletadosDialog.patientName}</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setExamenesCompletadosDialog(prev => ({ ...prev, open: false }))}>✕</Button>
+            </CardHeader>
+            <CardContent>
+              <div className="max-h-[40vh] overflow-y-auto space-y-3 pr-2">
+                {examenesCompletadosDialog.examenes.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-4">
+                    No hay exámenes completados o incompletos para este paciente
+                  </p>
+                ) : (
+                  examenesCompletadosDialog.examenes.map((examen) => (
+                    <div 
+                      key={examen.id} 
+                      className="flex items-center justify-between p-3 border rounded-lg"
                     >
-                      Revertir
-                    </Button>
-                  </div>
-                ))
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{examen.examenes.nombre}</span>
+                        <Badge 
+                          variant={examen.estado === "completado" ? "default" : "secondary"}
+                          className={examen.estado === "completado" ? "bg-green-500" : "bg-orange-500"}
+                        >
+                          {examen.estado === "completado" ? "Completado" : "Incompleto"}
+                        </Badge>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRevertirExamen(examen.id)}
+                        className="text-warning border-warning hover:bg-warning/10"
+                      >
+                        Revertir
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
           </TabsContent>
 
           <TabsContent value="nuevo">
