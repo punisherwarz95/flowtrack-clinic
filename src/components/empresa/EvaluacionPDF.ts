@@ -106,6 +106,23 @@ export const generarEvaluacionPDF = async (data: EvaluacionPDFData) => {
   const margin = 15;
   let y = margin;
 
+  // Pre-load background image if configured
+  let fondoImg: string | null = null;
+  if ((configData as any)?.fondo_url) {
+    try {
+      fondoImg = await loadImage((configData as any).fondo_url);
+    } catch {
+      // skip background
+    }
+  }
+
+  // Helper: add background image to current page
+  const addBackground = () => {
+    if (fondoImg) {
+      doc.addImage(fondoImg, "PNG", 0, 0, pageW, pageH);
+    }
+  };
+
   // Helper: add footer
   const addFooter = () => {
     const footerY = pageH - 20;
@@ -119,6 +136,7 @@ export const generarEvaluacionPDF = async (data: EvaluacionPDFData) => {
   };
 
   // === PAGE 1 ===
+  addBackground();
 
   // Logo
   if (configData?.logo_url) {
