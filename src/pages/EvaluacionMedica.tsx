@@ -121,6 +121,7 @@ const EvaluacionMedica = () => {
 
   // Exam results for the selected battery
   const [examenResultados, setExamenResultados] = useState<ExamenResultado[]>([]);
+  const [archivosCompartidos, setArchivosCompartidos] = useState<Record<string, Array<{ nombre_archivo: string; archivo_url: string }>>>({});
   const [loadingResultados, setLoadingResultados] = useState(false);
 
   // No aptos
