@@ -677,6 +677,7 @@ export type Database = {
           created_at: string
           direccion: string | null
           email_contacto: string | null
+          fondo_url: string | null
           id: string
           logo_url: string | null
           nombre_centro: string
@@ -689,6 +690,7 @@ export type Database = {
           created_at?: string
           direccion?: string | null
           email_contacto?: string | null
+          fondo_url?: string | null
           id?: string
           logo_url?: string | null
           nombre_centro?: string
@@ -701,6 +703,7 @@ export type Database = {
           created_at?: string
           direccion?: string | null
           email_contacto?: string | null
+          fondo_url?: string | null
           id?: string
           logo_url?: string | null
           nombre_centro?: string
