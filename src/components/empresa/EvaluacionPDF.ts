@@ -3,7 +3,7 @@ import autoTable from "jspdf-autotable";
 import QRCode from "qrcode";
 import { supabase } from "@/integrations/supabase/client";
 
-// v4 - Detailed exam results, blue/teal palette, grouped sub-results
+// v5 - Filter exams by paquete, remove top bar, detailed sub-results
 
 interface EvaluacionPDFData {
   evaluacion: {
@@ -14,7 +14,7 @@ interface EvaluacionPDFData {
     numero_informe: number | null;
     evaluado_at: string | null;
     datos_clinicos: any;
-    paquete: { nombre: string };
+    paquete: { id: string; nombre: string };
     evaluado_por: string | null;
   };
   paciente: {
