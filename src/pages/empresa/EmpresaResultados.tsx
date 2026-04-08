@@ -90,7 +90,7 @@ const EmpresaResultados = () => {
           evaluaciones:evaluaciones_clinicas(
             id, resultado, observaciones, restricciones, numero_informe,
             evaluado_at, evaluado_por, datos_clinicos,
-            paquete:paquetes_examenes(nombre)
+            paquete:paquetes_examenes(id, nombre)
           ),
           examenes:atencion_examenes(
             id, estado,
