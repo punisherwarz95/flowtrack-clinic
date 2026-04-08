@@ -434,6 +434,13 @@ const StaffUsersList = () => {
               </div>
             </CardHeader>
             <CardContent>
+              {user.firma_url && (
+                <div className="mb-3 flex items-center gap-2">
+                  <PenTool className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Firma:</span>
+                  <img src={user.firma_url} alt="Firma" className="h-8 object-contain border rounded" />
+                </div>
+              )}
               {!user.isAdmin && (
                 <>
                   {editingUser === user.id ? (
