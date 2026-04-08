@@ -21,6 +21,7 @@ import { toast } from "sonner";
 interface Evaluacion {
   id: string;
   resultado: string;
+  paquete_id?: string;
   observaciones: string | null;
   restricciones: string | null;
   numero_informe: number | null;
