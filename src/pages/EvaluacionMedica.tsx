@@ -121,6 +121,7 @@ const EvaluacionMedica = () => {
 
   // Exam results for the selected battery
   const [examenResultados, setExamenResultados] = useState<ExamenResultado[]>([]);
+  const [archivosCompartidos, setArchivosCompartidos] = useState<Record<string, Array<{ nombre_archivo: string; archivo_url: string }>>>({});
   const [loadingResultados, setLoadingResultados] = useState(false);
 
   // No aptos
@@ -308,26 +309,53 @@ const EvaluacionMedica = () => {
     setLoadingResultados(true);
     try {
       const examenIds = paqueteExamenItems[paqueteId] || [];
-      const atencionExamenIds = atencion.atencion_examenes
-        .filter(ae => examenIds.includes(ae.examen_id))
-        .map(ae => ae.id);
+      const atencionExamenes = atencion.atencion_examenes.filter(ae => examenIds.includes(ae.examen_id));
+      const atencionExamenIds = atencionExamenes.map(ae => ae.id);
 
       if (atencionExamenIds.length === 0) {
         setExamenResultados([]);
+        setArchivosCompartidos({});
         return;
       }
 
-      const { data, error } = await supabase
-        .from("examen_resultados")
-        .select(`
-          atencion_examen_id, campo_id, valor, archivo_url,
-          examen_formulario_campos(etiqueta, tipo_campo, opciones, orden, grupo)
-        `)
-        .in("atencion_examen_id", atencionExamenIds)
-        .order("campo_id");
+      // Fetch form results and shared files in parallel
+      const [resultadosRes, archivosRes] = await Promise.all([
+        supabase
+          .from("examen_resultados")
+          .select(`
+            atencion_examen_id, campo_id, valor, archivo_url,
+            examen_formulario_campos(etiqueta, tipo_campo, opciones, orden, grupo)
+          `)
+          .in("atencion_examen_id", atencionExamenIds)
+          .order("campo_id"),
+        supabase
+          .from("examen_archivos_compartidos")
+          .select(`
+            id, nombre_archivo, archivo_url,
+            examen_archivo_vinculos(examen_id)
+          `)
+          .eq("atencion_id", atencion.id),
+      ]);
 
-      if (error) throw error;
-      setExamenResultados((data as unknown as ExamenResultado[]) || []);
+      if (resultadosRes.error) throw resultadosRes.error;
+      setExamenResultados((resultadosRes.data as unknown as ExamenResultado[]) || []);
+
+      // Build map: atencion_examen.id -> shared files
+      const archMap: Record<string, Array<{ nombre_archivo: string; archivo_url: string }>> = {};
+      if (archivosRes.data) {
+        for (const archivo of archivosRes.data as any[]) {
+          const vinculos = archivo.examen_archivo_vinculos || [];
+          for (const v of vinculos) {
+            // Find the atencion_examen that matches this examen_id
+            const ae = atencionExamenes.find(a => a.examen_id === v.examen_id);
+            if (ae) {
+              if (!archMap[ae.id]) archMap[ae.id] = [];
+              archMap[ae.id].push({ nombre_archivo: archivo.nombre_archivo, archivo_url: archivo.archivo_url });
+            }
+          }
+        }
+      }
+      setArchivosCompartidos(archMap);
     } catch (error) {
       console.error("Error loading results:", error);
     } finally {
@@ -869,7 +897,28 @@ const EvaluacionMedica = () => {
                                         );
                                       })}
                                     </div>
-                                  ) : (
+                                  ) : null}
+                                  {/* Shared files from external labs */}
+                                  {(archivosCompartidos[ae.id] || []).length > 0 && (
+                                    <div className="space-y-2 mt-2">
+                                      {(archivosCompartidos[ae.id] || []).map((arch, archIdx) => (
+                                        <div key={`shared-${archIdx}`} className="border-b last:border-0 pb-2 last:pb-0">
+                                          <span className="text-xs text-muted-foreground block mb-1">📎 {arch.nombre_archivo}</span>
+                                          <div className="space-y-2">
+                                            {arch.archivo_url.toLowerCase().includes("pdf") ? (
+                                              <iframe src={arch.archivo_url} className="w-full h-48 border rounded-md" title={arch.nombre_archivo} />
+                                            ) : (
+                                              <img src={arch.archivo_url} alt={arch.nombre_archivo} className="max-h-48 rounded-md border object-contain" />
+                                            )}
+                                            <a href={arch.archivo_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline flex items-center gap-1">
+                                              <FileText className="h-3 w-3" /> Ver archivo completo
+                                            </a>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {sorted.length === 0 && (archivosCompartidos[ae.id] || []).length === 0 && (
                                     <p className="text-xs text-muted-foreground text-center py-2">Sin resultados cargados</p>
                                   )}
                                 </div>
