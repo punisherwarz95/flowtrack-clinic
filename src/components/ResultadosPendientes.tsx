@@ -352,6 +352,8 @@ const ResultadosPendientes = ({ selectedDate }: Props) => {
       if (vinculoError) throw vinculoError;
 
       toast.success(`PDF "${file.name}" vinculado a ${prestadorRows.length} examen(es) de ${prestadorRows[0]?.prestadorNombre}`);
+      // Refresh archivosMap so completion validation sees the new file
+      await loadPendientes();
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al subir PDF");
