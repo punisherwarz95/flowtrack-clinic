@@ -528,6 +528,7 @@ const Pacientes = () => {
           .filter(d => d.atencion_id === atencion.id)
           .map(d => d.documento_id);
         setSelectedExamenes(exams);
+        setOriginalExamenesCount(exams.length);
         setSelectedDocumentos(docs);
       } else {
         setSelectedExamenes([]);
