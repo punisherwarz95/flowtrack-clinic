@@ -319,13 +319,22 @@ export const generarEvaluacionPDF = async (data: EvaluacionPDFData) => {
   doc.setFont("helvetica", "normal");
   doc.text("Dirección Salud Ocupacional", margin, y);
 
-  // QR code - Using a text-based link since we can't generate QR in jspdf natively
-  // We'll use a simple text with the verification URL
-  doc.setFontSize(7);
-  doc.setTextColor(100);
-  doc.text("Verificar documento:", pageW - margin - 50, y - 15);
-  doc.text(verifyUrl, pageW - margin - 50, y - 11, { maxWidth: 48 });
-  doc.setTextColor(0);
+  // QR code for verification
+  try {
+    const qrDataUrl = await QRCode.toDataURL(verifyUrl, { width: 120, margin: 1 });
+    doc.addImage(qrDataUrl, "PNG", pageW - margin - 35, y - 25, 35, 35);
+    doc.setFontSize(7);
+    doc.setTextColor(100);
+    doc.text("Verificar documento", pageW - margin - 35, y + 13, { align: "left" });
+    doc.setTextColor(0);
+  } catch {
+    // Fallback to text URL if QR generation fails
+    doc.setFontSize(7);
+    doc.setTextColor(100);
+    doc.text("Verificar documento:", pageW - margin - 50, y - 15);
+    doc.text(verifyUrl, pageW - margin - 50, y - 11, { maxWidth: 48 });
+    doc.setTextColor(0);
+  }
 
   addFooter();
 
