@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Building2, Upload, Save, Image } from "lucide-react";
+import { Building2, Upload, Save, Image, Trash2 } from "lucide-react";
 
 const CentroMedicoConfig = () => {
   const [loading, setLoading] = useState(true);
@@ -186,7 +186,7 @@ const CentroMedicoConfig = () => {
                   className="h-16 object-contain border rounded p-1"
                 />
               )}
-              <div>
+              <div className="flex gap-2">
                 <input
                   type="file"
                   accept="image/*"
@@ -202,6 +202,19 @@ const CentroMedicoConfig = () => {
                   <Upload className="h-4 w-4 mr-2" />
                   {uploadingLogo ? "Subiendo..." : "Subir Logo"}
                 </Button>
+                {config.logo_url && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={async () => {
+                      setConfig((prev) => ({ ...prev, logo_url: "" }));
+                      await supabase.from("configuracion_centro").update({ logo_url: null }).eq("id", config.id);
+                      toast.success("Logo eliminado");
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />Quitar
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -220,7 +233,7 @@ const CentroMedicoConfig = () => {
                   className="h-24 object-contain border rounded p-1"
                 />
               )}
-              <div>
+              <div className="flex gap-2">
                 <input
                   type="file"
                   accept="image/*"
@@ -236,6 +249,19 @@ const CentroMedicoConfig = () => {
                   <Image className="h-4 w-4 mr-2" />
                   {uploadingFondo ? "Subiendo..." : "Subir Fondo"}
                 </Button>
+                {config.fondo_url && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={async () => {
+                      setConfig((prev) => ({ ...prev, fondo_url: "" }));
+                      await supabase.from("configuracion_centro").update({ fondo_url: null } as any).eq("id", config.id);
+                      toast.success("Fondo eliminado");
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />Quitar
+                  </Button>
+                )}
               </div>
             </div>
           </div>
