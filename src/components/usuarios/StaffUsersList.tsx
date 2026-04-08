@@ -262,6 +262,32 @@ const StaffUsersList = () => {
     }
   };
 
+  const handleFirmaUpload = async (userId: string, file: File) => {
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `firmas/${userId}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("centro-assets")
+        .upload(path, file, { upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("centro-assets")
+        .getPublicUrl(path);
+
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ firma_url: urlData.publicUrl })
+        .eq("id", userId);
+      if (updateError) throw updateError;
+
+      toast.success("Firma actualizada");
+      loadData();
+    } catch (error: any) {
+      toast.error("Error al subir firma: " + error.message);
+    }
+  };
+
   const filteredUsers = users.filter((u) =>
     u.username.toLowerCase().includes(searchFilter.toLowerCase())
   );
