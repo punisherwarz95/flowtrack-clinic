@@ -8,18 +8,15 @@ import { Button } from "@/components/ui/button";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import {
-  Search, Calendar, ClipboardCheck, CheckCircle, XCircle, Clock, FileText, Download,
+  Search, Calendar, ClipboardCheck, CheckCircle, XCircle, Clock, FileText, Download, ArrowLeft,
 } from "lucide-react";
 import { generarEvaluacionPDF } from "@/components/empresa/EvaluacionPDF";
 import { toast } from "sonner";
 
-// v2 - Refactored to use atenciones as data source
+// v3 - Fixed resultado values (apto/no_apto), added atencion_baterias, removed popup
 
 interface Evaluacion {
   id: string;
@@ -39,6 +36,11 @@ interface AtencionExamen {
   examen: { nombre: string };
 }
 
+interface AtencionBateria {
+  id: string;
+  paquete: { id: string; nombre: string };
+}
+
 interface PacienteResultado {
   atencion_id: string;
   fecha_ingreso: string;
@@ -51,6 +53,7 @@ interface PacienteResultado {
   empresa_rut: string;
   evaluaciones: Evaluacion[];
   examenes: AtencionExamen[];
+  baterias: AtencionBateria[];
 }
 
 const EmpresaResultados = () => {
@@ -75,7 +78,6 @@ const EmpresaResultados = () => {
     if (!currentEmpresaId) return;
     setLoading(true);
     try {
-      // Get atenciones for patients belonging to this empresa
       const { data, error } = await supabase
         .from("atenciones")
         .select(`
@@ -93,6 +95,10 @@ const EmpresaResultados = () => {
           examenes:atencion_examenes(
             id, estado,
             examen:examenes(nombre)
+          ),
+          baterias:atencion_baterias(
+            id,
+            paquete:paquetes_examenes(id, nombre)
           )
         `)
         .eq("paciente.empresa_id", currentEmpresaId)
@@ -115,6 +121,7 @@ const EmpresaResultados = () => {
         empresa_rut: a.paciente?.empresa?.rut || "",
         evaluaciones: a.evaluaciones || [],
         examenes: a.examenes || [],
+        baterias: a.baterias || [],
       }));
 
       setPacientes(mapped);
@@ -135,13 +142,17 @@ const EmpresaResultados = () => {
 
   const getResultadoBadge = (resultado: string) => {
     switch (resultado) {
-      case "aprobado":
+      case "apto":
         return (
           <Badge className="bg-green-600 text-white"><CheckCircle className="h-3 w-3 mr-1" />Apto</Badge>
         );
-      case "rechazado":
+      case "no_apto":
         return (
           <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />No Apto</Badge>
+        );
+      case "apto_con_restricciones":
+        return (
+          <Badge className="bg-amber-500 text-white"><CheckCircle className="h-3 w-3 mr-1" />Apto c/ Restricciones</Badge>
         );
       default:
         return (
@@ -150,18 +161,25 @@ const EmpresaResultados = () => {
     }
   };
 
-  const getResumenGeneral = (evaluaciones: Evaluacion[]) => {
-    if (!evaluaciones || evaluaciones.length === 0) {
-      return <Badge variant="secondary">Sin evaluaciones</Badge>;
-    }
-    const rechazados = evaluaciones.filter((e) => e.resultado === "rechazado").length;
-    const pendientes = evaluaciones.filter((e) => !e.resultado || e.resultado === "pendiente").length;
-    const aprobados = evaluaciones.filter((e) => e.resultado === "aprobado").length;
+  const getResumenGeneral = (p: PacienteResultado) => {
+    const { evaluaciones, baterias } = p;
+    if (baterias.length === 0) return <Badge variant="secondary">Sin baterías</Badge>;
+    if (evaluaciones.length === 0) return <Badge variant="secondary">Pendiente evaluación</Badge>;
 
-    if (rechazados > 0) return <Badge variant="destructive">No Apto</Badge>;
+    const noAptos = evaluaciones.filter((e) => e.resultado === "no_apto").length;
+    const pendientes = evaluaciones.filter((e) => !e.resultado || e.resultado === "pendiente").length;
+    const aptos = evaluaciones.filter((e) => e.resultado === "apto" || e.resultado === "apto_con_restricciones").length;
+
+    if (noAptos > 0) return <Badge variant="destructive">No Apto</Badge>;
     if (pendientes > 0) return <Badge variant="secondary">En evaluación</Badge>;
-    if (aprobados === evaluaciones.length) return <Badge className="bg-green-600 text-white">Apto</Badge>;
+    if (aptos === evaluaciones.length) return <Badge className="bg-green-600 text-white">Apto</Badge>;
     return <Badge variant="secondary">En proceso</Badge>;
+  };
+
+  const getBateriaStatus = (p: PacienteResultado, bateria: AtencionBateria) => {
+    const eval_ = p.evaluaciones.find(e => e.paquete?.nombre === bateria.paquete?.nombre);
+    if (!eval_) return <Badge variant="secondary" className="text-xs">Pendiente</Badge>;
+    return getResultadoBadge(eval_.resultado);
   };
 
   const handleDescargarPDF = async (paciente: PacienteResultado, evaluacion: Evaluacion) => {
@@ -197,6 +215,105 @@ const EmpresaResultados = () => {
       setGeneratingPDF(false);
     }
   };
+
+  // Inline detail view
+  if (selectedPaciente) {
+    return (
+      <EmpresaLayout>
+        <div className="space-y-6">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => setSelectedPaciente(null)}>
+              <ArrowLeft className="h-4 w-4 mr-1" />Volver
+            </Button>
+            <h1 className="text-2xl font-bold">Detalle de Evaluaciones</h1>
+          </div>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-lg bg-muted">
+                <div>
+                  <p className="text-sm text-muted-foreground">Nombre</p>
+                  <p className="font-medium">{selectedPaciente.nombre}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">RUT</p>
+                  <p className="font-mono">{selectedPaciente.rut}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Cargo</p>
+                  <p>{selectedPaciente.cargo || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Fecha de Atención</p>
+                  <p>{format(new Date(selectedPaciente.fecha_ingreso), "dd/MM/yyyy")}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-3">
+            <h4 className="font-medium text-lg">Baterías Asignadas</h4>
+            {selectedPaciente.baterias.length === 0 ? (
+              <p className="text-muted-foreground">No hay baterías asignadas</p>
+            ) : (
+              selectedPaciente.baterias.map((bateria) => {
+                const evaluacion = selectedPaciente.evaluaciones.find(
+                  e => e.paquete?.nombre === bateria.paquete?.nombre
+                );
+                return (
+                  <Card key={bateria.id}>
+                    <CardContent className="pt-4">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h5 className="font-medium">{bateria.paquete?.nombre}</h5>
+                          {evaluacion?.evaluado_at && (
+                            <p className="text-sm text-muted-foreground">
+                              Evaluado: {format(new Date(evaluacion.evaluado_at), "dd/MM/yyyy HH:mm")}
+                            </p>
+                          )}
+                        </div>
+                        {evaluacion ? getResultadoBadge(evaluacion.resultado) : (
+                          <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" />Pendiente</Badge>
+                        )}
+                      </div>
+
+                      {evaluacion?.observaciones && (
+                        <div className="mt-3 p-3 rounded-lg bg-muted">
+                          <p className="text-sm font-medium">Observaciones:</p>
+                          <p className="text-sm">{evaluacion.observaciones}</p>
+                        </div>
+                      )}
+
+                      {evaluacion?.restricciones && (
+                        <div className="mt-2 p-3 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/20 dark:border-amber-800">
+                          <p className="text-sm font-medium">Restricciones:</p>
+                          <p className="text-sm">{evaluacion.restricciones}</p>
+                        </div>
+                      )}
+
+                      {evaluacion && (evaluacion.resultado === "apto" || evaluacion.resultado === "no_apto" || evaluacion.resultado === "apto_con_restricciones") && evaluacion.numero_informe && (
+                        <div className="mt-3">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={generatingPDF}
+                            onClick={() => handleDescargarPDF(selectedPaciente, evaluacion)}
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            {generatingPDF ? "Generando..." : `Descargar Informe N° ${evaluacion.numero_informe}`}
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </EmpresaLayout>
+    );
+  }
 
   return (
     <EmpresaLayout>
@@ -275,17 +392,18 @@ const EmpresaResultados = () => {
                         <TableCell>{p.cargo || "-"}</TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
-                            {p.evaluaciones.map((e) => (
-                              <div key={e.id} title={`${e.paquete?.nombre}: ${e.resultado}`} className="cursor-pointer" onClick={() => setSelectedPaciente(p)}>
-                                {getResultadoBadge(e.resultado)}
+                            {p.baterias.map((b) => (
+                              <div key={b.id} className="flex items-center gap-1">
+                                {getBateriaStatus(p, b)}
+                                <span className="text-xs text-muted-foreground">{b.paquete?.nombre}</span>
                               </div>
                             ))}
-                            {p.evaluaciones.length === 0 && (
+                            {p.baterias.length === 0 && (
                               <Badge variant="secondary">Sin baterías</Badge>
                             )}
                           </div>
                         </TableCell>
-                        <TableCell>{getResumenGeneral(p.evaluaciones)}</TableCell>
+                        <TableCell>{getResumenGeneral(p)}</TableCell>
                         <TableCell>
                           <Button variant="ghost" size="sm" onClick={() => setSelectedPaciente(p)}>
                             <FileText className="h-4 w-4 mr-1" />Ver detalle
@@ -299,91 +417,6 @@ const EmpresaResultados = () => {
             )}
           </CardContent>
         </Card>
-
-        {/* Dialog de detalle */}
-        <Dialog open={!!selectedPaciente} onOpenChange={() => setSelectedPaciente(null)}>
-          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Detalle de Evaluaciones</DialogTitle>
-            </DialogHeader>
-
-            {selectedPaciente && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 p-4 rounded-lg bg-muted">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Nombre</p>
-                    <p className="font-medium">{selectedPaciente.nombre}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">RUT</p>
-                    <p className="font-mono">{selectedPaciente.rut}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Cargo</p>
-                    <p>{selectedPaciente.cargo || "-"}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Fecha de Atención</p>
-                    <p>{format(new Date(selectedPaciente.fecha_ingreso), "dd/MM/yyyy")}</p>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <h4 className="font-medium">Evaluaciones por Batería</h4>
-                  {selectedPaciente.evaluaciones.length === 0 ? (
-                    <p className="text-muted-foreground">No hay evaluaciones registradas</p>
-                  ) : (
-                    selectedPaciente.evaluaciones.map((evaluacion) => (
-                      <Card key={evaluacion.id}>
-                        <CardContent className="pt-4">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <h5 className="font-medium">{evaluacion.paquete?.nombre}</h5>
-                              {evaluacion.evaluado_at && (
-                                <p className="text-sm text-muted-foreground">
-                                  Evaluado: {format(new Date(evaluacion.evaluado_at), "dd/MM/yyyy HH:mm")}
-                                </p>
-                              )}
-                            </div>
-                            {getResultadoBadge(evaluacion.resultado)}
-                          </div>
-
-                          {evaluacion.observaciones && (
-                            <div className="mt-3 p-3 rounded-lg bg-muted">
-                              <p className="text-sm font-medium">Observaciones:</p>
-                              <p className="text-sm">{evaluacion.observaciones}</p>
-                            </div>
-                          )}
-
-                          {evaluacion.restricciones && (
-                            <div className="mt-2 p-3 rounded-lg bg-amber-50 border border-amber-200">
-                              <p className="text-sm font-medium text-amber-800">Restricciones:</p>
-                              <p className="text-sm text-amber-700">{evaluacion.restricciones}</p>
-                            </div>
-                          )}
-
-                          {(evaluacion.resultado === "aprobado" || evaluacion.resultado === "rechazado") && evaluacion.numero_informe && (
-                            <div className="mt-3">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={generatingPDF}
-                                onClick={() => handleDescargarPDF(selectedPaciente, evaluacion)}
-                              >
-                                <Download className="h-4 w-4 mr-2" />
-                                {generatingPDF ? "Generando..." : `Descargar Informe N° ${evaluacion.numero_informe}`}
-                              </Button>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
       </div>
     </EmpresaLayout>
   );
