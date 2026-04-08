@@ -43,6 +43,7 @@ import EmpresaBaterias from "./pages/empresa/EmpresaBaterias";
 import EmpresaResultados from "./pages/empresa/EmpresaResultados";
 import GuiaUsuario from "./pages/GuiaUsuario";
 import EstadosPago from "./pages/EstadosPago";
+import VerificarInforme from "./pages/VerificarInforme";
 
 const queryClient = new QueryClient();
 
