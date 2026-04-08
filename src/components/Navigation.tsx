@@ -86,6 +86,7 @@ const Navigation = () => {
           
           <div className="flex items-center gap-2 shrink-0">
             <SyncStatusBadge syncState={syncCtx} onForceSync={syncCtx.forcePush} />
+            {isAdmin && <PortalSwitcher currentPortal="staff" />}
             <span className="text-sm font-medium text-foreground bg-muted px-2.5 py-1 rounded-md">
               {user?.email?.replace("@mediflow.local", "") ?? ""}
             </span>
