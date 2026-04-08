@@ -129,17 +129,23 @@ export const EmpresaAuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) {
         console.error("Error cargando empresa_usuario:", error);
-        // No sobrescribir si ya tenemos un usuario (admin virtual)
         if (!empresaUsuario) {
           setEmpresaUsuario(null);
         }
       } else if (data && data.length > 0) {
         setEmpresaUsuario(data[0] as unknown as EmpresaUsuario);
       } else {
-        // No sobrescribir si ya tenemos un usuario (admin virtual)
+        // No es usuario de empresa — verificar si es admin de staff
         if (!empresaUsuario) {
           setEmpresaUsuario(null);
         }
+        // Verificar rol admin en user_roles para permitir acceso como staff admin
+        const { data: roles } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", authUserId);
+        const adminDetected = roles?.some((r) => r.role === "admin") ?? false;
+        setIsStaffAdmin(adminDetected);
       }
     } catch (err) {
       console.error("Error en loadEmpresaUsuario:", err);
