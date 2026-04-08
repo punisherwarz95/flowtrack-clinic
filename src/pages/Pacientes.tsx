@@ -754,6 +754,9 @@ const Pacientes = () => {
             toast.success("Datos del paciente actualizados");
             await logActivity("editar_paciente", { nombre: formData.nombre, rut: formData.rut }, "/pacientes");
           }
+
+          // Sync local cache to reflect cloud changes
+          syncCtx.forcePull();
         }
       } else {
         // ── NEW PATIENT: Background cloud write for instant UI ──
