@@ -195,6 +195,10 @@ const Configuracion = () => {
               <MapPin className="h-4 w-4" />
               Faenas
             </TabsTrigger>
+            <TabsTrigger value="centro" className="flex items-center gap-2">
+              <Building2 className="h-4 w-4" />
+              Centro Médico
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="bloques">
