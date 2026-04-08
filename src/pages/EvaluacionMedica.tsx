@@ -243,25 +243,21 @@ const EvaluacionMedica = () => {
       return;
     }
 
-    let peiMap = listPaqueteExamItems;
-    let evals = listEvaluaciones[atencion.id] || [];
+    // Always fetch fresh data for the selected patient to avoid stale state
+    const [peiRes, evalRes] = await Promise.all([
+      supabase.from("paquete_examen_items").select("paquete_id, examen_id").in("paquete_id", paqueteIds),
+      supabase.from("evaluaciones_clinicas").select("*, paquetes_examenes(nombre)").eq("atencion_id", atencion.id),
+    ]);
+
+    const peiMap: Record<string, string[]> = {};
+    (peiRes.data || []).forEach((item: { paquete_id: string; examen_id: string }) => {
+      if (!peiMap[item.paquete_id]) peiMap[item.paquete_id] = [];
+      peiMap[item.paquete_id].push(item.examen_id);
+    });
+    const evals = (evalRes.data || []) as unknown as EvaluacionClinica[];
 
     // Get all examen_ids for this patient
     const allExamenIds = Array.from(new Set(atencion.atencion_examenes.map(ae => ae.examen_id)));
-
-    if (Object.keys(peiMap).length === 0) {
-      const [peiRes, evalRes] = await Promise.all([
-        supabase.from("paquete_examen_items").select("paquete_id, examen_id").in("paquete_id", paqueteIds),
-        supabase.from("evaluaciones_clinicas").select("*, paquetes_examenes(nombre)").eq("atencion_id", atencion.id),
-      ]);
-
-      peiMap = {};
-      (peiRes.data || []).forEach((item: { paquete_id: string; examen_id: string }) => {
-        if (!peiMap[item.paquete_id]) peiMap[item.paquete_id] = [];
-        peiMap[item.paquete_id].push(item.examen_id);
-      });
-      evals = (evalRes.data || []) as unknown as EvaluacionClinica[];
-    }
 
     // Fetch prestador mapping for exams
     if (allExamenIds.length > 0) {
