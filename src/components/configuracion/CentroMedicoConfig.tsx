@@ -6,12 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Building2, Upload, Save } from "lucide-react";
+import { Building2, Upload, Save, Image } from "lucide-react";
 
 const CentroMedicoConfig = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingFondo, setUploadingFondo] = useState(false);
   const [config, setConfig] = useState({
     id: "",
     nombre_centro: "",
@@ -21,6 +22,7 @@ const CentroMedicoConfig = () => {
     email_contacto: "",
     parrafo_legal: "",
     logo_url: "",
+    fondo_url: "",
   });
 
   useEffect(() => {
@@ -46,6 +48,7 @@ const CentroMedicoConfig = () => {
           email_contacto: data.email_contacto || "",
           parrafo_legal: data.parrafo_legal || "",
           logo_url: data.logo_url || "",
+          fondo_url: (data as any).fondo_url || "",
         });
       }
     } catch (error) {
@@ -68,7 +71,8 @@ const CentroMedicoConfig = () => {
           email_contacto: config.email_contacto,
           parrafo_legal: config.parrafo_legal,
           logo_url: config.logo_url,
-        })
+          fondo_url: config.fondo_url,
+        } as any)
         .eq("id", config.id);
 
       if (error) throw error;
@@ -112,6 +116,41 @@ const CentroMedicoConfig = () => {
       toast.error("Error al subir logo: " + error.message);
     } finally {
       setUploadingLogo(false);
+    }
+  };
+
+  const handleFondoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingFondo(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `fondo/fondo.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("centro-assets")
+        .upload(path, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("centro-assets")
+        .getPublicUrl(path);
+
+      const fondo_url = urlData.publicUrl;
+      setConfig((prev) => ({ ...prev, fondo_url }));
+
+      await supabase
+        .from("configuracion_centro")
+        .update({ fondo_url } as any)
+        .eq("id", config.id);
+
+      toast.success("Fondo de hoja actualizado");
+    } catch (error: any) {
+      toast.error("Error al subir fondo: " + error.message);
+    } finally {
+      setUploadingFondo(false);
     }
   };
 
@@ -162,6 +201,40 @@ const CentroMedicoConfig = () => {
                 >
                   <Upload className="h-4 w-4 mr-2" />
                   {uploadingLogo ? "Subiendo..." : "Subir Logo"}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Fondo de hoja */}
+          <div className="space-y-2">
+            <Label>Fondo de Hoja (PDF)</Label>
+            <p className="text-xs text-muted-foreground">
+              Imagen de fondo para las páginas del informe PDF (tamaño carta recomendado: 816x1056px)
+            </p>
+            <div className="flex items-center gap-4">
+              {config.fondo_url && (
+                <img
+                  src={config.fondo_url}
+                  alt="Fondo"
+                  className="h-24 object-contain border rounded p-1"
+                />
+              )}
+              <div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFondoUpload}
+                  className="hidden"
+                  id="fondo-upload"
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => document.getElementById("fondo-upload")?.click()}
+                  disabled={uploadingFondo}
+                >
+                  <Image className="h-4 w-4 mr-2" />
+                  {uploadingFondo ? "Subiendo..." : "Subir Fondo"}
                 </Button>
               </div>
             </div>
