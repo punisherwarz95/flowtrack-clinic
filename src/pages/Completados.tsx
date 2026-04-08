@@ -296,22 +296,19 @@ const Completados = () => {
           </TabsContent>
         </Tabs>
 
-        {/* Dialog para revertir atención */}
-        <Dialog open={revertDialog.open} onOpenChange={(open) => {
-          setRevertDialog({ open, atencion: open ? revertDialog.atencion : null });
-          if (!open) setSelectedExamenesRevert([]);
-        }}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Devolver Paciente a Espera</DialogTitle>
-              <DialogDescription>
+        {/* Inline panel para revertir atención */}
+        {revertDialog.open && revertDialog.atencion && (
+          <Card className="border-2 border-primary">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Devolver Paciente a Espera</CardTitle>
+              <p className="text-sm text-muted-foreground">
                 Selecciona los exámenes que deseas revertir a pendiente para el paciente{" "}
-                <span className="font-semibold">{revertDialog.atencion?.pacientes.nombre}</span>
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3 py-4">
+                <span className="font-semibold">{revertDialog.atencion.pacientes.nombre}</span>
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-3">
               <Label className="text-sm font-medium">Exámenes a revertir:</Label>
-              {revertDialog.atencion?.atencion_examenes
+              {revertDialog.atencion.atencion_examenes
                 .filter(ae => ae.estado === "completado")
                 .map((ae) => (
                   <div key={ae.id} className="flex items-center gap-2">
@@ -325,20 +322,20 @@ const Completados = () => {
                     </Label>
                   </div>
                 ))}
-              {revertDialog.atencion?.atencion_examenes.filter(ae => ae.estado === "completado").length === 0 && (
+              {revertDialog.atencion.atencion_examenes.filter(ae => ae.estado === "completado").length === 0 && (
                 <p className="text-muted-foreground text-sm">No hay exámenes completados para revertir</p>
               )}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setRevertDialog({ open: false, atencion: null })}>
-                Cancelar
-              </Button>
-              <Button onClick={handleRevertAtencion} disabled={selectedExamenesRevert.length === 0}>
-                Devolver a Espera
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <div className="flex gap-2 justify-end pt-2">
+                <Button variant="outline" onClick={() => { setRevertDialog({ open: false, atencion: null }); setSelectedExamenesRevert([]); }}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleRevertAtencion} disabled={selectedExamenesRevert.length === 0}>
+                  Devolver a Espera
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </main>
     </div>
   );
