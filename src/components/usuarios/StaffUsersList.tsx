@@ -387,7 +387,7 @@ const StaffUsersList = () => {
         {filteredUsers.map((user) => (
           <Card key={user.id}>
             <CardHeader>
-              <div className="flex justify-between items-start">
+                <div className="flex justify-between items-start">
                 <div>
                   <CardTitle>{user.username}</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
@@ -395,6 +395,26 @@ const StaffUsersList = () => {
                   </p>
                 </div>
                 <div className="flex gap-2">
+                  <div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      id={`firma-${user.id}`}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleFirmaUpload(user.id, f);
+                      }}
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => document.getElementById(`firma-${user.id}`)?.click()}
+                      title="Subir firma"
+                    >
+                      <PenTool className="h-4 w-4" />
+                    </Button>
+                  </div>
                   <Button
                     variant="outline"
                     size="icon"
