@@ -309,26 +309,53 @@ const EvaluacionMedica = () => {
     setLoadingResultados(true);
     try {
       const examenIds = paqueteExamenItems[paqueteId] || [];
-      const atencionExamenIds = atencion.atencion_examenes
-        .filter(ae => examenIds.includes(ae.examen_id))
-        .map(ae => ae.id);
+      const atencionExamenes = atencion.atencion_examenes.filter(ae => examenIds.includes(ae.examen_id));
+      const atencionExamenIds = atencionExamenes.map(ae => ae.id);
 
       if (atencionExamenIds.length === 0) {
         setExamenResultados([]);
+        setArchivosCompartidos({});
         return;
       }
 
-      const { data, error } = await supabase
-        .from("examen_resultados")
-        .select(`
-          atencion_examen_id, campo_id, valor, archivo_url,
-          examen_formulario_campos(etiqueta, tipo_campo, opciones, orden, grupo)
-        `)
-        .in("atencion_examen_id", atencionExamenIds)
-        .order("campo_id");
+      // Fetch form results and shared files in parallel
+      const [resultadosRes, archivosRes] = await Promise.all([
+        supabase
+          .from("examen_resultados")
+          .select(`
+            atencion_examen_id, campo_id, valor, archivo_url,
+            examen_formulario_campos(etiqueta, tipo_campo, opciones, orden, grupo)
+          `)
+          .in("atencion_examen_id", atencionExamenIds)
+          .order("campo_id"),
+        supabase
+          .from("examen_archivos_compartidos")
+          .select(`
+            id, nombre_archivo, archivo_url,
+            examen_archivo_vinculos(examen_id)
+          `)
+          .eq("atencion_id", atencion.id),
+      ]);
 
-      if (error) throw error;
-      setExamenResultados((data as unknown as ExamenResultado[]) || []);
+      if (resultadosRes.error) throw resultadosRes.error;
+      setExamenResultados((resultadosRes.data as unknown as ExamenResultado[]) || []);
+
+      // Build map: atencion_examen.id -> shared files
+      const archMap: Record<string, Array<{ nombre_archivo: string; archivo_url: string }>> = {};
+      if (archivosRes.data) {
+        for (const archivo of archivosRes.data as any[]) {
+          const vinculos = archivo.examen_archivo_vinculos || [];
+          for (const v of vinculos) {
+            // Find the atencion_examen that matches this examen_id
+            const ae = atencionExamenes.find(a => a.examen_id === v.examen_id);
+            if (ae) {
+              if (!archMap[ae.id]) archMap[ae.id] = [];
+              archMap[ae.id].push({ nombre_archivo: archivo.nombre_archivo, archivo_url: archivo.archivo_url });
+            }
+          }
+        }
+      }
+      setArchivosCompartidos(archMap);
     } catch (error) {
       console.error("Error loading results:", error);
     } finally {
