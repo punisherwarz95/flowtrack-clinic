@@ -85,12 +85,21 @@ interface ExamDetailResult {
   campos: Array<{ etiqueta: string; valor: string | null; grupo: string | null }>;
 }
 
-const fetchExamDetails = async (atencionId: string): Promise<ExamDetailResult[]> => {
+const fetchExamDetails = async (atencionId: string, paqueteId: string): Promise<ExamDetailResult[]> => {
+  // First get examen_ids that belong to this paquete
+  const { data: paqueteItems } = await supabase
+    .from("paquete_examen_items")
+    .select("examen_id")
+    .eq("paquete_id", paqueteId);
+
+  const paqueteExamenIds = new Set((paqueteItems || []).map((p: any) => p.examen_id));
+
   const { data } = await supabase
     .from("atencion_examenes")
     .select(`
       id,
       estado,
+      examen_id,
       examen:examenes(nombre),
       resultados:examen_resultados(
         valor,
