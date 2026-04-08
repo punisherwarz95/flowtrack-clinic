@@ -897,7 +897,28 @@ const EvaluacionMedica = () => {
                                         );
                                       })}
                                     </div>
-                                  ) : (
+                                  ) : null}
+                                  {/* Shared files from external labs */}
+                                  {(archivosCompartidos[ae.id] || []).length > 0 && (
+                                    <div className="space-y-2 mt-2">
+                                      {(archivosCompartidos[ae.id] || []).map((arch, archIdx) => (
+                                        <div key={`shared-${archIdx}`} className="border-b last:border-0 pb-2 last:pb-0">
+                                          <span className="text-xs text-muted-foreground block mb-1">📎 {arch.nombre_archivo}</span>
+                                          <div className="space-y-2">
+                                            {arch.archivo_url.toLowerCase().includes("pdf") ? (
+                                              <iframe src={arch.archivo_url} className="w-full h-48 border rounded-md" title={arch.nombre_archivo} />
+                                            ) : (
+                                              <img src={arch.archivo_url} alt={arch.nombre_archivo} className="max-h-48 rounded-md border object-contain" />
+                                            )}
+                                            <a href={arch.archivo_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline flex items-center gap-1">
+                                              <FileText className="h-3 w-3" /> Ver archivo completo
+                                            </a>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {sorted.length === 0 && (archivosCompartidos[ae.id] || []).length === 0 && (
                                     <p className="text-xs text-muted-foreground text-center py-2">Sin resultados cargados</p>
                                   )}
                                 </div>
