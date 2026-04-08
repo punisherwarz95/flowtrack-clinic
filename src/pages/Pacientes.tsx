@@ -573,6 +573,7 @@ const Pacientes = () => {
           setSelectedDocumentos(docsRes.data?.map(d => d.documento_id) || []);
         } else {
           setSelectedExamenes([]);
+          setOriginalExamenesCount(0);
           setSelectedDocumentos([]);
         }
       } catch (error) {
