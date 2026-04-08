@@ -28,7 +28,7 @@ interface Evaluacion {
   evaluado_at: string | null;
   evaluado_por: string | null;
   datos_clinicos: any;
-  paquete: { nombre: string };
+  paquete: { id: string; nombre: string };
 }
 
 interface AtencionExamen {
