@@ -186,7 +186,7 @@ const CentroMedicoConfig = () => {
                   className="h-16 object-contain border rounded p-1"
                 />
               )}
-              <div>
+              <div className="flex gap-2">
                 <input
                   type="file"
                   accept="image/*"
@@ -202,6 +202,19 @@ const CentroMedicoConfig = () => {
                   <Upload className="h-4 w-4 mr-2" />
                   {uploadingLogo ? "Subiendo..." : "Subir Logo"}
                 </Button>
+                {config.logo_url && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={async () => {
+                      setConfig((prev) => ({ ...prev, logo_url: "" }));
+                      await supabase.from("configuracion_centro").update({ logo_url: null }).eq("id", config.id);
+                      toast.success("Logo eliminado");
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />Quitar
+                  </Button>
+                )}
               </div>
             </div>
           </div>
