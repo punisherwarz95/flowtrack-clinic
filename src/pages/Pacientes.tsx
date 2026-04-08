@@ -155,6 +155,7 @@ const Pacientes = () => {
   const [empresaDropdownOpen, setEmpresaDropdownOpen] = useState(false);
   const empresaDropdownRef = useRef<HTMLDivElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [originalExamenesCount, setOriginalExamenesCount] = useState(0);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [documentosPendientes, setDocumentosPendientes] = useState<{[patientId: string]: number}>({});
   
@@ -527,9 +528,11 @@ const Pacientes = () => {
           .filter(d => d.atencion_id === atencion.id)
           .map(d => d.documento_id);
         setSelectedExamenes(exams);
+        setOriginalExamenesCount(exams.length);
         setSelectedDocumentos(docs);
       } else {
         setSelectedExamenes([]);
+        setOriginalExamenesCount(0);
         setSelectedDocumentos([]);
       }
     } else {
@@ -564,10 +567,13 @@ const Pacientes = () => {
           ]);
 
           if (examenesRes.error) throw examenesRes.error;
-          setSelectedExamenes(examenesRes.data?.map(e => e.examen_id) || []);
+          const loadedExams = examenesRes.data?.map(e => e.examen_id) || [];
+          setSelectedExamenes(loadedExams);
+          setOriginalExamenesCount(loadedExams.length);
           setSelectedDocumentos(docsRes.data?.map(d => d.documento_id) || []);
         } else {
           setSelectedExamenes([]);
+          setOriginalExamenesCount(0);
           setSelectedDocumentos([]);
         }
       } catch (error) {
@@ -639,11 +645,11 @@ const Pacientes = () => {
         if (atencionError) throw atencionError;
 
         if (atencionData) {
-          // Solo modificar exámenes si se seleccionaron exámenes o paquetes
-          const hayNuevosExamenes = selectedExamenes.length > 0 || selectedPaquetes.length > 0;
+          // Detectar si hubo cambios en exámenes (agregaron, quitaron o cambiaron paquetes)
+          const hayCambiosExamenes = selectedExamenes.length > 0 || selectedPaquetes.length > 0 || originalExamenesCount > 0;
           
-          if (hayNuevosExamenes) {
-            // Solo eliminar exámenes pendientes (conservar los completados)
+          if (hayCambiosExamenes) {
+            // Eliminar exámenes pendientes (conservar los completados)
             await supabase
               .from("atencion_examenes")
               .delete()
@@ -748,6 +754,9 @@ const Pacientes = () => {
             toast.success("Datos del paciente actualizados");
             await logActivity("editar_paciente", { nombre: formData.nombre, rut: formData.rut }, "/pacientes");
           }
+
+          // Sync local cache to reflect cloud changes
+          syncCtx.forcePull();
         }
       } else {
         // ── NEW PATIENT: Background cloud write for instant UI ──
