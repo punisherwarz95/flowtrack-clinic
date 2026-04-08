@@ -532,6 +532,7 @@ const Pacientes = () => {
         setSelectedDocumentos(docs);
       } else {
         setSelectedExamenes([]);
+        setOriginalExamenesCount(0);
         setSelectedDocumentos([]);
       }
     } else {
