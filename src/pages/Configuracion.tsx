@@ -392,6 +392,10 @@ const Configuracion = () => {
           <TabsContent value="faenas">
             <FaenasConfig />
           </TabsContent>
+
+          <TabsContent value="centro">
+            <CentroMedicoConfig />
+          </TabsContent>
         </Tabs>
 
         <AlertDialog

@@ -6,30 +6,20 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import {
-  Search,
-  Calendar,
-  ClipboardCheck,
-  CheckCircle,
-  XCircle,
-  Clock,
-  FileText,
+  Search, Calendar, ClipboardCheck, CheckCircle, XCircle, Clock, FileText, Download,
 } from "lucide-react";
+import { generarEvaluacionPDF } from "@/components/empresa/EvaluacionPDF";
+import { toast } from "sonner";
+
+// v2 - Refactored to use atenciones as data source
 
 interface Evaluacion {
   id: string;
@@ -38,24 +28,33 @@ interface Evaluacion {
   restricciones: string | null;
   numero_informe: number | null;
   evaluado_at: string | null;
+  evaluado_por: string | null;
+  datos_clinicos: any;
   paquete: { nombre: string };
 }
 
-interface PacienteResultado {
+interface AtencionExamen {
   id: string;
-  fecha: string;
+  estado: string;
+  examen: { nombre: string };
+}
+
+interface PacienteResultado {
+  atencion_id: string;
+  fecha_ingreso: string;
   nombre: string;
   rut: string;
   cargo: string;
-  faena: { nombre: string } | null;
-  atencion: {
-    id: string;
-    evaluaciones: Evaluacion[];
-  } | null;
+  fecha_nacimiento: string | null;
+  tipo_servicio: string | null;
+  empresa_nombre: string;
+  empresa_rut: string;
+  evaluaciones: Evaluacion[];
+  examenes: AtencionExamen[];
 }
 
 const EmpresaResultados = () => {
-  const { currentEmpresaId, isStaffAdmin } = useEmpresaAuth();
+  const { currentEmpresaId } = useEmpresaAuth();
 
   const [pacientes, setPacientes] = useState<PacienteResultado[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,52 +63,61 @@ const EmpresaResultados = () => {
     format(new Date(new Date().setDate(1)), "yyyy-MM-dd")
   );
   const [fechaHasta, setFechaHasta] = useState(format(new Date(), "yyyy-MM-dd"));
-  
   const [selectedPaciente, setSelectedPaciente] = useState<PacienteResultado | null>(null);
+  const [generatingPDF, setGeneratingPDF] = useState(false);
 
   useEffect(() => {
-    if (currentEmpresaId) {
-      loadResultados();
-    } else {
-      setLoading(false);
-    }
+    if (currentEmpresaId) loadResultados();
+    else setLoading(false);
   }, [currentEmpresaId, fechaDesde, fechaHasta]);
 
   const loadResultados = async () => {
     if (!currentEmpresaId) return;
-
     setLoading(true);
     try {
+      // Get atenciones for patients belonging to this empresa
       const { data, error } = await supabase
-        .from("prereservas")
+        .from("atenciones")
         .select(`
           id,
-          fecha,
-          nombre,
-          rut,
-          cargo,
-          faena:faenas(nombre),
-          atencion:atenciones(
-            id,
-            evaluaciones:evaluaciones_clinicas(
-              id,
-              resultado,
-              observaciones,
-              restricciones,
-              numero_informe,
-              evaluado_at,
-              paquete:paquetes_examenes(nombre)
-            )
+          fecha_ingreso,
+          paciente:pacientes!inner(
+            nombre, rut, cargo, fecha_nacimiento, tipo_servicio,
+            empresa:empresas(nombre, rut)
+          ),
+          evaluaciones:evaluaciones_clinicas(
+            id, resultado, observaciones, restricciones, numero_informe,
+            evaluado_at, evaluado_por, datos_clinicos,
+            paquete:paquetes_examenes(nombre)
+          ),
+          examenes:atencion_examenes(
+            id, estado,
+            examen:examenes(nombre)
           )
         `)
-        .eq("empresa_id", currentEmpresaId)
-        .eq("estado", "atendido")
-        .gte("fecha", fechaDesde)
-        .lte("fecha", fechaHasta)
-        .order("fecha", { ascending: false });
+        .eq("paciente.empresa_id", currentEmpresaId)
+        .gte("fecha_ingreso", `${fechaDesde}T00:00:00`)
+        .lte("fecha_ingreso", `${fechaHasta}T23:59:59`)
+        .in("estado", ["en_atencion", "completado"])
+        .order("fecha_ingreso", { ascending: false });
 
       if (error) throw error;
-      setPacientes((data as unknown as PacienteResultado[]) || []);
+
+      const mapped: PacienteResultado[] = (data || []).map((a: any) => ({
+        atencion_id: a.id,
+        fecha_ingreso: a.fecha_ingreso,
+        nombre: a.paciente?.nombre || "",
+        rut: a.paciente?.rut || "",
+        cargo: a.paciente?.cargo || "",
+        fecha_nacimiento: a.paciente?.fecha_nacimiento || null,
+        tipo_servicio: a.paciente?.tipo_servicio || null,
+        empresa_nombre: a.paciente?.empresa?.nombre || "",
+        empresa_rut: a.paciente?.empresa?.rut || "",
+        evaluaciones: a.evaluaciones || [],
+        examenes: a.examenes || [],
+      }));
+
+      setPacientes(mapped);
     } catch (error) {
       console.error("Error cargando resultados:", error);
     } finally {
@@ -119,12 +127,9 @@ const EmpresaResultados = () => {
 
   const filteredPacientes = useMemo(() => {
     if (!searchFilter) return pacientes;
-    const search = searchFilter.toLowerCase();
+    const s = searchFilter.toLowerCase();
     return pacientes.filter(
-      (p) =>
-        p.nombre.toLowerCase().includes(search) ||
-        p.rut.toLowerCase().includes(search) ||
-        p.cargo?.toLowerCase().includes(search)
+      (p) => p.nombre.toLowerCase().includes(s) || p.rut.toLowerCase().includes(s) || p.cargo?.toLowerCase().includes(s)
     );
   }, [pacientes, searchFilter]);
 
@@ -132,54 +137,65 @@ const EmpresaResultados = () => {
     switch (resultado) {
       case "aprobado":
         return (
-          <Badge className="bg-green-600 text-white cursor-pointer">
-            <CheckCircle className="h-3 w-3 mr-1" />
-            Apto
-          </Badge>
+          <Badge className="bg-green-600 text-white"><CheckCircle className="h-3 w-3 mr-1" />Apto</Badge>
         );
       case "rechazado":
         return (
-          <Badge variant="destructive" className="cursor-pointer">
-            <XCircle className="h-3 w-3 mr-1" />
-            No Apto
-          </Badge>
-        );
-      case "observado":
-        return (
-          <Badge className="bg-amber-600 text-white cursor-pointer">
-            <Clock className="h-3 w-3 mr-1" />
-            Observado
-          </Badge>
+          <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />No Apto</Badge>
         );
       default:
         return (
-          <Badge variant="secondary" className="cursor-pointer">
-            <Clock className="h-3 w-3 mr-1" />
-            Pendiente
-          </Badge>
+          <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" />Pendiente</Badge>
         );
     }
   };
 
-  const getResumenResultados = (evaluaciones: Evaluacion[] | undefined) => {
+  const getResumenGeneral = (evaluaciones: Evaluacion[]) => {
     if (!evaluaciones || evaluaciones.length === 0) {
       return <Badge variant="secondary">Sin evaluaciones</Badge>;
     }
-
-    const aprobados = evaluaciones.filter((e) => e.resultado === "aprobado").length;
     const rechazados = evaluaciones.filter((e) => e.resultado === "rechazado").length;
-    const pendientes = evaluaciones.filter((e) => e.resultado === "pendiente").length;
+    const pendientes = evaluaciones.filter((e) => !e.resultado || e.resultado === "pendiente").length;
+    const aprobados = evaluaciones.filter((e) => e.resultado === "aprobado").length;
 
-    if (rechazados > 0) {
-      return <Badge variant="destructive">No Apto</Badge>;
-    }
-    if (pendientes > 0) {
-      return <Badge variant="secondary">En evaluación</Badge>;
-    }
-    if (aprobados === evaluaciones.length) {
-      return <Badge className="bg-green-600 text-white">Apto</Badge>;
-    }
+    if (rechazados > 0) return <Badge variant="destructive">No Apto</Badge>;
+    if (pendientes > 0) return <Badge variant="secondary">En evaluación</Badge>;
+    if (aprobados === evaluaciones.length) return <Badge className="bg-green-600 text-white">Apto</Badge>;
     return <Badge variant="secondary">En proceso</Badge>;
+  };
+
+  const handleDescargarPDF = async (paciente: PacienteResultado, evaluacion: Evaluacion) => {
+    setGeneratingPDF(true);
+    try {
+      await generarEvaluacionPDF({
+        evaluacion: {
+          ...evaluacion,
+          datos_clinicos: evaluacion.datos_clinicos || {},
+        },
+        paciente: {
+          nombre: paciente.nombre,
+          rut: paciente.rut,
+          cargo: paciente.cargo,
+          fecha_nacimiento: paciente.fecha_nacimiento,
+        },
+        empresa: {
+          nombre: paciente.empresa_nombre,
+          rut: paciente.empresa_rut,
+        },
+        tipo_servicio: paciente.tipo_servicio,
+        fecha_atencion: paciente.fecha_ingreso,
+        examenes: paciente.examenes.map((ex: any) => ({
+          nombre: ex.examen?.nombre || "",
+          estado: ex.estado,
+        })),
+      });
+      toast.success("PDF descargado exitosamente");
+    } catch (error) {
+      console.error("Error generando PDF:", error);
+      toast.error("Error al generar el PDF");
+    } finally {
+      setGeneratingPDF(false);
+    }
   };
 
   return (
@@ -192,60 +208,43 @@ const EmpresaResultados = () => {
           </p>
         </div>
 
-        {/* Filtros */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Filtros
+              <Calendar className="h-4 w-4" />Filtros
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Desde</label>
-                <Input
-                  type="date"
-                  value={fechaDesde}
-                  onChange={(e) => setFechaDesde(e.target.value)}
-                />
+                <Input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Hasta</label>
-                <Input
-                  type="date"
-                  value={fechaHasta}
-                  onChange={(e) => setFechaHasta(e.target.value)}
-                />
+                <Input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Buscar</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Nombre, RUT, cargo..."
-                    value={searchFilter}
-                    onChange={(e) => setSearchFilter(e.target.value)}
-                    className="pl-10"
-                  />
+                  <Input placeholder="Nombre, RUT, cargo..." value={searchFilter} onChange={(e) => setSearchFilter(e.target.value)} className="pl-10" />
                 </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Tabla de resultados */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <ClipboardCheck className="h-4 w-4" />
-              Resultados ({filteredPacientes.length})
+              <ClipboardCheck className="h-4 w-4" />Resultados ({filteredPacientes.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
               </div>
             ) : filteredPacientes.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
@@ -260,45 +259,36 @@ const EmpresaResultados = () => {
                       <TableHead>Nombre</TableHead>
                       <TableHead>RUT</TableHead>
                       <TableHead>Cargo</TableHead>
-                      <TableHead>Faena</TableHead>
                       <TableHead>Baterías</TableHead>
                       <TableHead>Estado General</TableHead>
                       <TableHead>Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredPacientes.map((paciente) => (
-                      <TableRow key={paciente.id}>
+                    {filteredPacientes.map((p) => (
+                      <TableRow key={p.atencion_id}>
                         <TableCell>
-                          {format(new Date(paciente.fecha + "T12:00:00"), "dd/MM/yyyy")}
+                          {format(new Date(p.fecha_ingreso), "dd/MM/yyyy")}
                         </TableCell>
-                        <TableCell className="font-medium">{paciente.nombre}</TableCell>
-                        <TableCell className="font-mono text-sm">{paciente.rut}</TableCell>
-                        <TableCell>{paciente.cargo}</TableCell>
-                        <TableCell>{paciente.faena?.nombre || "-"}</TableCell>
+                        <TableCell className="font-medium">{p.nombre}</TableCell>
+                        <TableCell className="font-mono text-sm">{p.rut}</TableCell>
+                        <TableCell>{p.cargo || "-"}</TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
-                            {paciente.atencion?.evaluaciones?.map((e) => (
-                              <div
-                                key={e.id}
-                                title={`${e.paquete?.nombre}: ${e.resultado}`}
-                              >
+                            {p.evaluaciones.map((e) => (
+                              <div key={e.id} title={`${e.paquete?.nombre}: ${e.resultado}`} className="cursor-pointer" onClick={() => setSelectedPaciente(p)}>
                                 {getResultadoBadge(e.resultado)}
                               </div>
                             ))}
+                            {p.evaluaciones.length === 0 && (
+                              <Badge variant="secondary">Sin baterías</Badge>
+                            )}
                           </div>
                         </TableCell>
+                        <TableCell>{getResumenGeneral(p.evaluaciones)}</TableCell>
                         <TableCell>
-                          {getResumenResultados(paciente.atencion?.evaluaciones)}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setSelectedPaciente(paciente)}
-                          >
-                            <FileText className="h-4 w-4 mr-1" />
-                            Ver detalle
+                          <Button variant="ghost" size="sm" onClick={() => setSelectedPaciente(p)}>
+                            <FileText className="h-4 w-4 mr-1" />Ver detalle
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -312,7 +302,7 @@ const EmpresaResultados = () => {
 
         {/* Dialog de detalle */}
         <Dialog open={!!selectedPaciente} onOpenChange={() => setSelectedPaciente(null)}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Detalle de Evaluaciones</DialogTitle>
             </DialogHeader>
@@ -330,24 +320,20 @@ const EmpresaResultados = () => {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Cargo</p>
-                    <p>{selectedPaciente.cargo}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Faena</p>
-                    <p>{selectedPaciente.faena?.nombre || "-"}</p>
+                    <p>{selectedPaciente.cargo || "-"}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Fecha de Atención</p>
-                    <p>{format(new Date(selectedPaciente.fecha + "T12:00:00"), "dd/MM/yyyy")}</p>
+                    <p>{format(new Date(selectedPaciente.fecha_ingreso), "dd/MM/yyyy")}</p>
                   </div>
                 </div>
 
                 <div className="space-y-3">
                   <h4 className="font-medium">Evaluaciones por Batería</h4>
-                  {selectedPaciente.atencion?.evaluaciones?.length === 0 ? (
+                  {selectedPaciente.evaluaciones.length === 0 ? (
                     <p className="text-muted-foreground">No hay evaluaciones registradas</p>
                   ) : (
-                    selectedPaciente.atencion?.evaluaciones?.map((evaluacion) => (
+                    selectedPaciente.evaluaciones.map((evaluacion) => (
                       <Card key={evaluacion.id}>
                         <CardContent className="pt-4">
                           <div className="flex items-start justify-between">
@@ -376,11 +362,16 @@ const EmpresaResultados = () => {
                             </div>
                           )}
 
-                          {evaluacion.numero_informe && (
+                          {(evaluacion.resultado === "aprobado" || evaluacion.resultado === "rechazado") && evaluacion.numero_informe && (
                             <div className="mt-3">
-                              <Button variant="outline" size="sm">
-                                <FileText className="h-4 w-4 mr-2" />
-                                Descargar Informe N° {evaluacion.numero_informe}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={generatingPDF}
+                                onClick={() => handleDescargarPDF(selectedPaciente, evaluacion)}
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                {generatingPDF ? "Generando..." : `Descargar Informe N° ${evaluacion.numero_informe}`}
                               </Button>
                             </div>
                           )}
