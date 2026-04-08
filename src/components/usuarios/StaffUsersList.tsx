@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { logActivity } from "@/lib/activityLog";
-import { Trash2, Plus, Save, Key, Search } from "lucide-react";
+import { Trash2, Plus, Save, Key, Search, Upload, PenTool } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,7 @@ interface User {
   username: string;
   isAdmin: boolean;
   permissions: string[];
+  firma_url: string | null;
 }
 
 interface Modulo {
@@ -69,7 +70,7 @@ const StaffUsersList = () => {
 
       setModulos(modulosResult.data || []);
 
-      const usersData: User[] = profilesResult.data.map((profile) => {
+      const usersData: User[] = profilesResult.data.map((profile: any) => {
         const userRoles = rolesResult.data.filter((r) => r.user_id === profile.id);
         const userPermissions = permissionsResult.data.filter((p) => p.user_id === profile.id);
         
@@ -78,6 +79,7 @@ const StaffUsersList = () => {
           username: profile.username,
           isAdmin: userRoles.some((r) => r.role === "admin"),
           permissions: userPermissions.map((p) => p.menu_path),
+          firma_url: profile.firma_url || null,
         };
       });
 
@@ -260,6 +262,32 @@ const StaffUsersList = () => {
     }
   };
 
+  const handleFirmaUpload = async (userId: string, file: File) => {
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `firmas/${userId}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("centro-assets")
+        .upload(path, file, { upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("centro-assets")
+        .getPublicUrl(path);
+
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ firma_url: urlData.publicUrl })
+        .eq("id", userId);
+      if (updateError) throw updateError;
+
+      toast.success("Firma actualizada");
+      loadData();
+    } catch (error: any) {
+      toast.error("Error al subir firma: " + error.message);
+    }
+  };
+
   const filteredUsers = users.filter((u) =>
     u.username.toLowerCase().includes(searchFilter.toLowerCase())
   );
@@ -359,7 +387,7 @@ const StaffUsersList = () => {
         {filteredUsers.map((user) => (
           <Card key={user.id}>
             <CardHeader>
-              <div className="flex justify-between items-start">
+                <div className="flex justify-between items-start">
                 <div>
                   <CardTitle>{user.username}</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
@@ -367,6 +395,26 @@ const StaffUsersList = () => {
                   </p>
                 </div>
                 <div className="flex gap-2">
+                  <div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      id={`firma-${user.id}`}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleFirmaUpload(user.id, f);
+                      }}
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => document.getElementById(`firma-${user.id}`)?.click()}
+                      title="Subir firma"
+                    >
+                      <PenTool className="h-4 w-4" />
+                    </Button>
+                  </div>
                   <Button
                     variant="outline"
                     size="icon"
@@ -386,6 +434,13 @@ const StaffUsersList = () => {
               </div>
             </CardHeader>
             <CardContent>
+              {user.firma_url && (
+                <div className="mb-3 flex items-center gap-2">
+                  <PenTool className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Firma:</span>
+                  <img src={user.firma_url} alt="Firma" className="h-8 object-contain border rounded" />
+                </div>
+              )}
               {!user.isAdmin && (
                 <>
                   {editingUser === user.id ? (

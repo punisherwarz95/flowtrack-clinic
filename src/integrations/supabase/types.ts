@@ -672,6 +672,45 @@ export type Database = {
         }
         Relationships: []
       }
+      configuracion_centro: {
+        Row: {
+          created_at: string
+          direccion: string | null
+          email_contacto: string | null
+          id: string
+          logo_url: string | null
+          nombre_centro: string
+          parrafo_legal: string | null
+          telefono: string | null
+          updated_at: string
+          web: string | null
+        }
+        Insert: {
+          created_at?: string
+          direccion?: string | null
+          email_contacto?: string | null
+          id?: string
+          logo_url?: string | null
+          nombre_centro?: string
+          parrafo_legal?: string | null
+          telefono?: string | null
+          updated_at?: string
+          web?: string | null
+        }
+        Update: {
+          created_at?: string
+          direccion?: string | null
+          email_contacto?: string | null
+          id?: string
+          logo_url?: string | null
+          nombre_centro?: string
+          parrafo_legal?: string | null
+          telefono?: string | null
+          updated_at?: string
+          web?: string | null
+        }
+        Relationships: []
+      }
       cotizacion_items: {
         Row: {
           cantidad: number
@@ -1732,6 +1771,35 @@ export type Database = {
           },
         ]
       }
+      informe_verificacion: {
+        Row: {
+          created_at: string
+          evaluacion_id: string
+          id: string
+          token_verificacion: string
+        }
+        Insert: {
+          created_at?: string
+          evaluacion_id: string
+          id?: string
+          token_verificacion?: string
+        }
+        Update: {
+          created_at?: string
+          evaluacion_id?: string
+          id?: string
+          token_verificacion?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "informe_verificacion_evaluacion_id_fkey"
+            columns: ["evaluacion_id"]
+            isOneToOne: false
+            referencedRelation: "evaluaciones_clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       margenes_cotizacion: {
         Row: {
           activo: boolean | null
@@ -2217,16 +2285,19 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string | null
+          firma_url: string | null
           id: string
           username: string
         }
         Insert: {
           created_at?: string | null
+          firma_url?: string | null
           id: string
           username: string
         }
         Update: {
           created_at?: string | null
+          firma_url?: string | null
           id?: string
           username?: string
         }

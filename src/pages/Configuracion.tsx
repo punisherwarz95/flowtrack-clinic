@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings, Clock, Plus, Pencil, Trash2, Calendar, MapPin } from "lucide-react";
+import { Settings, Clock, Plus, Pencil, Trash2, Calendar, MapPin, Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { logActivity } from "@/lib/activityLog";
@@ -37,6 +37,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import FaenasConfig from "@/components/configuracion/FaenasConfig";
+import CentroMedicoConfig from "@/components/configuracion/CentroMedicoConfig";
 
 interface AgendaBloque {
   id: string;
@@ -193,6 +194,10 @@ const Configuracion = () => {
             <TabsTrigger value="faenas" className="flex items-center gap-2">
               <MapPin className="h-4 w-4" />
               Faenas
+            </TabsTrigger>
+            <TabsTrigger value="centro" className="flex items-center gap-2">
+              <Building2 className="h-4 w-4" />
+              Centro Médico
             </TabsTrigger>
           </TabsList>
 
@@ -386,6 +391,10 @@ const Configuracion = () => {
 
           <TabsContent value="faenas">
             <FaenasConfig />
+          </TabsContent>
+
+          <TabsContent value="centro">
+            <CentroMedicoConfig />
           </TabsContent>
         </Tabs>
 
