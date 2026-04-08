@@ -645,11 +645,11 @@ const Pacientes = () => {
         if (atencionError) throw atencionError;
 
         if (atencionData) {
-          // Solo modificar exámenes si se seleccionaron exámenes o paquetes
-          const hayNuevosExamenes = selectedExamenes.length > 0 || selectedPaquetes.length > 0;
+          // Detectar si hubo cambios en exámenes (agregaron, quitaron o cambiaron paquetes)
+          const hayCambiosExamenes = selectedExamenes.length > 0 || selectedPaquetes.length > 0 || originalExamenesCount > 0;
           
-          if (hayNuevosExamenes) {
-            // Solo eliminar exámenes pendientes (conservar los completados)
+          if (hayCambiosExamenes) {
+            // Eliminar exámenes pendientes (conservar los completados)
             await supabase
               .from("atencion_examenes")
               .delete()
