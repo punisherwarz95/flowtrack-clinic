@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Building2, Upload, Save, Image } from "lucide-react";
+import { Building2, Upload, Save, Image, Trash2 } from "lucide-react";
 
 const CentroMedicoConfig = () => {
   const [loading, setLoading] = useState(true);
