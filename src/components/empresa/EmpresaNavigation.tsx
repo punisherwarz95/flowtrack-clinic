@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import EmpresaSelector from "./EmpresaSelector";
+import PortalSwitcher from "@/components/PortalSwitcher";
 
 const menuItems = [
   { path: "/empresa", label: "Dashboard", icon: LayoutDashboard },
@@ -83,6 +84,7 @@ const EmpresaNavigation = () => {
 
           {/* Usuario y logout */}
           <div className="flex items-center gap-3">
+            {isStaffAdmin && <PortalSwitcher currentPortal="empresa" />}
             <div className="hidden sm:block text-right">
               <p className="text-sm font-medium">{empresaUsuario?.nombre}</p>
               <p className="text-xs text-muted-foreground">{empresaUsuario?.email}</p>
