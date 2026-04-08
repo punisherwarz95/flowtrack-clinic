@@ -3,7 +3,7 @@ import autoTable from "jspdf-autotable";
 import QRCode from "qrcode";
 import { supabase } from "@/integrations/supabase/client";
 
-// v4 - Detailed exam results, blue/teal palette, grouped sub-results
+// v5 - Filter exams by paquete, remove top bar, detailed sub-results
 
 interface EvaluacionPDFData {
   evaluacion: {
@@ -14,7 +14,7 @@ interface EvaluacionPDFData {
     numero_informe: number | null;
     evaluado_at: string | null;
     datos_clinicos: any;
-    paquete: { nombre: string };
+    paquete: { id: string; nombre: string };
     evaluado_por: string | null;
   };
   paciente: {
@@ -85,12 +85,21 @@ interface ExamDetailResult {
   campos: Array<{ etiqueta: string; valor: string | null; grupo: string | null }>;
 }
 
-const fetchExamDetails = async (atencionId: string): Promise<ExamDetailResult[]> => {
+const fetchExamDetails = async (atencionId: string, paqueteId: string): Promise<ExamDetailResult[]> => {
+  // First get examen_ids that belong to this paquete
+  const { data: paqueteItems } = await supabase
+    .from("paquete_examen_items")
+    .select("examen_id")
+    .eq("paquete_id", paqueteId);
+
+  const paqueteExamenIds = new Set((paqueteItems || []).map((p: any) => p.examen_id));
+
   const { data } = await supabase
     .from("atencion_examenes")
     .select(`
       id,
       estado,
+      examen_id,
       examen:examenes(nombre),
       resultados:examen_resultados(
         valor,
@@ -103,6 +112,8 @@ const fetchExamDetails = async (atencionId: string): Promise<ExamDetailResult[]>
 
   const results: ExamDetailResult[] = [];
   for (const ae of data as any[]) {
+    // Only include exams that belong to this paquete
+    if (!paqueteExamenIds.has(ae.examen_id)) continue;
     const nombre = ae.examen?.nombre || "";
     const campos: Array<{ etiqueta: string; valor: string | null; grupo: string | null }> = [];
 
@@ -167,7 +178,7 @@ export const generarEvaluacionPDF = async (data: EvaluacionPDFData) => {
   }
 
   // Fetch detailed exam results
-  const examDetails = await fetchExamDetails(data.atencion_id);
+  const examDetails = await fetchExamDetails(data.atencion_id, data.evaluacion.paquete.id);
 
   const verifyUrl = `${window.location.origin}/verificar/${verificationToken}`;
 
@@ -226,9 +237,6 @@ export const generarEvaluacionPDF = async (data: EvaluacionPDFData) => {
   // === PAGE 1 ===
   addBackground();
 
-  // Header bar
-  doc.setFillColor(...COLORS.primary);
-  doc.rect(0, 0, pageW, 8, "F");
 
   // Logo
   if (configData?.logo_url) {
@@ -400,9 +408,6 @@ export const generarEvaluacionPDF = async (data: EvaluacionPDFData) => {
   addBackground();
   y = margin;
 
-  // Header bar
-  doc.setFillColor(...COLORS.primary);
-  doc.rect(0, 0, pageW, 8, "F");
 
   // Logo
   if (configData?.logo_url) {
@@ -533,9 +538,6 @@ export const generarEvaluacionPDF = async (data: EvaluacionPDFData) => {
     doc.addPage();
     addBackground();
     y = margin;
-
-    doc.setFillColor(...COLORS.primary);
-    doc.rect(0, 0, pageW, 8, "F");
 
     if (configData?.logo_url) {
       try {

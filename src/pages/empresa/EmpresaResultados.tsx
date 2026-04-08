@@ -21,13 +21,14 @@ import { toast } from "sonner";
 interface Evaluacion {
   id: string;
   resultado: string;
+  paquete_id?: string;
   observaciones: string | null;
   restricciones: string | null;
   numero_informe: number | null;
   evaluado_at: string | null;
   evaluado_por: string | null;
   datos_clinicos: any;
-  paquete: { nombre: string };
+  paquete: { id: string; nombre: string };
 }
 
 interface AtencionExamen {
@@ -90,7 +91,7 @@ const EmpresaResultados = () => {
           evaluaciones:evaluaciones_clinicas(
             id, resultado, observaciones, restricciones, numero_informe,
             evaluado_at, evaluado_por, datos_clinicos,
-            paquete:paquetes_examenes(nombre)
+            paquete:paquetes_examenes(id, nombre)
           ),
           examenes:atencion_examenes(
             id, estado,
