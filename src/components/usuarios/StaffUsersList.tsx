@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { logActivity } from "@/lib/activityLog";
-import { Trash2, Plus, Save, Key, Search } from "lucide-react";
+import { Trash2, Plus, Save, Key, Search, Upload, PenTool } from "lucide-react";
 import {
   Dialog,
   DialogContent,
