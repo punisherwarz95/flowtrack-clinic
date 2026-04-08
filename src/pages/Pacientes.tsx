@@ -567,7 +567,9 @@ const Pacientes = () => {
           ]);
 
           if (examenesRes.error) throw examenesRes.error;
-          setSelectedExamenes(examenesRes.data?.map(e => e.examen_id) || []);
+          const loadedExams = examenesRes.data?.map(e => e.examen_id) || [];
+          setSelectedExamenes(loadedExams);
+          setOriginalExamenesCount(loadedExams.length);
           setSelectedDocumentos(docsRes.data?.map(d => d.documento_id) || []);
         } else {
           setSelectedExamenes([]);
