@@ -202,6 +202,7 @@ const EmpresaResultados = () => {
         },
         tipo_servicio: paciente.tipo_servicio,
         fecha_atencion: paciente.fecha_ingreso,
+        atencion_id: paciente.atencion_id,
         examenes: paciente.examenes.map((ex: any) => ({
           nombre: ex.examen?.nombre || "",
           estado: ex.estado,
