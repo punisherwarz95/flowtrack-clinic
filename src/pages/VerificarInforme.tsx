@@ -84,6 +84,8 @@ const VerificarInforme = () => {
   const paciente = atencion?.paciente;
   const empresa = paciente?.empresa;
 
+  const esApto = ev?.resultado === "apto" || ev?.resultado === "apto_con_restricciones";
+
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-2xl mx-auto space-y-6">
@@ -125,7 +127,7 @@ const VerificarInforme = () => {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Batería</p>
-                <p>{ev?.paquete?.nombre}</p>
+                <p className="font-medium">{ev?.paquete?.nombre}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Fecha Evaluación</p>
@@ -135,7 +137,7 @@ const VerificarInforme = () => {
 
             <div className="flex items-center gap-2 p-4 rounded-lg bg-muted">
               <span className="font-medium">Resultado:</span>
-              {ev?.resultado === "aprobado" ? (
+              {esApto ? (
                 <Badge className="bg-green-600 text-white text-lg px-4 py-1">
                   <CheckCircle className="h-4 w-4 mr-2" />
                   APTO

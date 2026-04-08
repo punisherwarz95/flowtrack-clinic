@@ -1,0 +1,1 @@
+ALTER TABLE public.configuracion_centro ADD COLUMN fondo_url text;
