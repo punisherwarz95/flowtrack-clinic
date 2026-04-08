@@ -155,6 +155,7 @@ const Pacientes = () => {
   const [empresaDropdownOpen, setEmpresaDropdownOpen] = useState(false);
   const empresaDropdownRef = useRef<HTMLDivElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [originalExamenesCount, setOriginalExamenesCount] = useState(0);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [documentosPendientes, setDocumentosPendientes] = useState<{[patientId: string]: number}>({});
   
