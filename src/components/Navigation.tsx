@@ -13,7 +13,7 @@ import PortalSwitcher from "@/components/PortalSwitcher";
 const Navigation = () => {
   const location = useLocation();
   const { user, signOut } = useAuth();
-  const { hasPermission } = useAuthContext();
+  const { hasPermission, isAdmin } = useAuthContext();
   const { theme, toggleTheme } = useTheme();
   const syncCtx = useSyncContext();
 
