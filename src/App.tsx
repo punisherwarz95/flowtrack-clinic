@@ -65,6 +65,7 @@ const App = () => (
                 <Route path="/portal-paciente" element={<PortalPaciente />} />
                 <Route path="/guia" element={<GuiaUsuario />} />
                 <Route path="/pantalla" element={<PantallaTv />} />
+                <Route path="/verificar/:token" element={<VerificarInforme />} />
                 <Route path="/" element={<ProtectedRoute path="/"><Dashboard /></ProtectedRoute>} />
                 <Route path="/flujo" element={<ProtectedRoute path="/flujo"><Flujo /></ProtectedRoute>} />
                 <Route path="/mi-box" element={<ProtectedRoute path="/mi-box"><MiBox /></ProtectedRoute>} />
