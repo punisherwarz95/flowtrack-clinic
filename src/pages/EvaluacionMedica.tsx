@@ -340,14 +340,18 @@ const EvaluacionMedica = () => {
       if (resultadosRes.error) throw resultadosRes.error;
       setExamenResultados((resultadosRes.data as unknown as ExamenResultado[]) || []);
 
-      // Build map: atencion_examen.id -> shared files
+      // Build map: atencion_examen.id -> shared files (deduplicated by archivo id)
       const archMap: Record<string, Array<{ nombre_archivo: string; archivo_url: string }>> = {};
       if (archivosRes.data) {
+        const seenArchivos = new Set<string>();
         for (const archivo of archivosRes.data as any[]) {
+          if (seenArchivos.has(archivo.id)) continue;
+          seenArchivos.add(archivo.id);
           const vinculos = archivo.examen_archivo_vinculos || [];
-          for (const v of vinculos) {
-            // Find the atencion_examen that matches this examen_id
-            const ae = atencionExamenes.find(a => a.examen_id === v.examen_id);
+          if (vinculos.length > 0) {
+            // Assign to just the FIRST matching atencion_examen to avoid duplicates
+            const firstVinculo = vinculos[0];
+            const ae = atencionExamenes.find(a => a.examen_id === firstVinculo.examen_id);
             if (ae) {
               if (!archMap[ae.id]) archMap[ae.id] = [];
               archMap[ae.id].push({ nombre_archivo: archivo.nombre_archivo, archivo_url: archivo.archivo_url });

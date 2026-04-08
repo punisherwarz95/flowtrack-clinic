@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import QRCode from "qrcode";
 import { supabase } from "@/integrations/supabase/client";
 
 interface EvaluacionPDFData {
