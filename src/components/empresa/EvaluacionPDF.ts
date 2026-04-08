@@ -408,9 +408,6 @@ export const generarEvaluacionPDF = async (data: EvaluacionPDFData) => {
   addBackground();
   y = margin;
 
-  // Header bar
-  doc.setFillColor(...COLORS.primary);
-  doc.rect(0, 0, pageW, 8, "F");
 
   // Logo
   if (configData?.logo_url) {
