@@ -8,6 +8,7 @@ import ChangeOwnPassword from "@/components/ChangeOwnPassword";
 import SyncStatusBadge from "@/components/SyncStatusBadge";
 import { useSyncContext } from "@/contexts/SyncContext";
 import { logActivity } from "@/lib/activityLog";
+import PortalSwitcher from "@/components/PortalSwitcher";
 
 const Navigation = () => {
   const location = useLocation();
