@@ -539,9 +539,6 @@ export const generarEvaluacionPDF = async (data: EvaluacionPDFData) => {
     addBackground();
     y = margin;
 
-    doc.setFillColor(...COLORS.primary);
-    doc.rect(0, 0, pageW, 8, "F");
-
     if (configData?.logo_url) {
       try {
         const logoImg = await loadImage(configData.logo_url);
