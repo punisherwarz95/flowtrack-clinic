@@ -112,6 +112,8 @@ const fetchExamDetails = async (atencionId: string, paqueteId: string): Promise<
 
   const results: ExamDetailResult[] = [];
   for (const ae of data as any[]) {
+    // Only include exams that belong to this paquete
+    if (!paqueteExamenIds.has(ae.examen_id)) continue;
     const nombre = ae.examen?.nombre || "";
     const campos: Array<{ etiqueta: string; valor: string | null; grupo: string | null }> = [];
 
