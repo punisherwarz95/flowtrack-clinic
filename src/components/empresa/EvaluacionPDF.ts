@@ -360,6 +360,7 @@ export const generarEvaluacionPDF = async (data: EvaluacionPDFData) => {
   // === PAGE 3 === (Legal)
   if (configData?.parrafo_legal) {
     doc.addPage();
+    addBackground();
     y = margin;
 
     if (configData?.logo_url) {
