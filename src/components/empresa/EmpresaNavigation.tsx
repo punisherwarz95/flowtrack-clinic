@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import EmpresaSelector from "./EmpresaSelector";
+import PortalSwitcher from "@/components/PortalSwitcher";
 
 const menuItems = [
   { path: "/empresa", label: "Dashboard", icon: LayoutDashboard },
