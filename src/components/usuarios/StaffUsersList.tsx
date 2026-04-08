@@ -70,7 +70,7 @@ const StaffUsersList = () => {
 
       setModulos(modulosResult.data || []);
 
-      const usersData: User[] = profilesResult.data.map((profile) => {
+      const usersData: User[] = profilesResult.data.map((profile: any) => {
         const userRoles = rolesResult.data.filter((r) => r.user_id === profile.id);
         const userPermissions = permissionsResult.data.filter((p) => p.user_id === profile.id);
         
@@ -79,6 +79,7 @@ const StaffUsersList = () => {
           username: profile.username,
           isAdmin: userRoles.some((r) => r.role === "admin"),
           permissions: userPermissions.map((p) => p.menu_path),
+          firma_url: profile.firma_url || null,
         };
       });
 
