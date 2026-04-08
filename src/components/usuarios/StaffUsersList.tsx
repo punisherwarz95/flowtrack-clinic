@@ -22,6 +22,7 @@ interface User {
   username: string;
   isAdmin: boolean;
   permissions: string[];
+  firma_url: string | null;
 }
 
 interface Modulo {
