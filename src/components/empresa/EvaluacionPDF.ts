@@ -178,7 +178,7 @@ export const generarEvaluacionPDF = async (data: EvaluacionPDFData) => {
   }
 
   // Fetch detailed exam results
-  const examDetails = await fetchExamDetails(data.atencion_id);
+  const examDetails = await fetchExamDetails(data.atencion_id, data.evaluacion.paquete.id);
 
   const verifyUrl = `${window.location.origin}/verificar/${verificationToken}`;
 
