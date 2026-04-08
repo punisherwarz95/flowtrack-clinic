@@ -37,6 +37,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import FaenasConfig from "@/components/configuracion/FaenasConfig";
+import CentroMedicoConfig from "@/components/configuracion/CentroMedicoConfig";
 
 interface AgendaBloque {
   id: string;
