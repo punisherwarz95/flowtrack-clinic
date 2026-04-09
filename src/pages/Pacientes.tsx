@@ -153,7 +153,7 @@ const Pacientes = () => {
   const [editingPatient, setEditingPatient] = useState<string | null>(null);
   const [pacienteToDelete, setPacienteToDelete] = useState<string | null>(null);
   const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
-  const [examenEstados, setExamenEstados] = useState<Record<string, string>>({}); // examen_id -> estado
+  const [examenEstados, setExamenEstados] = useState<Record<string, string>>({}); // atencion_examen composite key -> estado
   const [selectedPaquetes, setSelectedPaquetes] = useState<string[]>([]);
   const [examenFilter, setExamenFilter] = useState("");
   const [empresaSearchFilter, setEmpresaSearchFilter] = useState("");
@@ -552,7 +552,7 @@ const Pacientes = () => {
         const aeList = localAtencionExamenes.filter(ae => ae.atencion_id === atencion.id);
         const exams = aeList.map(ae => ae.examen_id);
         const estados: Record<string, string> = {};
-        aeList.forEach(ae => { estados[ae.examen_id] = ae.estado || 'pendiente'; });
+        aeList.forEach((ae, i) => { estados[`${ae.examen_id}_${i}`] = ae.estado || 'pendiente'; });
         const docs = localAtencionDocumentos
           .filter(d => d.atencion_id === atencion.id)
           .map(d => d.documento_id);
@@ -601,7 +601,7 @@ const Pacientes = () => {
           if (examenesRes.error) throw examenesRes.error;
           const loadedExams = examenesRes.data?.map(e => e.examen_id) || [];
           const estados: Record<string, string> = {};
-          examenesRes.data?.forEach(e => { estados[e.examen_id] = e.estado || 'pendiente'; });
+          examenesRes.data?.forEach((e, i) => { estados[`${e.examen_id}_${i}`] = e.estado || 'pendiente'; });
           setSelectedExamenes(loadedExams);
           setExamenEstados(estados);
           setOriginalExamenesCount(loadedExams.length);
