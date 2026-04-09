@@ -549,18 +549,21 @@ const Pacientes = () => {
       const atencion = localAtenciones.find(a => a.paciente_id === patient.id);
       if (atencion) {
         setAtencionPrioridad(atencion.prioridad ?? false);
-        const exams = localAtencionExamenes
-          .filter(ae => ae.atencion_id === atencion.id)
-          .map(ae => ae.examen_id);
+        const aeList = localAtencionExamenes.filter(ae => ae.atencion_id === atencion.id);
+        const exams = aeList.map(ae => ae.examen_id);
+        const estados: Record<string, string> = {};
+        aeList.forEach(ae => { estados[ae.examen_id] = ae.estado || 'pendiente'; });
         const docs = localAtencionDocumentos
           .filter(d => d.atencion_id === atencion.id)
           .map(d => d.documento_id);
         setSelectedExamenes(exams);
+        setExamenEstados(estados);
         setOriginalExamenesCount(exams.length);
         setSelectedDocumentos(docs);
       } else {
         setAtencionPrioridad(false);
         setSelectedExamenes([]);
+        setExamenEstados({});
         setOriginalExamenesCount(0);
         setSelectedDocumentos([]);
       }
