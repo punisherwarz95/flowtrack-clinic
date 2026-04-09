@@ -81,6 +81,7 @@ export function useLocalSync(enabled = true) {
         observaciones: a.observaciones,
         prereserva_id: a.prereserva_id,
         prioridad: a.prioridad ?? false,
+        empresa_id: a.empresa_id ?? null,
         paciente_nombre: a.pacientes?.nombre,
         paciente_rut: a.pacientes?.rut,
         paciente_tipo_servicio: a.pacientes?.tipo_servicio,

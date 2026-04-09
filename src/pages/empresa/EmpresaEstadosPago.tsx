@@ -120,24 +120,7 @@ const EmpresaEstadosPago = () => {
         .single();
       const esAfectaIva = empresaData?.afecto_iva !== false;
 
-      // 1. Obtener IDs de pacientes de esta empresa
-      const { data: pacientesEmpresa, error: pacError } = await supabase
-        .from("pacientes")
-        .select("id, nombre, rut, cargo, faena:faenas(nombre)")
-        .eq("empresa_id", currentEmpresaId);
-
-      if (pacError) throw pacError;
-
-      if (!pacientesEmpresa || pacientesEmpresa.length === 0) {
-        toast({ title: "No hay pacientes registrados para esta empresa", variant: "destructive" });
-        setGenerando(false);
-        return;
-      }
-
-      const pacienteIds = pacientesEmpresa.map((p) => p.id);
-      const pacientesMap = new Map(pacientesEmpresa.map((p) => [p.id, p]));
-
-      // 2. Obtener atenciones completadas en el período
+      // 1. Obtener atenciones completadas en el período para esta empresa
       const { data: atenciones, error: atencionesError } = await supabase
         .from("atenciones")
         .select(`
@@ -147,7 +130,7 @@ const EmpresaEstadosPago = () => {
           estado,
           fecha_fin_atencion
         `)
-        .in("paciente_id", pacienteIds)
+        .eq("empresa_id", currentEmpresaId)
         .eq("estado", "completado")
         .gte("fecha_ingreso", `${fechaDesde}T00:00:00`)
         .lte("fecha_ingreso", `${fechaHasta}T23:59:59`);
@@ -159,6 +142,14 @@ const EmpresaEstadosPago = () => {
         setGenerando(false);
         return;
       }
+
+      // 1b. Get patient data for these atenciones
+      const pacienteIdsSet = new Set(atenciones.map((a: any) => a.paciente_id));
+      const { data: pacientesEmpresa } = await supabase
+        .from("pacientes")
+        .select("id, nombre, rut, cargo, faena:faenas(nombre)")
+        .in("id", Array.from(pacienteIdsSet));
+      const pacientesMap = new Map((pacientesEmpresa || []).map((p: any) => [p.id, p]));
 
       // 2b. Obtener baterías de atencion_baterias
       const atencionIds = atenciones.map((a: any) => a.id);

@@ -837,6 +837,7 @@ const Pacientes = () => {
           observaciones: null,
           prereserva_id: null,
           prioridad: false,
+          empresa_id: insertData.empresa_id || null,
           paciente_nombre: insertData.nombre,
           paciente_rut: insertData.rut,
           paciente_tipo_servicio: insertData.tipo_servicio,
@@ -889,7 +890,7 @@ const Pacientes = () => {
             // Create atencion
             const { data: atencionData, error: atencionError } = await supabase
               .from("atenciones")
-              .insert([{ id: atencionId, paciente_id: pacienteId, estado: 'en_espera' }])
+              .insert([{ id: atencionId, paciente_id: pacienteId, estado: 'en_espera', empresa_id: insertData.empresa_id || null }])
               .select()
               .single();
             if (atencionError) throw atencionError;

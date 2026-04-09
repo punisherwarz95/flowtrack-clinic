@@ -406,10 +406,12 @@ export default function PortalPaciente() {
         } else {
           console.log("[Portal] No se encontró atención existente, creando nueva para paciente:", pacienteData.id);
           
+          const empresaIdForAtencion = agendaDiferida?.empresa_id || pacienteData.empresa_id || null;
           const insertData: any = {
             paciente_id: pacienteData.id,
             estado: "en_espera",
-            fecha_ingreso: new Date().toISOString()
+            fecha_ingreso: new Date().toISOString(),
+            empresa_id: empresaIdForAtencion
           };
 
           if (agendaDiferida) {
