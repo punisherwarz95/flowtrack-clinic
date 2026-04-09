@@ -904,6 +904,11 @@ const Flujo = () => {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant="outline" className="font-bold">#{atencion.numero_ingreso}</Badge>
+                          {(atencion as any).prioridad && (
+                            <Badge className="bg-amber-500 text-white text-xs gap-1 py-0">
+                              <Star className="h-3 w-3" /> Prioritario
+                            </Badge>
+                          )}
                           <span className="font-medium text-foreground">{atencion.pacientes.nombre}</span>
                           <Badge variant="outline" className="text-xs">
                             {atencion.pacientes.tipo_servicio === "workmed" ? "WM" : "J"}
