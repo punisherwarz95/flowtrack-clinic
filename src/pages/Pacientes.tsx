@@ -590,9 +590,8 @@ const Pacientes = () => {
           const [examenesRes, docsRes] = await Promise.all([
             supabase
               .from("atencion_examenes")
-              .select("examen_id")
-              .eq("atencion_id", atencionData.id)
-              .eq("estado", "pendiente"),
+              .select("examen_id, estado")
+              .eq("atencion_id", atencionData.id),
             supabase
               .from("atencion_documentos")
               .select("documento_id")
@@ -601,11 +600,15 @@ const Pacientes = () => {
 
           if (examenesRes.error) throw examenesRes.error;
           const loadedExams = examenesRes.data?.map(e => e.examen_id) || [];
+          const estados: Record<string, string> = {};
+          examenesRes.data?.forEach(e => { estados[e.examen_id] = e.estado || 'pendiente'; });
           setSelectedExamenes(loadedExams);
+          setExamenEstados(estados);
           setOriginalExamenesCount(loadedExams.length);
           setSelectedDocumentos(docsRes.data?.map(d => d.documento_id) || []);
         } else {
           setSelectedExamenes([]);
+          setExamenEstados({});
           setOriginalExamenesCount(0);
           setSelectedDocumentos([]);
         }
