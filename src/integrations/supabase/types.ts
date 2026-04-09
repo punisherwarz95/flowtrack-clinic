@@ -397,6 +397,7 @@ export type Database = {
         Row: {
           box_id: string | null
           created_at: string | null
+          empresa_id: string | null
           estado: Database["public"]["Enums"]["estado_atencion"] | null
           estado_ficha: Database["public"]["Enums"]["estado_ficha"] | null
           fecha_fin_atencion: string | null
@@ -412,6 +413,7 @@ export type Database = {
         Insert: {
           box_id?: string | null
           created_at?: string | null
+          empresa_id?: string | null
           estado?: Database["public"]["Enums"]["estado_atencion"] | null
           estado_ficha?: Database["public"]["Enums"]["estado_ficha"] | null
           fecha_fin_atencion?: string | null
@@ -427,6 +429,7 @@ export type Database = {
         Update: {
           box_id?: string | null
           created_at?: string | null
+          empresa_id?: string | null
           estado?: Database["public"]["Enums"]["estado_atencion"] | null
           estado_ficha?: Database["public"]["Enums"]["estado_ficha"] | null
           fecha_fin_atencion?: string | null
@@ -445,6 +448,13 @@ export type Database = {
             columns: ["box_id"]
             isOneToOne: false
             referencedRelation: "boxes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atenciones_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
           {
