@@ -15,6 +15,7 @@ export interface LocalAtencion {
   observaciones: string | null;
   prereserva_id: string | null;
   prioridad: boolean;
+  empresa_id: string | null;
   // Denormalized joins stored locally
   paciente_nombre?: string;
   paciente_rut?: string;

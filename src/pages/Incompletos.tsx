@@ -196,8 +196,9 @@ const Incompletos = () => {
           paciente_id: atencionOriginal.paciente_id,
           estado: "en_espera",
           fecha_ingreso: new Date().toISOString(),
-          observaciones: `Reactivado desde atención incompleta #${atencionOriginal.numero_ingreso}`
-        })
+          observaciones: `Reactivado desde atención incompleta #${atencionOriginal.numero_ingreso}`,
+          empresa_id: atencionOriginal.pacientes?.empresas?.id || null
+        } as any)
         .select()
         .single();
 
