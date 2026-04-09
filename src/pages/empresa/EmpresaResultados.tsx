@@ -84,7 +84,7 @@ const EmpresaResultados = () => {
         .select(`
           id,
           fecha_ingreso,
-          paciente:pacientes!inner(
+          paciente:pacientes(
             nombre, rut, cargo, fecha_nacimiento, tipo_servicio,
             empresa:empresas(nombre, rut)
           ),
