@@ -1,41 +1,55 @@
-## Plan: Sistema de Resultados Portal Empresa con PDF
 
-### 1. Migración de Base de Datos
-- Crear tabla `configuracion_centro` para almacenar: logo_url, párrafo legal del PDF, nombre del centro, dirección, teléfono, web, email
-- Agregar columna `firma_url` a la tabla `profiles` para que los médicos puedan subir su firma digital
-- Crear tabla `informe_verificacion` para almacenar QR únicos por informe (informe_id, token_verificacion, evaluacion_id)
-- Crear bucket de storage `centro-assets` para logos y firmas
 
-### 2. Configuración del Staff (Configuracion.tsx)
-- Nueva pestaña "Centro Médico" con:
-  - Upload de logo del centro
-  - Párrafo legal configurable (el texto que va al final del PDF)
-  - Datos del centro (dirección, teléfono, web, email)
+## Plan: Sistema de Prioridad de Pacientes
 
-### 3. Firma del Médico (Usuarios)
-- En el perfil del usuario médico, agregar campo para subir firma digital (imagen)
+### Resumen
+Agregar un campo `prioridad` a la tabla `atenciones` que permita a los administradores marcar un paciente como prioritario. Los pacientes prioritarios aparecerán primero en todas las colas de atención (Flujo, Mi Box, BoxView, PantallaTv).
 
-### 4. Refactorizar EmpresaResultados.tsx
-- Cambiar fuente de datos de `prereservas` a `atenciones` (consistente con la arquitectura)
-- Filtrar por empresa_id del paciente
-- Mostrar: nombre, RUT, baterías asignadas con badge de estado (pendiente/apto/no apto)
-- Rango de fechas por defecto = mes completo
-- Al clicar en el badge → detalle de evaluación con opción de generar PDF
+### Cambios en Base de Datos
 
-### 5. Generador de PDF de Evaluación
-Basado en el formato subido, generar PDF con:
-- **Página 1**: Logo, título "RESULTADO EXAMEN" + nombre batería, fecha, folio, válido hasta, datos paciente, datos empresa, resultado (APTO/NO APTO), datos clínicos, evaluación médica
-- **Página 2**: Exámenes complementarios con estado, conclusión final, recomendaciones, firma del doctor, QR de verificación
-- **Página 3**: Párrafo legal configurable
+**Migración**: Agregar columna `prioridad` a `atenciones`
+```sql
+ALTER TABLE public.atenciones ADD COLUMN prioridad boolean NOT NULL DEFAULT false;
+```
 
-### 6. Ruta Pública de Verificación QR
-- Ruta `/verificar/:token` que muestra los datos del informe sin necesidad de login
-- Permite a terceros verificar la autenticidad del documento
+**LocalDb**: Agregar campo `prioridad` a `LocalAtencion` interface.
 
-### Orden de implementación:
-1. Migración DB (tablas + storage)
-2. Configuración centro médico
-3. Firma médico en usuarios  
-4. Refactorizar EmpresaResultados
-5. Generador PDF
-6. Ruta verificación QR
+### Lógica de Ordenamiento
+
+Actualmente las colas se ordenan por `numero_ingreso ASC`. El cambio es mínimo: ordenar primero por `prioridad DESC`, luego por `numero_ingreso ASC`. Esto aplica en:
+
+1. **Flujo.tsx** — Query Supabase (línea 356): agregar `.order("prioridad", { ascending: false })` antes del order por `numero_ingreso`. En `localDerived` (línea 122): ajustar el `.sort()`.
+2. **MiBox.tsx** — Sort local (líneas 142, 229): agregar prioridad al comparador.
+3. **BoxView.tsx** — Query Supabase (línea 99): agregar order por prioridad.
+4. **PantallaTv.tsx** — Si ordena por ingreso, ajustar igual.
+5. **localDb.ts** — Agregar `prioridad` a `LocalAtencion`.
+6. **useLocalSync.ts** — Incluir `prioridad` en el pull de datos.
+
+### UI para Asignar Prioridad (Solo Admin)
+
+En **Pacientes.tsx**, dentro del detalle/edición del paciente, agregar un botón/switch visible solo para admins que marque la atención activa como prioritaria. Al activarlo, se actualiza `atenciones.prioridad = true` via Supabase.
+
+### Indicador Visual
+
+En las colas de Flujo, Mi Box y BoxView, mostrar un badge o icono (estrella/flecha arriba) junto al nombre del paciente prioritario para que el staff sepa por qué está primero.
+
+### Archivos a Modificar
+
+| Archivo | Cambio |
+|---|---|
+| `src/lib/localDb.ts` | Agregar `prioridad` a `LocalAtencion` |
+| `src/hooks/useLocalSync.ts` | Incluir `prioridad` en pull |
+| `src/pages/Flujo.tsx` | Ordenar por prioridad, mostrar badge |
+| `src/pages/MiBox.tsx` | Ordenar por prioridad, mostrar badge |
+| `src/pages/BoxView.tsx` | Ordenar por prioridad, mostrar badge |
+| `src/pages/PantallaTv.tsx` | Ordenar por prioridad |
+| `src/pages/Pacientes.tsx` | Botón admin para asignar prioridad |
+| `src/pages/Dashboard.tsx` | Sin cambios (no afecta orden de tabla) |
+
+### Impacto en Funcionalidad Existente
+
+- **Ningún campo existente se modifica** — solo se agrega una columna con default `false`.
+- **El orden base se mantiene** — pacientes sin prioridad siguen ordenados por `numero_ingreso`.
+- **Offline-first compatible** — se sincroniza via el mismo pipeline de `useLocalSync`.
+- **Sin cambios en RLS** — usa las mismas políticas abiertas de `atenciones`.
+
