@@ -37,6 +37,7 @@ interface Atencion {
   numero_ingreso: number;
   box_id: string | null;
   estado_ficha: string;
+  prioridad?: boolean;
   pacientes: {
     id: string;
     nombre: string;
@@ -139,7 +140,12 @@ const MiBox = () => {
     // (filter out patients already released locally via completarAtencionMiBox)
     const enAtencionLocal = localData.atenciones
       .filter(a => a.estado === 'en_atencion' && a.box_id === selectedBoxId)
-      .sort((a, b) => (a.numero_ingreso || 0) - (b.numero_ingreso || 0))
+      .sort((a, b) => {
+        const pa = a.prioridad ? 1 : 0;
+        const pb = b.prioridad ? 1 : 0;
+        if (pb !== pa) return pb - pa;
+        return (a.numero_ingreso || 0) - (b.numero_ingreso || 0);
+      })
       .map(la => ({
         id: la.id,
         estado: la.estado,
@@ -147,6 +153,7 @@ const MiBox = () => {
         numero_ingreso: la.numero_ingreso || 0,
         box_id: la.box_id,
         estado_ficha: la.estado_ficha,
+        prioridad: la.prioridad,
         pacientes: {
           id: la.paciente_id,
           nombre: la.paciente_nombre || '',
@@ -186,6 +193,7 @@ const MiBox = () => {
         numero_ingreso: la.numero_ingreso || 0,
         box_id: la.box_id,
         estado_ficha: la.estado_ficha,
+        prioridad: la.prioridad,
         pacientes: {
           id: la.paciente_id,
           nombre: la.paciente_nombre || '',
@@ -226,7 +234,12 @@ const MiBox = () => {
       }
     });
 
-    enEsperaLocal.sort((a, b) => (a.numero_ingreso || 0) - (b.numero_ingreso || 0));
+    enEsperaLocal.sort((a, b) => {
+      const pa = (a as any).prioridad ? 1 : 0;
+      const pb = (b as any).prioridad ? 1 : 0;
+      if (pb !== pa) return pb - pa;
+      return (a.numero_ingreso || 0) - (b.numero_ingreso || 0);
+    });
     setPacientesEnEspera(enEsperaLocal);
     setPacientesCompletados(completadosLocal);
     setPacientesEnOtrosBoxes(otrosBoxesCount);
