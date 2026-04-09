@@ -22,6 +22,7 @@ export type ActivityAction =
   | "crear_paquete" | "editar_paquete" | "eliminar_paquete"
   | "importar_examenes"
   | "crear_bloque" | "editar_bloque" | "eliminar_bloque" | "toggle_bloque"
+  | "toggle_prioridad"
   | "otro";
 
 export const logActivity = async (
