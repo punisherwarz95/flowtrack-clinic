@@ -1611,17 +1611,21 @@ const Pacientes = () => {
                       </div>
                     ) : (
                       <div className="p-2 space-y-1">
-                        {selectedExamenes.map((examenId) => {
+                        {selectedExamenes.map((examenId, idx) => {
                           const examen = examenes.find(e => e.id === examenId);
                           if (!examen) return null;
                           return (
-                            <div key={examenId} className="flex items-center justify-between py-1.5 px-2 bg-background rounded border text-sm">
+                            <div key={`${examenId}-${idx}`} className="flex items-center justify-between py-1.5 px-2 bg-background rounded border text-sm">
                               <div className="flex-1 min-w-0">
                                 <span className="block break-words">{examen.nombre}</span>
                                 {examen.codigo && <span className="text-xs text-muted-foreground">{examen.codigo}</span>}
                               </div>
                               <Button type="button" variant="ghost" size="icon" className="h-6 w-6 shrink-0"
-                                onClick={() => setSelectedExamenes(prev => prev.filter(id => id !== examenId))}>
+                                onClick={() => setSelectedExamenes(prev => {
+                                  const copy = [...prev];
+                                  copy.splice(idx, 1);
+                                  return copy;
+                                })}>
                                 <Trash2 className="h-3 w-3 text-destructive" />
                               </Button>
                             </div>
