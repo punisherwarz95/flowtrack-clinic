@@ -102,7 +102,7 @@ const EmpresaResultados = () => {
             paquete:paquetes_examenes(id, nombre)
           )
         `)
-        .eq("paciente.empresa_id", currentEmpresaId)
+        .eq("empresa_id", currentEmpresaId)
         .gte("fecha_ingreso", `${fechaDesde}T00:00:00`)
         .lte("fecha_ingreso", `${fechaHasta}T23:59:59`)
         .in("estado", ["en_atencion", "completado"])

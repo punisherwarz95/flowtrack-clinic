@@ -54,25 +54,11 @@ const EmpresaPacientes = () => {
 
     setLoading(true);
     try {
-      // Nota: En este proyecto las atenciones no están ligadas a prereservas (prereserva_id viene null),
-      // por lo que el historial de atendidos se arma desde atenciones + pacientes.
-      const { data: pacientesData, error: pacientesError } = await supabase
-        .from("pacientes")
-        .select("id, nombre, rut, cargo, faena:faenas(nombre)")
-        .eq("empresa_id", currentEmpresaId);
-
-      if (pacientesError) throw pacientesError;
-
-      const pacienteIds = (pacientesData ?? []).map((p: any) => p.id).filter(Boolean);
-      if (pacienteIds.length === 0) {
-        setPacientes([]);
-        return;
-      }
-
+      // Query atenciones directly by empresa_id to get patients historically associated
       let atQuery = supabase
         .from("atenciones")
-        .select("id, paciente_id, fecha_ingreso, estado, fecha_fin_atencion")
-        .in("paciente_id", pacienteIds)
+        .select("id, paciente_id, fecha_ingreso, estado, fecha_fin_atencion, empresa_id, pacientes(id, nombre, rut, cargo, faena:faenas(nombre))")
+        .eq("empresa_id", currentEmpresaId)
         .order("fecha_ingreso", { ascending: false });
 
       if (fechaDesde) atQuery = atQuery.gte("fecha_ingreso", `${fechaDesde}T00:00:00`);
@@ -101,13 +87,11 @@ const EmpresaPacientes = () => {
         });
       }
 
-      const pacienteById = new Map<string, any>((pacientesData ?? []).map((p: any) => [p.id, p]));
       const rows: PacienteAtendido[] = (atencionesData ?? []).map((a: any) => {
-        const p = pacienteById.get(a.paciente_id);
+        const p = a.pacientes;
         const fecha = a.fecha_ingreso ? String(a.fecha_ingreso).slice(0, 10) : "";
         const estado = a.estado ?? "";
 
-        // Obtener baterías de esta atención
         const bateriasDeAtencion = bateriasPorAtencion[a.id] || [];
 
         return {

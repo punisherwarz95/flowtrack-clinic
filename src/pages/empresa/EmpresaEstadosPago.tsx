@@ -120,22 +120,20 @@ const EmpresaEstadosPago = () => {
         .single();
       const esAfectaIva = empresaData?.afecto_iva !== false;
 
-      // 1. Obtener IDs de pacientes de esta empresa
-      const { data: pacientesEmpresa, error: pacError } = await supabase
-        .from("pacientes")
-        .select("id, nombre, rut, cargo, faena:faenas(nombre)")
-        .eq("empresa_id", currentEmpresaId);
-
-      if (pacError) throw pacError;
-
-      if (!pacientesEmpresa || pacientesEmpresa.length === 0) {
-        toast({ title: "No hay pacientes registrados para esta empresa", variant: "destructive" });
-        setGenerando(false);
-        return;
-      }
-
-      const pacienteIds = pacientesEmpresa.map((p) => p.id);
-      const pacientesMap = new Map(pacientesEmpresa.map((p) => [p.id, p]));
+      // 1. Obtener atenciones completadas en el período para esta empresa
+      const { data: atenciones, error: atencionesError } = await supabase
+        .from("atenciones")
+        .select(`
+          id,
+          paciente_id,
+          fecha_ingreso,
+          estado,
+          fecha_fin_atencion
+        `)
+        .eq("empresa_id", currentEmpresaId)
+        .eq("estado", "completado")
+        .gte("fecha_ingreso", `${fechaDesde}T00:00:00`)
+        .lte("fecha_ingreso", `${fechaHasta}T23:59:59`);
 
       // 2. Obtener atenciones completadas en el período
       const { data: atenciones, error: atencionesError } = await supabase
