@@ -135,21 +135,6 @@ const EmpresaEstadosPago = () => {
         .gte("fecha_ingreso", `${fechaDesde}T00:00:00`)
         .lte("fecha_ingreso", `${fechaHasta}T23:59:59`);
 
-      // 2. Obtener atenciones completadas en el período
-      const { data: atenciones, error: atencionesError } = await supabase
-        .from("atenciones")
-        .select(`
-          id,
-          paciente_id,
-          fecha_ingreso,
-          estado,
-          fecha_fin_atencion
-        `)
-        .in("paciente_id", pacienteIds)
-        .eq("estado", "completado")
-        .gte("fecha_ingreso", `${fechaDesde}T00:00:00`)
-        .lte("fecha_ingreso", `${fechaHasta}T23:59:59`);
-
       if (atencionesError) throw atencionesError;
 
       if (!atenciones || atenciones.length === 0) {
@@ -157,6 +142,14 @@ const EmpresaEstadosPago = () => {
         setGenerando(false);
         return;
       }
+
+      // 1b. Get patient data for these atenciones
+      const pacienteIdsSet = new Set(atenciones.map((a: any) => a.paciente_id));
+      const { data: pacientesEmpresa } = await supabase
+        .from("pacientes")
+        .select("id, nombre, rut, cargo, faena:faenas(nombre)")
+        .in("id", Array.from(pacienteIdsSet));
+      const pacientesMap = new Map((pacientesEmpresa || []).map((p: any) => [p.id, p]));
 
       // 2b. Obtener baterías de atencion_baterias
       const atencionIds = atenciones.map((a: any) => a.id);
