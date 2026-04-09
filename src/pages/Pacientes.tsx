@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Trash2, Pencil, Calendar as CalendarIcon, ClipboardList, FileText, ClipboardPaste, X, Clock } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Calendar as CalendarIcon, ClipboardList, FileText, ClipboardPaste, X, Clock, Star } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PreReservasManagement from "@/components/PreReservasManagement";
 import CodigoDelDia from "@/components/CodigoDelDia";
@@ -39,8 +39,10 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn, formatRutStandard } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useAuthContext } from "@/contexts/AuthContext";
 import AgendaDiferida from "@/components/AgendaDiferida";
 import { logActivity } from "@/lib/activityLog";
+import { Switch } from "@/components/ui/switch";
 
 interface Patient {
   id: string;
@@ -131,7 +133,9 @@ interface ExamenCompletado {
 
 const Pacientes = () => {
   useAuth(); // Protect route
+  const { isAdmin } = useAuthContext();
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [atencionPrioridad, setAtencionPrioridad] = useState<boolean>(false);
   const { data: cachedEmpresas = [] } = useEmpresas();
   const empresas = cachedEmpresas as Empresa[];
   const { data: cachedExamenes = [] } = useExamenes();
@@ -494,6 +498,28 @@ const Pacientes = () => {
     loadFaenaExamenes(faenaId);
   };
 
+  const handleTogglePrioridad = async (patientId: string, newValue: boolean) => {
+    try {
+      const atencion = localAtenciones.find(a => a.paciente_id === patientId);
+      if (!atencion) {
+        toast.error("No hay atención activa para este paciente");
+        return;
+      }
+      const { error } = await supabase
+        .from("atenciones")
+        .update({ prioridad: newValue })
+        .eq("id", atencion.id);
+      if (error) throw error;
+      await localDb.atenciones.update(atencion.id, { prioridad: newValue });
+      setAtencionPrioridad(newValue);
+      toast.success(newValue ? "Paciente marcado como prioritario" : "Prioridad removida");
+      await logActivity("toggle_prioridad", { paciente_id: patientId, prioridad: newValue, atencion_id: atencion.id }, "/pacientes");
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al cambiar prioridad");
+    }
+  };
+
   const handleEdit = async (patient: Patient) => {
     setEditingPatient(patient.id);
     setFormData({
@@ -521,6 +547,7 @@ const Pacientes = () => {
     if (isToday) {
       const atencion = localAtenciones.find(a => a.paciente_id === patient.id);
       if (atencion) {
+        setAtencionPrioridad(atencion.prioridad ?? false);
         const exams = localAtencionExamenes
           .filter(ae => ae.atencion_id === atencion.id)
           .map(ae => ae.examen_id);
@@ -531,6 +558,7 @@ const Pacientes = () => {
         setOriginalExamenesCount(exams.length);
         setSelectedDocumentos(docs);
       } else {
+        setAtencionPrioridad(false);
         setSelectedExamenes([]);
         setOriginalExamenesCount(0);
         setSelectedDocumentos([]);
@@ -543,7 +571,7 @@ const Pacientes = () => {
 
         const { data: atencionData, error: atencionError } = await supabase
           .from("atenciones")
-          .select("id, estado")
+          .select("id, estado, prioridad")
           .eq("paciente_id", patient.id)
           .gte("fecha_ingreso", startOfDay)
           .lte("fecha_ingreso", endOfDay)
@@ -554,6 +582,7 @@ const Pacientes = () => {
         if (atencionError) throw atencionError;
 
         if (atencionData) {
+          setAtencionPrioridad((atencionData as any).prioridad ?? false);
           const [examenesRes, docsRes] = await Promise.all([
             supabase
               .from("atencion_examenes")
@@ -800,6 +829,7 @@ const Pacientes = () => {
           estado_ficha: 'pendiente',
           observaciones: null,
           prereserva_id: null,
+          prioridad: false,
           paciente_nombre: insertData.nombre,
           paciente_rut: insertData.rut,
           paciente_tipo_servicio: insertData.tipo_servicio,
@@ -1430,6 +1460,20 @@ const Pacientes = () => {
                       Atención #{pat.atencion_actual.numero_ingreso}
                     </Badge>
                   ) : null;
+                })()}
+                {editingPatient && isAdmin && (() => {
+                  const pat = patients.find(p => p.id === editingPatient);
+                  if (!pat?.atencion_actual) return null;
+                  return (
+                    <div className="flex items-center gap-2 ml-auto">
+                      <Star className={`h-4 w-4 ${atencionPrioridad ? 'text-amber-500 fill-amber-500' : 'text-muted-foreground'}`} />
+                      <Switch
+                        checked={atencionPrioridad}
+                        onCheckedChange={(val) => handleTogglePrioridad(editingPatient, val)}
+                      />
+                      <span className="text-sm font-medium">Prioritario</span>
+                    </div>
+                  );
                 })()}
               </div>
               <p className="text-muted-foreground text-sm">Complete los datos del paciente y seleccione los exámenes</p>

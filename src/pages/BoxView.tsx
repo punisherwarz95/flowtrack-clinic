@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
-import { CheckCircle, XCircle, Clock } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Star } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { logActivity } from "@/lib/activityLog";
 
 interface Atencion {
@@ -13,6 +14,7 @@ interface Atencion {
   paciente_id: string;
   estado: string;
   fecha_ingreso: string;
+  prioridad?: boolean;
   pacientes: {
     id: string;
     nombre: string;
@@ -96,6 +98,7 @@ const BoxView = () => {
           atencion_examenes(*, examenes(*))
         `)
         .in("estado", ["en_espera", "en_atencion"])
+        .order("prioridad", { ascending: false })
         .order("fecha_ingreso", { ascending: true });
 
       if (error) throw error;
@@ -221,7 +224,14 @@ const BoxView = () => {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle>{atencion.pacientes.nombre}</CardTitle>
+                      <CardTitle className="flex items-center gap-2">
+                        {atencion.prioridad && (
+                          <Badge className="bg-amber-500 text-white text-xs gap-1">
+                            <Star className="h-3 w-3" /> Prioritario
+                          </Badge>
+                        )}
+                        {atencion.pacientes.nombre}
+                      </CardTitle>
                       <p className="text-sm text-muted-foreground mt-1">
                         {atencion.pacientes.empresas?.nombre || "Sin empresa"} •{" "}
                         <span className={atencion.pacientes.tipo_servicio === 'workmed' ? 'text-blue-600' : 'text-green-600'}>

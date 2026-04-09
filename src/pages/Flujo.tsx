@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
-import { Play, CheckCircle, XCircle, Calendar as CalendarIcon, FileText, RefreshCw, ChevronDown, Check, FileWarning } from "lucide-react";
+import { Play, CheckCircle, XCircle, Calendar as CalendarIcon, FileText, RefreshCw, ChevronDown, Check, FileWarning, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -32,6 +32,7 @@ interface Atencion {
   numero_ingreso: number;
   box_id: string | null;
   estado_ficha: string;
+  prioridad?: boolean;
   pacientes: {
     id: string;
     nombre: string;
@@ -119,7 +120,12 @@ const Flujo = () => {
     
     const localAtenciones: Atencion[] = localData.atenciones
       .filter(a => a.estado === 'en_espera' || a.estado === 'en_atencion')
-      .sort((a, b) => (a.numero_ingreso || 0) - (b.numero_ingreso || 0))
+      .sort((a, b) => {
+        const pa = a.prioridad ? 1 : 0;
+        const pb = b.prioridad ? 1 : 0;
+        if (pb !== pa) return pb - pa;
+        return (a.numero_ingreso || 0) - (b.numero_ingreso || 0);
+      })
       .map(la => ({
         id: la.id,
         estado: la.estado,
@@ -128,6 +134,7 @@ const Flujo = () => {
         numero_ingreso: la.numero_ingreso || 0,
         box_id: la.box_id,
         estado_ficha: la.estado_ficha,
+        prioridad: la.prioridad,
         pacientes: {
           id: la.paciente_id,
           nombre: la.paciente_nombre || '',
@@ -353,6 +360,7 @@ const Flujo = () => {
         .from("atenciones")
         .select("*, pacientes(id, nombre, rut, tipo_servicio), boxes(*)")
         .in("estado", ["en_espera", "en_atencion"])
+        .order("prioridad", { ascending: false })
         .order("numero_ingreso", { ascending: true });
 
       if (startOfDay && endOfDay) {
@@ -896,6 +904,11 @@ const Flujo = () => {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant="outline" className="font-bold">#{atencion.numero_ingreso}</Badge>
+                          {(atencion as any).prioridad && (
+                            <Badge className="bg-amber-500 text-white text-xs gap-1 py-0">
+                              <Star className="h-3 w-3" /> Prioritario
+                            </Badge>
+                          )}
                           <span className="font-medium text-foreground">{atencion.pacientes.nombre}</span>
                           <Badge variant="outline" className="text-xs">
                             {atencion.pacientes.tipo_servicio === "workmed" ? "WM" : "J"}
@@ -1057,6 +1070,11 @@ const Flujo = () => {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant="outline" className="font-bold">#{atencion.numero_ingreso}</Badge>
+                          {(atencion as any).prioridad && (
+                            <Badge className="bg-amber-500 text-white text-xs gap-1 py-0">
+                              <Star className="h-3 w-3" /> Prioritario
+                            </Badge>
+                          )}
                           <div className="font-medium text-foreground">
                             {atencion.pacientes.nombre}
                           </div>

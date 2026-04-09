@@ -1,0 +1,1 @@
+ALTER TABLE public.atenciones ADD COLUMN prioridad boolean NOT NULL DEFAULT false;
