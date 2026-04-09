@@ -80,6 +80,7 @@ export function useLocalSync(enabled = true) {
         estado_ficha: a.estado_ficha || 'pendiente',
         observaciones: a.observaciones,
         prereserva_id: a.prereserva_id,
+        prioridad: a.prioridad ?? false,
         paciente_nombre: a.pacientes?.nombre,
         paciente_rut: a.pacientes?.rut,
         paciente_tipo_servicio: a.pacientes?.tipo_servicio,
