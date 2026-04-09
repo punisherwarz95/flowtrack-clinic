@@ -1461,6 +1461,20 @@ const Pacientes = () => {
                     </Badge>
                   ) : null;
                 })()}
+                {editingPatient && isAdmin && (() => {
+                  const pat = patients.find(p => p.id === editingPatient);
+                  if (!pat?.atencion_actual) return null;
+                  return (
+                    <div className="flex items-center gap-2 ml-auto">
+                      <Star className={`h-4 w-4 ${atencionPrioridad ? 'text-amber-500 fill-amber-500' : 'text-muted-foreground'}`} />
+                      <Switch
+                        checked={atencionPrioridad}
+                        onCheckedChange={(val) => handleTogglePrioridad(editingPatient, val)}
+                      />
+                      <span className="text-sm font-medium">Prioritario</span>
+                    </div>
+                  );
+                })()}
               </div>
               <p className="text-muted-foreground text-sm">Complete los datos del paciente y seleccione los exámenes</p>
             </div>
