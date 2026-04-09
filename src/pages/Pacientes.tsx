@@ -153,7 +153,7 @@ const Pacientes = () => {
   const [editingPatient, setEditingPatient] = useState<string | null>(null);
   const [pacienteToDelete, setPacienteToDelete] = useState<string | null>(null);
   const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
-  const [examenEstados, setExamenEstados] = useState<Record<string, string>>({}); // examen_id -> estado
+  const [examenEstados, setExamenEstados] = useState<Record<string, string>>({}); // atencion_examen composite key -> estado
   const [selectedPaquetes, setSelectedPaquetes] = useState<string[]>([]);
   const [examenFilter, setExamenFilter] = useState("");
   const [empresaSearchFilter, setEmpresaSearchFilter] = useState("");
@@ -552,7 +552,7 @@ const Pacientes = () => {
         const aeList = localAtencionExamenes.filter(ae => ae.atencion_id === atencion.id);
         const exams = aeList.map(ae => ae.examen_id);
         const estados: Record<string, string> = {};
-        aeList.forEach(ae => { estados[ae.examen_id] = ae.estado || 'pendiente'; });
+        aeList.forEach((ae, i) => { estados[`${ae.examen_id}_${i}`] = ae.estado || 'pendiente'; });
         const docs = localAtencionDocumentos
           .filter(d => d.atencion_id === atencion.id)
           .map(d => d.documento_id);
@@ -601,7 +601,7 @@ const Pacientes = () => {
           if (examenesRes.error) throw examenesRes.error;
           const loadedExams = examenesRes.data?.map(e => e.examen_id) || [];
           const estados: Record<string, string> = {};
-          examenesRes.data?.forEach(e => { estados[e.examen_id] = e.estado || 'pendiente'; });
+          examenesRes.data?.forEach((e, i) => { estados[`${e.examen_id}_${i}`] = e.estado || 'pendiente'; });
           setSelectedExamenes(loadedExams);
           setExamenEstados(estados);
           setOriginalExamenesCount(loadedExams.length);
@@ -1628,15 +1628,14 @@ const Pacientes = () => {
                                 {examen.codigo && <span className="text-xs text-muted-foreground">{examen.codigo}</span>}
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
-                                {examenEstados[examenId] === 'completado' && (
-                                  <span title="Completado"><CheckCircle2 className="h-4 w-4 text-green-600" /></span>
-                                )}
-                                {examenEstados[examenId] === 'toma_muestra' && (
-                                  <span title="Toma de muestra"><FlaskConical className="h-4 w-4 text-blue-600" /></span>
-                                )}
-                                {examenEstados[examenId] === 'incompleto' && (
-                                  <span title="Incompleto"><Clock className="h-4 w-4 text-amber-600" /></span>
-                                )}
+                                {(() => {
+                                  const key = `${examenId}_${idx}`;
+                                  const estado = examenEstados[key];
+                                  if (estado === 'completado') return <span title="Completado"><CheckCircle2 className="h-4 w-4 text-green-600" /></span>;
+                                  if (estado === 'toma_muestra') return <span title="Toma de muestra"><FlaskConical className="h-4 w-4 text-blue-600" /></span>;
+                                  if (estado === 'incompleto') return <span title="Incompleto"><Clock className="h-4 w-4 text-amber-600" /></span>;
+                                  return null;
+                                })()}
                                 <Button type="button" variant="ghost" size="icon" className="h-6 w-6"
                                   onClick={() => setSelectedExamenes(prev => {
                                     const copy = [...prev];
@@ -1808,8 +1807,9 @@ const Pacientes = () => {
                                   <label key={examen.id} className="flex items-center gap-2 cursor-pointer py-1 px-1 hover:bg-accent rounded text-sm">
                                     <input type="checkbox" checked={selectedExamenes.includes(examen.id)}
                                       onChange={(e) => {
-                                        if (e.target.checked) setSelectedExamenes([...selectedExamenes, examen.id]);
-                                        else setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
+                                        if (e.target.checked) {
+                                          if (!selectedExamenes.includes(examen.id)) setSelectedExamenes([...selectedExamenes, examen.id]);
+                                        } else setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
                                       }} className="w-3.5 h-3.5" />
                                     <span className="break-words flex-1">{examen.nombre}</span>
                                     {examen.codigo && <span className="text-xs text-muted-foreground shrink-0">{examen.codigo}</span>}
