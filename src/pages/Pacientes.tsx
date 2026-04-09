@@ -549,7 +549,7 @@ const Pacientes = () => {
 
         const { data: atencionData, error: atencionError } = await supabase
           .from("atenciones")
-          .select("id, estado")
+          .select("id, estado, prioridad")
           .eq("paciente_id", patient.id)
           .gte("fecha_ingreso", startOfDay)
           .lte("fecha_ingreso", endOfDay)
@@ -560,6 +560,7 @@ const Pacientes = () => {
         if (atencionError) throw atencionError;
 
         if (atencionData) {
+          setAtencionPrioridad((atencionData as any).prioridad ?? false);
           const [examenesRes, docsRes] = await Promise.all([
             supabase
               .from("atencion_examenes")
