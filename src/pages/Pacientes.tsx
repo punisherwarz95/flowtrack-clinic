@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Trash2, Pencil, Calendar as CalendarIcon, ClipboardList, FileText, ClipboardPaste, X, Clock, Star } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Calendar as CalendarIcon, ClipboardList, FileText, ClipboardPaste, X, Clock, Star, CheckCircle2, FlaskConical } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PreReservasManagement from "@/components/PreReservasManagement";
 import CodigoDelDia from "@/components/CodigoDelDia";
@@ -153,6 +153,7 @@ const Pacientes = () => {
   const [editingPatient, setEditingPatient] = useState<string | null>(null);
   const [pacienteToDelete, setPacienteToDelete] = useState<string | null>(null);
   const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
+  const [examenEstados, setExamenEstados] = useState<Record<string, string>>({}); // examen_id -> estado
   const [selectedPaquetes, setSelectedPaquetes] = useState<string[]>([]);
   const [examenFilter, setExamenFilter] = useState("");
   const [empresaSearchFilter, setEmpresaSearchFilter] = useState("");
@@ -548,18 +549,21 @@ const Pacientes = () => {
       const atencion = localAtenciones.find(a => a.paciente_id === patient.id);
       if (atencion) {
         setAtencionPrioridad(atencion.prioridad ?? false);
-        const exams = localAtencionExamenes
-          .filter(ae => ae.atencion_id === atencion.id)
-          .map(ae => ae.examen_id);
+        const aeList = localAtencionExamenes.filter(ae => ae.atencion_id === atencion.id);
+        const exams = aeList.map(ae => ae.examen_id);
+        const estados: Record<string, string> = {};
+        aeList.forEach(ae => { estados[ae.examen_id] = ae.estado || 'pendiente'; });
         const docs = localAtencionDocumentos
           .filter(d => d.atencion_id === atencion.id)
           .map(d => d.documento_id);
         setSelectedExamenes(exams);
+        setExamenEstados(estados);
         setOriginalExamenesCount(exams.length);
         setSelectedDocumentos(docs);
       } else {
         setAtencionPrioridad(false);
         setSelectedExamenes([]);
+        setExamenEstados({});
         setOriginalExamenesCount(0);
         setSelectedDocumentos([]);
       }
@@ -586,9 +590,8 @@ const Pacientes = () => {
           const [examenesRes, docsRes] = await Promise.all([
             supabase
               .from("atencion_examenes")
-              .select("examen_id")
-              .eq("atencion_id", atencionData.id)
-              .eq("estado", "pendiente"),
+              .select("examen_id, estado")
+              .eq("atencion_id", atencionData.id),
             supabase
               .from("atencion_documentos")
               .select("documento_id")
@@ -597,11 +600,15 @@ const Pacientes = () => {
 
           if (examenesRes.error) throw examenesRes.error;
           const loadedExams = examenesRes.data?.map(e => e.examen_id) || [];
+          const estados: Record<string, string> = {};
+          examenesRes.data?.forEach(e => { estados[e.examen_id] = e.estado || 'pendiente'; });
           setSelectedExamenes(loadedExams);
+          setExamenEstados(estados);
           setOriginalExamenesCount(loadedExams.length);
           setSelectedDocumentos(docsRes.data?.map(d => d.documento_id) || []);
         } else {
           setSelectedExamenes([]);
+          setExamenEstados({});
           setOriginalExamenesCount(0);
           setSelectedDocumentos([]);
         }
@@ -1620,14 +1627,25 @@ const Pacientes = () => {
                                 <span className="block break-words">{examen.nombre}</span>
                                 {examen.codigo && <span className="text-xs text-muted-foreground">{examen.codigo}</span>}
                               </div>
-                              <Button type="button" variant="ghost" size="icon" className="h-6 w-6 shrink-0"
-                                onClick={() => setSelectedExamenes(prev => {
-                                  const copy = [...prev];
-                                  copy.splice(idx, 1);
-                                  return copy;
-                                })}>
-                                <Trash2 className="h-3 w-3 text-destructive" />
-                              </Button>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {examenEstados[examenId] === 'completado' && (
+                                  <span title="Completado"><CheckCircle2 className="h-4 w-4 text-green-600" /></span>
+                                )}
+                                {examenEstados[examenId] === 'toma_muestra' && (
+                                  <span title="Toma de muestra"><FlaskConical className="h-4 w-4 text-blue-600" /></span>
+                                )}
+                                {examenEstados[examenId] === 'incompleto' && (
+                                  <span title="Incompleto"><Clock className="h-4 w-4 text-amber-600" /></span>
+                                )}
+                                <Button type="button" variant="ghost" size="icon" className="h-6 w-6"
+                                  onClick={() => setSelectedExamenes(prev => {
+                                    const copy = [...prev];
+                                    copy.splice(idx, 1);
+                                    return copy;
+                                  })}>
+                                  <Trash2 className="h-3 w-3 text-destructive" />
+                                </Button>
+                              </div>
                             </div>
                           );
                         })}
