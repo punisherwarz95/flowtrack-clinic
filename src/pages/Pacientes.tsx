@@ -800,6 +800,7 @@ const Pacientes = () => {
           estado_ficha: 'pendiente',
           observaciones: null,
           prereserva_id: null,
+          prioridad: false,
           paciente_nombre: insertData.nombre,
           paciente_rut: insertData.rut,
           paciente_tipo_servicio: insertData.tipo_servicio,
