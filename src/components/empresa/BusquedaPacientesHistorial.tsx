@@ -151,7 +151,7 @@ const BusquedaPacientesHistorial = ({
         .order("fecha_ingreso", { ascending: false });
 
       if (empresaIdToFilter) {
-        query = query.eq("pacientes.empresa_id", empresaIdToFilter);
+        query = query.eq("empresa_id", empresaIdToFilter);
       }
       if (fechaDesde) query = query.gte("fecha_ingreso", fechaDesde);
       if (fechaHasta) query = query.lte("fecha_ingreso", `${fechaHasta}T23:59:59`);
@@ -160,18 +160,19 @@ const BusquedaPacientesHistorial = ({
 
       // Fallback
       if (!error && empresaIdToFilter && (!data || data.length === 0)) {
-        const { data: pacientesData, error: pacientesError } = await supabase
-          .from("pacientes")
-          .select("id")
+        // Fallback: search by atenciones.empresa_id with in-clause on paciente_ids
+        const { data: atencionesData, error: atencionesError } = await supabase
+          .from("atenciones")
+          .select("paciente_id")
           .eq("empresa_id", empresaIdToFilter);
 
-        if (pacientesError) {
+        if (atencionesError) {
           setErrorMsg("No se pudieron cargar los pacientes de la empresa seleccionada.");
           setResultados([]);
           return;
         }
 
-        const pacienteIds = pacientesData?.map((p: any) => p.id) || [];
+        const pacienteIds = [...new Set((atencionesData || []).map((a: any) => a.paciente_id))];
         if (pacienteIds.length === 0) {
           setResultados([]);
           setDebugInfo(`empresa=${empresaIdToFilter} · pacientes=0 · atenciones=0`);
