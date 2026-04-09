@@ -498,6 +498,28 @@ const Pacientes = () => {
     loadFaenaExamenes(faenaId);
   };
 
+  const handleTogglePrioridad = async (patientId: string, newValue: boolean) => {
+    try {
+      const atencion = localAtenciones.find(a => a.paciente_id === patientId);
+      if (!atencion) {
+        toast.error("No hay atención activa para este paciente");
+        return;
+      }
+      const { error } = await supabase
+        .from("atenciones")
+        .update({ prioridad: newValue })
+        .eq("id", atencion.id);
+      if (error) throw error;
+      await localDb.atenciones.update(atencion.id, { prioridad: newValue });
+      setAtencionPrioridad(newValue);
+      toast.success(newValue ? "Paciente marcado como prioritario" : "Prioridad removida");
+      await logActivity("toggle_prioridad", { paciente_id: patientId, prioridad: newValue, atencion_id: atencion.id }, "/pacientes");
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al cambiar prioridad");
+    }
+  };
+
   const handleEdit = async (patient: Patient) => {
     setEditingPatient(patient.id);
     setFormData({
