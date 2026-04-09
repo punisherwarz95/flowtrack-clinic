@@ -39,8 +39,10 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn, formatRutStandard } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useAuthContext } from "@/contexts/AuthContext";
 import AgendaDiferida from "@/components/AgendaDiferida";
 import { logActivity } from "@/lib/activityLog";
+import { Switch } from "@/components/ui/switch";
 
 interface Patient {
   id: string;
