@@ -1629,13 +1629,13 @@ const Pacientes = () => {
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
                                 {examenEstados[examenId] === 'completado' && (
-                                  <CheckCircle2 className="h-4 w-4 text-green-600" title="Completado" />
+                                  <span title="Completado"><CheckCircle2 className="h-4 w-4 text-green-600" /></span>
                                 )}
                                 {examenEstados[examenId] === 'toma_muestra' && (
-                                  <FlaskConical className="h-4 w-4 text-blue-600" title="Toma de muestra" />
+                                  <span title="Toma de muestra"><FlaskConical className="h-4 w-4 text-blue-600" /></span>
                                 )}
                                 {examenEstados[examenId] === 'incompleto' && (
-                                  <Clock className="h-4 w-4 text-amber-600" title="Incompleto" />
+                                  <span title="Incompleto"><Clock className="h-4 w-4 text-amber-600" /></span>
                                 )}
                                 <Button type="button" variant="ghost" size="icon" className="h-6 w-6"
                                   onClick={() => setSelectedExamenes(prev => {
