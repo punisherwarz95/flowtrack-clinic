@@ -1,55 +1,53 @@
 
 
-## Plan: Sistema de Prioridad de Pacientes
+## Plan: Persistencia de Empresa por Atención
 
-### Resumen
-Agregar un campo `prioridad` a la tabla `atenciones` que permita a los administradores marcar un paciente como prioritario. Los pacientes prioritarios aparecerán primero en todas las colas de atención (Flujo, Mi Box, BoxView, PantallaTv).
+### Problema
+La tabla `atenciones` no almacena `empresa_id`. Las consultas del portal empresa filtran por `pacientes.empresa_id`, que es un campo único que se sobreescribe cuando el staff cambia la empresa del paciente. Resultado: si un paciente cambia de Empresa A a Empresa B, Empresa A pierde visibilidad de sus atenciones históricas.
 
-### Cambios en Base de Datos
+### Solución
+Desnormalizar `empresa_id` en la tabla `atenciones` para que cada visita capture la empresa asociada al momento del ingreso. Las consultas del portal empresa filtrarán por `atenciones.empresa_id` en vez de `pacientes.empresa_id`.
 
-**Migración**: Agregar columna `prioridad` a `atenciones`
-```sql
-ALTER TABLE public.atenciones ADD COLUMN prioridad boolean NOT NULL DEFAULT false;
-```
+### Cambios
 
-**LocalDb**: Agregar campo `prioridad` a `LocalAtencion` interface.
+**1. Migración de base de datos**
+- Agregar columna `empresa_id UUID` a `atenciones` (nullable, sin FK a auth).
+- Backfill: `UPDATE atenciones SET empresa_id = p.empresa_id FROM pacientes p WHERE atenciones.paciente_id = p.id AND atenciones.empresa_id IS NULL;`
 
-### Lógica de Ordenamiento
+**2. Escritura de empresa_id al crear atención**
+- **Pacientes.tsx** (~línea 892): al insertar atención, incluir `empresa_id: formData.empresa_id || null`.
+- **PortalPaciente.tsx**: al crear atención, incluir `empresa_id` del paciente.
+- **Incompletos.tsx**: al reactivar, copiar `empresa_id` de la atención original.
 
-Actualmente las colas se ordenan por `numero_ingreso ASC`. El cambio es mínimo: ordenar primero por `prioridad DESC`, luego por `numero_ingreso ASC`. Esto aplica en:
+**3. Actualizar consultas del portal empresa**
+- **EmpresaPacientes.tsx**: cambiar de `pacientes.empresa_id = X` → `atenciones.empresa_id = X` con join a pacientes para nombre/rut.
+- **EmpresaResultados.tsx** (~línea 105): cambiar `.eq("paciente.empresa_id", currentEmpresaId)` → filtrar directamente por `atenciones.empresa_id`.
+- **EmpresaEstadosPago.tsx** (~línea 124-137): cambiar la lógica de "buscar pacientes de empresa → buscar atenciones" por "buscar atenciones con empresa_id → traer datos del paciente".
 
-1. **Flujo.tsx** — Query Supabase (línea 356): agregar `.order("prioridad", { ascending: false })` antes del order por `numero_ingreso`. En `localDerived` (línea 122): ajustar el `.sort()`.
-2. **MiBox.tsx** — Sort local (líneas 142, 229): agregar prioridad al comparador.
-3. **BoxView.tsx** — Query Supabase (línea 99): agregar order por prioridad.
-4. **PantallaTv.tsx** — Si ordena por ingreso, ajustar igual.
-5. **localDb.ts** — Agregar `prioridad` a `LocalAtencion`.
-6. **useLocalSync.ts** — Incluir `prioridad` en el pull de datos.
+**4. Sincronización local**
+- Agregar `empresa_id` a `LocalAtencion` en `localDb.ts`.
+- Incluir en el diffing de `useLocalSync.ts`.
 
-### UI para Asignar Prioridad (Solo Admin)
+**5. BusquedaPacientesHistorial.tsx**
+- Si filtra por empresa, usar `atenciones.empresa_id` en lugar de `pacientes.empresa_id`.
 
-En **Pacientes.tsx**, dentro del detalle/edición del paciente, agregar un botón/switch visible solo para admins que marque la atención activa como prioritaria. Al activarlo, se actualiza `atenciones.prioridad = true` via Supabase.
-
-### Indicador Visual
-
-En las colas de Flujo, Mi Box y BoxView, mostrar un badge o icono (estrella/flecha arriba) junto al nombre del paciente prioritario para que el staff sepa por qué está primero.
-
-### Archivos a Modificar
+### Archivos a modificar
 
 | Archivo | Cambio |
 |---|---|
-| `src/lib/localDb.ts` | Agregar `prioridad` a `LocalAtencion` |
-| `src/hooks/useLocalSync.ts` | Incluir `prioridad` en pull |
-| `src/pages/Flujo.tsx` | Ordenar por prioridad, mostrar badge |
-| `src/pages/MiBox.tsx` | Ordenar por prioridad, mostrar badge |
-| `src/pages/BoxView.tsx` | Ordenar por prioridad, mostrar badge |
-| `src/pages/PantallaTv.tsx` | Ordenar por prioridad |
-| `src/pages/Pacientes.tsx` | Botón admin para asignar prioridad |
-| `src/pages/Dashboard.tsx` | Sin cambios (no afecta orden de tabla) |
+| Migración SQL | Agregar columna + backfill |
+| `src/pages/Pacientes.tsx` | Escribir `empresa_id` al crear atención |
+| `src/pages/PortalPaciente.tsx` | Escribir `empresa_id` al crear atención |
+| `src/pages/Incompletos.tsx` | Copiar `empresa_id` al reactivar |
+| `src/pages/empresa/EmpresaPacientes.tsx` | Filtrar por `atenciones.empresa_id` |
+| `src/pages/empresa/EmpresaResultados.tsx` | Filtrar por `atenciones.empresa_id` |
+| `src/pages/empresa/EmpresaEstadosPago.tsx` | Filtrar por `atenciones.empresa_id` |
+| `src/components/empresa/BusquedaPacientesHistorial.tsx` | Filtrar por `atenciones.empresa_id` |
+| `src/lib/localDb.ts` | Agregar campo |
+| `src/hooks/useLocalSync.ts` | Incluir en pull + diff |
 
-### Impacto en Funcionalidad Existente
-
-- **Ningún campo existente se modifica** — solo se agrega una columna con default `false`.
-- **El orden base se mantiene** — pacientes sin prioridad siguen ordenados por `numero_ingreso`.
-- **Offline-first compatible** — se sincroniza via el mismo pipeline de `useLocalSync`.
-- **Sin cambios en RLS** — usa las mismas políticas abiertas de `atenciones`.
+### Impacto
+- **Cero impacto** en funcionalidad existente: el backfill pobla datos históricos.
+- El campo `pacientes.empresa_id` sigue existiendo y el staff puede cambiarlo libremente.
+- Cada atención queda ligada a la empresa correcta de forma inmutable.
 
