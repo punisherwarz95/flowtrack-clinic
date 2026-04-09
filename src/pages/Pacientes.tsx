@@ -1628,15 +1628,14 @@ const Pacientes = () => {
                                 {examen.codigo && <span className="text-xs text-muted-foreground">{examen.codigo}</span>}
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
-                                {examenEstados[examenId] === 'completado' && (
-                                  <span title="Completado"><CheckCircle2 className="h-4 w-4 text-green-600" /></span>
-                                )}
-                                {examenEstados[examenId] === 'toma_muestra' && (
-                                  <span title="Toma de muestra"><FlaskConical className="h-4 w-4 text-blue-600" /></span>
-                                )}
-                                {examenEstados[examenId] === 'incompleto' && (
-                                  <span title="Incompleto"><Clock className="h-4 w-4 text-amber-600" /></span>
-                                )}
+                                {(() => {
+                                  const key = `${examenId}_${idx}`;
+                                  const estado = examenEstados[key];
+                                  if (estado === 'completado') return <span title="Completado"><CheckCircle2 className="h-4 w-4 text-green-600" /></span>;
+                                  if (estado === 'toma_muestra') return <span title="Toma de muestra"><FlaskConical className="h-4 w-4 text-blue-600" /></span>;
+                                  if (estado === 'incompleto') return <span title="Incompleto"><Clock className="h-4 w-4 text-amber-600" /></span>;
+                                  return null;
+                                })()}
                                 <Button type="button" variant="ghost" size="icon" className="h-6 w-6"
                                   onClick={() => setSelectedExamenes(prev => {
                                     const copy = [...prev];
