@@ -133,7 +133,9 @@ interface ExamenCompletado {
 
 const Pacientes = () => {
   useAuth(); // Protect route
+  const { isAdmin } = useAuthContext();
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [atencionPrioridad, setAtencionPrioridad] = useState<boolean>(false);
   const { data: cachedEmpresas = [] } = useEmpresas();
   const empresas = cachedEmpresas as Empresa[];
   const { data: cachedExamenes = [] } = useExamenes();
