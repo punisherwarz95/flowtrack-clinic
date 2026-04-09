@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import CodigoDelDia from "@/components/CodigoDelDia";
-import { Clock, Play, CheckCircle, XCircle, RefreshCw, Box as BoxIcon, Settings, ClipboardList, Users, UserCheck, UsersRound } from "lucide-react";
+import { Clock, Play, CheckCircle, XCircle, RefreshCw, Box as BoxIcon, Settings, ClipboardList, Users, UserCheck, UsersRound, Star } from "lucide-react";
 import { logActivity } from "@/lib/activityLog";
 import { Badge } from "@/components/ui/badge";
 import EstadoFichaCheckboxes from "@/components/EstadoFichaCheckboxes";
@@ -724,6 +724,11 @@ const MiBox = () => {
                         <div className="flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <Badge variant="outline" className="text-xs font-bold">#{atencion.numero_ingreso}</Badge>
+                            {atencion.prioridad && (
+                              <Badge className="bg-amber-500 text-white text-xs gap-1 py-0">
+                                <Star className="h-3 w-3" /> Prioritario
+                              </Badge>
+                            )}
                             <span className="font-medium text-sm">{atencion.pacientes.nombre}</span>
                             {atencion.pacientes.rut && (
                               <span className="text-xs text-muted-foreground font-mono">{atencion.pacientes.rut}</span>
