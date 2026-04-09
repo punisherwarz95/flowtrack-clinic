@@ -525,6 +525,7 @@ const Pacientes = () => {
     if (isToday) {
       const atencion = localAtenciones.find(a => a.paciente_id === patient.id);
       if (atencion) {
+        setAtencionPrioridad(atencion.prioridad ?? false);
         const exams = localAtencionExamenes
           .filter(ae => ae.atencion_id === atencion.id)
           .map(ae => ae.examen_id);
@@ -535,6 +536,7 @@ const Pacientes = () => {
         setOriginalExamenesCount(exams.length);
         setSelectedDocumentos(docs);
       } else {
+        setAtencionPrioridad(false);
         setSelectedExamenes([]);
         setOriginalExamenesCount(0);
         setSelectedDocumentos([]);
