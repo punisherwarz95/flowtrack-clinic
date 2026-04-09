@@ -1627,14 +1627,25 @@ const Pacientes = () => {
                                 <span className="block break-words">{examen.nombre}</span>
                                 {examen.codigo && <span className="text-xs text-muted-foreground">{examen.codigo}</span>}
                               </div>
-                              <Button type="button" variant="ghost" size="icon" className="h-6 w-6 shrink-0"
-                                onClick={() => setSelectedExamenes(prev => {
-                                  const copy = [...prev];
-                                  copy.splice(idx, 1);
-                                  return copy;
-                                })}>
-                                <Trash2 className="h-3 w-3 text-destructive" />
-                              </Button>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {examenEstados[examenId] === 'completado' && (
+                                  <CheckCircle2 className="h-4 w-4 text-green-600" title="Completado" />
+                                )}
+                                {examenEstados[examenId] === 'toma_muestra' && (
+                                  <FlaskConical className="h-4 w-4 text-blue-600" title="Toma de muestra" />
+                                )}
+                                {examenEstados[examenId] === 'incompleto' && (
+                                  <Clock className="h-4 w-4 text-amber-600" title="Incompleto" />
+                                )}
+                                <Button type="button" variant="ghost" size="icon" className="h-6 w-6"
+                                  onClick={() => setSelectedExamenes(prev => {
+                                    const copy = [...prev];
+                                    copy.splice(idx, 1);
+                                    return copy;
+                                  })}>
+                                  <Trash2 className="h-3 w-3 text-destructive" />
+                                </Button>
+                              </div>
                             </div>
                           );
                         })}
