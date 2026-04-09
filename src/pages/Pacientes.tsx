@@ -153,6 +153,7 @@ const Pacientes = () => {
   const [editingPatient, setEditingPatient] = useState<string | null>(null);
   const [pacienteToDelete, setPacienteToDelete] = useState<string | null>(null);
   const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
+  const [examenEstados, setExamenEstados] = useState<Record<string, string>>({}); // examen_id -> estado
   const [selectedPaquetes, setSelectedPaquetes] = useState<string[]>([]);
   const [examenFilter, setExamenFilter] = useState("");
   const [empresaSearchFilter, setEmpresaSearchFilter] = useState("");
