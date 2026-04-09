@@ -1807,8 +1807,9 @@ const Pacientes = () => {
                                   <label key={examen.id} className="flex items-center gap-2 cursor-pointer py-1 px-1 hover:bg-accent rounded text-sm">
                                     <input type="checkbox" checked={selectedExamenes.includes(examen.id)}
                                       onChange={(e) => {
-                                        if (e.target.checked) setSelectedExamenes([...selectedExamenes, examen.id]);
-                                        else setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
+                                        if (e.target.checked) {
+                                          if (!selectedExamenes.includes(examen.id)) setSelectedExamenes([...selectedExamenes, examen.id]);
+                                        } else setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
                                       }} className="w-3.5 h-3.5" />
                                     <span className="break-words flex-1">{examen.nombre}</span>
                                     {examen.codigo && <span className="text-xs text-muted-foreground shrink-0">{examen.codigo}</span>}
