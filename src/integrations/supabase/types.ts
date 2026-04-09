@@ -407,6 +407,7 @@ export type Database = {
           observaciones: string | null
           paciente_id: string
           prereserva_id: string | null
+          prioridad: boolean
         }
         Insert: {
           box_id?: string | null
@@ -421,6 +422,7 @@ export type Database = {
           observaciones?: string | null
           paciente_id: string
           prereserva_id?: string | null
+          prioridad?: boolean
         }
         Update: {
           box_id?: string | null
@@ -435,6 +437,7 @@ export type Database = {
           observaciones?: string | null
           paciente_id?: string
           prereserva_id?: string | null
+          prioridad?: boolean
         }
         Relationships: [
           {
