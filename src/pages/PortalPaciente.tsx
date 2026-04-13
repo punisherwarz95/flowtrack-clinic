@@ -3,7 +3,7 @@ import portalBackground from "@/assets/portal-background.jpeg";
 
 // Portal Paciente v0.1.0 - Sin toasts, sin sonidos, sin vibraciones, sin popups
 // Banner sticky superior muestra estado de atención en todo momento
-const PORTAL_VERSION = "0.1.0";
+const PORTAL_VERSION = "0.2.0";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,9 @@ import { cn, formatRutStandard, normalizeRut as normalizeRutUtil } from "@/lib/u
 import { useAtencionDocumentos } from "@/hooks/useAtencionDocumentos";
 import { DocumentoFormViewer, DocumentoStatusCard, DocumentoContextData } from "@/components/DocumentoFormViewer";
 import PortalCuestionarios from "@/components/PortalCuestionarios";
+import { t, PortalLang } from "@/lib/portalTranslations";
+import { Globe } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 interface Paciente {
   id: string;
@@ -98,6 +101,8 @@ export default function PortalPaciente() {
   const [testTracking, setTestTracking] = useState<TestTracking[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [agendaDiferidaMatch, setAgendaDiferidaMatch] = useState<any>(null);
+  const [lang, setLang] = useState<PortalLang>("es");
+  const [isExtranjero, setIsExtranjero] = useState(false);
   
   // Inline message state (replaces toasts)
   const [inlineMsg, setInlineMsg] = useState<InlineMsg | null>(null);
@@ -178,18 +183,26 @@ export default function PortalPaciente() {
   };
 
   const handleRutChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatRutForDisplay(e.target.value);
-    setRut(formatted);
+    if (isExtranjero) {
+      setRut(e.target.value.toUpperCase());
+    } else {
+      const formatted = formatRutForDisplay(e.target.value);
+      setRut(formatted);
+    }
   };
 
   const handleFormRutChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatRutForDisplay(e.target.value);
-    setFormData(prev => ({ ...prev, rut: formatted }));
+    if (isExtranjero) {
+      setFormData(prev => ({ ...prev, rut: e.target.value.toUpperCase() }));
+    } else {
+      const formatted = formatRutForDisplay(e.target.value);
+      setFormData(prev => ({ ...prev, rut: formatted }));
+    }
   };
 
   const validarCodigoDiario = async () => {
     if (!codigoIngresado.trim()) {
-      showMsg("Ingrese el código del día", "error");
+      showMsg(t("ingreseCodigo", lang), "error");
       return;
     }
 
@@ -210,11 +223,11 @@ export default function PortalPaciente() {
         setInlineMsg(null);
         setStep("identificacion");
       } else {
-        showMsg("El código ingresado no es correcto. Solicítelo al personal de recepción.", "error", 8000);
+        showMsg(t("codigoIncorrecto", lang), "error", 8000);
       }
     } catch (error) {
       console.error("Error validating código:", error);
-      showMsg("No se pudo validar el código. Intente nuevamente.", "error");
+      showMsg(t("errorValidarCodigo", lang), "error");
     } finally {
       setIsLoading(false);
     }
@@ -289,13 +302,13 @@ export default function PortalPaciente() {
 
   const buscarPaciente = async () => {
     if (!rut.trim()) {
-      showMsg("Ingrese su RUT", "error");
+      showMsg(isExtranjero ? t("ingresePasaporte", lang) : t("ingreseRut", lang), "error");
       return;
     }
 
     setIsLoading(true);
     try {
-      const rutFormateado = formatRutStandard(rut);
+      const rutFormateado = isExtranjero ? rut.trim().toUpperCase() : formatRutStandard(rut);
 
       const { data: agendaDiferidaData } = await supabase
         .from("agenda_diferida")
@@ -360,7 +373,7 @@ export default function PortalPaciente() {
 
           if (existingAtencion) {
             setAtencion({ ...existingAtencion, atencion_examenes: [] });
-            showMsg(`Su número de atención es #${existingAtencion.numero_ingreso}. Complete sus datos.`, "info", 0);
+            showMsg(`${t("suNumeroAtencion", lang)} #${existingAtencion.numero_ingreso}. ${t("completeDatos", lang)}`, "info", 0);
           }
 
           setFormData(prev => ({ ...prev, rut: rut }));
@@ -465,7 +478,7 @@ export default function PortalPaciente() {
             ciudad: direccionParts[2] || direccionParts[0] || ""
           });
           
-          showMsg(`Su número de atención es #${newAtencion.numero_ingreso}. Verifique sus datos.`, "info", 0);
+          showMsg(`${t("suNumeroAtencion", lang)} #${newAtencion.numero_ingreso}. ${t("verifiqueDatos", lang)}`, "info", 0);
           
           setStep("registro");
           return;
@@ -530,7 +543,7 @@ export default function PortalPaciente() {
           setFormData(prev => ({ ...prev, rut: rut }));
         }
 
-        showMsg(`Su número de atención es #${newAtencion.numero_ingreso}. Complete sus datos.`, "info", 0);
+        showMsg(`${t("suNumeroAtencion", lang)} #${newAtencion.numero_ingreso}. ${t("completeDatos", lang)}`, "info", 0);
 
         setPaciente(newPaciente);
         setAtencion({ ...newAtencion, atencion_examenes: [], boxes: null });
@@ -538,7 +551,7 @@ export default function PortalPaciente() {
       }
     } catch (error: any) {
       console.error("Error buscando paciente:", error);
-      showMsg("No se pudo buscar el paciente", "error");
+      showMsg(t("errorBuscarPaciente", lang), "error");
     } finally {
       setIsLoading(false);
     }
@@ -650,27 +663,27 @@ export default function PortalPaciente() {
   const registrarPaciente = async () => {
     const errores: string[] = [];
     
-    if (!formData.primerNombre.trim()) errores.push("Nombre es obligatorio");
-    if (!formData.apellidoPaterno.trim()) errores.push("Apellido paterno es obligatorio");
-    if (!formData.apellidoMaterno.trim()) errores.push("Apellido materno es obligatorio");
-    if (!formData.rut.trim()) errores.push("RUT es obligatorio");
-    if (!formData.fecha_nacimiento) errores.push("Fecha de nacimiento es obligatoria");
+    if (!formData.primerNombre.trim()) errores.push(t("errNombre", lang));
+    if (!formData.apellidoPaterno.trim()) errores.push(t("errApPaterno", lang));
+    if (!formData.apellidoMaterno.trim()) errores.push(t("errApMaterno", lang));
+    if (!formData.rut.trim()) errores.push(isExtranjero ? t("errPasaporte", lang) : t("errRut", lang));
+    if (!formData.fecha_nacimiento) errores.push(t("errFechaNac", lang));
     if (!formData.email.trim()) {
-      errores.push("Email es obligatorio");
+      errores.push(t("errEmail", lang));
     } else if (!isValidEmail(formData.email)) {
-      errores.push("Email no tiene formato válido");
+      errores.push(t("errEmailInvalid", lang));
     }
     if (!formData.telefono) {
-      errores.push("Teléfono es obligatorio");
+      errores.push(t("errTelefono", lang));
     } else if (formData.telefono.length !== 9) {
-      errores.push("El teléfono debe tener 9 dígitos");
+      errores.push(t("errTelefonoLen", lang));
     }
-    if (!formData.calle.trim()) errores.push("Calle es obligatoria");
-    if (!formData.numeracion.trim()) errores.push("Numeración es obligatoria");
+    if (!formData.calle.trim()) errores.push(t("errCalle", lang));
+    if (!formData.numeracion.trim()) errores.push(t("errNumeracion", lang));
     if (!formData.ciudad.trim()) {
-      errores.push("Ciudad es obligatoria");
+      errores.push(t("errCiudad", lang));
     } else if (!isValidCiudad(formData.ciudad)) {
-      errores.push("Ingrese una ciudad válida de Chile");
+      errores.push(t("errCiudadInvalid", lang));
     }
 
     if (errores.length > 0) {
@@ -678,7 +691,7 @@ export default function PortalPaciente() {
       return;
     }
 
-    const rutFormateado = formatRutStandard(formData.rut);
+    const rutFormateado = isExtranjero ? formData.rut.trim().toUpperCase() : formatRutStandard(formData.rut);
     const telefonoCompleto = `+56${formData.telefono}`;
 
     setIsLoading(true);
@@ -785,7 +798,7 @@ export default function PortalPaciente() {
       }
     } catch (error: any) {
       console.error("Error registrando paciente:", error);
-      showMsg(error.message || "No se pudo registrar el paciente", "error");
+      showMsg(error.message || t("errorRegistrar", lang), "error");
     } finally {
       setIsLoading(false);
     }
@@ -1030,6 +1043,34 @@ export default function PortalPaciente() {
     );
   };
 
+  // ============ Language Selector ============
+  const LanguageSelector = () => (
+    <div className="flex items-center justify-center gap-2 mb-3">
+      <Globe className="h-4 w-4 text-muted-foreground" />
+      <button
+        type="button"
+        onClick={() => setLang("es")}
+        className={cn(
+          "px-2 py-1 text-sm rounded transition-colors",
+          lang === "es" ? "bg-primary text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
+        )}
+      >
+        Español
+      </button>
+      <span className="text-muted-foreground">|</span>
+      <button
+        type="button"
+        onClick={() => setLang("en")}
+        className={cn(
+          "px-2 py-1 text-sm rounded transition-colors",
+          lang === "en" ? "bg-primary text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
+        )}
+      >
+        English
+      </button>
+    </div>
+  );
+
   // ============ Sticky Status Banner for portal view ============
   const StickyStatusBanner = () => {
     if (!atencion) return null;
@@ -1040,10 +1081,10 @@ export default function PortalPaciente() {
           <div className="bg-green-600 text-white px-4 py-4 text-center shadow-lg animate-pulse">
             <div className="flex items-center justify-center gap-2">
               <MapPin className="h-5 w-5" />
-              <span className="text-lg font-bold">¡ES SU TURNO!</span>
+              <span className="text-lg font-bold">{t("esSuTurno", lang)}</span>
             </div>
             <div className="text-xl font-black mt-1">
-              Diríjase al Box {atencion.boxes.nombre}
+              {t("dirijaseBox", lang)} {atencion.boxes.nombre}
             </div>
           </div>
         </div>
@@ -1056,9 +1097,9 @@ export default function PortalPaciente() {
           <div className="bg-amber-500 text-white px-4 py-3 text-center shadow-md">
             <div className="flex items-center justify-center gap-2">
               <Clock className="h-4 w-4" />
-              <span className="font-semibold">En espera de atención — Turno #{atencion.numero_ingreso}</span>
+              <span className="font-semibold">{t("enEspera", lang)} #{atencion.numero_ingreso}</span>
             </div>
-            <p className="text-xs mt-0.5 opacity-90">Le informaremos aquí cuando sea llamado a un box</p>
+            <p className="text-xs mt-0.5 opacity-90">{t("leInformaremos", lang)}</p>
           </div>
         </div>
       );
@@ -1070,7 +1111,7 @@ export default function PortalPaciente() {
           <div className="bg-green-700 text-white px-4 py-3 text-center shadow-md">
             <div className="flex items-center justify-center gap-2">
               <CheckCircle2 className="h-4 w-4" />
-              <span className="font-semibold">Atención completada</span>
+              <span className="font-semibold">{t("atencionCompletada", lang)}</span>
             </div>
           </div>
         </div>
@@ -1083,7 +1124,7 @@ export default function PortalPaciente() {
           <div className="bg-amber-600 text-white px-4 py-3 text-center shadow-md">
             <div className="flex items-center justify-center gap-2">
               <AlertCircle className="h-4 w-4" />
-              <span className="font-semibold">Atención incompleta — Turno #{atencion.numero_ingreso}</span>
+              <span className="font-semibold">{t("atencionIncompleta", lang)} #{atencion.numero_ingreso}</span>
             </div>
           </div>
         </div>
@@ -1098,13 +1139,14 @@ export default function PortalPaciente() {
       <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundImage: `url(${portalBackground})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold">Portal del Paciente</CardTitle>
-            <CardDescription>Ingrese el código del día proporcionado en recepción</CardDescription>
+            <CardTitle className="text-2xl font-bold">{t("portalTitle", lang)}</CardTitle>
+            <CardDescription>{t("codigoSubtitle", lang)}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <LanguageSelector />
             <InlineMessageBanner />
             <div>
-              <Label htmlFor="codigo">Código del Día</Label>
+              <Label htmlFor="codigo">{t("codigoDia", lang)}</Label>
               <Input
                 id="codigo"
                 placeholder="ABC12"
@@ -1124,10 +1166,10 @@ export default function PortalPaciente() {
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Validando...
+                  {t("validando", lang)}
                 </>
               ) : (
-                "Continuar"
+                t("continuar", lang)
               )}
             </Button>
           </CardContent>
@@ -1141,16 +1183,34 @@ export default function PortalPaciente() {
       <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundImage: `url(${portalBackground})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold">Portal del Paciente</CardTitle>
-            <CardDescription>Ingrese su RUT para identificarse</CardDescription>
+            <CardTitle className="text-2xl font-bold">{t("portalTitle", lang)}</CardTitle>
+            <CardDescription>
+              {isExtranjero ? t("identificacionSubtitlePassport", lang) : t("identificacionSubtitle", lang)}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <LanguageSelector />
             <InlineMessageBanner />
+            {/* Toggle Extranjero */}
+            <div className="flex items-center justify-between p-3 rounded-lg border border-input bg-muted/30">
+              <Label htmlFor="extranjero-toggle" className="text-sm font-medium cursor-pointer flex items-center gap-2">
+                <Globe className="h-4 w-4 text-muted-foreground" />
+                {t("extranjero", lang)}
+              </Label>
+              <Switch
+                id="extranjero-toggle"
+                checked={isExtranjero}
+                onCheckedChange={(checked) => {
+                  setIsExtranjero(checked);
+                  setRut("");
+                }}
+              />
+            </div>
             <div>
-              <Label htmlFor="rut">RUT</Label>
+              <Label htmlFor="rut">{isExtranjero ? t("pasaporte", lang) : t("rut", lang)}</Label>
               <Input
                 id="rut"
-                placeholder="12.345.678-9"
+                placeholder={isExtranjero ? t("placeholderPassport", lang) : t("placeholderRut", lang)}
                 value={rut}
                 onChange={handleRutChange}
                 onKeyDown={(e) => e.key === "Enter" && buscarPaciente()}
@@ -1166,10 +1226,10 @@ export default function PortalPaciente() {
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Buscando...
+                  {t("buscando", lang)}
                 </>
               ) : (
-                "Ingresar"
+                t("ingresar", lang)
               )}
             </Button>
           </CardContent>
@@ -1183,14 +1243,15 @@ export default function PortalPaciente() {
       <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundImage: `url(${portalBackground})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
         <Card className="w-full max-w-lg">
           <CardHeader className="text-center pb-4">
-            <CardTitle className="text-2xl font-bold">Registro de Paciente</CardTitle>
-            <CardDescription>Complete sus datos para registrarse</CardDescription>
+            <CardTitle className="text-2xl font-bold">{t("registroTitle", lang)}</CardTitle>
+            <CardDescription>{t("registroSubtitle", lang)}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
+            <LanguageSelector />
             <InlineMessageBanner />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="primerNombre" className="text-sm font-medium mb-1.5 block">Nombre *</Label>
+                <Label htmlFor="primerNombre" className="text-sm font-medium mb-1.5 block">{t("nombre", lang)}</Label>
                 <Input
                   id="primerNombre"
                   placeholder="JUAN"
@@ -1200,7 +1261,7 @@ export default function PortalPaciente() {
                 />
               </div>
               <div>
-                <Label htmlFor="apellidoPaterno" className="text-sm font-medium mb-1.5 block">Apellido Paterno *</Label>
+                <Label htmlFor="apellidoPaterno" className="text-sm font-medium mb-1.5 block">{t("apellidoPaterno", lang)}</Label>
                 <Input
                   id="apellidoPaterno"
                   placeholder="PÉREZ"
@@ -1210,7 +1271,7 @@ export default function PortalPaciente() {
                 />
               </div>
               <div>
-                <Label htmlFor="apellidoMaterno" className="text-sm font-medium mb-1.5 block">Apellido Materno *</Label>
+                <Label htmlFor="apellidoMaterno" className="text-sm font-medium mb-1.5 block">{t("apellidoMaterno", lang)}</Label>
                 <Input
                   id="apellidoMaterno"
                   placeholder="GONZÁLEZ"
@@ -1220,17 +1281,17 @@ export default function PortalPaciente() {
                 />
               </div>
               <div>
-                <Label htmlFor="formRut" className="text-sm font-medium mb-1.5 block">RUT *</Label>
+                <Label htmlFor="formRut" className="text-sm font-medium mb-1.5 block">{isExtranjero ? t("pasaporteLabel", lang) : t("rutLabel", lang)}</Label>
                 <Input
                   id="formRut"
-                  placeholder="12.345.678-9"
+                  placeholder={isExtranjero ? t("placeholderPassport", lang) : t("placeholderRut", lang)}
                   value={formData.rut}
                   onChange={handleFormRutChange}
                   className="h-11"
                 />
               </div>
               <div>
-                <Label htmlFor="fecha_nacimiento" className="text-sm font-medium mb-1.5 block">Fecha de Nacimiento *</Label>
+                <Label htmlFor="fecha_nacimiento" className="text-sm font-medium mb-1.5 block">{t("fechaNacimiento", lang)}</Label>
                 <div className="flex items-center gap-2">
                   <Input
                     id="fecha_nacimiento"
@@ -1264,7 +1325,7 @@ export default function PortalPaciente() {
                 </div>
               </div>
               <div>
-                <Label htmlFor="email" className="text-sm font-medium mb-1.5 block">Email *</Label>
+                <Label htmlFor="email" className="text-sm font-medium mb-1.5 block">{t("email", lang)}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -1275,7 +1336,7 @@ export default function PortalPaciente() {
                 />
               </div>
               <div>
-                <Label htmlFor="telefono" className="text-sm font-medium mb-1.5 block">Teléfono *</Label>
+                <Label htmlFor="telefono" className="text-sm font-medium mb-1.5 block">{t("telefono", lang)}</Label>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-muted-foreground bg-muted px-3 py-2.5 rounded-md border h-11 flex items-center">+56</span>
                   <Input
@@ -1290,7 +1351,7 @@ export default function PortalPaciente() {
                 </div>
               </div>
               <div>
-                <Label htmlFor="calle" className="text-sm font-medium mb-1.5 block">Calle *</Label>
+                <Label htmlFor="calle" className="text-sm font-medium mb-1.5 block">{t("calle", lang)}</Label>
                 <Input
                   id="calle"
                   placeholder="AV. PRINCIPAL"
@@ -1300,7 +1361,7 @@ export default function PortalPaciente() {
                 />
               </div>
               <div>
-                <Label htmlFor="numeracion" className="text-sm font-medium mb-1.5 block">Numeración *</Label>
+                <Label htmlFor="numeracion" className="text-sm font-medium mb-1.5 block">{t("numeracion", lang)}</Label>
                 <Input
                   id="numeracion"
                   placeholder="123"
@@ -1310,7 +1371,7 @@ export default function PortalPaciente() {
                 />
               </div>
               <div className="sm:col-span-2 relative">
-                <Label htmlFor="ciudad" className="text-sm font-medium mb-1.5 block">Ciudad *</Label>
+                <Label htmlFor="ciudad" className="text-sm font-medium mb-1.5 block">{t("ciudad", lang)}</Label>
                 <Input
                   id="ciudad"
                   placeholder="Santiago"
@@ -1336,7 +1397,7 @@ export default function PortalPaciente() {
                     ))}
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground mt-1">Ingrese una ciudad de Chile</p>
+                <p className="text-xs text-muted-foreground mt-1">{t("ciudadHint", lang)}</p>
               </div>
             </div>
             <div className="flex gap-3 pt-2">
@@ -1345,7 +1406,7 @@ export default function PortalPaciente() {
                 onClick={() => setStep("identificacion")}
                 className="flex-1 h-11"
               >
-                Volver
+                {t("volver", lang)}
               </Button>
               <Button 
                 onClick={registrarPaciente} 
@@ -1355,10 +1416,10 @@ export default function PortalPaciente() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Registrando...
+                    {t("registrando", lang)}
                   </>
                 ) : (
-                  "Registrar"
+                  t("registrar", lang)
                 )}
               </Button>
             </div>
@@ -1375,6 +1436,7 @@ export default function PortalPaciente() {
       <StickyStatusBanner />
 
       <div className="max-w-lg mx-auto space-y-4 p-4">
+        <LanguageSelector />
         {/* Patient Card */}
         <Card className="border-border">
           <CardContent className="pt-6">
@@ -1392,7 +1454,7 @@ export default function PortalPaciente() {
                 <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
                   <span>{paciente?.rut}</span>
                   {atencion?.fecha_ingreso && (
-                    <span>• Ingreso: {format(new Date(atencion.fecha_ingreso), "HH:mm", { locale: es })}</span>
+                    <span>• {t("ingreso", lang)}: {format(new Date(atencion.fecha_ingreso), "HH:mm", { locale: es })}</span>
                   )}
                   {paciente?.tipo_servicio && (
                     <Badge variant="outline" className="text-xs">
@@ -1412,7 +1474,7 @@ export default function PortalPaciente() {
                 {/* Pending Boxes */}
                 {pendingBoxes.length > 0 && (
                   <div className="text-sm text-primary mt-2 font-medium">
-                    Boxes pendientes: {pendingBoxes.map(b => `Box ${b}`).join(", ")}
+                    {t("boxesPendientes", lang)}: {pendingBoxes.map(b => `Box ${b}`).join(", ")}
                   </div>
                 )}
 
@@ -1422,7 +1484,7 @@ export default function PortalPaciente() {
                     <CollapsibleTrigger className="flex items-center gap-1 text-sm text-primary hover:underline">
                       <ChevronDown className="h-4 w-4" />
                       <span className="font-medium">
-                        Ver exámenes ({atencion.atencion_examenes.filter(ae => ae.estado === "pendiente" || ae.estado === "incompleto").length} pendientes)
+                        {t("verExamenes", lang)} ({atencion.atencion_examenes.filter(ae => ae.estado === "pendiente" || ae.estado === "incompleto").length} {t("pendientes", lang)})
                       </span>
                     </CollapsibleTrigger>
                     <CollapsibleContent className="mt-2 space-y-3 data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up">
@@ -1499,7 +1561,7 @@ export default function PortalPaciente() {
               <div className="mt-3 p-2 rounded bg-warning/10 border border-warning/30">
                 <div className="flex items-center gap-2 text-warning text-sm">
                   <AlertCircle className="h-4 w-4" />
-                  <span>Esperando asignación de empresa por recepción</span>
+                  <span>{t("esperandoEmpresa", lang)}</span>
                 </div>
               </div>
             )}
@@ -1509,7 +1571,7 @@ export default function PortalPaciente() {
               <div className="mt-3 p-2 rounded bg-muted/50 border border-border">
                 <div className="flex items-center gap-2 text-muted-foreground text-sm">
                   <FileText className="h-4 w-4" />
-                  <span>Sus exámenes aparecerán aquí cuando estén asignados</span>
+                  <span>{t("examenesAparecen", lang)}</span>
                 </div>
               </div>
             )}
@@ -1522,15 +1584,15 @@ export default function PortalPaciente() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <ClipboardList className="h-5 w-5" />
-                Documentos a Completar
+                {t("documentosCompletar", lang)}
                 {documentosPendientes > 0 && (
                   <Badge variant="outline" className="ml-2">
-                    {documentosPendientes} pendiente{documentosPendientes > 1 ? "s" : ""}
+                    {documentosPendientes} {documentosPendientes > 1 ? t("pendientes", lang) : t("pendiente", lang)}
                   </Badge>
                 )}
               </CardTitle>
               <CardDescription>
-                Toque un documento para expandirlo y completarlo
+                {t("toqueDocumento", lang)}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -1578,7 +1640,7 @@ export default function PortalPaciente() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <ExternalLink className="h-5 w-5" />
-                Formularios Externos
+                {t("formulariosExternos", lang)}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -1605,8 +1667,8 @@ export default function PortalPaciente() {
           <Card className="border-muted">
             <CardContent className="pt-6 text-center text-muted-foreground">
               <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Esperando que recepción complete su registro</p>
-              <p className="text-sm mt-2">Sus exámenes aparecerán aquí cuando estén asignados</p>
+              <p>{t("esperandoRegistro", lang)}</p>
+              <p className="text-sm mt-2">{t("examenesAparecen", lang)}</p>
             </CardContent>
           </Card>
         )}
@@ -1625,7 +1687,7 @@ export default function PortalPaciente() {
             setStep("identificacion");
           }}
         >
-          Cambiar Paciente
+          {t("cambiarPaciente", lang)}
         </Button>
       </div>
 
