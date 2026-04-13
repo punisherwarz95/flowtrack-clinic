@@ -1561,7 +1561,7 @@ export default function PortalPaciente() {
               <div className="mt-3 p-2 rounded bg-warning/10 border border-warning/30">
                 <div className="flex items-center gap-2 text-warning text-sm">
                   <AlertCircle className="h-4 w-4" />
-                  <span>Esperando asignación de empresa por recepción</span>
+                  <span>{t("esperandoEmpresa", lang)}</span>
                 </div>
               </div>
             )}
@@ -1571,7 +1571,7 @@ export default function PortalPaciente() {
               <div className="mt-3 p-2 rounded bg-muted/50 border border-border">
                 <div className="flex items-center gap-2 text-muted-foreground text-sm">
                   <FileText className="h-4 w-4" />
-                  <span>Sus exámenes aparecerán aquí cuando estén asignados</span>
+                  <span>{t("examenesAparecen", lang)}</span>
                 </div>
               </div>
             )}
@@ -1584,15 +1584,15 @@ export default function PortalPaciente() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <ClipboardList className="h-5 w-5" />
-                Documentos a Completar
+                {t("documentosCompletar", lang)}
                 {documentosPendientes > 0 && (
                   <Badge variant="outline" className="ml-2">
-                    {documentosPendientes} pendiente{documentosPendientes > 1 ? "s" : ""}
+                    {documentosPendientes} {documentosPendientes > 1 ? t("pendientes", lang) : t("pendiente", lang)}
                   </Badge>
                 )}
               </CardTitle>
               <CardDescription>
-                Toque un documento para expandirlo y completarlo
+                {t("toqueDocumento", lang)}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
