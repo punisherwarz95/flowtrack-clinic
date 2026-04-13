@@ -183,13 +183,21 @@ export default function PortalPaciente() {
   };
 
   const handleRutChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatRutForDisplay(e.target.value);
-    setRut(formatted);
+    if (isExtranjero) {
+      setRut(e.target.value.toUpperCase());
+    } else {
+      const formatted = formatRutForDisplay(e.target.value);
+      setRut(formatted);
+    }
   };
 
   const handleFormRutChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatRutForDisplay(e.target.value);
-    setFormData(prev => ({ ...prev, rut: formatted }));
+    if (isExtranjero) {
+      setFormData(prev => ({ ...prev, rut: e.target.value.toUpperCase() }));
+    } else {
+      const formatted = formatRutForDisplay(e.target.value);
+      setFormData(prev => ({ ...prev, rut: formatted }));
+    }
   };
 
   const validarCodigoDiario = async () => {
