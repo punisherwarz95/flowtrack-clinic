@@ -1043,6 +1043,34 @@ export default function PortalPaciente() {
     );
   };
 
+  // ============ Language Selector ============
+  const LanguageSelector = () => (
+    <div className="flex items-center justify-center gap-2 mb-3">
+      <Globe className="h-4 w-4 text-muted-foreground" />
+      <button
+        type="button"
+        onClick={() => setLang("es")}
+        className={cn(
+          "px-2 py-1 text-sm rounded transition-colors",
+          lang === "es" ? "bg-primary text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
+        )}
+      >
+        Español
+      </button>
+      <span className="text-muted-foreground">|</span>
+      <button
+        type="button"
+        onClick={() => setLang("en")}
+        className={cn(
+          "px-2 py-1 text-sm rounded transition-colors",
+          lang === "en" ? "bg-primary text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
+        )}
+      >
+        English
+      </button>
+    </div>
+  );
+
   // ============ Sticky Status Banner for portal view ============
   const StickyStatusBanner = () => {
     if (!atencion) return null;
