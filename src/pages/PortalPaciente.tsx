@@ -1081,10 +1081,10 @@ export default function PortalPaciente() {
           <div className="bg-green-600 text-white px-4 py-4 text-center shadow-lg animate-pulse">
             <div className="flex items-center justify-center gap-2">
               <MapPin className="h-5 w-5" />
-              <span className="text-lg font-bold">¡ES SU TURNO!</span>
+              <span className="text-lg font-bold">{t("esSuTurno", lang)}</span>
             </div>
             <div className="text-xl font-black mt-1">
-              Diríjase al Box {atencion.boxes.nombre}
+              {t("dirijaseBox", lang)} {atencion.boxes.nombre}
             </div>
           </div>
         </div>
@@ -1097,9 +1097,9 @@ export default function PortalPaciente() {
           <div className="bg-amber-500 text-white px-4 py-3 text-center shadow-md">
             <div className="flex items-center justify-center gap-2">
               <Clock className="h-4 w-4" />
-              <span className="font-semibold">En espera de atención — Turno #{atencion.numero_ingreso}</span>
+              <span className="font-semibold">{t("enEspera", lang)} #{atencion.numero_ingreso}</span>
             </div>
-            <p className="text-xs mt-0.5 opacity-90">Le informaremos aquí cuando sea llamado a un box</p>
+            <p className="text-xs mt-0.5 opacity-90">{t("leInformaremos", lang)}</p>
           </div>
         </div>
       );
@@ -1111,7 +1111,7 @@ export default function PortalPaciente() {
           <div className="bg-green-700 text-white px-4 py-3 text-center shadow-md">
             <div className="flex items-center justify-center gap-2">
               <CheckCircle2 className="h-4 w-4" />
-              <span className="font-semibold">Atención completada</span>
+              <span className="font-semibold">{t("atencionCompletada", lang)}</span>
             </div>
           </div>
         </div>
@@ -1124,7 +1124,7 @@ export default function PortalPaciente() {
           <div className="bg-amber-600 text-white px-4 py-3 text-center shadow-md">
             <div className="flex items-center justify-center gap-2">
               <AlertCircle className="h-4 w-4" />
-              <span className="font-semibold">Atención incompleta — Turno #{atencion.numero_ingreso}</span>
+              <span className="font-semibold">{t("atencionIncompleta", lang)} #{atencion.numero_ingreso}</span>
             </div>
           </div>
         </div>
