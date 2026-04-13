@@ -133,7 +133,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     loadMonthlyStats();
-  }, [selectedMonth]);
+  }, [selectedMonth, prestadorExamenesMapCached, boxExamenesMapCached]);
 
   useEffect(() => {
     if (isToday(selectedDateTable) && localLoaded) {
