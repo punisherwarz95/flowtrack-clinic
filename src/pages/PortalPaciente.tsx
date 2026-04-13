@@ -1139,13 +1139,14 @@ export default function PortalPaciente() {
       <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundImage: `url(${portalBackground})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold">Portal del Paciente</CardTitle>
-            <CardDescription>Ingrese el código del día proporcionado en recepción</CardDescription>
+            <CardTitle className="text-2xl font-bold">{t("portalTitle", lang)}</CardTitle>
+            <CardDescription>{t("codigoSubtitle", lang)}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <LanguageSelector />
             <InlineMessageBanner />
             <div>
-              <Label htmlFor="codigo">Código del Día</Label>
+              <Label htmlFor="codigo">{t("codigoDia", lang)}</Label>
               <Input
                 id="codigo"
                 placeholder="ABC12"
@@ -1165,10 +1166,10 @@ export default function PortalPaciente() {
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Validando...
+                  {t("validando", lang)}
                 </>
               ) : (
-                "Continuar"
+                t("continuar", lang)
               )}
             </Button>
           </CardContent>
@@ -1182,16 +1183,34 @@ export default function PortalPaciente() {
       <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundImage: `url(${portalBackground})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold">Portal del Paciente</CardTitle>
-            <CardDescription>Ingrese su RUT para identificarse</CardDescription>
+            <CardTitle className="text-2xl font-bold">{t("portalTitle", lang)}</CardTitle>
+            <CardDescription>
+              {isExtranjero ? t("identificacionSubtitlePassport", lang) : t("identificacionSubtitle", lang)}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <LanguageSelector />
             <InlineMessageBanner />
+            {/* Toggle Extranjero */}
+            <div className="flex items-center justify-between p-3 rounded-lg border border-input bg-muted/30">
+              <Label htmlFor="extranjero-toggle" className="text-sm font-medium cursor-pointer flex items-center gap-2">
+                <Globe className="h-4 w-4 text-muted-foreground" />
+                {t("extranjero", lang)}
+              </Label>
+              <Switch
+                id="extranjero-toggle"
+                checked={isExtranjero}
+                onCheckedChange={(checked) => {
+                  setIsExtranjero(checked);
+                  setRut("");
+                }}
+              />
+            </div>
             <div>
-              <Label htmlFor="rut">RUT</Label>
+              <Label htmlFor="rut">{isExtranjero ? t("pasaporte", lang) : t("rut", lang)}</Label>
               <Input
                 id="rut"
-                placeholder="12.345.678-9"
+                placeholder={isExtranjero ? t("placeholderPassport", lang) : t("placeholderRut", lang)}
                 value={rut}
                 onChange={handleRutChange}
                 onKeyDown={(e) => e.key === "Enter" && buscarPaciente()}
@@ -1207,10 +1226,10 @@ export default function PortalPaciente() {
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Buscando...
+                  {t("buscando", lang)}
                 </>
               ) : (
-                "Ingresar"
+                t("ingresar", lang)
               )}
             </Button>
           </CardContent>
