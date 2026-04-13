@@ -1243,14 +1243,15 @@ export default function PortalPaciente() {
       <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundImage: `url(${portalBackground})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
         <Card className="w-full max-w-lg">
           <CardHeader className="text-center pb-4">
-            <CardTitle className="text-2xl font-bold">Registro de Paciente</CardTitle>
-            <CardDescription>Complete sus datos para registrarse</CardDescription>
+            <CardTitle className="text-2xl font-bold">{t("registroTitle", lang)}</CardTitle>
+            <CardDescription>{t("registroSubtitle", lang)}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
+            <LanguageSelector />
             <InlineMessageBanner />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="primerNombre" className="text-sm font-medium mb-1.5 block">Nombre *</Label>
+                <Label htmlFor="primerNombre" className="text-sm font-medium mb-1.5 block">{t("nombre", lang)}</Label>
                 <Input
                   id="primerNombre"
                   placeholder="JUAN"
