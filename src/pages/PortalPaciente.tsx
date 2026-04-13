@@ -551,7 +551,7 @@ export default function PortalPaciente() {
       }
     } catch (error: any) {
       console.error("Error buscando paciente:", error);
-      showMsg("No se pudo buscar el paciente", "error");
+      showMsg(t("errorBuscarPaciente", lang), "error");
     } finally {
       setIsLoading(false);
     }
