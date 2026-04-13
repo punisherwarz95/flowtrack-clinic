@@ -202,7 +202,7 @@ export default function PortalPaciente() {
 
   const validarCodigoDiario = async () => {
     if (!codigoIngresado.trim()) {
-      showMsg("Ingrese el código del día", "error");
+      showMsg(t("ingreseCodigo", lang), "error");
       return;
     }
 
