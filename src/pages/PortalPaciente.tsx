@@ -3,7 +3,7 @@ import portalBackground from "@/assets/portal-background.jpeg";
 
 // Portal Paciente v0.1.0 - Sin toasts, sin sonidos, sin vibraciones, sin popups
 // Banner sticky superior muestra estado de atención en todo momento
-const PORTAL_VERSION = "0.1.0";
+const PORTAL_VERSION = "0.2.0";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
