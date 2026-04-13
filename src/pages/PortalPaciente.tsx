@@ -663,27 +663,27 @@ export default function PortalPaciente() {
   const registrarPaciente = async () => {
     const errores: string[] = [];
     
-    if (!formData.primerNombre.trim()) errores.push("Nombre es obligatorio");
-    if (!formData.apellidoPaterno.trim()) errores.push("Apellido paterno es obligatorio");
-    if (!formData.apellidoMaterno.trim()) errores.push("Apellido materno es obligatorio");
-    if (!formData.rut.trim()) errores.push("RUT es obligatorio");
-    if (!formData.fecha_nacimiento) errores.push("Fecha de nacimiento es obligatoria");
+    if (!formData.primerNombre.trim()) errores.push(t("errNombre", lang));
+    if (!formData.apellidoPaterno.trim()) errores.push(t("errApPaterno", lang));
+    if (!formData.apellidoMaterno.trim()) errores.push(t("errApMaterno", lang));
+    if (!formData.rut.trim()) errores.push(isExtranjero ? t("errPasaporte", lang) : t("errRut", lang));
+    if (!formData.fecha_nacimiento) errores.push(t("errFechaNac", lang));
     if (!formData.email.trim()) {
-      errores.push("Email es obligatorio");
+      errores.push(t("errEmail", lang));
     } else if (!isValidEmail(formData.email)) {
-      errores.push("Email no tiene formato válido");
+      errores.push(t("errEmailInvalid", lang));
     }
     if (!formData.telefono) {
-      errores.push("Teléfono es obligatorio");
+      errores.push(t("errTelefono", lang));
     } else if (formData.telefono.length !== 9) {
-      errores.push("El teléfono debe tener 9 dígitos");
+      errores.push(t("errTelefonoLen", lang));
     }
-    if (!formData.calle.trim()) errores.push("Calle es obligatoria");
-    if (!formData.numeracion.trim()) errores.push("Numeración es obligatoria");
+    if (!formData.calle.trim()) errores.push(t("errCalle", lang));
+    if (!formData.numeracion.trim()) errores.push(t("errNumeracion", lang));
     if (!formData.ciudad.trim()) {
-      errores.push("Ciudad es obligatoria");
+      errores.push(t("errCiudad", lang));
     } else if (!isValidCiudad(formData.ciudad)) {
-      errores.push("Ingrese una ciudad válida de Chile");
+      errores.push(t("errCiudadInvalid", lang));
     }
 
     if (errores.length > 0) {
@@ -691,7 +691,7 @@ export default function PortalPaciente() {
       return;
     }
 
-    const rutFormateado = formatRutStandard(formData.rut);
+    const rutFormateado = isExtranjero ? formData.rut.trim().toUpperCase() : formatRutStandard(formData.rut);
     const telefonoCompleto = `+56${formData.telefono}`;
 
     setIsLoading(true);
