@@ -1436,6 +1436,7 @@ export default function PortalPaciente() {
       <StickyStatusBanner />
 
       <div className="max-w-lg mx-auto space-y-4 p-4">
+        <LanguageSelector />
         {/* Patient Card */}
         <Card className="border-border">
           <CardContent className="pt-6">
@@ -1453,7 +1454,7 @@ export default function PortalPaciente() {
                 <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
                   <span>{paciente?.rut}</span>
                   {atencion?.fecha_ingreso && (
-                    <span>• Ingreso: {format(new Date(atencion.fecha_ingreso), "HH:mm", { locale: es })}</span>
+                    <span>• {t("ingreso", lang)}: {format(new Date(atencion.fecha_ingreso), "HH:mm", { locale: es })}</span>
                   )}
                   {paciente?.tipo_servicio && (
                     <Badge variant="outline" className="text-xs">
@@ -1473,7 +1474,7 @@ export default function PortalPaciente() {
                 {/* Pending Boxes */}
                 {pendingBoxes.length > 0 && (
                   <div className="text-sm text-primary mt-2 font-medium">
-                    Boxes pendientes: {pendingBoxes.map(b => `Box ${b}`).join(", ")}
+                    {t("boxesPendientes", lang)}: {pendingBoxes.map(b => `Box ${b}`).join(", ")}
                   </div>
                 )}
 
@@ -1483,7 +1484,7 @@ export default function PortalPaciente() {
                     <CollapsibleTrigger className="flex items-center gap-1 text-sm text-primary hover:underline">
                       <ChevronDown className="h-4 w-4" />
                       <span className="font-medium">
-                        Ver exámenes ({atencion.atencion_examenes.filter(ae => ae.estado === "pendiente" || ae.estado === "incompleto").length} pendientes)
+                        {t("verExamenes", lang)} ({atencion.atencion_examenes.filter(ae => ae.estado === "pendiente" || ae.estado === "incompleto").length} {t("pendientes", lang)})
                       </span>
                     </CollapsibleTrigger>
                     <CollapsibleContent className="mt-2 space-y-3 data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up">
