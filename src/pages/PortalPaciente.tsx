@@ -223,11 +223,11 @@ export default function PortalPaciente() {
         setInlineMsg(null);
         setStep("identificacion");
       } else {
-        showMsg("El código ingresado no es correcto. Solicítelo al personal de recepción.", "error", 8000);
+        showMsg(t("codigoIncorrecto", lang), "error", 8000);
       }
     } catch (error) {
       console.error("Error validating código:", error);
-      showMsg("No se pudo validar el código. Intente nuevamente.", "error");
+      showMsg(t("errorValidarCodigo", lang), "error");
     } finally {
       setIsLoading(false);
     }
