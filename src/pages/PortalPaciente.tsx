@@ -1261,7 +1261,7 @@ export default function PortalPaciente() {
                 />
               </div>
               <div>
-                <Label htmlFor="apellidoPaterno" className="text-sm font-medium mb-1.5 block">Apellido Paterno *</Label>
+                <Label htmlFor="apellidoPaterno" className="text-sm font-medium mb-1.5 block">{t("apellidoPaterno", lang)}</Label>
                 <Input
                   id="apellidoPaterno"
                   placeholder="PÉREZ"
@@ -1271,7 +1271,7 @@ export default function PortalPaciente() {
                 />
               </div>
               <div>
-                <Label htmlFor="apellidoMaterno" className="text-sm font-medium mb-1.5 block">Apellido Materno *</Label>
+                <Label htmlFor="apellidoMaterno" className="text-sm font-medium mb-1.5 block">{t("apellidoMaterno", lang)}</Label>
                 <Input
                   id="apellidoMaterno"
                   placeholder="GONZÁLEZ"
@@ -1281,10 +1281,10 @@ export default function PortalPaciente() {
                 />
               </div>
               <div>
-                <Label htmlFor="formRut" className="text-sm font-medium mb-1.5 block">RUT *</Label>
+                <Label htmlFor="formRut" className="text-sm font-medium mb-1.5 block">{isExtranjero ? t("pasaporteLabel", lang) : t("rutLabel", lang)}</Label>
                 <Input
                   id="formRut"
-                  placeholder="12.345.678-9"
+                  placeholder={isExtranjero ? t("placeholderPassport", lang) : t("placeholderRut", lang)}
                   value={formData.rut}
                   onChange={handleFormRutChange}
                   className="h-11"
