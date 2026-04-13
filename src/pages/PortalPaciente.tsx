@@ -373,7 +373,7 @@ export default function PortalPaciente() {
 
           if (existingAtencion) {
             setAtencion({ ...existingAtencion, atencion_examenes: [] });
-            showMsg(`Su número de atención es #${existingAtencion.numero_ingreso}. Complete sus datos.`, "info", 0);
+            showMsg(`${t("suNumeroAtencion", lang)} #${existingAtencion.numero_ingreso}. ${t("completeDatos", lang)}`, "info", 0);
           }
 
           setFormData(prev => ({ ...prev, rut: rut }));
@@ -478,7 +478,7 @@ export default function PortalPaciente() {
             ciudad: direccionParts[2] || direccionParts[0] || ""
           });
           
-          showMsg(`Su número de atención es #${newAtencion.numero_ingreso}. Verifique sus datos.`, "info", 0);
+          showMsg(`${t("suNumeroAtencion", lang)} #${newAtencion.numero_ingreso}. ${t("verifiqueDatos", lang)}`, "info", 0);
           
           setStep("registro");
           return;
@@ -543,7 +543,7 @@ export default function PortalPaciente() {
           setFormData(prev => ({ ...prev, rut: rut }));
         }
 
-        showMsg(`Su número de atención es #${newAtencion.numero_ingreso}. Complete sus datos.`, "info", 0);
+        showMsg(`${t("suNumeroAtencion", lang)} #${newAtencion.numero_ingreso}. ${t("completeDatos", lang)}`, "info", 0);
 
         setPaciente(newPaciente);
         setAtencion({ ...newAtencion, atencion_examenes: [], boxes: null });
@@ -798,7 +798,7 @@ export default function PortalPaciente() {
       }
     } catch (error: any) {
       console.error("Error registrando paciente:", error);
-      showMsg(error.message || "No se pudo registrar el paciente", "error");
+      showMsg(error.message || t("errorRegistrar", lang), "error");
     } finally {
       setIsLoading(false);
     }
