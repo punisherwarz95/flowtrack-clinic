@@ -302,13 +302,13 @@ export default function PortalPaciente() {
 
   const buscarPaciente = async () => {
     if (!rut.trim()) {
-      showMsg("Ingrese su RUT", "error");
+      showMsg(isExtranjero ? t("ingresePasaporte", lang) : t("ingreseRut", lang), "error");
       return;
     }
 
     setIsLoading(true);
     try {
-      const rutFormateado = formatRutStandard(rut);
+      const rutFormateado = isExtranjero ? rut.trim().toUpperCase() : formatRutStandard(rut);
 
       const { data: agendaDiferidaData } = await supabase
         .from("agenda_diferida")
