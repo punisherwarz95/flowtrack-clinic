@@ -20,6 +20,9 @@ import { cn, formatRutStandard, normalizeRut as normalizeRutUtil } from "@/lib/u
 import { useAtencionDocumentos } from "@/hooks/useAtencionDocumentos";
 import { DocumentoFormViewer, DocumentoStatusCard, DocumentoContextData } from "@/components/DocumentoFormViewer";
 import PortalCuestionarios from "@/components/PortalCuestionarios";
+import { t, PortalLang } from "@/lib/portalTranslations";
+import { Globe } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 interface Paciente {
   id: string;
