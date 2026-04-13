@@ -1640,7 +1640,7 @@ export default function PortalPaciente() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <ExternalLink className="h-5 w-5" />
-                Formularios Externos
+                {t("formulariosExternos", lang)}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -1667,8 +1667,8 @@ export default function PortalPaciente() {
           <Card className="border-muted">
             <CardContent className="pt-6 text-center text-muted-foreground">
               <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Esperando que recepción complete su registro</p>
-              <p className="text-sm mt-2">Sus exámenes aparecerán aquí cuando estén asignados</p>
+              <p>{t("esperandoRegistro", lang)}</p>
+              <p className="text-sm mt-2">{t("examenesAparecen", lang)}</p>
             </CardContent>
           </Card>
         )}
@@ -1687,7 +1687,7 @@ export default function PortalPaciente() {
             setStep("identificacion");
           }}
         >
-          Cambiar Paciente
+          {t("cambiarPaciente", lang)}
         </Button>
       </div>
 
