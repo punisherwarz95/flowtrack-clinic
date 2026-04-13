@@ -1291,7 +1291,7 @@ export default function PortalPaciente() {
                 />
               </div>
               <div>
-                <Label htmlFor="fecha_nacimiento" className="text-sm font-medium mb-1.5 block">Fecha de Nacimiento *</Label>
+                <Label htmlFor="fecha_nacimiento" className="text-sm font-medium mb-1.5 block">{t("fechaNacimiento", lang)}</Label>
                 <div className="flex items-center gap-2">
                   <Input
                     id="fecha_nacimiento"
@@ -1325,7 +1325,7 @@ export default function PortalPaciente() {
                 </div>
               </div>
               <div>
-                <Label htmlFor="email" className="text-sm font-medium mb-1.5 block">Email *</Label>
+                <Label htmlFor="email" className="text-sm font-medium mb-1.5 block">{t("email", lang)}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -1336,7 +1336,7 @@ export default function PortalPaciente() {
                 />
               </div>
               <div>
-                <Label htmlFor="telefono" className="text-sm font-medium mb-1.5 block">Teléfono *</Label>
+                <Label htmlFor="telefono" className="text-sm font-medium mb-1.5 block">{t("telefono", lang)}</Label>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-muted-foreground bg-muted px-3 py-2.5 rounded-md border h-11 flex items-center">+56</span>
                   <Input
@@ -1351,7 +1351,7 @@ export default function PortalPaciente() {
                 </div>
               </div>
               <div>
-                <Label htmlFor="calle" className="text-sm font-medium mb-1.5 block">Calle *</Label>
+                <Label htmlFor="calle" className="text-sm font-medium mb-1.5 block">{t("calle", lang)}</Label>
                 <Input
                   id="calle"
                   placeholder="AV. PRINCIPAL"
@@ -1361,7 +1361,7 @@ export default function PortalPaciente() {
                 />
               </div>
               <div>
-                <Label htmlFor="numeracion" className="text-sm font-medium mb-1.5 block">Numeración *</Label>
+                <Label htmlFor="numeracion" className="text-sm font-medium mb-1.5 block">{t("numeracion", lang)}</Label>
                 <Input
                   id="numeracion"
                   placeholder="123"
@@ -1371,7 +1371,7 @@ export default function PortalPaciente() {
                 />
               </div>
               <div className="sm:col-span-2 relative">
-                <Label htmlFor="ciudad" className="text-sm font-medium mb-1.5 block">Ciudad *</Label>
+                <Label htmlFor="ciudad" className="text-sm font-medium mb-1.5 block">{t("ciudad", lang)}</Label>
                 <Input
                   id="ciudad"
                   placeholder="Santiago"
@@ -1397,7 +1397,7 @@ export default function PortalPaciente() {
                     ))}
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground mt-1">Ingrese una ciudad de Chile</p>
+                <p className="text-xs text-muted-foreground mt-1">{t("ciudadHint", lang)}</p>
               </div>
             </div>
             <div className="flex gap-3 pt-2">
@@ -1406,7 +1406,7 @@ export default function PortalPaciente() {
                 onClick={() => setStep("identificacion")}
                 className="flex-1 h-11"
               >
-                Volver
+                {t("volver", lang)}
               </Button>
               <Button 
                 onClick={registrarPaciente} 
@@ -1416,10 +1416,10 @@ export default function PortalPaciente() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Registrando...
+                    {t("registrando", lang)}
                   </>
                 ) : (
-                  "Registrar"
+                  t("registrar", lang)
                 )}
               </Button>
             </div>
