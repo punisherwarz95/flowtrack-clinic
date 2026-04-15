@@ -301,7 +301,50 @@ export default function PortalPaciente() {
     }
   };
 
-  const buscarPaciente = async () => {
+  // Confirmar fusión de agenda diferida manualmente por recepción
+  const confirmarFusionAgenda = async () => {
+    if (!agendaDiferidaMatch || !atencion || !paciente) return;
+    setIsFusing(true);
+    try {
+      // 1. Update paciente with empresa/faena/cargo from agenda
+      if (agendaDiferidaMatch.empresa_id) {
+        await supabase.from("pacientes").update({
+          empresa_id: agendaDiferidaMatch.empresa_id,
+          faena_id: agendaDiferidaMatch.faena_id,
+          cargo: agendaDiferidaMatch.cargo || paciente.cargo || null,
+          tipo_servicio: agendaDiferidaMatch.tipo_servicio || paciente.tipo_servicio || null,
+        }).eq("id", paciente.id);
+      }
+
+      // 2. Update atencion with empresa_id
+      if (agendaDiferidaMatch.empresa_id) {
+        await supabase.from("atenciones").update({
+          empresa_id: agendaDiferidaMatch.empresa_id
+        }).eq("id", atencion.id);
+      }
+
+      // 3. Vincular agenda diferida (baterias, examenes, documentos)
+      await vincularAgendaDiferida(agendaDiferidaMatch, atencion.id);
+
+      // 4. Clear match
+      setAgendaDiferidaMatch(null);
+      showMsg(t("agendaFusionExito", lang), "success", 5000);
+
+      // 5. Refresh data
+      refreshData();
+    } catch (err: any) {
+      console.error("[Portal] Error en fusión:", err);
+      showMsg(t("agendaFusionError", lang), "error");
+    } finally {
+      setIsFusing(false);
+    }
+  };
+
+  const rechazarFusionAgenda = () => {
+    setAgendaDiferidaMatch(null);
+  };
+
+
     if (!rut.trim()) {
       showMsg(isExtranjero ? t("ingresePasaporte", lang) : t("ingreseRut", lang), "error");
       return;
