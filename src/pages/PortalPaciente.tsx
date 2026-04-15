@@ -366,6 +366,14 @@ export default function PortalPaciente() {
       const agendaDiferida = agendaDiferidaData?.[0] || null;
       if (agendaDiferida) {
         console.log("[Portal] Agenda diferida encontrada:", agendaDiferida.id);
+        // Fetch paquete names for display
+        if (agendaDiferida.paquetes_ids?.length > 0) {
+          const { data: paquetesData } = await supabase
+            .from("paquetes_examenes")
+            .select("id, nombre")
+            .in("id", agendaDiferida.paquetes_ids);
+          agendaDiferida._paquetesNombres = paquetesData || [];
+        }
         setAgendaDiferidaMatch(agendaDiferida);
       }
 
