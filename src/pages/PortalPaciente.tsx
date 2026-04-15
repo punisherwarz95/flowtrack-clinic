@@ -372,7 +372,7 @@ export default function PortalPaciente() {
             .from("paquetes_examenes")
             .select("id, nombre")
             .in("id", agendaDiferida.paquetes_ids);
-          agendaDiferida._paquetesNombres = paquetesData || [];
+          (agendaDiferida as any)._paquetesNombres = paquetesData || [];
         }
         setAgendaDiferidaMatch(agendaDiferida);
       }
