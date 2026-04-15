@@ -420,24 +420,12 @@ export default function PortalPaciente() {
         } else {
           console.log("[Portal] No se encontró atención existente, creando nueva para paciente:", pacienteData.id);
           
-          const empresaIdForAtencion = agendaDiferida?.empresa_id || pacienteData.empresa_id || null;
           const insertData: any = {
             paciente_id: pacienteData.id,
             estado: "en_espera",
             fecha_ingreso: new Date().toISOString(),
-            empresa_id: empresaIdForAtencion
+            empresa_id: pacienteData.empresa_id || null
           };
-
-          if (agendaDiferida) {
-            if (agendaDiferida.empresa_id) {
-              await supabase.from("pacientes").update({
-                empresa_id: agendaDiferida.empresa_id,
-                faena_id: agendaDiferida.faena_id,
-                cargo: agendaDiferida.cargo || pacienteData.cargo,
-                tipo_servicio: agendaDiferida.tipo_servicio || pacienteData.tipo_servicio,
-              }).eq("id", pacienteData.id);
-            }
-          }
 
           const { data: newAtencion, error: atencionError } = await supabase
             .from("atenciones")
@@ -447,10 +435,6 @@ export default function PortalPaciente() {
 
           if (atencionError) throw atencionError;
 
-          if (agendaDiferida) {
-            await vincularAgendaDiferida(agendaDiferida, newAtencion.id);
-          }
-
           setAtencion({
             ...newAtencion,
             atencion_examenes: []
@@ -458,22 +442,20 @@ export default function PortalPaciente() {
           prevEstadoRef.current = "en_espera";
           prevBoxIdRef.current = null;
           
-          const sourceData = agendaDiferida || pacienteData;
-          const nombreParts = (sourceData.nombre || pacienteData.nombre)?.split(" ") || [];
-          const direccionSource = agendaDiferida?.direccion || pacienteData.direccion;
-          const direccionParts = direccionSource?.split(", ") || [];
+          const nombreParts = pacienteData.nombre?.split(" ") || [];
+          const direccionParts = pacienteData.direccion?.split(", ") || [];
           
           setFormData({
             primerNombre: nombreParts[0] || "",
             apellidoPaterno: nombreParts[1] || "",
             apellidoMaterno: nombreParts.slice(2).join(" ") || "",
             rut: pacienteData.rut || rut,
-            fecha_nacimiento: agendaDiferida?.fecha_nacimiento || pacienteData.fecha_nacimiento || "",
-            fecha_nacimiento_display: (agendaDiferida?.fecha_nacimiento || pacienteData.fecha_nacimiento)
-              ? format(new Date((agendaDiferida?.fecha_nacimiento || pacienteData.fecha_nacimiento) + "T12:00:00"), "dd/MM/yyyy")
+            fecha_nacimiento: pacienteData.fecha_nacimiento || "",
+            fecha_nacimiento_display: pacienteData.fecha_nacimiento
+              ? format(new Date(pacienteData.fecha_nacimiento + "T12:00:00"), "dd/MM/yyyy")
               : "",
-            email: agendaDiferida?.email || pacienteData.email || "",
-            telefono: agendaDiferida?.telefono || pacienteData.telefono || "",
+            email: pacienteData.email || "",
+            telefono: pacienteData.telefono || "",
             calle: direccionParts[0] || "",
             numeracion: direccionParts[1] || "",
             ciudad: direccionParts[2] || direccionParts[0] || ""
