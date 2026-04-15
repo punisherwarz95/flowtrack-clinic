@@ -1490,7 +1490,10 @@ export default function PortalPaciente() {
                 <div>
                   <span className="text-sm text-muted-foreground">{t("agendaBaterias", lang)}:</span>
                   <div className="flex flex-wrap gap-1 mt-1">
-                    {agendaDiferidaMatch.paquetes_ids.map((pId: string) => (
+                    {(agendaDiferidaMatch._paquetesNombres || []).map((p: any) => (
+                      <Badge key={p.id} variant="secondary" className="text-xs">{p.nombre}</Badge>
+                    ))}
+                    {!agendaDiferidaMatch._paquetesNombres?.length && agendaDiferidaMatch.paquetes_ids.map((pId: string) => (
                       <Badge key={pId} variant="secondary" className="text-xs">{pId.slice(0, 8)}...</Badge>
                     ))}
                   </div>
