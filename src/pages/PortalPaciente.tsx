@@ -1440,6 +1440,82 @@ export default function PortalPaciente() {
 
       <div className="max-w-lg mx-auto space-y-4 p-4">
         <LanguageSelector />
+
+        {/* Agenda Diferida Confirmation Banner */}
+        {agendaDiferidaMatch && (
+          <Card className="border-2 border-primary bg-primary/5">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <CalendarIcon className="h-5 w-5 text-primary" />
+                {t("agendaConfirmTitle", lang)}
+              </CardTitle>
+              <CardDescription className="text-xs">
+                {t("agendaConfirmDesc", lang)}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="text-muted-foreground">{t("agendaNombreProgramado", lang)}:</span>
+                  <p className="font-medium">{agendaDiferidaMatch.nombre}</p>
+                </div>
+                {agendaDiferidaMatch.empresas?.nombre && (
+                  <div>
+                    <span className="text-muted-foreground">{t("agendaEmpresa", lang)}:</span>
+                    <p className="font-medium">{agendaDiferidaMatch.empresas.nombre}</p>
+                  </div>
+                )}
+                {agendaDiferidaMatch.faenas?.nombre && (
+                  <div>
+                    <span className="text-muted-foreground">{t("agendaFaena", lang)}:</span>
+                    <p className="font-medium">{agendaDiferidaMatch.faenas.nombre}</p>
+                  </div>
+                )}
+                {agendaDiferidaMatch.cargo && (
+                  <div>
+                    <span className="text-muted-foreground">{t("agendaCargo", lang)}:</span>
+                    <p className="font-medium">{agendaDiferidaMatch.cargo}</p>
+                  </div>
+                )}
+              </div>
+              {agendaDiferidaMatch.paquetes_ids?.length > 0 && (
+                <div>
+                  <span className="text-sm text-muted-foreground">{t("agendaBaterias", lang)}:</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {agendaDiferidaMatch.paquetes_ids.map((pId: string) => (
+                      <Badge key={pId} variant="secondary" className="text-xs">{pId.slice(0, 8)}...</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={rechazarFusionAgenda}
+                  disabled={isFusing}
+                >
+                  {t("agendaRechazar", lang)}
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={confirmarFusionAgenda}
+                  disabled={isFusing}
+                >
+                  {isFusing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {t("agendaFusionando", lang)}
+                    </>
+                  ) : (
+                    t("agendaConfirmar", lang)
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Patient Card */}
         <Card className="border-border">
           <CardContent className="pt-6">
