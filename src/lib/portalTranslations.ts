@@ -85,6 +85,20 @@ const translations = {
   suNumeroAtencion: { es: "Su número de atención es", en: "Your attention number is" },
   completeDatos: { es: "Complete sus datos.", en: "Complete your information." },
   verifiqueDatos: { es: "Verifique sus datos.", en: "Verify your information." },
+
+  // Agenda diferida confirmation
+  agendaConfirmTitle: { es: "Pre-agendamiento detectado", en: "Pre-scheduling detected" },
+  agendaConfirmDesc: { es: "Se encontró un pre-agendamiento que coincide con este paciente. Recepción debe confirmar la identidad para fusionar los datos.", en: "A pre-scheduling matching this patient was found. Reception must confirm the identity to merge the data." },
+  agendaEmpresa: { es: "Empresa", en: "Company" },
+  agendaFaena: { es: "Faena", en: "Work Site" },
+  agendaBaterias: { es: "Baterías", en: "Protocols" },
+  agendaCargo: { es: "Cargo", en: "Position" },
+  agendaNombreProgramado: { es: "Nombre programado", en: "Scheduled name" },
+  agendaConfirmar: { es: "Confirmar y Fusionar", en: "Confirm & Merge" },
+  agendaRechazar: { es: "No es este paciente", en: "Not this patient" },
+  agendaFusionExito: { es: "Datos fusionados correctamente. Exámenes asignados.", en: "Data merged successfully. Exams assigned." },
+  agendaFusionError: { es: "Error al fusionar datos", en: "Error merging data" },
+  agendaFusionando: { es: "Fusionando...", en: "Merging..." },
 } as const;
 
 export type TranslationKey = keyof typeof translations;
