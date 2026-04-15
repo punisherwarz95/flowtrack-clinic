@@ -513,7 +513,7 @@ export default function PortalPaciente() {
             paciente_id: pacienteData.id,
             estado: "en_espera",
             fecha_ingreso: new Date().toISOString(),
-            empresa_id: pacienteData.empresa_id || null
+            empresa_id: agendaDiferida?.empresa_id || pacienteData.empresa_id || null
           };
 
           const { data: newAtencion, error: atencionError } = await supabase
