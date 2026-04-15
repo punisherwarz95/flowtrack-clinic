@@ -33,6 +33,7 @@ interface Paciente {
   telefono: string | null;
   direccion: string | null;
   tipo_servicio?: string | null;
+  cargo?: string | null;
 }
 
 interface Empresa {
