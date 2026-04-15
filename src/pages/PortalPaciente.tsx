@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import portalBackground from "@/assets/portal-background.jpeg";
 
-// Portal Paciente v0.1.0 - Sin toasts, sin sonidos, sin vibraciones, sin popups
+// Portal Paciente v0.3.0 - Agenda diferida con confirmación manual
 // Banner sticky superior muestra estado de atención en todo momento
-const PORTAL_VERSION = "0.2.0";
+const PORTAL_VERSION = "0.3.0";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +33,7 @@ interface Paciente {
   telefono: string | null;
   direccion: string | null;
   tipo_servicio?: string | null;
+  cargo?: string | null;
 }
 
 interface Empresa {
@@ -101,6 +102,7 @@ export default function PortalPaciente() {
   const [testTracking, setTestTracking] = useState<TestTracking[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [agendaDiferidaMatch, setAgendaDiferidaMatch] = useState<any>(null);
+  const [isFusing, setIsFusing] = useState(false);
   const [lang, setLang] = useState<PortalLang>("es");
   const [isExtranjero, setIsExtranjero] = useState(false);
   
@@ -300,6 +302,49 @@ export default function PortalPaciente() {
     }
   };
 
+  // Confirmar fusión de agenda diferida manualmente por recepción
+  const confirmarFusionAgenda = async () => {
+    if (!agendaDiferidaMatch || !atencion || !paciente) return;
+    setIsFusing(true);
+    try {
+      // 1. Update paciente with empresa/faena/cargo from agenda
+      if (agendaDiferidaMatch.empresa_id) {
+        await supabase.from("pacientes").update({
+          empresa_id: agendaDiferidaMatch.empresa_id,
+          faena_id: agendaDiferidaMatch.faena_id,
+          cargo: agendaDiferidaMatch.cargo || paciente.cargo || null,
+          tipo_servicio: agendaDiferidaMatch.tipo_servicio || paciente.tipo_servicio || null,
+        }).eq("id", paciente.id);
+      }
+
+      // 2. Update atencion with empresa_id
+      if (agendaDiferidaMatch.empresa_id) {
+        await supabase.from("atenciones").update({
+          empresa_id: agendaDiferidaMatch.empresa_id
+        }).eq("id", atencion.id);
+      }
+
+      // 3. Vincular agenda diferida (baterias, examenes, documentos)
+      await vincularAgendaDiferida(agendaDiferidaMatch, atencion.id);
+
+      // 4. Clear match
+      setAgendaDiferidaMatch(null);
+      showMsg(t("agendaFusionExito", lang), "success", 5000);
+
+      // 5. Refresh data
+      refreshData();
+    } catch (err: any) {
+      console.error("[Portal] Error en fusión:", err);
+      showMsg(t("agendaFusionError", lang), "error");
+    } finally {
+      setIsFusing(false);
+    }
+  };
+
+  const rechazarFusionAgenda = () => {
+    setAgendaDiferidaMatch(null);
+  };
+
   const buscarPaciente = async () => {
     if (!rut.trim()) {
       showMsg(isExtranjero ? t("ingresePasaporte", lang) : t("ingreseRut", lang), "error");
@@ -310,17 +355,27 @@ export default function PortalPaciente() {
     try {
       const rutFormateado = isExtranjero ? rut.trim().toUpperCase() : formatRutStandard(rut);
 
+      const todayStr = new Date().toISOString().split('T')[0];
       const { data: agendaDiferidaData } = await supabase
         .from("agenda_diferida")
         .select("*, empresas(id, nombre), faenas(id, nombre)")
         .eq("rut", rutFormateado)
         .eq("estado", "pendiente")
+        .or(`fecha_programada.eq.${todayStr},fecha_programada.is.null`)
         .order("created_at", { ascending: false })
         .limit(1);
 
       const agendaDiferida = agendaDiferidaData?.[0] || null;
       if (agendaDiferida) {
         console.log("[Portal] Agenda diferida encontrada:", agendaDiferida.id);
+        // Fetch paquete names for display
+        if (agendaDiferida.paquetes_ids?.length > 0) {
+          const { data: paquetesData } = await supabase
+            .from("paquetes_examenes")
+            .select("id, nombre")
+            .in("id", agendaDiferida.paquetes_ids);
+          (agendaDiferida as any)._paquetesNombres = paquetesData || [];
+        }
         setAgendaDiferidaMatch(agendaDiferida);
       }
 
@@ -419,24 +474,12 @@ export default function PortalPaciente() {
         } else {
           console.log("[Portal] No se encontró atención existente, creando nueva para paciente:", pacienteData.id);
           
-          const empresaIdForAtencion = agendaDiferida?.empresa_id || pacienteData.empresa_id || null;
           const insertData: any = {
             paciente_id: pacienteData.id,
             estado: "en_espera",
             fecha_ingreso: new Date().toISOString(),
-            empresa_id: empresaIdForAtencion
+            empresa_id: pacienteData.empresa_id || null
           };
-
-          if (agendaDiferida) {
-            if (agendaDiferida.empresa_id) {
-              await supabase.from("pacientes").update({
-                empresa_id: agendaDiferida.empresa_id,
-                faena_id: agendaDiferida.faena_id,
-                cargo: agendaDiferida.cargo || pacienteData.cargo,
-                tipo_servicio: agendaDiferida.tipo_servicio || pacienteData.tipo_servicio,
-              }).eq("id", pacienteData.id);
-            }
-          }
 
           const { data: newAtencion, error: atencionError } = await supabase
             .from("atenciones")
@@ -446,10 +489,6 @@ export default function PortalPaciente() {
 
           if (atencionError) throw atencionError;
 
-          if (agendaDiferida) {
-            await vincularAgendaDiferida(agendaDiferida, newAtencion.id);
-          }
-
           setAtencion({
             ...newAtencion,
             atencion_examenes: []
@@ -457,22 +496,20 @@ export default function PortalPaciente() {
           prevEstadoRef.current = "en_espera";
           prevBoxIdRef.current = null;
           
-          const sourceData = agendaDiferida || pacienteData;
-          const nombreParts = (sourceData.nombre || pacienteData.nombre)?.split(" ") || [];
-          const direccionSource = agendaDiferida?.direccion || pacienteData.direccion;
-          const direccionParts = direccionSource?.split(", ") || [];
+          const nombreParts = pacienteData.nombre?.split(" ") || [];
+          const direccionParts = pacienteData.direccion?.split(", ") || [];
           
           setFormData({
             primerNombre: nombreParts[0] || "",
             apellidoPaterno: nombreParts[1] || "",
             apellidoMaterno: nombreParts.slice(2).join(" ") || "",
             rut: pacienteData.rut || rut,
-            fecha_nacimiento: agendaDiferida?.fecha_nacimiento || pacienteData.fecha_nacimiento || "",
-            fecha_nacimiento_display: (agendaDiferida?.fecha_nacimiento || pacienteData.fecha_nacimiento)
-              ? format(new Date((agendaDiferida?.fecha_nacimiento || pacienteData.fecha_nacimiento) + "T12:00:00"), "dd/MM/yyyy")
+            fecha_nacimiento: pacienteData.fecha_nacimiento || "",
+            fecha_nacimiento_display: pacienteData.fecha_nacimiento
+              ? format(new Date(pacienteData.fecha_nacimiento + "T12:00:00"), "dd/MM/yyyy")
               : "",
-            email: agendaDiferida?.email || pacienteData.email || "",
-            telefono: agendaDiferida?.telefono || pacienteData.telefono || "",
+            email: pacienteData.email || "",
+            telefono: pacienteData.telefono || "",
             calle: direccionParts[0] || "",
             numeracion: direccionParts[1] || "",
             ciudad: direccionParts[2] || direccionParts[0] || ""
@@ -489,16 +526,16 @@ export default function PortalPaciente() {
         const { data: newPaciente, error: createError } = await supabase
           .from("pacientes")
           .insert({
-            nombre: agendaDiferida?.nombre || "PENDIENTE DE REGISTRO",
+            nombre: "PENDIENTE DE REGISTRO",
             rut: rutFormateado,
-            fecha_nacimiento: agendaDiferida?.fecha_nacimiento || null,
-            email: agendaDiferida?.email || null,
-            telefono: agendaDiferida?.telefono || null,
-            direccion: agendaDiferida?.direccion || null,
-            empresa_id: agendaDiferida?.empresa_id || null,
-            faena_id: agendaDiferida?.faena_id || null,
-            cargo: agendaDiferida?.cargo || null,
-            tipo_servicio: agendaDiferida?.tipo_servicio || null
+            fecha_nacimiento: null,
+            email: null,
+            telefono: null,
+            direccion: null,
+            empresa_id: null,
+            faena_id: null,
+            cargo: null,
+            tipo_servicio: null
           })
           .select()
           .single();
@@ -517,31 +554,7 @@ export default function PortalPaciente() {
 
         if (atencionError) throw atencionError;
 
-        if (agendaDiferida) {
-          await vincularAgendaDiferida(agendaDiferida, newAtencion.id);
-        }
-
-        if (agendaDiferida && agendaDiferida.nombre !== "PENDIENTE DE REGISTRO") {
-          const nombreParts = agendaDiferida.nombre?.split(" ") || [];
-          const direccionParts = agendaDiferida.direccion?.split(", ") || [];
-          setFormData({
-            primerNombre: nombreParts[0] || "",
-            apellidoPaterno: nombreParts[1] || "",
-            apellidoMaterno: nombreParts.slice(2).join(" ") || "",
-            rut: rut,
-            fecha_nacimiento: agendaDiferida.fecha_nacimiento || "",
-            fecha_nacimiento_display: agendaDiferida.fecha_nacimiento
-              ? format(new Date(agendaDiferida.fecha_nacimiento + "T12:00:00"), "dd/MM/yyyy")
-              : "",
-            email: agendaDiferida.email || "",
-            telefono: agendaDiferida.telefono || "",
-            calle: direccionParts[0] || "",
-            numeracion: direccionParts[1] || "",
-            ciudad: direccionParts[2] || ""
-          });
-        } else {
-          setFormData(prev => ({ ...prev, rut: rut }));
-        }
+        setFormData(prev => ({ ...prev, rut: rut }));
 
         showMsg(`${t("suNumeroAtencion", lang)} #${newAtencion.numero_ingreso}. ${t("completeDatos", lang)}`, "info", 0);
 
@@ -1437,6 +1450,86 @@ export default function PortalPaciente() {
 
       <div className="max-w-lg mx-auto space-y-4 p-4">
         <LanguageSelector />
+        <InlineMessageBanner />
+
+        {/* Agenda Diferida Confirmation Banner */}
+        {agendaDiferidaMatch && (
+          <Card className="border-2 border-primary bg-primary/5">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <CalendarIcon className="h-5 w-5 text-primary" />
+                {t("agendaConfirmTitle", lang)}
+              </CardTitle>
+              <CardDescription className="text-xs">
+                {t("agendaConfirmDesc", lang)}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="text-muted-foreground">{t("agendaNombreProgramado", lang)}:</span>
+                  <p className="font-medium">{agendaDiferidaMatch.nombre}</p>
+                </div>
+                {agendaDiferidaMatch.empresas?.nombre && (
+                  <div>
+                    <span className="text-muted-foreground">{t("agendaEmpresa", lang)}:</span>
+                    <p className="font-medium">{agendaDiferidaMatch.empresas.nombre}</p>
+                  </div>
+                )}
+                {agendaDiferidaMatch.faenas?.nombre && (
+                  <div>
+                    <span className="text-muted-foreground">{t("agendaFaena", lang)}:</span>
+                    <p className="font-medium">{agendaDiferidaMatch.faenas.nombre}</p>
+                  </div>
+                )}
+                {agendaDiferidaMatch.cargo && (
+                  <div>
+                    <span className="text-muted-foreground">{t("agendaCargo", lang)}:</span>
+                    <p className="font-medium">{agendaDiferidaMatch.cargo}</p>
+                  </div>
+                )}
+              </div>
+              {agendaDiferidaMatch.paquetes_ids?.length > 0 && (
+                <div>
+                  <span className="text-sm text-muted-foreground">{t("agendaBaterias", lang)}:</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {(agendaDiferidaMatch._paquetesNombres || []).map((p: any) => (
+                      <Badge key={p.id} variant="secondary" className="text-xs">{p.nombre}</Badge>
+                    ))}
+                    {!agendaDiferidaMatch._paquetesNombres?.length && agendaDiferidaMatch.paquetes_ids.map((pId: string) => (
+                      <Badge key={pId} variant="secondary" className="text-xs">{pId.slice(0, 8)}...</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={rechazarFusionAgenda}
+                  disabled={isFusing}
+                >
+                  {t("agendaRechazar", lang)}
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={confirmarFusionAgenda}
+                  disabled={isFusing}
+                >
+                  {isFusing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {t("agendaFusionando", lang)}
+                    </>
+                  ) : (
+                    t("agendaConfirmar", lang)
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Patient Card */}
         <Card className="border-border">
           <CardContent className="pt-6">
