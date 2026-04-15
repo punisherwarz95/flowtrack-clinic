@@ -355,11 +355,13 @@ export default function PortalPaciente() {
     try {
       const rutFormateado = isExtranjero ? rut.trim().toUpperCase() : formatRutStandard(rut);
 
+      const todayStr = new Date().toISOString().split('T')[0];
       const { data: agendaDiferidaData } = await supabase
         .from("agenda_diferida")
         .select("*, empresas(id, nombre), faenas(id, nombre)")
         .eq("rut", rutFormateado)
         .eq("estado", "pendiente")
+        .or(`fecha_programada.eq.${todayStr},fecha_programada.is.null`)
         .order("created_at", { ascending: false })
         .limit(1);
 
