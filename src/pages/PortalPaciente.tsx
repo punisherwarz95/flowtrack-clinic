@@ -472,16 +472,16 @@ export default function PortalPaciente() {
         const { data: newPaciente, error: createError } = await supabase
           .from("pacientes")
           .insert({
-            nombre: agendaDiferida?.nombre || "PENDIENTE DE REGISTRO",
+            nombre: "PENDIENTE DE REGISTRO",
             rut: rutFormateado,
-            fecha_nacimiento: agendaDiferida?.fecha_nacimiento || null,
-            email: agendaDiferida?.email || null,
-            telefono: agendaDiferida?.telefono || null,
-            direccion: agendaDiferida?.direccion || null,
-            empresa_id: agendaDiferida?.empresa_id || null,
-            faena_id: agendaDiferida?.faena_id || null,
-            cargo: agendaDiferida?.cargo || null,
-            tipo_servicio: agendaDiferida?.tipo_servicio || null
+            fecha_nacimiento: null,
+            email: null,
+            telefono: null,
+            direccion: null,
+            empresa_id: null,
+            faena_id: null,
+            cargo: null,
+            tipo_servicio: null
           })
           .select()
           .single();
@@ -500,31 +500,7 @@ export default function PortalPaciente() {
 
         if (atencionError) throw atencionError;
 
-        if (agendaDiferida) {
-          await vincularAgendaDiferida(agendaDiferida, newAtencion.id);
-        }
-
-        if (agendaDiferida && agendaDiferida.nombre !== "PENDIENTE DE REGISTRO") {
-          const nombreParts = agendaDiferida.nombre?.split(" ") || [];
-          const direccionParts = agendaDiferida.direccion?.split(", ") || [];
-          setFormData({
-            primerNombre: nombreParts[0] || "",
-            apellidoPaterno: nombreParts[1] || "",
-            apellidoMaterno: nombreParts.slice(2).join(" ") || "",
-            rut: rut,
-            fecha_nacimiento: agendaDiferida.fecha_nacimiento || "",
-            fecha_nacimiento_display: agendaDiferida.fecha_nacimiento
-              ? format(new Date(agendaDiferida.fecha_nacimiento + "T12:00:00"), "dd/MM/yyyy")
-              : "",
-            email: agendaDiferida.email || "",
-            telefono: agendaDiferida.telefono || "",
-            calle: direccionParts[0] || "",
-            numeracion: direccionParts[1] || "",
-            ciudad: direccionParts[2] || ""
-          });
-        } else {
-          setFormData(prev => ({ ...prev, rut: rut }));
-        }
+        setFormData(prev => ({ ...prev, rut: rut }));
 
         showMsg(`${t("suNumeroAtencion", lang)} #${newAtencion.numero_ingreso}. ${t("completeDatos", lang)}`, "info", 0);
 
