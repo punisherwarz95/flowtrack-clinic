@@ -344,7 +344,7 @@ export default function PortalPaciente() {
     setAgendaDiferidaMatch(null);
   };
 
-
+  const buscarPaciente = async () => {
     if (!rut.trim()) {
       showMsg(isExtranjero ? t("ingresePasaporte", lang) : t("ingreseRut", lang), "error");
       return;
