@@ -1,4 +1,4 @@
-// Portal Paciente Translations v1.0.0
+// Portal Paciente Translations v1.1.0
 
 export type PortalLang = "es" | "en";
 
