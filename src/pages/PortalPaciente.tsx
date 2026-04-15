@@ -1448,6 +1448,7 @@ export default function PortalPaciente() {
 
       <div className="max-w-lg mx-auto space-y-4 p-4">
         <LanguageSelector />
+        <InlineMessageBanner />
 
         {/* Agenda Diferida Confirmation Banner */}
         {agendaDiferidaMatch && (
