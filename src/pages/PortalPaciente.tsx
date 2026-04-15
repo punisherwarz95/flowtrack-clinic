@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import portalBackground from "@/assets/portal-background.jpeg";
 
-// Portal Paciente v0.1.0 - Sin toasts, sin sonidos, sin vibraciones, sin popups
+// Portal Paciente v0.3.0 - Agenda diferida con confirmación manual
 // Banner sticky superior muestra estado de atención en todo momento
-const PORTAL_VERSION = "0.2.0";
+const PORTAL_VERSION = "0.3.0";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
