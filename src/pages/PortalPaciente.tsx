@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import portalBackground from "@/assets/portal-background.jpeg";
 
-// Portal Paciente v0.3.0 - Agenda diferida con confirmación manual
+// Portal Paciente v0.4.0 - Fix fusion: dedup exams/baterias, propagate empresa_id on new patients
 // Banner sticky superior muestra estado de atención en todo momento
-const PORTAL_VERSION = "0.3.0";
+const PORTAL_VERSION = "0.4.0";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -248,14 +248,39 @@ export default function PortalPaciente() {
         console.error("[Portal] Error actualizando agenda diferida:", updateError);
       }
 
+      // Fetch existing baterias & examenes to avoid duplicates
+      const { data: existingBaterias } = await supabase
+        .from("atencion_baterias")
+        .select("paquete_id")
+        .eq("atencion_id", atencionId);
+      const existingPaqueteIds = new Set((existingBaterias || []).map((b: any) => b.paquete_id));
+
+      const { data: existingExamenes } = await supabase
+        .from("atencion_examenes")
+        .select("examen_id")
+        .eq("atencion_id", atencionId);
+      const existingExamenIds = new Set((existingExamenes || []).map((e: any) => e.examen_id));
+
+      const { data: existingDocs } = await supabase
+        .from("atencion_documentos")
+        .select("documento_id")
+        .eq("atencion_id", atencionId);
+      const existingDocIds = new Set((existingDocs || []).map((d: any) => d.documento_id));
+
+      // Insert only new baterias
       if (agendaDiferida.paquetes_ids?.length > 0) {
-        const baterias = agendaDiferida.paquetes_ids.map((pId: string) => ({
-          atencion_id: atencionId,
-          paquete_id: pId
-        }));
-        await supabase.from("atencion_baterias").insert(baterias);
+        const newBaterias = agendaDiferida.paquetes_ids
+          .filter((pId: string) => !existingPaqueteIds.has(pId))
+          .map((pId: string) => ({
+            atencion_id: atencionId,
+            paquete_id: pId
+          }));
+        if (newBaterias.length > 0) {
+          await supabase.from("atencion_baterias").insert(newBaterias);
+        }
       }
 
+      // Collect all exam IDs from agenda
       const allExamenIds = new Set<string>(agendaDiferida.examenes_ids || []);
 
       if (agendaDiferida.paquetes_ids?.length > 0) {
@@ -269,15 +294,21 @@ export default function PortalPaciente() {
         }
       }
 
+      // Insert only new examenes
       if (allExamenIds.size > 0) {
-        const examenes = Array.from(allExamenIds).map((eId: string) => ({
-          atencion_id: atencionId,
-          examen_id: eId,
-          estado: "pendiente" as const
-        }));
-        await supabase.from("atencion_examenes").insert(examenes);
+        const newExamenes = Array.from(allExamenIds)
+          .filter((eId: string) => !existingExamenIds.has(eId))
+          .map((eId: string) => ({
+            atencion_id: atencionId,
+            examen_id: eId,
+            estado: "pendiente" as const
+          }));
+        if (newExamenes.length > 0) {
+          await supabase.from("atencion_examenes").insert(newExamenes);
+        }
       }
 
+      // Insert only new documentos
       if (agendaDiferida.paquetes_ids?.length > 0) {
         const { data: bateriaDocumentos } = await supabase
           .from("bateria_documentos")
@@ -286,17 +317,21 @@ export default function PortalPaciente() {
 
         if (bateriaDocumentos && bateriaDocumentos.length > 0) {
           const uniqueDocIds = [...new Set(bateriaDocumentos.map((bd: any) => bd.documento_id))];
-          const documentos = uniqueDocIds.map((docId: string) => ({
-            atencion_id: atencionId,
-            documento_id: docId,
-            estado: "pendiente",
-            respuestas: {}
-          }));
-          await supabase.from("atencion_documentos").insert(documentos);
+          const newDocs = uniqueDocIds
+            .filter((docId: string) => !existingDocIds.has(docId))
+            .map((docId: string) => ({
+              atencion_id: atencionId,
+              documento_id: docId,
+              estado: "pendiente",
+              respuestas: {}
+            }));
+          if (newDocs.length > 0) {
+            await supabase.from("atencion_documentos").insert(newDocs);
+          }
         }
       }
 
-      console.log("[Portal] Agenda diferida vinculada:", agendaDiferida.id, "- Exámenes:", allExamenIds.size);
+      console.log("[Portal] Agenda diferida vinculada:", agendaDiferida.id, "- Exámenes nuevos:", allExamenIds.size, "- Existentes omitidos:", existingExamenIds.size);
     } catch (err) {
       console.error("[Portal] Error vinculando agenda diferida:", err);
     }
@@ -478,7 +513,7 @@ export default function PortalPaciente() {
             paciente_id: pacienteData.id,
             estado: "en_espera",
             fecha_ingreso: new Date().toISOString(),
-            empresa_id: pacienteData.empresa_id || null
+            empresa_id: agendaDiferida?.empresa_id || pacienteData.empresa_id || null
           };
 
           const { data: newAtencion, error: atencionError } = await supabase
@@ -523,6 +558,12 @@ export default function PortalPaciente() {
         
         setStep("portal");
       } else {
+        // If agenda diferida matched, pre-populate empresa/faena/cargo on new patient
+        const agendaEmpresaId = agendaDiferida?.empresa_id || null;
+        const agendaFaenaId = agendaDiferida?.faena_id || null;
+        const agendaCargo = agendaDiferida?.cargo || null;
+        const agendaTipoServicio = agendaDiferida?.tipo_servicio || null;
+
         const { data: newPaciente, error: createError } = await supabase
           .from("pacientes")
           .insert({
@@ -532,10 +573,10 @@ export default function PortalPaciente() {
             email: null,
             telefono: null,
             direccion: null,
-            empresa_id: null,
-            faena_id: null,
-            cargo: null,
-            tipo_servicio: null
+            empresa_id: agendaEmpresaId,
+            faena_id: agendaFaenaId,
+            cargo: agendaCargo,
+            tipo_servicio: agendaTipoServicio
           })
           .select()
           .single();
@@ -547,7 +588,8 @@ export default function PortalPaciente() {
           .insert({
             paciente_id: newPaciente.id,
             estado: "en_espera",
-            fecha_ingreso: new Date().toISOString()
+            fecha_ingreso: new Date().toISOString(),
+            empresa_id: agendaEmpresaId
           })
           .select()
           .single();
