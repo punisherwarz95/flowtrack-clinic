@@ -101,6 +101,7 @@ export default function PortalPaciente() {
   const [testTracking, setTestTracking] = useState<TestTracking[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [agendaDiferidaMatch, setAgendaDiferidaMatch] = useState<any>(null);
+  const [isFusing, setIsFusing] = useState(false);
   const [lang, setLang] = useState<PortalLang>("es");
   const [isExtranjero, setIsExtranjero] = useState(false);
   
