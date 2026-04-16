@@ -90,9 +90,6 @@ const AgendaDiferida = () => {
   const [formData, setFormData] = useState({
     nombre: "",
     rut: "",
-    email: "",
-    telefono: "",
-    fecha_nacimiento: "",
     tipo_servicio: "workmed" as "workmed" | "jenner" | "",
     empresa_id: "",
     faena_id: "",
@@ -173,9 +170,6 @@ const AgendaDiferida = () => {
       const payload = {
         nombre: formData.nombre.toUpperCase(),
         rut: rutFormatted,
-        email: formData.email || null,
-        telefono: formData.telefono || null,
-        fecha_nacimiento: formData.fecha_nacimiento || null,
         tipo_servicio: formData.tipo_servicio || null,
         empresa_id: formData.empresa_id || null,
         faena_id: formData.faena_id || null,
@@ -211,9 +205,6 @@ const AgendaDiferida = () => {
     setFormData({
       nombre: item.nombre,
       rut: item.rut,
-      email: item.email || "",
-      telefono: item.telefono || "",
-      fecha_nacimiento: item.fecha_nacimiento || "",
       tipo_servicio: (item.tipo_servicio as any) || "workmed",
       empresa_id: item.empresa_id || "",
       faena_id: item.faena_id || "",
@@ -245,7 +236,7 @@ const AgendaDiferida = () => {
   };
 
   const resetForm = () => {
-    setFormData({ nombre: "", rut: "", email: "", telefono: "", fecha_nacimiento: "", tipo_servicio: "workmed", empresa_id: "", faena_id: "", cargo: "", fecha_programada: "" });
+    setFormData({ nombre: "", rut: "", tipo_servicio: "workmed", empresa_id: "", faena_id: "", cargo: "", fecha_programada: "" });
     setSelectedExamenes([]);
     setSelectedPaquetes([]);
     setShowForm(false);
@@ -311,15 +302,7 @@ const AgendaDiferida = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input value={formData.email} onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} placeholder="email@ejemplo.com" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Teléfono</Label>
-                  <Input value={formData.telefono} onChange={(e) => setFormData(prev => ({ ...prev, telefono: e.target.value }))} placeholder="+56 9 1234 5678" />
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Cargo</Label>
                   <Input value={formData.cargo} onChange={(e) => setFormData(prev => ({ ...prev, cargo: e.target.value }))} placeholder="Cargo" />
