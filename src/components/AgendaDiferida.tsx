@@ -90,9 +90,6 @@ const AgendaDiferida = () => {
   const [formData, setFormData] = useState({
     nombre: "",
     rut: "",
-    email: "",
-    telefono: "",
-    fecha_nacimiento: "",
     tipo_servicio: "workmed" as "workmed" | "jenner" | "",
     empresa_id: "",
     faena_id: "",
