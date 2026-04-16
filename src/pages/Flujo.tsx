@@ -88,6 +88,8 @@ const Flujo = () => {
   const [docsPendientes, setDocsPendientes] = useState<{[atencionId: string]: number}>({});
   const [docsTotal, setDocsTotal] = useState<{[atencionId: string]: number}>({});
   const [totalExamenesPorAtencion, setTotalExamenesPorAtencion] = useState<{[atencionId: string]: number}>({});
+  // Pacientes con fusion de agenda diferida pendiente (RUTs)
+  const [rutsConFusionPendiente, setRutsConFusionPendiente] = useState<Set<string>>(new Set());
   const atencionesRef = useRef<Atencion[]>([]);
   const boxesRef = useRef<Box[]>([]);
   const examenesRef = useRef<Examen[]>([]);
@@ -331,6 +333,26 @@ const Flujo = () => {
     return () => clearInterval(interval);
   }, [selectedDate]);
 
+  // Cargar RUTs con agenda diferida pendiente (solo hoy) cada 15s
+  useEffect(() => {
+    if (!isToday) {
+      setRutsConFusionPendiente(new Set());
+      return;
+    }
+    const fetchPendientes = async () => {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const { data } = await supabase
+        .from("agenda_diferida")
+        .select("rut")
+        .eq("estado", "pendiente")
+        .or(`fecha_programada.eq.${todayStr},fecha_programada.is.null`);
+      setRutsConFusionPendiente(new Set((data || []).map(d => d.rut)));
+    };
+    fetchPendientes();
+    const id = setInterval(fetchPendientes, 15000);
+    return () => clearInterval(id);
+  }, [isToday]);
+
   const loadData = async () => {
     try {
       const startOfDay = selectedDate
@@ -540,6 +562,13 @@ const Flujo = () => {
     const boxId = selectedBox[atencionId];
     if (!boxId) {
       toast.error("Selecciona un box");
+      return;
+    }
+
+    // Bloqueo: paciente con fusion de agenda diferida pendiente
+    const atencionTarget = atenciones.find(a => a.id === atencionId);
+    if (atencionTarget && rutsConFusionPendiente.has(atencionTarget.pacientes.rut)) {
+      toast.error("Este paciente tiene una fusión de agenda pendiente. Confírmala en Pacientes antes de llamarlo.");
       return;
     }
 
@@ -1078,6 +1107,11 @@ const Flujo = () => {
                           <div className="font-medium text-foreground">
                             {atencion.pacientes.nombre}
                           </div>
+                          {rutsConFusionPendiente.has(atencion.pacientes.rut) && (
+                            <Badge variant="destructive" className="text-xs gap-1">
+                              <FileWarning className="h-3 w-3" /> Pendiente fusión (ir a Pacientes)
+                            </Badge>
+                          )}
                           <PresionTimerBadge timer={timerByAtencion[atencion.id]} />
                         </div>
                         {examenesPendientes[atencion.id] && examenesPendientes[atencion.id].length > 0 && atencionExamenes[atencion.id] && (
@@ -1214,6 +1248,8 @@ const Flujo = () => {
                         size="sm"
                         onClick={() => handleIniciarAtencion(atencion.id)}
                         className="gap-2"
+                        disabled={rutsConFusionPendiente.has(atencion.pacientes.rut)}
+                        title={rutsConFusionPendiente.has(atencion.pacientes.rut) ? "Confirma la fusión en el módulo Pacientes" : ""}
                       >
                         <Play className="h-4 w-4" />
                         Llamar
