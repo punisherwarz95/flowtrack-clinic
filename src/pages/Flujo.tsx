@@ -333,6 +333,26 @@ const Flujo = () => {
     return () => clearInterval(interval);
   }, [selectedDate]);
 
+  // Cargar RUTs con agenda diferida pendiente (solo hoy) cada 15s
+  useEffect(() => {
+    if (!isToday) {
+      setRutsConFusionPendiente(new Set());
+      return;
+    }
+    const fetchPendientes = async () => {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const { data } = await supabase
+        .from("agenda_diferida")
+        .select("rut")
+        .eq("estado", "pendiente")
+        .or(`fecha_programada.eq.${todayStr},fecha_programada.is.null`);
+      setRutsConFusionPendiente(new Set((data || []).map(d => d.rut)));
+    };
+    fetchPendientes();
+    const id = setInterval(fetchPendientes, 15000);
+    return () => clearInterval(id);
+  }, [isToday]);
+
   const loadData = async () => {
     try {
       const startOfDay = selectedDate
