@@ -295,7 +295,162 @@ const Pacientes = () => {
     }
   }, [isToday, selectedDate]);
 
-  // Populate faenas and bateria map from cache
+  // Load pending agenda diferida for today
+  useEffect(() => {
+    if (!isToday) {
+      setAgendaDiferidaPendientes([]);
+      return;
+    }
+    const loadAgendaDiferida = async () => {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const { data } = await supabase
+        .from("agenda_diferida")
+        .select("*, empresas(id, nombre), faenas(id, nombre)")
+        .eq("estado", "pendiente")
+        .or(`fecha_programada.eq.${todayStr},fecha_programada.is.null`);
+      
+      if (data && data.length > 0) {
+        // Collect all paquete IDs to fetch names
+        const allPaqueteIds = new Set<string>();
+        data.forEach((ad: any) => (ad.paquetes_ids || []).forEach((pid: string) => allPaqueteIds.add(pid)));
+        
+        let paquetesMap: Record<string, string> = {};
+        if (allPaqueteIds.size > 0) {
+          const { data: pqData } = await supabase
+            .from("paquetes_examenes")
+            .select("id, nombre")
+            .in("id", Array.from(allPaqueteIds));
+          if (pqData) pqData.forEach(p => { paquetesMap[p.id] = p.nombre; });
+        }
+        
+        const enriched = data.map((ad: any) => ({
+          ...ad,
+          _paquetesNombres: (ad.paquetes_ids || [])
+            .filter((pid: string) => paquetesMap[pid])
+            .map((pid: string) => ({ id: pid, nombre: paquetesMap[pid] }))
+        }));
+        setAgendaDiferidaPendientes(enriched);
+      } else {
+        setAgendaDiferidaPendientes([]);
+      }
+    };
+    loadAgendaDiferida();
+    const interval = setInterval(loadAgendaDiferida, 15000);
+    return () => clearInterval(interval);
+  }, [isToday]);
+
+  // Fusion helper: match patient RUT to agenda diferida
+  const getAgendaMatchForPatient = (patient: Patient): AgendaDiferidaMatch | null => {
+    if (!patient.rut) return null;
+    return agendaDiferidaPendientes.find(ad => ad.rut === patient.rut) || null;
+  };
+
+  // Handle fusion from Pacientes module
+  const handleFusionAgenda = async (patient: Patient, agendaMatch: AgendaDiferidaMatch) => {
+    setFusingPatientId(patient.id);
+    try {
+      const atencion = localAtenciones.find(a => a.paciente_id === patient.id);
+      if (!atencion) {
+        toast.error("No se encontró la atención del paciente");
+        return;
+      }
+      const atencionId = atencion.id;
+
+      // 1. Update paciente with empresa/faena/cargo
+      if (agendaMatch.empresa_id) {
+        await supabase.from("pacientes").update({
+          empresa_id: agendaMatch.empresa_id,
+          faena_id: agendaMatch.faena_id,
+          cargo: agendaMatch.cargo || patient.cargo || null,
+          tipo_servicio: agendaMatch.tipo_servicio as any || patient.tipo_servicio || null,
+        }).eq("id", patient.id);
+      }
+
+      // 2. Update atencion with empresa_id
+      if (agendaMatch.empresa_id) {
+        await supabase.from("atenciones").update({
+          empresa_id: agendaMatch.empresa_id
+        }).eq("id", atencionId);
+      }
+
+      // 3. Fetch existing to deduplicate
+      const [existBat, existEx, existDoc] = await Promise.all([
+        supabase.from("atencion_baterias").select("paquete_id").eq("atencion_id", atencionId),
+        supabase.from("atencion_examenes").select("examen_id").eq("atencion_id", atencionId),
+        supabase.from("atencion_documentos").select("documento_id").eq("atencion_id", atencionId),
+      ]);
+      const existingPaqueteIds = new Set((existBat.data || []).map(b => b.paquete_id));
+      const existingExamenIds = new Set((existEx.data || []).map(e => e.examen_id));
+      const existingDocIds = new Set((existDoc.data || []).map(d => d.documento_id));
+
+      // 4. Insert baterias
+      if (agendaMatch.paquetes_ids?.length > 0) {
+        const newBaterias = agendaMatch.paquetes_ids
+          .filter(pId => !existingPaqueteIds.has(pId))
+          .map(pId => ({ atencion_id: atencionId, paquete_id: pId }));
+        if (newBaterias.length > 0) await supabase.from("atencion_baterias").insert(newBaterias);
+      }
+
+      // 5. Collect and insert exams
+      const allExamenIds = new Set<string>(agendaMatch.examenes_ids || []);
+      if (agendaMatch.paquetes_ids?.length > 0) {
+        const { data: pqItems } = await supabase
+          .from("paquete_examen_items")
+          .select("examen_id")
+          .in("paquete_id", agendaMatch.paquetes_ids);
+        if (pqItems) pqItems.forEach(item => allExamenIds.add(item.examen_id));
+      }
+      if (allExamenIds.size > 0) {
+        const newExamenes = Array.from(allExamenIds)
+          .filter(eId => !existingExamenIds.has(eId))
+          .map(eId => ({ atencion_id: atencionId, examen_id: eId, estado: "pendiente" as const }));
+        if (newExamenes.length > 0) await supabase.from("atencion_examenes").insert(newExamenes);
+      }
+
+      // 6. Insert documents from baterias
+      if (agendaMatch.paquetes_ids?.length > 0) {
+        const { data: batDocs } = await supabase
+          .from("bateria_documentos")
+          .select("documento_id")
+          .in("paquete_id", agendaMatch.paquetes_ids);
+        if (batDocs && batDocs.length > 0) {
+          const uniqueDocIds = [...new Set(batDocs.map(bd => bd.documento_id))];
+          const newDocs = uniqueDocIds
+            .filter(docId => !existingDocIds.has(docId))
+            .map(docId => ({ atencion_id: atencionId, documento_id: docId, estado: "pendiente", respuestas: {} }));
+          if (newDocs.length > 0) await supabase.from("atencion_documentos").insert(newDocs);
+        }
+      }
+
+      // 7. Mark agenda diferida as vinculado
+      await supabase.from("agenda_diferida").update({
+        estado: "vinculado",
+        atencion_id: atencionId,
+        vinculado_at: new Date().toISOString()
+      }).eq("id", agendaMatch.id);
+
+      // 8. Remove from local state
+      setAgendaDiferidaPendientes(prev => prev.filter(ad => ad.id !== agendaMatch.id));
+
+      // 9. Force sync
+      if (syncCtx?.forcePull) syncCtx.forcePull();
+
+      toast.success(`Datos fusionados: ${agendaMatch.nombre}. ${allExamenIds.size} exámenes asignados.`);
+      
+      await logActivity(
+        "fusion_agenda_diferida",
+        `Fusión agenda diferida: ${agendaMatch.nombre} (${agendaMatch.rut}) → Atención #${atencion.numero_ingreso}`,
+        "pacientes"
+      );
+    } catch (error: any) {
+      console.error("[Pacientes] Error en fusión:", error);
+      toast.error("Error al fusionar datos: " + (error.message || "Error desconocido"));
+    } finally {
+      setFusingPatientId(null);
+    }
+  };
+
+
   useEffect(() => {
     if (cachedFaenas.length > 0) {
       setAllFaenas(cachedFaenas as Faena[]);
