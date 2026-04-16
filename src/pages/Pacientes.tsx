@@ -361,7 +361,7 @@ const Pacientes = () => {
         await supabase.from("pacientes").update({
           empresa_id: agendaMatch.empresa_id,
           faena_id: agendaMatch.faena_id,
-          cargo: agendaMatch.cargo || patient.cargo || null,
+          cargo: agendaMatch.cargo || null,
           tipo_servicio: agendaMatch.tipo_servicio as any || patient.tipo_servicio || null,
         }).eq("id", patient.id);
       }
@@ -438,8 +438,8 @@ const Pacientes = () => {
       toast.success(`Datos fusionados: ${agendaMatch.nombre}. ${allExamenIds.size} exámenes asignados.`);
       
       await logActivity(
-        "fusion_agenda_diferida",
-        `Fusión agenda diferida: ${agendaMatch.nombre} (${agendaMatch.rut}) → Atención #${atencion.numero_ingreso}`,
+        "vincular_agenda_diferida",
+        { nombre: agendaMatch.nombre, rut: agendaMatch.rut, atencion: atencion.numero_ingreso },
         "pacientes"
       );
     } catch (error: any) {
