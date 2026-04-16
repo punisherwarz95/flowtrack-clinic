@@ -170,9 +170,6 @@ const AgendaDiferida = () => {
       const payload = {
         nombre: formData.nombre.toUpperCase(),
         rut: rutFormatted,
-        email: formData.email || null,
-        telefono: formData.telefono || null,
-        fecha_nacimiento: formData.fecha_nacimiento || null,
         tipo_servicio: formData.tipo_servicio || null,
         empresa_id: formData.empresa_id || null,
         faena_id: formData.faena_id || null,
