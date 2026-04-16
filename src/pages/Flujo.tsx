@@ -1248,6 +1248,8 @@ const Flujo = () => {
                         size="sm"
                         onClick={() => handleIniciarAtencion(atencion.id)}
                         className="gap-2"
+                        disabled={rutsConFusionPendiente.has(atencion.pacientes.rut)}
+                        title={rutsConFusionPendiente.has(atencion.pacientes.rut) ? "Confirma la fusión en el módulo Pacientes" : ""}
                       >
                         <Play className="h-4 w-4" />
                         Llamar
