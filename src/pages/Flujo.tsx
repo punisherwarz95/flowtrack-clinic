@@ -1107,6 +1107,11 @@ const Flujo = () => {
                           <div className="font-medium text-foreground">
                             {atencion.pacientes.nombre}
                           </div>
+                          {rutsConFusionPendiente.has(atencion.pacientes.rut) && (
+                            <Badge variant="destructive" className="text-xs gap-1">
+                              <FileWarning className="h-3 w-3" /> Pendiente fusión (ir a Pacientes)
+                            </Badge>
+                          )}
                           <PresionTimerBadge timer={timerByAtencion[atencion.id]} />
                         </div>
                         {examenesPendientes[atencion.id] && examenesPendientes[atencion.id].length > 0 && atencionExamenes[atencion.id] && (
