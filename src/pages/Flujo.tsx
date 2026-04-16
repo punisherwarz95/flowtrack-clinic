@@ -565,6 +565,13 @@ const Flujo = () => {
       return;
     }
 
+    // Bloqueo: paciente con fusion de agenda diferida pendiente
+    const atencionTarget = atenciones.find(a => a.id === atencionId);
+    if (atencionTarget && rutsConFusionPendiente.has(atencionTarget.pacientes.rut)) {
+      toast.error("Este paciente tiene una fusión de agenda pendiente. Confírmala en Pacientes antes de llamarlo.");
+      return;
+    }
+
     try {
       // Obtener los exámenes filtrados por box ANTES de actualizar
       const box = boxes.find(b => b.id === boxId);
