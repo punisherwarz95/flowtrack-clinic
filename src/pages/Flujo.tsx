@@ -88,6 +88,8 @@ const Flujo = () => {
   const [docsPendientes, setDocsPendientes] = useState<{[atencionId: string]: number}>({});
   const [docsTotal, setDocsTotal] = useState<{[atencionId: string]: number}>({});
   const [totalExamenesPorAtencion, setTotalExamenesPorAtencion] = useState<{[atencionId: string]: number}>({});
+  // Pacientes con fusion de agenda diferida pendiente (RUTs)
+  const [rutsConFusionPendiente, setRutsConFusionPendiente] = useState<Set<string>>(new Set());
   const atencionesRef = useRef<Atencion[]>([]);
   const boxesRef = useRef<Box[]>([]);
   const examenesRef = useRef<Examen[]>([]);
