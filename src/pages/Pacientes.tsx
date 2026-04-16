@@ -131,6 +131,22 @@ interface ExamenCompletado {
   };
 }
 
+interface AgendaDiferidaMatch {
+  id: string;
+  nombre: string;
+  rut: string;
+  empresa_id: string | null;
+  faena_id: string | null;
+  cargo: string | null;
+  tipo_servicio: string | null;
+  paquetes_ids: string[];
+  examenes_ids: string[];
+  fecha_programada: string | null;
+  empresas?: { id: string; nombre: string } | null;
+  faenas?: { id: string; nombre: string } | null;
+  _paquetesNombres?: { id: string; nombre: string }[];
+}
+
 const Pacientes = () => {
   useAuth(); // Protect route
   const { isAdmin } = useAuthContext();
@@ -163,6 +179,10 @@ const Pacientes = () => {
   const [originalExamenesCount, setOriginalExamenesCount] = useState(0);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [documentosPendientes, setDocumentosPendientes] = useState<{[patientId: string]: number}>({});
+  
+  // Agenda diferida fusion state
+  const [agendaDiferidaPendientes, setAgendaDiferidaPendientes] = useState<AgendaDiferidaMatch[]>([]);
+  const [fusingPatientId, setFusingPatientId] = useState<string | null>(null);
   
   // Faenas computed from cache
   const [faenasEmpresa, setFaenasEmpresa] = useState<Faena[]>([]);
