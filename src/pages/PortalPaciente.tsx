@@ -337,48 +337,7 @@ export default function PortalPaciente() {
     }
   };
 
-  // Confirmar fusión de agenda diferida manualmente por recepción
-  const confirmarFusionAgenda = async () => {
-    if (!agendaDiferidaMatch || !atencion || !paciente) return;
-    setIsFusing(true);
-    try {
-      // 1. Update paciente with empresa/faena/cargo from agenda
-      if (agendaDiferidaMatch.empresa_id) {
-        await supabase.from("pacientes").update({
-          empresa_id: agendaDiferidaMatch.empresa_id,
-          faena_id: agendaDiferidaMatch.faena_id,
-          cargo: agendaDiferidaMatch.cargo || paciente.cargo || null,
-          tipo_servicio: agendaDiferidaMatch.tipo_servicio || paciente.tipo_servicio || null,
-        }).eq("id", paciente.id);
-      }
-
-      // 2. Update atencion with empresa_id
-      if (agendaDiferidaMatch.empresa_id) {
-        await supabase.from("atenciones").update({
-          empresa_id: agendaDiferidaMatch.empresa_id
-        }).eq("id", atencion.id);
-      }
-
-      // 3. Vincular agenda diferida (baterias, examenes, documentos)
-      await vincularAgendaDiferida(agendaDiferidaMatch, atencion.id);
-
-      // 4. Clear match
-      setAgendaDiferidaMatch(null);
-      showMsg(t("agendaFusionExito", lang), "success", 5000);
-
-      // 5. Refresh data
-      refreshData();
-    } catch (err: any) {
-      console.error("[Portal] Error en fusión:", err);
-      showMsg(t("agendaFusionError", lang), "error");
-    } finally {
-      setIsFusing(false);
-    }
-  };
-
-  const rechazarFusionAgenda = () => {
-    setAgendaDiferidaMatch(null);
-  };
+  // Fusion is now handled by staff in Pacientes module — these are kept for reference only
 
   const buscarPaciente = async () => {
     if (!rut.trim()) {
@@ -1494,83 +1453,7 @@ export default function PortalPaciente() {
         <LanguageSelector />
         <InlineMessageBanner />
 
-        {/* Agenda Diferida Confirmation Banner */}
-        {agendaDiferidaMatch && (
-          <Card className="border-2 border-primary bg-primary/5">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <CalendarIcon className="h-5 w-5 text-primary" />
-                {t("agendaConfirmTitle", lang)}
-              </CardTitle>
-              <CardDescription className="text-xs">
-                {t("agendaConfirmDesc", lang)}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <span className="text-muted-foreground">{t("agendaNombreProgramado", lang)}:</span>
-                  <p className="font-medium">{agendaDiferidaMatch.nombre}</p>
-                </div>
-                {agendaDiferidaMatch.empresas?.nombre && (
-                  <div>
-                    <span className="text-muted-foreground">{t("agendaEmpresa", lang)}:</span>
-                    <p className="font-medium">{agendaDiferidaMatch.empresas.nombre}</p>
-                  </div>
-                )}
-                {agendaDiferidaMatch.faenas?.nombre && (
-                  <div>
-                    <span className="text-muted-foreground">{t("agendaFaena", lang)}:</span>
-                    <p className="font-medium">{agendaDiferidaMatch.faenas.nombre}</p>
-                  </div>
-                )}
-                {agendaDiferidaMatch.cargo && (
-                  <div>
-                    <span className="text-muted-foreground">{t("agendaCargo", lang)}:</span>
-                    <p className="font-medium">{agendaDiferidaMatch.cargo}</p>
-                  </div>
-                )}
-              </div>
-              {agendaDiferidaMatch.paquetes_ids?.length > 0 && (
-                <div>
-                  <span className="text-sm text-muted-foreground">{t("agendaBaterias", lang)}:</span>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {(agendaDiferidaMatch._paquetesNombres || []).map((p: any) => (
-                      <Badge key={p.id} variant="secondary" className="text-xs">{p.nombre}</Badge>
-                    ))}
-                    {!agendaDiferidaMatch._paquetesNombres?.length && agendaDiferidaMatch.paquetes_ids.map((pId: string) => (
-                      <Badge key={pId} variant="secondary" className="text-xs">{pId.slice(0, 8)}...</Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="flex gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={rechazarFusionAgenda}
-                  disabled={isFusing}
-                >
-                  {t("agendaRechazar", lang)}
-                </Button>
-                <Button
-                  className="flex-1"
-                  onClick={confirmarFusionAgenda}
-                  disabled={isFusing}
-                >
-                  {isFusing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {t("agendaFusionando", lang)}
-                    </>
-                  ) : (
-                    t("agendaConfirmar", lang)
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Agenda Diferida — fusion is handled by staff in Pacientes module */}
 
         {/* Patient Card */}
         <Card className="border-border">

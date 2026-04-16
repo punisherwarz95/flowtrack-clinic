@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Trash2, Pencil, Calendar as CalendarIcon, ClipboardList, FileText, ClipboardPaste, X, Clock, Star, CheckCircle2, FlaskConical } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Calendar as CalendarIcon, ClipboardList, FileText, ClipboardPaste, X, Clock, Star, CheckCircle2, FlaskConical, Loader2, Merge } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PreReservasManagement from "@/components/PreReservasManagement";
 import CodigoDelDia from "@/components/CodigoDelDia";
@@ -131,6 +131,22 @@ interface ExamenCompletado {
   };
 }
 
+interface AgendaDiferidaMatch {
+  id: string;
+  nombre: string;
+  rut: string;
+  empresa_id: string | null;
+  faena_id: string | null;
+  cargo: string | null;
+  tipo_servicio: string | null;
+  paquetes_ids: string[];
+  examenes_ids: string[];
+  fecha_programada: string | null;
+  empresas?: { id: string; nombre: string } | null;
+  faenas?: { id: string; nombre: string } | null;
+  _paquetesNombres?: { id: string; nombre: string }[];
+}
+
 const Pacientes = () => {
   useAuth(); // Protect route
   const { isAdmin } = useAuthContext();
@@ -163,6 +179,10 @@ const Pacientes = () => {
   const [originalExamenesCount, setOriginalExamenesCount] = useState(0);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [documentosPendientes, setDocumentosPendientes] = useState<{[patientId: string]: number}>({});
+  
+  // Agenda diferida fusion state
+  const [agendaDiferidaPendientes, setAgendaDiferidaPendientes] = useState<AgendaDiferidaMatch[]>([]);
+  const [fusingPatientId, setFusingPatientId] = useState<string | null>(null);
   
   // Faenas computed from cache
   const [faenasEmpresa, setFaenasEmpresa] = useState<Faena[]>([]);
@@ -275,7 +295,162 @@ const Pacientes = () => {
     }
   }, [isToday, selectedDate]);
 
-  // Populate faenas and bateria map from cache
+  // Load pending agenda diferida for today
+  useEffect(() => {
+    if (!isToday) {
+      setAgendaDiferidaPendientes([]);
+      return;
+    }
+    const loadAgendaDiferida = async () => {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const { data } = await supabase
+        .from("agenda_diferida")
+        .select("*, empresas(id, nombre), faenas(id, nombre)")
+        .eq("estado", "pendiente")
+        .or(`fecha_programada.eq.${todayStr},fecha_programada.is.null`);
+      
+      if (data && data.length > 0) {
+        // Collect all paquete IDs to fetch names
+        const allPaqueteIds = new Set<string>();
+        data.forEach((ad: any) => (ad.paquetes_ids || []).forEach((pid: string) => allPaqueteIds.add(pid)));
+        
+        let paquetesMap: Record<string, string> = {};
+        if (allPaqueteIds.size > 0) {
+          const { data: pqData } = await supabase
+            .from("paquetes_examenes")
+            .select("id, nombre")
+            .in("id", Array.from(allPaqueteIds));
+          if (pqData) pqData.forEach(p => { paquetesMap[p.id] = p.nombre; });
+        }
+        
+        const enriched = data.map((ad: any) => ({
+          ...ad,
+          _paquetesNombres: (ad.paquetes_ids || [])
+            .filter((pid: string) => paquetesMap[pid])
+            .map((pid: string) => ({ id: pid, nombre: paquetesMap[pid] }))
+        }));
+        setAgendaDiferidaPendientes(enriched);
+      } else {
+        setAgendaDiferidaPendientes([]);
+      }
+    };
+    loadAgendaDiferida();
+    const interval = setInterval(loadAgendaDiferida, 15000);
+    return () => clearInterval(interval);
+  }, [isToday]);
+
+  // Fusion helper: match patient RUT to agenda diferida
+  const getAgendaMatchForPatient = (patient: Patient): AgendaDiferidaMatch | null => {
+    if (!patient.rut) return null;
+    return agendaDiferidaPendientes.find(ad => ad.rut === patient.rut) || null;
+  };
+
+  // Handle fusion from Pacientes module
+  const handleFusionAgenda = async (patient: Patient, agendaMatch: AgendaDiferidaMatch) => {
+    setFusingPatientId(patient.id);
+    try {
+      const atencion = localAtenciones.find(a => a.paciente_id === patient.id);
+      if (!atencion) {
+        toast.error("No se encontró la atención del paciente");
+        return;
+      }
+      const atencionId = atencion.id;
+
+      // 1. Update paciente with empresa/faena/cargo
+      if (agendaMatch.empresa_id) {
+        await supabase.from("pacientes").update({
+          empresa_id: agendaMatch.empresa_id,
+          faena_id: agendaMatch.faena_id,
+          cargo: agendaMatch.cargo || null,
+          tipo_servicio: agendaMatch.tipo_servicio as any || patient.tipo_servicio || null,
+        }).eq("id", patient.id);
+      }
+
+      // 2. Update atencion with empresa_id
+      if (agendaMatch.empresa_id) {
+        await supabase.from("atenciones").update({
+          empresa_id: agendaMatch.empresa_id
+        }).eq("id", atencionId);
+      }
+
+      // 3. Fetch existing to deduplicate
+      const [existBat, existEx, existDoc] = await Promise.all([
+        supabase.from("atencion_baterias").select("paquete_id").eq("atencion_id", atencionId),
+        supabase.from("atencion_examenes").select("examen_id").eq("atencion_id", atencionId),
+        supabase.from("atencion_documentos").select("documento_id").eq("atencion_id", atencionId),
+      ]);
+      const existingPaqueteIds = new Set((existBat.data || []).map(b => b.paquete_id));
+      const existingExamenIds = new Set((existEx.data || []).map(e => e.examen_id));
+      const existingDocIds = new Set((existDoc.data || []).map(d => d.documento_id));
+
+      // 4. Insert baterias
+      if (agendaMatch.paquetes_ids?.length > 0) {
+        const newBaterias = agendaMatch.paquetes_ids
+          .filter(pId => !existingPaqueteIds.has(pId))
+          .map(pId => ({ atencion_id: atencionId, paquete_id: pId }));
+        if (newBaterias.length > 0) await supabase.from("atencion_baterias").insert(newBaterias);
+      }
+
+      // 5. Collect and insert exams
+      const allExamenIds = new Set<string>(agendaMatch.examenes_ids || []);
+      if (agendaMatch.paquetes_ids?.length > 0) {
+        const { data: pqItems } = await supabase
+          .from("paquete_examen_items")
+          .select("examen_id")
+          .in("paquete_id", agendaMatch.paquetes_ids);
+        if (pqItems) pqItems.forEach(item => allExamenIds.add(item.examen_id));
+      }
+      if (allExamenIds.size > 0) {
+        const newExamenes = Array.from(allExamenIds)
+          .filter(eId => !existingExamenIds.has(eId))
+          .map(eId => ({ atencion_id: atencionId, examen_id: eId, estado: "pendiente" as const }));
+        if (newExamenes.length > 0) await supabase.from("atencion_examenes").insert(newExamenes);
+      }
+
+      // 6. Insert documents from baterias
+      if (agendaMatch.paquetes_ids?.length > 0) {
+        const { data: batDocs } = await supabase
+          .from("bateria_documentos")
+          .select("documento_id")
+          .in("paquete_id", agendaMatch.paquetes_ids);
+        if (batDocs && batDocs.length > 0) {
+          const uniqueDocIds = [...new Set(batDocs.map(bd => bd.documento_id))];
+          const newDocs = uniqueDocIds
+            .filter(docId => !existingDocIds.has(docId))
+            .map(docId => ({ atencion_id: atencionId, documento_id: docId, estado: "pendiente", respuestas: {} }));
+          if (newDocs.length > 0) await supabase.from("atencion_documentos").insert(newDocs);
+        }
+      }
+
+      // 7. Mark agenda diferida as vinculado
+      await supabase.from("agenda_diferida").update({
+        estado: "vinculado",
+        atencion_id: atencionId,
+        vinculado_at: new Date().toISOString()
+      }).eq("id", agendaMatch.id);
+
+      // 8. Remove from local state
+      setAgendaDiferidaPendientes(prev => prev.filter(ad => ad.id !== agendaMatch.id));
+
+      // 9. Force sync
+      if (syncCtx?.forcePull) syncCtx.forcePull();
+
+      toast.success(`Datos fusionados: ${agendaMatch.nombre}. ${allExamenIds.size} exámenes asignados.`);
+      
+      await logActivity(
+        "vincular_agenda_diferida",
+        { nombre: agendaMatch.nombre, rut: agendaMatch.rut, atencion: atencion.numero_ingreso },
+        "pacientes"
+      );
+    } catch (error: any) {
+      console.error("[Pacientes] Error en fusión:", error);
+      toast.error("Error al fusionar datos: " + (error.message || "Error desconocido"));
+    } finally {
+      setFusingPatientId(null);
+    }
+  };
+
+
   useEffect(() => {
     if (cachedFaenas.length > 0) {
       setAllFaenas(cachedFaenas as Faena[]);
@@ -1292,103 +1467,175 @@ const Pacientes = () => {
             <div className="space-y-2">
               {filteredPatients.map((patient) => {
                 const incompleto = isPacienteIncompleto(patient);
+                const agendaMatch = getAgendaMatchForPatient(patient);
+                const isFusingThis = fusingPatientId === patient.id;
                 
                 return (
-                  <div
-                    key={patient.id}
-                    className={cn(
-                      "flex items-center justify-between p-4 rounded-lg border transition-colors",
-                      incompleto 
-                        ? "border-amber-300 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-700" 
-                        : "border-border hover:bg-accent"
-                    )}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {patient.atencion_actual && (
-                          <Badge variant="outline" className="font-bold">#{patient.atencion_actual.numero_ingreso}</Badge>
-                        )}
-                        {incompleto && (
-                          <Badge variant="secondary" className="bg-amber-500 text-white hover:bg-amber-600">
-                            Esperando datos
-                          </Badge>
-                        )}
-                        <div className="font-medium text-foreground">
-                          {patient.nombre === "PENDIENTE DE REGISTRO" ? (
-                            <span className="italic text-muted-foreground">Pendiente de registro</span>
-                          ) : (
-                            patient.nombre
-                          )}
-                        </div>
-                        {patient.rut && (
-                          <span className="text-sm text-muted-foreground">({patient.rut})</span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground flex-wrap">
-                        {incompleto ? (
-                          <span className="text-amber-600 dark:text-amber-400">
-                            El paciente está completando sus datos en el portal...
-                          </span>
-                        ) : (
-                          <>
-                            <span>{patient.empresas?.nombre || "Sin empresa"}</span>
-                            {patient.fecha_nacimiento && patient.fecha_nacimiento.length > 0 && !isNaN(new Date(patient.fecha_nacimiento + "T00:00:00").getTime()) && (
-                              <span>• Nac: {format(new Date(patient.fecha_nacimiento + "T00:00:00"), "dd/MM/yyyy", { locale: es })}</span>
-                            )}
-                            {patient.email && <span>• {patient.email}</span>}
-                            {patient.telefono && <span>• {patient.telefono}</span>}
-                          </>
-                        )}
-                      </div>
-                      {patient.atencion_actual?.fecha_ingreso && (
-                        <div className="text-xs text-muted-foreground mt-1">
-                          Ingresó hoy: {format(new Date(patient.atencion_actual.fecha_ingreso), "HH:mm", { locale: es })}
-                        </div>
+                  <div key={patient.id} className="space-y-0">
+                    <div
+                      className={cn(
+                        "flex items-center justify-between p-4 rounded-lg border transition-colors",
+                        agendaMatch
+                          ? "border-primary bg-primary/5"
+                          : incompleto 
+                            ? "border-amber-300 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-700" 
+                            : "border-border hover:bg-accent"
                       )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {!incompleto && (
-                        <>
-                          <div className="text-right text-sm">
-                            <div className={`font-medium ${patient.tipo_servicio === 'workmed' ? 'text-blue-600' : 'text-green-600'}`}>
-                              {patient.tipo_servicio === 'workmed' ? 'Workmed' : 'Jenner'}
-                            </div>
-                          </div>
-                          {/* FASE 7: Document pending indicator */}
-                          {documentosPendientes[patient.id] > 0 && (
-                            <Badge variant="outline" className="border-warning text-warning gap-1">
-                              <FileText className="h-3 w-3" />
-                              {documentosPendientes[patient.id]} docs
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {patient.atencion_actual && (
+                            <Badge variant="outline" className="font-bold">#{patient.atencion_actual.numero_ingreso}</Badge>
+                          )}
+                          {incompleto && (
+                            <Badge variant="secondary" className="bg-amber-500 text-white hover:bg-amber-600">
+                              Esperando datos
                             </Badge>
                           )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleViewExamenesCompletados(patient)}
-                            title="Ver exámenes completados"
-                          >
-                            <ClipboardList className="h-4 w-4 text-info" />
-                          </Button>
-                        </>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(patient)}
-                        title={incompleto ? "Completar datos del paciente" : "Editar paciente"}
-                      >
-                        <Pencil className="h-4 w-4 text-primary" />
-                      </Button>
-                      {patient.atencion_actual && (
+                          {agendaMatch && (
+                            <Badge variant="default" className="gap-1">
+                              <CalendarIcon className="h-3 w-3" />
+                              Pre-agendado
+                            </Badge>
+                          )}
+                          <div className="font-medium text-foreground">
+                            {patient.nombre === "PENDIENTE DE REGISTRO" ? (
+                              <span className="italic text-muted-foreground">Pendiente de registro</span>
+                            ) : (
+                              patient.nombre
+                            )}
+                          </div>
+                          {patient.rut && (
+                            <span className="text-sm text-muted-foreground">({patient.rut})</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground flex-wrap">
+                          {incompleto ? (
+                            <span className="text-amber-600 dark:text-amber-400">
+                              El paciente está completando sus datos en el portal...
+                            </span>
+                          ) : (
+                            <>
+                              <span>{patient.empresas?.nombre || "Sin empresa"}</span>
+                              {patient.fecha_nacimiento && patient.fecha_nacimiento.length > 0 && !isNaN(new Date(patient.fecha_nacimiento + "T00:00:00").getTime()) && (
+                                <span>• Nac: {format(new Date(patient.fecha_nacimiento + "T00:00:00"), "dd/MM/yyyy", { locale: es })}</span>
+                              )}
+                              {patient.email && <span>• {patient.email}</span>}
+                              {patient.telefono && <span>• {patient.telefono}</span>}
+                            </>
+                          )}
+                        </div>
+                        {patient.atencion_actual?.fecha_ingreso && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Ingresó hoy: {format(new Date(patient.atencion_actual.fecha_ingreso), "HH:mm", { locale: es })}
+                          </div>
+                        )}
+
+                        {/* Agenda Diferida Fusion Banner */}
+                        {agendaMatch && (
+                          <div className="mt-3 p-3 rounded-md border border-primary/30 bg-primary/5 space-y-2">
+                            <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                              <Merge className="h-4 w-4" />
+                              Confirmar fusión de datos pre-agendados
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                              <div>
+                                <span className="text-muted-foreground">Empresa:</span>
+                                <p className="font-medium">{agendaMatch.empresas?.nombre || "—"}</p>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Faena:</span>
+                                <p className="font-medium">{agendaMatch.faenas?.nombre || "—"}</p>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Cargo:</span>
+                                <p className="font-medium">{agendaMatch.cargo || "—"}</p>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Baterías:</span>
+                                <div className="flex flex-wrap gap-1 mt-0.5">
+                                  {(agendaMatch._paquetesNombres || []).map((p) => (
+                                    <Badge key={p.id} variant="secondary" className="text-xs py-0">{p.nombre}</Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => handleFusionAgenda(patient, agendaMatch)}
+                                disabled={isFusingThis}
+                              >
+                                {isFusingThis ? (
+                                  <>
+                                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                    Fusionando...
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle2 className="mr-1 h-3 w-3" />
+                                    Confirmar y Fusionar
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => setAgendaDiferidaPendientes(prev => prev.filter(ad => ad.id !== agendaMatch.id))}
+                                disabled={isFusingThis}
+                              >
+                                No es este paciente
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {!incompleto && (
+                          <>
+                            <div className="text-right text-sm">
+                              <div className={`font-medium ${patient.tipo_servicio === 'workmed' ? 'text-blue-600' : 'text-green-600'}`}>
+                                {patient.tipo_servicio === 'workmed' ? 'Workmed' : 'Jenner'}
+                              </div>
+                            </div>
+                            {/* FASE 7: Document pending indicator */}
+                            {documentosPendientes[patient.id] > 0 && (
+                              <Badge variant="outline" className="border-warning text-warning gap-1">
+                                <FileText className="h-3 w-3" />
+                                {documentosPendientes[patient.id]} docs
+                              </Badge>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleViewExamenesCompletados(patient)}
+                              title="Ver exámenes completados"
+                            >
+                              <ClipboardList className="h-4 w-4 text-info" />
+                            </Button>
+                          </>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setPacienteToDelete(patient.id)}
-                          title="Eliminar atención del día"
+                          onClick={() => handleEdit(patient)}
+                          title={incompleto ? "Completar datos del paciente" : "Editar paciente"}
                         >
-                          <Trash2 className="h-4 w-4 text-destructive" />
+                          <Pencil className="h-4 w-4 text-primary" />
                         </Button>
-                      )}
+                        {patient.atencion_actual && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setPacienteToDelete(patient.id)}
+                            title="Eliminar atención del día"
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
