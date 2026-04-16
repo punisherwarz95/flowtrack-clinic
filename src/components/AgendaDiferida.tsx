@@ -205,9 +205,6 @@ const AgendaDiferida = () => {
     setFormData({
       nombre: item.nombre,
       rut: item.rut,
-      email: item.email || "",
-      telefono: item.telefono || "",
-      fecha_nacimiento: item.fecha_nacimiento || "",
       tipo_servicio: (item.tipo_servicio as any) || "workmed",
       empresa_id: item.empresa_id || "",
       faena_id: item.faena_id || "",
