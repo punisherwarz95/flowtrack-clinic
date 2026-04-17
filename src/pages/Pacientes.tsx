@@ -170,6 +170,8 @@ const Pacientes = () => {
   const [pacienteToDelete, setPacienteToDelete] = useState<string | null>(null);
   const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
   const [examenEstados, setExamenEstados] = useState<Record<string, string>>({}); // atencion_examen composite key -> estado
+  // Exámenes ya realizados/en proceso (no pendiente) → para mostrar ícono y bloquear duplicidad al editar
+  const [examenesYaRealizados, setExamenesYaRealizados] = useState<Record<string, string>>({}); // examen_id -> estado
   const [selectedPaquetes, setSelectedPaquetes] = useState<string[]>([]);
   const [examenFilter, setExamenFilter] = useState("");
   const [empresaSearchFilter, setEmpresaSearchFilter] = useState("");
@@ -725,20 +727,30 @@ const Pacientes = () => {
       if (atencion) {
         setAtencionPrioridad(atencion.prioridad ?? false);
         const aeList = localAtencionExamenes.filter(ae => ae.atencion_id === atencion.id);
-        const exams = aeList.map(ae => ae.examen_id);
+        // Separar pendientes (editables) de ya realizados (bloqueados)
+        const yaRealizadosMap: Record<string, string> = {};
+        const pendientes: typeof aeList = [];
+        aeList.forEach(ae => {
+          const est = ae.estado || 'pendiente';
+          if (est === 'pendiente') pendientes.push(ae);
+          else yaRealizadosMap[ae.examen_id] = est;
+        });
+        const exams = pendientes.map(ae => ae.examen_id);
         const estados: Record<string, string> = {};
-        aeList.forEach((ae, i) => { estados[`${ae.examen_id}_${i}`] = ae.estado || 'pendiente'; });
+        pendientes.forEach((ae, i) => { estados[`${ae.examen_id}_${i}`] = ae.estado || 'pendiente'; });
         const docs = localAtencionDocumentos
           .filter(d => d.atencion_id === atencion.id)
           .map(d => d.documento_id);
         setSelectedExamenes(exams);
         setExamenEstados(estados);
+        setExamenesYaRealizados(yaRealizadosMap);
         setOriginalExamenesCount(exams.length);
         setSelectedDocumentos(docs);
       } else {
         setAtencionPrioridad(false);
         setSelectedExamenes([]);
         setExamenEstados({});
+        setExamenesYaRealizados({});
         setOriginalExamenesCount(0);
         setSelectedDocumentos([]);
       }
@@ -774,16 +786,27 @@ const Pacientes = () => {
           ]);
 
           if (examenesRes.error) throw examenesRes.error;
-          const loadedExams = examenesRes.data?.map(e => e.examen_id) || [];
+          // Separar pendientes (editables) de realizados (bloqueados)
+          const allRows = examenesRes.data || [];
+          const yaRealizadosMap: Record<string, string> = {};
+          const pendientes: typeof allRows = [];
+          allRows.forEach(e => {
+            const est = (e.estado as string) || 'pendiente';
+            if (est === 'pendiente') pendientes.push(e);
+            else yaRealizadosMap[e.examen_id] = est;
+          });
+          const loadedExams = pendientes.map(e => e.examen_id);
           const estados: Record<string, string> = {};
-          examenesRes.data?.forEach((e, i) => { estados[`${e.examen_id}_${i}`] = e.estado || 'pendiente'; });
+          pendientes.forEach((e, i) => { estados[`${e.examen_id}_${i}`] = (e.estado as string) || 'pendiente'; });
           setSelectedExamenes(loadedExams);
           setExamenEstados(estados);
+          setExamenesYaRealizados(yaRealizadosMap);
           setOriginalExamenesCount(loadedExams.length);
           setSelectedDocumentos(docsRes.data?.map(d => d.documento_id) || []);
         } else {
           setSelectedExamenes([]);
           setExamenEstados({});
+          setExamenesYaRealizados({});
           setOriginalExamenesCount(0);
           setSelectedDocumentos([]);
         }
@@ -791,6 +814,7 @@ const Pacientes = () => {
         console.error("Error loading exams:", error);
         setSelectedExamenes([]);
         setSelectedDocumentos([]);
+        setExamenesYaRealizados({});
       }
     }
 
@@ -867,9 +891,10 @@ const Pacientes = () => {
               .eq("atencion_id", atencionData.id)
               .eq("estado", "pendiente");
 
-            // Agregar nuevos exámenes como pendientes
-            if (selectedExamenes.length > 0) {
-              const examenesData = selectedExamenes.map(examenId => ({
+            // Agregar nuevos exámenes como pendientes (excluir los que ya están realizados/en proceso)
+            const examenesAInsertar = selectedExamenes.filter(eId => !examenesYaRealizados[eId]);
+            if (examenesAInsertar.length > 0) {
+              const examenesData = examenesAInsertar.map(examenId => ({
                 atencion_id: atencionData.id,
                 examen_id: examenId,
                 estado: 'pendiente' as 'pendiente' | 'completado' | 'incompleto'
@@ -1146,7 +1171,7 @@ const Pacientes = () => {
       setSelectedExamenes([]);
       setSelectedPaquetes([]);
       setSelectedDocumentos([]);
-      setDocumentoFilter("");
+      setExamenesYaRealizados({});
       setBateriaFilter("");
       setFiltroFaenaIdBateria("__all__");
       loadPatients();
@@ -1394,6 +1419,7 @@ const Pacientes = () => {
             setSelectedExamenes([]);
             setSelectedPaquetes([]);
             setSelectedDocumentos([]);
+            setExamenesYaRealizados({});
             setExamenFilter("");
             setDocumentoFilter("");
             setBateriaFilter("");
@@ -2011,7 +2037,10 @@ const Pacientes = () => {
                                         onChange={(e) => {
                                           if (e.target.checked) {
                                             setSelectedPaquetes([...selectedPaquetes, paquete.id]);
-                                            const examenesIds = paquete.paquete_examen_items.map(item => item.examen_id);
+                                            // Excluir exámenes ya realizados para evitar duplicidad
+                                            const examenesIds = paquete.paquete_examen_items
+                                              .map(item => item.examen_id)
+                                              .filter(eid => !examenesYaRealizados[eid]);
                                             setSelectedExamenes(prev => [...new Set([...prev, ...examenesIds])]);
                                           } else {
                                             setSelectedPaquetes(selectedPaquetes.filter(id => id !== paquete.id));
@@ -2051,18 +2080,40 @@ const Pacientes = () => {
                                   examen.nombre.toLowerCase().includes(bateriaFilter.toLowerCase()) ||
                                   (examen.codigo && examen.codigo.toLowerCase().includes(bateriaFilter.toLowerCase()))
                                 )
-                                .map((examen) => (
-                                  <label key={examen.id} className="flex items-center gap-2 cursor-pointer py-1 px-1 hover:bg-accent rounded text-sm">
-                                    <input type="checkbox" checked={selectedExamenes.includes(examen.id)}
-                                      onChange={(e) => {
-                                        if (e.target.checked) {
-                                          if (!selectedExamenes.includes(examen.id)) setSelectedExamenes([...selectedExamenes, examen.id]);
-                                        } else setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
-                                      }} className="w-3.5 h-3.5" />
-                                    <span className="break-words flex-1">{examen.nombre}</span>
-                                    {examen.codigo && <span className="text-xs text-muted-foreground shrink-0">{examen.codigo}</span>}
-                                  </label>
-                                ))}
+                                .map((examen) => {
+                                  const estadoYa = examenesYaRealizados[examen.id];
+                                  const yaRealizado = !!estadoYa;
+                                  return (
+                                    <label
+                                      key={examen.id}
+                                      className={`flex items-center gap-2 py-1 px-1 rounded text-sm ${yaRealizado ? 'opacity-70 cursor-not-allowed bg-muted/40' : 'cursor-pointer hover:bg-accent'}`}
+                                      title={yaRealizado ? `Ya procesado (${estadoYa}). No se puede reasignar.` : undefined}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        disabled={yaRealizado}
+                                        checked={yaRealizado || selectedExamenes.includes(examen.id)}
+                                        onChange={(e) => {
+                                          if (yaRealizado) return;
+                                          if (e.target.checked) {
+                                            if (!selectedExamenes.includes(examen.id)) setSelectedExamenes([...selectedExamenes, examen.id]);
+                                          } else setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
+                                        }}
+                                        className="w-3.5 h-3.5"
+                                      />
+                                      <span className="break-words flex-1">{examen.nombre}</span>
+                                      {yaRealizado && (
+                                        <span className="shrink-0">
+                                          {estadoYa === 'completado' && <CheckCircle2 className="h-4 w-4 text-green-600" />}
+                                          {estadoYa === 'toma_muestra' && <FlaskConical className="h-4 w-4 text-blue-600" />}
+                                          {estadoYa === 'muestra_tomada' && <FlaskConical className="h-4 w-4 text-blue-600" />}
+                                          {estadoYa === 'incompleto' && <Clock className="h-4 w-4 text-amber-600" />}
+                                        </span>
+                                      )}
+                                      {examen.codigo && <span className="text-xs text-muted-foreground shrink-0">{examen.codigo}</span>}
+                                    </label>
+                                  );
+                                })}
                             </div>
                           )}
                         </div>
