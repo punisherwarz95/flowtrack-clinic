@@ -658,6 +658,7 @@ const EmpresaAgendamiento = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Fecha</TableHead>
                       <TableHead>Bloque</TableHead>
                       <TableHead>Nombre</TableHead>
                       <TableHead>RUT</TableHead>
@@ -671,6 +672,9 @@ const EmpresaAgendamiento = () => {
                   <TableBody>
                     {filteredPrereservas.map((prereserva) => (
                       <TableRow key={prereserva.id}>
+                        <TableCell className="text-sm whitespace-nowrap">
+                          {format(new Date(prereserva.fecha + "T12:00:00"), "dd-MM-yyyy", { locale: es })}
+                        </TableCell>
                         <TableCell>
                           <div className="text-sm">
                             {prereserva.bloque?.nombre}
