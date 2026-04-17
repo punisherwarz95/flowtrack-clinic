@@ -941,14 +941,28 @@ const Pacientes = () => {
               }
             }
 
-            // Agregar documentos seleccionados manualmente
-            if (selectedDocumentos.length > 0) {
-              // Verificar cuáles ya existen
-              const { data: existingDocs } = await supabase
-                .from("atencion_documentos")
-                .select("documento_id")
-                .eq("atencion_id", atencionData.id);
+            // Sincronizar documentos: eliminar pendientes deseleccionados y agregar nuevos
+            // Conservar documentos ya completados o revisados (datos históricos)
+            const { data: existingDocs } = await supabase
+              .from("atencion_documentos")
+              .select("documento_id, estado")
+              .eq("atencion_id", atencionData.id);
 
+            const selectedDocSet = new Set(selectedDocumentos);
+            const docsAEliminar = (existingDocs || [])
+              .filter(d => d.estado === "pendiente" && !selectedDocSet.has(d.documento_id))
+              .map(d => d.documento_id);
+
+            if (docsAEliminar.length > 0) {
+              await supabase
+                .from("atencion_documentos")
+                .delete()
+                .eq("atencion_id", atencionData.id)
+                .eq("estado", "pendiente")
+                .in("documento_id", docsAEliminar);
+            }
+
+            if (selectedDocumentos.length > 0) {
               const existingDocIds = new Set((existingDocs || []).map(d => d.documento_id));
               const newDocIds = selectedDocumentos.filter(id => !existingDocIds.has(id));
 
