@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus, Search, Trash2, Calendar as CalendarIcon, Clock, Pencil, X } from "lucide-react";
-import { format } from "date-fns";
+import { format, addDays } from "date-fns";
+import { es } from "date-fns/locale";
 import { formatRutStandard } from "@/lib/utils";
 import { logActivity } from "@/lib/activityLog";
 import {
