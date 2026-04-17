@@ -1170,7 +1170,7 @@ const Pacientes = () => {
       setSelectedExamenes([]);
       setSelectedPaquetes([]);
       setSelectedDocumentos([]);
-      setDocumentoFilter("");
+      setExamenesYaRealizados({});
       setBateriaFilter("");
       setFiltroFaenaIdBateria("__all__");
       loadPatients();
@@ -1418,6 +1418,7 @@ const Pacientes = () => {
             setSelectedExamenes([]);
             setSelectedPaquetes([]);
             setSelectedDocumentos([]);
+            setExamenesYaRealizados({});
             setExamenFilter("");
             setDocumentoFilter("");
             setBateriaFilter("");
