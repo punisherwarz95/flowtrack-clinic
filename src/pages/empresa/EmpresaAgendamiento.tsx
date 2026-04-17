@@ -83,7 +83,10 @@ const EmpresaAgendamiento = () => {
   const [prereservas, setPrereservas] = useState<Prereserva[]>([]);
   const [cuposDisponibles, setCuposDisponibles] = useState<Record<string, number>>({});
   
-  const [selectedDate, setSelectedDate] = useState(format(addDays(new Date(), 1), "yyyy-MM-dd"));
+  const tomorrowStr = format(addDays(new Date(), 1), "yyyy-MM-dd");
+  const [selectedDate, setSelectedDate] = useState(tomorrowStr);
+  const [fechaDesde, setFechaDesde] = useState(tomorrowStr);
+  const [fechaHasta, setFechaHasta] = useState(tomorrowStr);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   
