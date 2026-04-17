@@ -170,6 +170,8 @@ const Pacientes = () => {
   const [pacienteToDelete, setPacienteToDelete] = useState<string | null>(null);
   const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
   const [examenEstados, setExamenEstados] = useState<Record<string, string>>({}); // atencion_examen composite key -> estado
+  // Exámenes ya realizados/en proceso (no pendiente) → para mostrar ícono y bloquear duplicidad al editar
+  const [examenesYaRealizados, setExamenesYaRealizados] = useState<Record<string, string>>({}); // examen_id -> estado
   const [selectedPaquetes, setSelectedPaquetes] = useState<string[]>([]);
   const [examenFilter, setExamenFilter] = useState("");
   const [empresaSearchFilter, setEmpresaSearchFilter] = useState("");
