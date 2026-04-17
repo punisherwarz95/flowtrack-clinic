@@ -10,7 +10,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, CheckCircle2, FileText, AlertCircle } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import type { Json } from "@/integrations/supabase/types";
 
 interface DocumentoCampo {
@@ -163,6 +163,9 @@ export const DocumentoFormViewer = ({
   const canvasRefs = useRef<Map<string, HTMLCanvasElement>>(new Map());
   const [isDrawing, setIsDrawing] = useState(false);
   const [activeSignatureField, setActiveSignatureField] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const fieldRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const [errorFieldId, setErrorFieldId] = useState<string | null>(null);
 
   const isComplete = atencionDocumento.estado === "completado";
   const isReviewed = atencionDocumento.estado === "revisado";
@@ -224,25 +227,47 @@ export const DocumentoFormViewer = ({
     setRespuestas((prev) => ({ ...prev, [fieldId]: value }));
   };
 
-  const validateForm = (): boolean => {
-    for (const campo of campos) {
+  const validateForm = (): { ok: boolean; firstErrorId?: string; firstErrorLabel?: string } => {
+    for (const campo of campos.slice().sort((a, b) => a.orden - b.orden)) {
       if (campo.requerido && !isFieldDisabled(campo)) {
         const valor = respuestas[campo.id];
         if (valor === undefined || valor === null || valor === "") {
-          toast({
-            title: "Campo requerido",
-            description: `El campo "${campo.etiqueta}" es obligatorio`,
-            variant: "destructive",
-          });
-          return false;
+          return { ok: false, firstErrorId: campo.id, firstErrorLabel: campo.etiqueta };
         }
       }
     }
-    return true;
+    return { ok: true };
+  };
+
+  const scrollToField = (fieldId: string) => {
+    const el = fieldRefs.current.get(fieldId);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  };
+
+  const scrollToTop = () => {
+    if (containerRef.current) {
+      containerRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   };
 
   const handleSubmit = async () => {
-    if (!validateForm()) return;
+    const validation = validateForm();
+    if (!validation.ok) {
+      toast.error("Campo requerido", {
+        description: `El campo "${validation.firstErrorLabel}" es obligatorio`,
+      });
+      if (validation.firstErrorId) {
+        setErrorFieldId(validation.firstErrorId);
+        setTimeout(() => scrollToField(validation.firstErrorId!), 50);
+        // Clear highlight after a few seconds
+        setTimeout(() => setErrorFieldId(null), 4000);
+      }
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -258,17 +283,15 @@ export const DocumentoFormViewer = ({
 
       if (error) throw error;
 
-      toast({
-        title: "Documento completado",
+      toast.success("Documento completado", {
         description: "Sus respuestas han sido guardadas correctamente",
       });
+      scrollToTop();
       onComplete?.();
     } catch (error: any) {
       console.error("Error saving document:", error);
-      toast({
-        title: "Error al guardar",
+      toast.error("Error al guardar", {
         description: error.message || "No se pudo guardar el documento",
-        variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
@@ -525,6 +548,7 @@ export const DocumentoFormViewer = ({
   };
 
   return (
+    <div ref={containerRef}>
     <Card>
       {showHeader && (
         <CardHeader className="pb-3">
@@ -555,9 +579,18 @@ export const DocumentoFormViewer = ({
             .sort((a, b) => a.orden - b.orden)
             .map((campo) => {
               const fieldDisabled = isFieldDisabled(campo);
-              const hidden = fieldDisabled && campo.tipo_campo !== "puntaje";
+              const isErrorField = errorFieldId === campo.id;
               return (
-                <div key={campo.id} className={`space-y-2 ${fieldDisabled ? "opacity-50" : ""}`}>
+                <div
+                  key={campo.id}
+                  ref={(el) => {
+                    if (el) fieldRefs.current.set(campo.id, el);
+                    else fieldRefs.current.delete(campo.id);
+                  }}
+                  className={`space-y-2 scroll-mt-24 ${fieldDisabled ? "opacity-50" : ""} ${
+                    isErrorField ? "ring-2 ring-destructive rounded-md p-2 -m-2 bg-destructive/5 transition-all" : ""
+                  }`}
+                >
                   {campo.tipo_campo !== "checkbox" && campo.tipo_campo !== "texto_informativo" && campo.tipo_campo !== "puntaje" && (
                     <Label className="flex items-center gap-1">
                       {campo.etiqueta}
@@ -588,6 +621,7 @@ export const DocumentoFormViewer = ({
         </CardFooter>
       )}
     </Card>
+    </div>
   );
 };
 
