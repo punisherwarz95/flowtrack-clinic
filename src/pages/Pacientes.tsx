@@ -2037,7 +2037,10 @@ const Pacientes = () => {
                                         onChange={(e) => {
                                           if (e.target.checked) {
                                             setSelectedPaquetes([...selectedPaquetes, paquete.id]);
-                                            const examenesIds = paquete.paquete_examen_items.map(item => item.examen_id);
+                                            // Excluir exámenes ya realizados para evitar duplicidad
+                                            const examenesIds = paquete.paquete_examen_items
+                                              .map(item => item.examen_id)
+                                              .filter(eid => !examenesYaRealizados[eid]);
                                             setSelectedExamenes(prev => [...new Set([...prev, ...examenesIds])]);
                                           } else {
                                             setSelectedPaquetes(selectedPaquetes.filter(id => id !== paquete.id));
