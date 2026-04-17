@@ -262,8 +262,8 @@ const AgendaDiferida = () => {
       i.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       i.rut.toLowerCase().includes(searchTerm.toLowerCase());
     if (!matchesSearch) return false;
-    // Filtrar por rango de fecha programada (incluye sin fecha si rango cubre 'hoy o futuro' = no, los excluimos)
-    if (!i.fecha_programada) return false;
+    // Items sin fecha programada se muestran siempre; con fecha se filtran por rango
+    if (!i.fecha_programada) return true;
     return i.fecha_programada >= fechaDesde && i.fecha_programada <= fechaHasta;
   });
 
