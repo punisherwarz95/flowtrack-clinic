@@ -84,6 +84,8 @@ const AgendaDiferida = () => {
   const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
   const [selectedPaquetes, setSelectedPaquetes] = useState<string[]>([]);
   const [bateriaFilter, setBateriaFilter] = useState("");
+  const [examenFilter, setExamenFilter] = useState("");
+  const [tipoSeleccion, setTipoSeleccion] = useState<"bateria" | "examen">("bateria");
   const [empresaSearch, setEmpresaSearch] = useState("");
   const [empresaDropdownOpen, setEmpresaDropdownOpen] = useState(false);
   const empresaDropdownRef = useRef<HTMLDivElement>(null);
@@ -218,6 +220,7 @@ const AgendaDiferida = () => {
     });
     setSelectedPaquetes(item.paquetes_ids || []);
     setSelectedExamenes(item.examenes_ids || []);
+    setTipoSeleccion((item.paquetes_ids || []).length === 0 && (item.examenes_ids || []).length > 0 ? "examen" : "bateria");
     setEditingId(item.id);
     setShowForm(true);
 
@@ -367,54 +370,120 @@ const AgendaDiferida = () => {
                 </div>
               </div>
 
-              {/* Baterías selector - filtered by faena */}
+              {/* Selector de tipo: Baterías o Exámenes individuales */}
               <div className="space-y-2">
-                <Label>
-                  Baterías / Exámenes
-                  {formData.faena_id && (
-                    <span className="text-xs text-muted-foreground ml-2">
-                      (filtradas por faena seleccionada)
-                    </span>
-                  )}
-                </Label>
-                <div className="relative mb-2">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Buscar batería..." value={bateriaFilter} onChange={(e) => setBateriaFilter(e.target.value)} className="pl-8 h-8 text-sm" />
+                <Label>Tipo de selección</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={tipoSeleccion === "bateria" ? "default" : "outline"}
+                    onClick={() => setTipoSeleccion("bateria")}
+                  >
+                    Baterías
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={tipoSeleccion === "examen" ? "default" : "outline"}
+                    onClick={() => setTipoSeleccion("examen")}
+                  >
+                    Exámenes individuales
+                  </Button>
                 </div>
-                <div className="border rounded-md bg-muted/30 max-h-40 overflow-y-auto p-2">
-                  {filteredPaquetesByFaena
-                    .filter(p => !bateriaFilter || p.nombre.toLowerCase().includes(bateriaFilter.toLowerCase()))
-                    .map((paquete) => (
-                      <label key={paquete.id} className="flex items-center gap-2 cursor-pointer py-1 px-1 hover:bg-accent rounded text-sm">
-                        <input type="checkbox" checked={selectedPaquetes.includes(paquete.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedPaquetes([...selectedPaquetes, paquete.id]);
-                              const exIds = paquete.paquete_examen_items.map(i => i.examen_id);
-                              setSelectedExamenes(prev => [...new Set([...prev, ...exIds])]);
-                            } else {
-                              setSelectedPaquetes(selectedPaquetes.filter(id => id !== paquete.id));
-                              const exIds = paquete.paquete_examen_items.map(i => i.examen_id);
-                              setSelectedExamenes(prev => prev.filter(id => !exIds.includes(id)));
-                            }
-                          }} className="w-3.5 h-3.5" />
-                        <span>{paquete.nombre}</span>
-                        <span className="text-xs text-muted-foreground ml-auto">({paquete.paquete_examen_items.length})</span>
-                      </label>
-                    ))}
-                  {filteredPaquetesByFaena.filter(p => !bateriaFilter || p.nombre.toLowerCase().includes(bateriaFilter.toLowerCase())).length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-2">No hay baterías configuradas para esta faena</p>
-                  )}
-                </div>
-                {selectedPaquetes.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {selectedPaquetes.map((id) => {
-                      const p = paquetes.find(p => p.id === id);
-                      return p ? <Badge key={id} variant="secondary" className="text-xs">{p.nombre}</Badge> : null;
-                    })}
-                  </div>
-                )}
               </div>
+
+              {tipoSeleccion === "bateria" ? (
+                <div className="space-y-2">
+                  <Label>
+                    Baterías
+                    {formData.faena_id && (
+                      <span className="text-xs text-muted-foreground ml-2">
+                        (filtradas por faena seleccionada)
+                      </span>
+                    )}
+                  </Label>
+                  <div className="relative mb-2">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Buscar batería..." value={bateriaFilter} onChange={(e) => setBateriaFilter(e.target.value)} className="pl-8 h-8 text-sm" />
+                  </div>
+                  <div className="border rounded-md bg-muted/30 max-h-40 overflow-y-auto p-2">
+                    {filteredPaquetesByFaena
+                      .filter(p => !bateriaFilter || p.nombre.toLowerCase().includes(bateriaFilter.toLowerCase()))
+                      .map((paquete) => (
+                        <label key={paquete.id} className="flex items-center gap-2 cursor-pointer py-1 px-1 hover:bg-accent rounded text-sm">
+                          <input type="checkbox" checked={selectedPaquetes.includes(paquete.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedPaquetes([...selectedPaquetes, paquete.id]);
+                                const exIds = paquete.paquete_examen_items.map(i => i.examen_id);
+                                setSelectedExamenes(prev => [...new Set([...prev, ...exIds])]);
+                              } else {
+                                setSelectedPaquetes(selectedPaquetes.filter(id => id !== paquete.id));
+                                const exIds = paquete.paquete_examen_items.map(i => i.examen_id);
+                                setSelectedExamenes(prev => prev.filter(id => !exIds.includes(id)));
+                              }
+                            }} className="w-3.5 h-3.5" />
+                          <span>{paquete.nombre}</span>
+                          <span className="text-xs text-muted-foreground ml-auto">({paquete.paquete_examen_items.length})</span>
+                        </label>
+                      ))}
+                    {filteredPaquetesByFaena.filter(p => !bateriaFilter || p.nombre.toLowerCase().includes(bateriaFilter.toLowerCase())).length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-2">No hay baterías configuradas para esta faena</p>
+                    )}
+                  </div>
+                  {selectedPaquetes.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {selectedPaquetes.map((id) => {
+                        const p = paquetes.find(p => p.id === id);
+                        return p ? <Badge key={id} variant="secondary" className="text-xs">{p.nombre}</Badge> : null;
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Exámenes individuales</Label>
+                  <div className="relative mb-2">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Buscar examen..." value={examenFilter} onChange={(e) => setExamenFilter(e.target.value)} className="pl-8 h-8 text-sm" />
+                  </div>
+                  <div className="border rounded-md bg-muted/30 max-h-40 overflow-y-auto p-2">
+                    {examenes
+                      .filter(ex => !examenFilter || ex.nombre.toLowerCase().includes(examenFilter.toLowerCase()) || (ex.codigo || "").toLowerCase().includes(examenFilter.toLowerCase()))
+                      .slice(0, 100)
+                      .map((examen) => (
+                        <label key={examen.id} className="flex items-center gap-2 cursor-pointer py-1 px-1 hover:bg-accent rounded text-sm">
+                          <input type="checkbox" checked={selectedExamenes.includes(examen.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedExamenes([...selectedExamenes, examen.id]);
+                              } else {
+                                setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
+                              }
+                            }} className="w-3.5 h-3.5" />
+                          <span>{examen.nombre}</span>
+                          {examen.codigo && <span className="text-xs text-muted-foreground ml-auto">{examen.codigo}</span>}
+                        </label>
+                      ))}
+                  </div>
+                  {selectedExamenes.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {selectedExamenes.map((id) => {
+                        const ex = examenes.find(e => e.id === id);
+                        return ex ? (
+                          <Badge key={id} variant="secondary" className="text-xs gap-1">
+                            {ex.nombre}
+                            <button type="button" onClick={() => setSelectedExamenes(selectedExamenes.filter(i => i !== id))}>
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ) : null;
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="flex gap-2 justify-end">
                 <Button type="button" variant="outline" onClick={resetForm}>Cancelar</Button>
