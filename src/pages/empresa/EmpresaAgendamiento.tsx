@@ -110,12 +110,12 @@ const EmpresaAgendamiento = () => {
     }
   }, [currentEmpresaId]);
 
-  // Load prereservas when date changes
+  // Load prereservas when date range changes
   useEffect(() => {
-    if (selectedDate && currentEmpresaId) {
+    if (fechaDesde && fechaHasta && currentEmpresaId) {
       loadPrereservas();
     }
-  }, [selectedDate, currentEmpresaId]);
+  }, [fechaDesde, fechaHasta, currentEmpresaId]);
 
   // Recalculate cupos when bloques load or date changes
   useEffect(() => {
