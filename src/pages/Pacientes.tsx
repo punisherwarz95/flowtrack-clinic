@@ -891,9 +891,10 @@ const Pacientes = () => {
               .eq("atencion_id", atencionData.id)
               .eq("estado", "pendiente");
 
-            // Agregar nuevos exámenes como pendientes
-            if (selectedExamenes.length > 0) {
-              const examenesData = selectedExamenes.map(examenId => ({
+            // Agregar nuevos exámenes como pendientes (excluir los que ya están realizados/en proceso)
+            const examenesAInsertar = selectedExamenes.filter(eId => !examenesYaRealizados[eId]);
+            if (examenesAInsertar.length > 0) {
+              const examenesData = examenesAInsertar.map(examenId => ({
                 atencion_id: atencionData.id,
                 examen_id: examenId,
                 estado: 'pendiente' as 'pendiente' | 'completado' | 'incompleto'
