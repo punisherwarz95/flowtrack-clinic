@@ -227,25 +227,47 @@ export const DocumentoFormViewer = ({
     setRespuestas((prev) => ({ ...prev, [fieldId]: value }));
   };
 
-  const validateForm = (): boolean => {
-    for (const campo of campos) {
+  const validateForm = (): { ok: boolean; firstErrorId?: string; firstErrorLabel?: string } => {
+    for (const campo of campos.slice().sort((a, b) => a.orden - b.orden)) {
       if (campo.requerido && !isFieldDisabled(campo)) {
         const valor = respuestas[campo.id];
         if (valor === undefined || valor === null || valor === "") {
-          toast({
-            title: "Campo requerido",
-            description: `El campo "${campo.etiqueta}" es obligatorio`,
-            variant: "destructive",
-          });
-          return false;
+          return { ok: false, firstErrorId: campo.id, firstErrorLabel: campo.etiqueta };
         }
       }
     }
-    return true;
+    return { ok: true };
+  };
+
+  const scrollToField = (fieldId: string) => {
+    const el = fieldRefs.current.get(fieldId);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  };
+
+  const scrollToTop = () => {
+    if (containerRef.current) {
+      containerRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   };
 
   const handleSubmit = async () => {
-    if (!validateForm()) return;
+    const validation = validateForm();
+    if (!validation.ok) {
+      toast.error("Campo requerido", {
+        description: `El campo "${validation.firstErrorLabel}" es obligatorio`,
+      });
+      if (validation.firstErrorId) {
+        setErrorFieldId(validation.firstErrorId);
+        setTimeout(() => scrollToField(validation.firstErrorId!), 50);
+        // Clear highlight after a few seconds
+        setTimeout(() => setErrorFieldId(null), 4000);
+      }
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -261,17 +283,15 @@ export const DocumentoFormViewer = ({
 
       if (error) throw error;
 
-      toast({
-        title: "Documento completado",
+      toast.success("Documento completado", {
         description: "Sus respuestas han sido guardadas correctamente",
       });
+      scrollToTop();
       onComplete?.();
     } catch (error: any) {
       console.error("Error saving document:", error);
-      toast({
-        title: "Error al guardar",
+      toast.error("Error al guardar", {
         description: error.message || "No se pudo guardar el documento",
-        variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
