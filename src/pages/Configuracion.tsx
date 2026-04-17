@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings, Clock, Plus, Pencil, Trash2, Calendar, MapPin, Building2 } from "lucide-react";
+import { Settings, Clock, Plus, Pencil, Trash2, Calendar, MapPin, Building2, Layers } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { logActivity } from "@/lib/activityLog";
@@ -38,6 +38,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import FaenasConfig from "@/components/configuracion/FaenasConfig";
 import CentroMedicoConfig from "@/components/configuracion/CentroMedicoConfig";
+import PortalEmpresaModulosConfig from "@/components/configuracion/PortalEmpresaModulosConfig";
 
 interface AgendaBloque {
   id: string;
@@ -198,6 +199,10 @@ const Configuracion = () => {
             <TabsTrigger value="centro" className="flex items-center gap-2">
               <Building2 className="h-4 w-4" />
               Centro Médico
+            </TabsTrigger>
+            <TabsTrigger value="portal-empresa" className="flex items-center gap-2">
+              <Layers className="h-4 w-4" />
+              Portal Empresa
             </TabsTrigger>
           </TabsList>
 
@@ -395,6 +400,10 @@ const Configuracion = () => {
 
           <TabsContent value="centro">
             <CentroMedicoConfig />
+          </TabsContent>
+
+          <TabsContent value="portal-empresa">
+            <PortalEmpresaModulosConfig />
           </TabsContent>
         </Tabs>
 

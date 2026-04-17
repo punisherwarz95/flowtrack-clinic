@@ -23,6 +23,7 @@ export type ActivityAction =
   | "importar_examenes"
   | "crear_bloque" | "editar_bloque" | "eliminar_bloque" | "toggle_bloque"
   | "toggle_prioridad"
+  | "toggle_modulo_empresa"
   | "otro";
 
 export const logActivity = async (
