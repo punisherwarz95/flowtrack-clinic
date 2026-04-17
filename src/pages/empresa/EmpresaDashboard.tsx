@@ -271,33 +271,24 @@ const EmpresaDashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <a
-                href="/empresa/agendamiento"
-                className="block p-3 rounded-lg border hover:bg-muted transition-colors"
-              >
-                <div className="font-medium">Agendar Pacientes</div>
-                <div className="text-sm text-muted-foreground">
-                  Crear nuevas pre-reservas para sus trabajadores
-                </div>
-              </a>
-              <a
-                href="/empresa/cotizaciones"
-                className="block p-3 rounded-lg border hover:bg-muted transition-colors"
-              >
-                <div className="font-medium">Solicitar Cotización</div>
-                <div className="text-sm text-muted-foreground">
-                  Pedir cotización para nuevas baterías o servicios
-                </div>
-              </a>
-              <a
-                href="/empresa/resultados"
-                className="block p-3 rounded-lg border hover:bg-muted transition-colors"
-              >
-                <div className="font-medium">Ver Resultados</div>
-                <div className="text-sm text-muted-foreground">
-                  Consultar estado y resultados de evaluaciones
-                </div>
-              </a>
+              {quickActions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No hay acciones disponibles. Contacte al administrador.
+                </p>
+              ) : (
+                quickActions.map((action) => (
+                  <a
+                    key={action.href}
+                    href={action.href}
+                    className="block p-3 rounded-lg border hover:bg-muted transition-colors"
+                  >
+                    <div className="font-medium">{action.title}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {action.description}
+                    </div>
+                  </a>
+                ))
+              )}
             </CardContent>
           </Card>
 
