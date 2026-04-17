@@ -220,6 +220,7 @@ const AgendaDiferida = () => {
     });
     setSelectedPaquetes(item.paquetes_ids || []);
     setSelectedExamenes(item.examenes_ids || []);
+    setTipoSeleccion((item.paquetes_ids || []).length === 0 && (item.examenes_ids || []).length > 0 ? "examen" : "bateria");
     setEditingId(item.id);
     setShowForm(true);
 
