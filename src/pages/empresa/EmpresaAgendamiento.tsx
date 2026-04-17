@@ -180,7 +180,9 @@ const EmpresaAgendamiento = () => {
         baterias:prereserva_baterias(paquete:paquetes_examenes(*))
       `)
       .eq("empresa_id", currentEmpresaId)
-      .eq("fecha", selectedDate)
+      .gte("fecha", fechaDesde)
+      .lte("fecha", fechaHasta)
+      .order("fecha", { ascending: true })
       .order("created_at", { ascending: false });
 
     setPrereservas((data as unknown as Prereserva[]) || []);
