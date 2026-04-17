@@ -23,6 +23,12 @@ interface DashboardStats {
   evaluacionesPendientes: number;
 }
 
+interface ModuloActivo {
+  modulo_key: string;
+  path: string;
+  activo: boolean;
+}
+
 const EmpresaDashboard = () => {
   const { empresaUsuario, currentEmpresaId, isStaffAdmin, empresaOverride } = useEmpresaAuth();
   const [stats, setStats] = useState<DashboardStats>({
@@ -34,6 +40,20 @@ const EmpresaDashboard = () => {
     evaluacionesPendientes: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [modulosActivos, setModulosActivos] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const loadModulos = async () => {
+      const { data } = await supabase
+        .from("empresa_modulos_config")
+        .select("modulo_key, activo")
+        .eq("activo", true);
+      setModulosActivos(new Set((data || []).map((m: any) => m.modulo_key)));
+    };
+    loadModulos();
+  }, []);
+
+  const isModuloActivo = (key: string) => modulosActivos.has(key);
 
   // Nombre de empresa actual (override o original)
   const currentEmpresaNombre = empresaOverride?.nombre ?? empresaUsuario?.empresas?.nombre ?? "Empresa";
@@ -51,56 +71,66 @@ const EmpresaDashboard = () => {
     if (!currentEmpresaId) return;
 
     try {
-      const today = new Date().toISOString().split("T")[0];
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
+      setLoading(true);
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).toISOString();
+      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).toISOString();
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
+      const today = now.toISOString().split("T")[0];
 
-      // Pre-reservas de hoy
-      const { count: prereservasHoy } = await supabase
-        .from("prereservas")
-        .select("*", { count: "exact", head: true })
-        .eq("empresa_id", currentEmpresaId)
-        .eq("fecha", today)
-        .eq("estado", "pendiente");
-
-      // Pre-reservas pendientes totales
-      const { count: prereservasPendientes } = await supabase
-        .from("prereservas")
-        .select("*", { count: "exact", head: true })
-        .eq("empresa_id", currentEmpresaId)
-        .eq("estado", "pendiente")
-        .gte("fecha", today);
-
-      // Pacientes atendidos del mes
-      const { count: pacientesAtendidosMes } = await supabase
-        .from("prereservas")
-        .select("*", { count: "exact", head: true })
-        .eq("empresa_id", currentEmpresaId)
-        .eq("estado", "atendido")
-        .gte("fecha", startOfMonth.toISOString().split("T")[0]);
-
-      // Cotizaciones pendientes
-      const { count: cotizacionesPendientes } = await supabase
-        .from("cotizacion_solicitudes")
-        .select("*", { count: "exact", head: true })
-        .eq("empresa_id", currentEmpresaId)
-        .in("estado", ["pendiente", "en_revision"]);
-
-      // Estados de pago pendientes
-      const { count: estadosPagoPendientes } = await supabase
-        .from("estados_pago")
-        .select("*", { count: "exact", head: true })
-        .eq("empresa_id", currentEmpresaId)
-        .eq("estado", "pendiente");
+      // Fuente principal: tabla atenciones (igual método que el dashboard del staff)
+      const [
+        atencionesHoyRes,
+        atencionesMesRes,
+        prereservasPendientesRes,
+        cotizacionesPendientesRes,
+        estadosPagoPendientesRes,
+        evaluacionesPendientesRes,
+      ] = await Promise.all([
+        supabase
+          .from("atenciones")
+          .select("id", { count: "exact", head: true })
+          .eq("empresa_id", currentEmpresaId)
+          .gte("fecha_ingreso", startOfDay)
+          .lte("fecha_ingreso", endOfDay),
+        supabase
+          .from("atenciones")
+          .select("id", { count: "exact", head: true })
+          .eq("empresa_id", currentEmpresaId)
+          .eq("estado", "completado")
+          .gte("fecha_ingreso", startOfMonth)
+          .lte("fecha_ingreso", endOfMonth),
+        supabase
+          .from("prereservas" as any)
+          .select("*", { count: "exact", head: true })
+          .eq("empresa_id", currentEmpresaId)
+          .eq("estado", "pendiente")
+          .gte("fecha", today),
+        supabase
+          .from("cotizacion_solicitudes")
+          .select("*", { count: "exact", head: true })
+          .eq("empresa_id", currentEmpresaId)
+          .in("estado", ["pendiente", "en_revision"]),
+        supabase
+          .from("estados_pago")
+          .select("*", { count: "exact", head: true })
+          .eq("empresa_id", currentEmpresaId)
+          .eq("estado", "pendiente"),
+        supabase
+          .from("evaluaciones_clinicas")
+          .select("id, atenciones!inner(empresa_id)", { count: "exact", head: true })
+          .eq("atenciones.empresa_id", currentEmpresaId)
+          .eq("resultado", "pendiente"),
+      ]);
 
       setStats({
-        prereservasHoy: prereservasHoy || 0,
-        prereservasPendientes: prereservasPendientes || 0,
-        pacientesAtendidosMes: pacientesAtendidosMes || 0,
-        cotizacionesPendientes: cotizacionesPendientes || 0,
-        estadosPagoPendientes: estadosPagoPendientes || 0,
-        evaluacionesPendientes: 0, // TODO: calcular
+        prereservasHoy: atencionesHoyRes.count || 0,
+        prereservasPendientes: prereservasPendientesRes.count || 0,
+        pacientesAtendidosMes: atencionesMesRes.count || 0,
+        cotizacionesPendientes: cotizacionesPendientesRes.count || 0,
+        estadosPagoPendientes: estadosPagoPendientesRes.count || 0,
+        evaluacionesPendientes: evaluacionesPendientesRes.count || 0,
       });
     } catch (error) {
       console.error("Error cargando stats:", error);
@@ -109,22 +139,25 @@ const EmpresaDashboard = () => {
     }
   };
 
-  const statCards = [
+  const allStatCards = [
     {
-      title: "Pre-reservas Hoy",
+      moduloKey: "agendamiento",
+      title: "Atenciones Hoy",
       value: stats.prereservasHoy,
       icon: Calendar,
       color: "text-blue-500",
       bgColor: "bg-blue-50",
     },
     {
-      title: "Pendientes de Confirmar",
+      moduloKey: "agendamiento",
+      title: "Pre-reservas Pendientes",
       value: stats.prereservasPendientes,
       icon: Clock,
       color: "text-amber-500",
       bgColor: "bg-amber-50",
     },
     {
+      moduloKey: "pacientes",
       title: "Atendidos este Mes",
       value: stats.pacientesAtendidosMes,
       icon: Users,
@@ -132,6 +165,7 @@ const EmpresaDashboard = () => {
       bgColor: "bg-green-50",
     },
     {
+      moduloKey: "cotizaciones",
       title: "Cotizaciones Pendientes",
       value: stats.cotizacionesPendientes,
       icon: FileText,
@@ -139,6 +173,7 @@ const EmpresaDashboard = () => {
       bgColor: "bg-purple-50",
     },
     {
+      moduloKey: "estados-pago",
       title: "Estados de Pago",
       value: stats.estadosPagoPendientes,
       icon: AlertCircle,
@@ -146,6 +181,7 @@ const EmpresaDashboard = () => {
       bgColor: "bg-red-50",
     },
     {
+      moduloKey: "resultados",
       title: "Evaluaciones Pendientes",
       value: stats.evaluacionesPendientes,
       icon: CheckCircle,
@@ -153,6 +189,31 @@ const EmpresaDashboard = () => {
       bgColor: "bg-teal-50",
     },
   ];
+
+  const statCards = allStatCards.filter((s) => isModuloActivo(s.moduloKey));
+
+  const allQuickActions = [
+    {
+      moduloKey: "agendamiento",
+      href: "/empresa/agendamiento",
+      title: "Agendar Pacientes",
+      description: "Crear nuevas pre-reservas para sus trabajadores",
+    },
+    {
+      moduloKey: "cotizaciones",
+      href: "/empresa/cotizaciones",
+      title: "Solicitar Cotización",
+      description: "Pedir cotización para nuevas baterías o servicios",
+    },
+    {
+      moduloKey: "resultados",
+      href: "/empresa/resultados",
+      title: "Ver Resultados",
+      description: "Consultar estado y resultados de evaluaciones",
+    },
+  ];
+
+  const quickActions = allQuickActions.filter((a) => isModuloActivo(a.moduloKey));
 
   return (
     <EmpresaLayout>
@@ -210,33 +271,24 @@ const EmpresaDashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <a
-                href="/empresa/agendamiento"
-                className="block p-3 rounded-lg border hover:bg-muted transition-colors"
-              >
-                <div className="font-medium">Agendar Pacientes</div>
-                <div className="text-sm text-muted-foreground">
-                  Crear nuevas pre-reservas para sus trabajadores
-                </div>
-              </a>
-              <a
-                href="/empresa/cotizaciones"
-                className="block p-3 rounded-lg border hover:bg-muted transition-colors"
-              >
-                <div className="font-medium">Solicitar Cotización</div>
-                <div className="text-sm text-muted-foreground">
-                  Pedir cotización para nuevas baterías o servicios
-                </div>
-              </a>
-              <a
-                href="/empresa/resultados"
-                className="block p-3 rounded-lg border hover:bg-muted transition-colors"
-              >
-                <div className="font-medium">Ver Resultados</div>
-                <div className="text-sm text-muted-foreground">
-                  Consultar estado y resultados de evaluaciones
-                </div>
-              </a>
+              {quickActions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No hay acciones disponibles. Contacte al administrador.
+                </p>
+              ) : (
+                quickActions.map((action) => (
+                  <a
+                    key={action.href}
+                    href={action.href}
+                    className="block p-3 rounded-lg border hover:bg-muted transition-colors"
+                  >
+                    <div className="font-medium">{action.title}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {action.description}
+                    </div>
+                  </a>
+                ))
+              )}
             </CardContent>
           </Card>
 
