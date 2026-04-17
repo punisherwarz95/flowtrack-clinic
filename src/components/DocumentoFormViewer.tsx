@@ -163,6 +163,9 @@ export const DocumentoFormViewer = ({
   const canvasRefs = useRef<Map<string, HTMLCanvasElement>>(new Map());
   const [isDrawing, setIsDrawing] = useState(false);
   const [activeSignatureField, setActiveSignatureField] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const fieldRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const [errorFieldId, setErrorFieldId] = useState<string | null>(null);
 
   const isComplete = atencionDocumento.estado === "completado";
   const isReviewed = atencionDocumento.estado === "revisado";
