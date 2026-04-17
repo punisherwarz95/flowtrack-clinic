@@ -2080,18 +2080,40 @@ const Pacientes = () => {
                                   examen.nombre.toLowerCase().includes(bateriaFilter.toLowerCase()) ||
                                   (examen.codigo && examen.codigo.toLowerCase().includes(bateriaFilter.toLowerCase()))
                                 )
-                                .map((examen) => (
-                                  <label key={examen.id} className="flex items-center gap-2 cursor-pointer py-1 px-1 hover:bg-accent rounded text-sm">
-                                    <input type="checkbox" checked={selectedExamenes.includes(examen.id)}
-                                      onChange={(e) => {
-                                        if (e.target.checked) {
-                                          if (!selectedExamenes.includes(examen.id)) setSelectedExamenes([...selectedExamenes, examen.id]);
-                                        } else setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
-                                      }} className="w-3.5 h-3.5" />
-                                    <span className="break-words flex-1">{examen.nombre}</span>
-                                    {examen.codigo && <span className="text-xs text-muted-foreground shrink-0">{examen.codigo}</span>}
-                                  </label>
-                                ))}
+                                .map((examen) => {
+                                  const estadoYa = examenesYaRealizados[examen.id];
+                                  const yaRealizado = !!estadoYa;
+                                  return (
+                                    <label
+                                      key={examen.id}
+                                      className={`flex items-center gap-2 py-1 px-1 rounded text-sm ${yaRealizado ? 'opacity-70 cursor-not-allowed bg-muted/40' : 'cursor-pointer hover:bg-accent'}`}
+                                      title={yaRealizado ? `Ya procesado (${estadoYa}). No se puede reasignar.` : undefined}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        disabled={yaRealizado}
+                                        checked={yaRealizado || selectedExamenes.includes(examen.id)}
+                                        onChange={(e) => {
+                                          if (yaRealizado) return;
+                                          if (e.target.checked) {
+                                            if (!selectedExamenes.includes(examen.id)) setSelectedExamenes([...selectedExamenes, examen.id]);
+                                          } else setSelectedExamenes(selectedExamenes.filter(id => id !== examen.id));
+                                        }}
+                                        className="w-3.5 h-3.5"
+                                      />
+                                      <span className="break-words flex-1">{examen.nombre}</span>
+                                      {yaRealizado && (
+                                        <span className="shrink-0">
+                                          {estadoYa === 'completado' && <CheckCircle2 className="h-4 w-4 text-green-600" />}
+                                          {estadoYa === 'toma_muestra' && <FlaskConical className="h-4 w-4 text-blue-600" />}
+                                          {estadoYa === 'muestra_tomada' && <FlaskConical className="h-4 w-4 text-blue-600" />}
+                                          {estadoYa === 'incompleto' && <Clock className="h-4 w-4 text-amber-600" />}
+                                        </span>
+                                      )}
+                                      {examen.codigo && <span className="text-xs text-muted-foreground shrink-0">{examen.codigo}</span>}
+                                    </label>
+                                  );
+                                })}
                             </div>
                           )}
                         </div>
