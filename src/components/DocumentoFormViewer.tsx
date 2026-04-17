@@ -621,6 +621,7 @@ export const DocumentoFormViewer = ({
         </CardFooter>
       )}
     </Card>
+    </div>
   );
 };
 
