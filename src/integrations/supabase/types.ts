@@ -1193,6 +1193,39 @@ export type Database = {
           },
         ]
       }
+      empresa_modulos_config: {
+        Row: {
+          activo: boolean
+          created_at: string
+          id: string
+          label: string
+          modulo_key: string
+          orden: number
+          path: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          id?: string
+          label: string
+          modulo_key: string
+          orden?: number
+          path: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          id?: string
+          label?: string
+          modulo_key?: string
+          orden?: number
+          path?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       empresa_user_roles: {
         Row: {
           created_at: string | null
