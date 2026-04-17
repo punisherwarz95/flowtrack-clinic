@@ -727,20 +727,30 @@ const Pacientes = () => {
       if (atencion) {
         setAtencionPrioridad(atencion.prioridad ?? false);
         const aeList = localAtencionExamenes.filter(ae => ae.atencion_id === atencion.id);
-        const exams = aeList.map(ae => ae.examen_id);
+        // Separar pendientes (editables) de ya realizados (bloqueados)
+        const yaRealizadosMap: Record<string, string> = {};
+        const pendientes: typeof aeList = [];
+        aeList.forEach(ae => {
+          const est = ae.estado || 'pendiente';
+          if (est === 'pendiente') pendientes.push(ae);
+          else yaRealizadosMap[ae.examen_id] = est;
+        });
+        const exams = pendientes.map(ae => ae.examen_id);
         const estados: Record<string, string> = {};
-        aeList.forEach((ae, i) => { estados[`${ae.examen_id}_${i}`] = ae.estado || 'pendiente'; });
+        pendientes.forEach((ae, i) => { estados[`${ae.examen_id}_${i}`] = ae.estado || 'pendiente'; });
         const docs = localAtencionDocumentos
           .filter(d => d.atencion_id === atencion.id)
           .map(d => d.documento_id);
         setSelectedExamenes(exams);
         setExamenEstados(estados);
+        setExamenesYaRealizados(yaRealizadosMap);
         setOriginalExamenesCount(exams.length);
         setSelectedDocumentos(docs);
       } else {
         setAtencionPrioridad(false);
         setSelectedExamenes([]);
         setExamenEstados({});
+        setExamenesYaRealizados({});
         setOriginalExamenesCount(0);
         setSelectedDocumentos([]);
       }
@@ -776,16 +786,27 @@ const Pacientes = () => {
           ]);
 
           if (examenesRes.error) throw examenesRes.error;
-          const loadedExams = examenesRes.data?.map(e => e.examen_id) || [];
+          // Separar pendientes (editables) de realizados (bloqueados)
+          const allRows = examenesRes.data || [];
+          const yaRealizadosMap: Record<string, string> = {};
+          const pendientes: typeof allRows = [];
+          allRows.forEach(e => {
+            const est = (e.estado as string) || 'pendiente';
+            if (est === 'pendiente') pendientes.push(e);
+            else yaRealizadosMap[e.examen_id] = est;
+          });
+          const loadedExams = pendientes.map(e => e.examen_id);
           const estados: Record<string, string> = {};
-          examenesRes.data?.forEach((e, i) => { estados[`${e.examen_id}_${i}`] = e.estado || 'pendiente'; });
+          pendientes.forEach((e, i) => { estados[`${e.examen_id}_${i}`] = (e.estado as string) || 'pendiente'; });
           setSelectedExamenes(loadedExams);
           setExamenEstados(estados);
+          setExamenesYaRealizados(yaRealizadosMap);
           setOriginalExamenesCount(loadedExams.length);
           setSelectedDocumentos(docsRes.data?.map(d => d.documento_id) || []);
         } else {
           setSelectedExamenes([]);
           setExamenEstados({});
+          setExamenesYaRealizados({});
           setOriginalExamenesCount(0);
           setSelectedDocumentos([]);
         }
@@ -793,6 +814,7 @@ const Pacientes = () => {
         console.error("Error loading exams:", error);
         setSelectedExamenes([]);
         setSelectedDocumentos([]);
+        setExamenesYaRealizados({});
       }
     }
 
