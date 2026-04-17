@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus, Search, Trash2, Calendar as CalendarIcon, Clock, Pencil, X } from "lucide-react";
-import { format } from "date-fns";
+import { format, addDays } from "date-fns";
+import { es } from "date-fns/locale";
 import { formatRutStandard } from "@/lib/utils";
 import { logActivity } from "@/lib/activityLog";
 import {
@@ -87,6 +88,10 @@ const AgendaDiferida = () => {
   const [empresaDropdownOpen, setEmpresaDropdownOpen] = useState(false);
   const empresaDropdownRef = useRef<HTMLDivElement>(null);
 
+  const tomorrowStr = format(addDays(new Date(), 1), "yyyy-MM-dd");
+  const [fechaDesde, setFechaDesde] = useState(tomorrowStr);
+  const [fechaHasta, setFechaHasta] = useState(tomorrowStr);
+
   const [formData, setFormData] = useState({
     nombre: "",
     rut: "",
@@ -94,7 +99,7 @@ const AgendaDiferida = () => {
     empresa_id: "",
     faena_id: "",
     cargo: "",
-    fecha_programada: "",
+    fecha_programada: tomorrowStr,
   });
 
   useEffect(() => {
@@ -236,7 +241,7 @@ const AgendaDiferida = () => {
   };
 
   const resetForm = () => {
-    setFormData({ nombre: "", rut: "", tipo_servicio: "workmed", empresa_id: "", faena_id: "", cargo: "", fecha_programada: "" });
+    setFormData({ nombre: "", rut: "", tipo_servicio: "workmed", empresa_id: "", faena_id: "", cargo: "", fecha_programada: tomorrowStr });
     setSelectedExamenes([]);
     setSelectedPaquetes([]);
     setShowForm(false);
@@ -252,11 +257,15 @@ const AgendaDiferida = () => {
     setSelectedExamenes([]);
   };
 
-  const filteredItems = items.filter(
-    (i) =>
+  const filteredItems = items.filter((i) => {
+    const matchesSearch =
       i.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      i.rut.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      i.rut.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!matchesSearch) return false;
+    // Items sin fecha programada se muestran siempre; con fecha se filtran por rango
+    if (!i.fecha_programada) return true;
+    return i.fecha_programada >= fechaDesde && i.fecha_programada <= fechaHasta;
+  });
 
   const filteredEmpresas = empresas.filter(e =>
     !empresaSearch || e.nombre.toLowerCase().includes(empresaSearch.toLowerCase())
@@ -416,10 +425,49 @@ const AgendaDiferida = () => {
         </Card>
       )}
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Buscar por nombre o RUT..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
+      {/* Filtros: búsqueda + rango de fechas */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Buscar por nombre o RUT..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
+        </div>
+        <div className="flex gap-2 items-end flex-wrap">
+          <div className="space-y-1">
+            <Label className="text-xs">Desde</Label>
+            <Input
+              type="date"
+              value={fechaDesde}
+              onChange={(e) => {
+                const v = e.target.value;
+                setFechaDesde(v);
+                if (v > fechaHasta) setFechaHasta(v);
+              }}
+              className="w-[150px]"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Hasta</Label>
+            <Input
+              type="date"
+              value={fechaHasta}
+              min={fechaDesde}
+              onChange={(e) => setFechaHasta(e.target.value)}
+              className="w-[150px]"
+            />
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => { setFechaDesde(tomorrowStr); setFechaHasta(tomorrowStr); }}>
+            Solo mañana
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => { setFechaDesde(tomorrowStr); setFechaHasta(format(addDays(new Date(), 7), "yyyy-MM-dd")); }}>
+            Próximos 7 días
+          </Button>
+        </div>
+      </div>
+
+      <div className="text-xs text-muted-foreground">
+        Mostrando rango: {format(new Date(fechaDesde + "T12:00:00"), "dd-MM-yyyy", { locale: es })}
+        {fechaDesde !== fechaHasta && ` → ${format(new Date(fechaHasta + "T12:00:00"), "dd-MM-yyyy", { locale: es })}`}
+        {" "}· Los registros sin fecha programada siempre se muestran.
       </div>
 
       {/* List */}
