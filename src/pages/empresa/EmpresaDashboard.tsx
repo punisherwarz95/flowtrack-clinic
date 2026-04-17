@@ -139,22 +139,25 @@ const EmpresaDashboard = () => {
     }
   };
 
-  const statCards = [
+  const allStatCards = [
     {
-      title: "Pre-reservas Hoy",
+      moduloKey: "agendamiento",
+      title: "Atenciones Hoy",
       value: stats.prereservasHoy,
       icon: Calendar,
       color: "text-blue-500",
       bgColor: "bg-blue-50",
     },
     {
-      title: "Pendientes de Confirmar",
+      moduloKey: "agendamiento",
+      title: "Pre-reservas Pendientes",
       value: stats.prereservasPendientes,
       icon: Clock,
       color: "text-amber-500",
       bgColor: "bg-amber-50",
     },
     {
+      moduloKey: "pacientes",
       title: "Atendidos este Mes",
       value: stats.pacientesAtendidosMes,
       icon: Users,
@@ -162,6 +165,7 @@ const EmpresaDashboard = () => {
       bgColor: "bg-green-50",
     },
     {
+      moduloKey: "cotizaciones",
       title: "Cotizaciones Pendientes",
       value: stats.cotizacionesPendientes,
       icon: FileText,
@@ -169,6 +173,7 @@ const EmpresaDashboard = () => {
       bgColor: "bg-purple-50",
     },
     {
+      moduloKey: "estados-pago",
       title: "Estados de Pago",
       value: stats.estadosPagoPendientes,
       icon: AlertCircle,
@@ -176,6 +181,7 @@ const EmpresaDashboard = () => {
       bgColor: "bg-red-50",
     },
     {
+      moduloKey: "resultados",
       title: "Evaluaciones Pendientes",
       value: stats.evaluacionesPendientes,
       icon: CheckCircle,
@@ -183,6 +189,31 @@ const EmpresaDashboard = () => {
       bgColor: "bg-teal-50",
     },
   ];
+
+  const statCards = allStatCards.filter((s) => isModuloActivo(s.moduloKey));
+
+  const allQuickActions = [
+    {
+      moduloKey: "agendamiento",
+      href: "/empresa/agendamiento",
+      title: "Agendar Pacientes",
+      description: "Crear nuevas pre-reservas para sus trabajadores",
+    },
+    {
+      moduloKey: "cotizaciones",
+      href: "/empresa/cotizaciones",
+      title: "Solicitar Cotización",
+      description: "Pedir cotización para nuevas baterías o servicios",
+    },
+    {
+      moduloKey: "resultados",
+      href: "/empresa/resultados",
+      title: "Ver Resultados",
+      description: "Consultar estado y resultados de evaluaciones",
+    },
+  ];
+
+  const quickActions = allQuickActions.filter((a) => isModuloActivo(a.moduloKey));
 
   return (
     <EmpresaLayout>
