@@ -139,6 +139,48 @@ export default function PortalPaciente() {
     return () => clearInterval(interval);
   }, [atencion?.id, step, reloadDocumentos]);
 
+  // Cargar empresa asociada a la atención o al paciente
+  useEffect(() => {
+    const loadEmpresa = async () => {
+      if (!atencion?.id && !paciente?.id) {
+        setEmpresa(null);
+        return;
+      }
+      try {
+        let empresaId: string | null = null;
+        if (atencion?.id) {
+          const { data: atData } = await supabase
+            .from("atenciones")
+            .select("empresa_id")
+            .eq("id", atencion.id)
+            .maybeSingle();
+          empresaId = atData?.empresa_id || null;
+        }
+        if (!empresaId && paciente?.id) {
+          const { data: pacData } = await supabase
+            .from("pacientes")
+            .select("empresa_id")
+            .eq("id", paciente.id)
+            .maybeSingle();
+          empresaId = pacData?.empresa_id || null;
+        }
+        if (empresaId) {
+          const { data: empData } = await supabase
+            .from("empresas")
+            .select("id, nombre")
+            .eq("id", empresaId)
+            .maybeSingle();
+          setEmpresa(empData || null);
+        } else {
+          setEmpresa(null);
+        }
+      } catch (err) {
+        console.error("[Portal] Error cargando empresa:", err);
+      }
+    };
+    loadEmpresa();
+  }, [atencion?.id, paciente?.id, atencion?.estado]);
+
   // Lista de ciudades de Chile para validación
   const ciudadesChile = [
     "Arica", "Iquique", "Alto Hospicio", "Antofagasta", "Calama", "Tocopilla",
