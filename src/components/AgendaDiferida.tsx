@@ -84,6 +84,8 @@ const AgendaDiferida = () => {
   const [selectedExamenes, setSelectedExamenes] = useState<string[]>([]);
   const [selectedPaquetes, setSelectedPaquetes] = useState<string[]>([]);
   const [bateriaFilter, setBateriaFilter] = useState("");
+  const [examenFilter, setExamenFilter] = useState("");
+  const [tipoSeleccion, setTipoSeleccion] = useState<"bateria" | "examen">("bateria");
   const [empresaSearch, setEmpresaSearch] = useState("");
   const [empresaDropdownOpen, setEmpresaDropdownOpen] = useState(false);
   const empresaDropdownRef = useRef<HTMLDivElement>(null);
