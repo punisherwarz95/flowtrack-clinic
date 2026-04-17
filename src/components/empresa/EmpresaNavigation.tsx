@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useEmpresaAuth } from "@/contexts/EmpresaAuthContext";
 import { Button } from "@/components/ui/button";
@@ -14,20 +15,48 @@ import {
 import { cn } from "@/lib/utils";
 import EmpresaSelector from "./EmpresaSelector";
 import PortalSwitcher from "@/components/PortalSwitcher";
+import { supabase } from "@/integrations/supabase/client";
 
-const menuItems = [
-  { path: "/empresa", label: "Dashboard", icon: LayoutDashboard },
-  { path: "/empresa/agendamiento", label: "Agendamiento", icon: Calendar },
-  { path: "/empresa/pacientes", label: "Pacientes Atendidos", icon: Users },
-  { path: "/empresa/cotizaciones", label: "Cotizaciones", icon: FileText },
-  { path: "/empresa/estados-pago", label: "Estados de Pago", icon: CreditCard },
-  { path: "/empresa/baterias", label: "Baterías", icon: Package },
-  { path: "/empresa/resultados", label: "Resultados", icon: ClipboardCheck },
-];
+const ICONS: Record<string, any> = {
+  dashboard: LayoutDashboard,
+  agendamiento: Calendar,
+  pacientes: Users,
+  cotizaciones: FileText,
+  "estados-pago": CreditCard,
+  baterias: Package,
+  resultados: ClipboardCheck,
+};
+
+interface ModuloItem {
+  modulo_key: string;
+  label: string;
+  path: string;
+  icon: any;
+}
 
 const EmpresaNavigation = () => {
   const location = useLocation();
   const { empresaUsuario, signOut, isStaffAdmin, empresaOverride } = useEmpresaAuth();
+  const [menuItems, setMenuItems] = useState<ModuloItem[]>([]);
+
+  useEffect(() => {
+    const loadModulos = async () => {
+      const { data } = await supabase
+        .from("empresa_modulos_config")
+        .select("modulo_key, label, path, activo")
+        .eq("activo", true)
+        .order("orden");
+      setMenuItems(
+        (data || []).map((m: any) => ({
+          modulo_key: m.modulo_key,
+          label: m.label,
+          path: m.path,
+          icon: ICONS[m.modulo_key] ?? LayoutDashboard,
+        }))
+      );
+    };
+    loadModulos();
+  }, []);
 
   const handleSignOut = async () => {
     await signOut();
