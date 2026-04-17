@@ -241,7 +241,7 @@ const AgendaDiferida = () => {
   };
 
   const resetForm = () => {
-    setFormData({ nombre: "", rut: "", tipo_servicio: "workmed", empresa_id: "", faena_id: "", cargo: "", fecha_programada: "" });
+    setFormData({ nombre: "", rut: "", tipo_servicio: "workmed", empresa_id: "", faena_id: "", cargo: "", fecha_programada: tomorrowStr });
     setSelectedExamenes([]);
     setSelectedPaquetes([]);
     setShowForm(false);
