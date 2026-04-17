@@ -23,6 +23,12 @@ interface DashboardStats {
   evaluacionesPendientes: number;
 }
 
+interface ModuloActivo {
+  modulo_key: string;
+  path: string;
+  activo: boolean;
+}
+
 const EmpresaDashboard = () => {
   const { empresaUsuario, currentEmpresaId, isStaffAdmin, empresaOverride } = useEmpresaAuth();
   const [stats, setStats] = useState<DashboardStats>({
@@ -34,6 +40,20 @@ const EmpresaDashboard = () => {
     evaluacionesPendientes: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [modulosActivos, setModulosActivos] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const loadModulos = async () => {
+      const { data } = await supabase
+        .from("empresa_modulos_config")
+        .select("modulo_key, activo")
+        .eq("activo", true);
+      setModulosActivos(new Set((data || []).map((m: any) => m.modulo_key)));
+    };
+    loadModulos();
+  }, []);
+
+  const isModuloActivo = (key: string) => modulosActivos.has(key);
 
   // Nombre de empresa actual (override o original)
   const currentEmpresaNombre = empresaOverride?.nombre ?? empresaUsuario?.empresas?.nombre ?? "Empresa";
