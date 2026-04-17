@@ -88,6 +88,10 @@ const AgendaDiferida = () => {
   const [empresaDropdownOpen, setEmpresaDropdownOpen] = useState(false);
   const empresaDropdownRef = useRef<HTMLDivElement>(null);
 
+  const tomorrowStr = format(addDays(new Date(), 1), "yyyy-MM-dd");
+  const [fechaDesde, setFechaDesde] = useState(tomorrowStr);
+  const [fechaHasta, setFechaHasta] = useState(tomorrowStr);
+
   const [formData, setFormData] = useState({
     nombre: "",
     rut: "",
@@ -95,7 +99,7 @@ const AgendaDiferida = () => {
     empresa_id: "",
     faena_id: "",
     cargo: "",
-    fecha_programada: "",
+    fecha_programada: tomorrowStr,
   });
 
   useEffect(() => {
