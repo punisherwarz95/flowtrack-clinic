@@ -71,56 +71,66 @@ const EmpresaDashboard = () => {
     if (!currentEmpresaId) return;
 
     try {
-      const today = new Date().toISOString().split("T")[0];
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
+      setLoading(true);
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).toISOString();
+      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).toISOString();
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
+      const today = now.toISOString().split("T")[0];
 
-      // Pre-reservas de hoy
-      const { count: prereservasHoy } = await supabase
-        .from("prereservas")
-        .select("*", { count: "exact", head: true })
-        .eq("empresa_id", currentEmpresaId)
-        .eq("fecha", today)
-        .eq("estado", "pendiente");
-
-      // Pre-reservas pendientes totales
-      const { count: prereservasPendientes } = await supabase
-        .from("prereservas")
-        .select("*", { count: "exact", head: true })
-        .eq("empresa_id", currentEmpresaId)
-        .eq("estado", "pendiente")
-        .gte("fecha", today);
-
-      // Pacientes atendidos del mes
-      const { count: pacientesAtendidosMes } = await supabase
-        .from("prereservas")
-        .select("*", { count: "exact", head: true })
-        .eq("empresa_id", currentEmpresaId)
-        .eq("estado", "atendido")
-        .gte("fecha", startOfMonth.toISOString().split("T")[0]);
-
-      // Cotizaciones pendientes
-      const { count: cotizacionesPendientes } = await supabase
-        .from("cotizacion_solicitudes")
-        .select("*", { count: "exact", head: true })
-        .eq("empresa_id", currentEmpresaId)
-        .in("estado", ["pendiente", "en_revision"]);
-
-      // Estados de pago pendientes
-      const { count: estadosPagoPendientes } = await supabase
-        .from("estados_pago")
-        .select("*", { count: "exact", head: true })
-        .eq("empresa_id", currentEmpresaId)
-        .eq("estado", "pendiente");
+      // Fuente principal: tabla atenciones (igual método que el dashboard del staff)
+      const [
+        atencionesHoyRes,
+        atencionesMesRes,
+        prereservasPendientesRes,
+        cotizacionesPendientesRes,
+        estadosPagoPendientesRes,
+        evaluacionesPendientesRes,
+      ] = await Promise.all([
+        supabase
+          .from("atenciones")
+          .select("id", { count: "exact", head: true })
+          .eq("empresa_id", currentEmpresaId)
+          .gte("fecha_ingreso", startOfDay)
+          .lte("fecha_ingreso", endOfDay),
+        supabase
+          .from("atenciones")
+          .select("id", { count: "exact", head: true })
+          .eq("empresa_id", currentEmpresaId)
+          .eq("estado", "completado")
+          .gte("fecha_ingreso", startOfMonth)
+          .lte("fecha_ingreso", endOfMonth),
+        supabase
+          .from("prereservas" as any)
+          .select("*", { count: "exact", head: true })
+          .eq("empresa_id", currentEmpresaId)
+          .eq("estado", "pendiente")
+          .gte("fecha", today),
+        supabase
+          .from("cotizacion_solicitudes")
+          .select("*", { count: "exact", head: true })
+          .eq("empresa_id", currentEmpresaId)
+          .in("estado", ["pendiente", "en_revision"]),
+        supabase
+          .from("estados_pago")
+          .select("*", { count: "exact", head: true })
+          .eq("empresa_id", currentEmpresaId)
+          .eq("estado", "pendiente"),
+        supabase
+          .from("evaluaciones_clinicas")
+          .select("id, atenciones!inner(empresa_id)", { count: "exact", head: true })
+          .eq("atenciones.empresa_id", currentEmpresaId)
+          .eq("resultado", "pendiente"),
+      ]);
 
       setStats({
-        prereservasHoy: prereservasHoy || 0,
-        prereservasPendientes: prereservasPendientes || 0,
-        pacientesAtendidosMes: pacientesAtendidosMes || 0,
-        cotizacionesPendientes: cotizacionesPendientes || 0,
-        estadosPagoPendientes: estadosPagoPendientes || 0,
-        evaluacionesPendientes: 0, // TODO: calcular
+        prereservasHoy: atencionesHoyRes.count || 0,
+        prereservasPendientes: prereservasPendientesRes.count || 0,
+        pacientesAtendidosMes: atencionesMesRes.count || 0,
+        cotizacionesPendientes: cotizacionesPendientesRes.count || 0,
+        estadosPagoPendientes: estadosPagoPendientesRes.count || 0,
+        evaluacionesPendientes: evaluacionesPendientesRes.count || 0,
       });
     } catch (error) {
       console.error("Error cargando stats:", error);
