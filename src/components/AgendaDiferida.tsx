@@ -257,11 +257,15 @@ const AgendaDiferida = () => {
     setSelectedExamenes([]);
   };
 
-  const filteredItems = items.filter(
-    (i) =>
+  const filteredItems = items.filter((i) => {
+    const matchesSearch =
       i.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      i.rut.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      i.rut.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!matchesSearch) return false;
+    // Filtrar por rango de fecha programada (incluye sin fecha si rango cubre 'hoy o futuro' = no, los excluimos)
+    if (!i.fecha_programada) return false;
+    return i.fecha_programada >= fechaDesde && i.fecha_programada <= fechaHasta;
+  });
 
   const filteredEmpresas = empresas.filter(e =>
     !empresaSearch || e.nombre.toLowerCase().includes(empresaSearch.toLowerCase())
