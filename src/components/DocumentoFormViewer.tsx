@@ -548,6 +548,7 @@ export const DocumentoFormViewer = ({
   };
 
   return (
+    <div ref={containerRef}>
     <Card>
       {showHeader && (
         <CardHeader className="pb-3">
@@ -578,9 +579,18 @@ export const DocumentoFormViewer = ({
             .sort((a, b) => a.orden - b.orden)
             .map((campo) => {
               const fieldDisabled = isFieldDisabled(campo);
-              const hidden = fieldDisabled && campo.tipo_campo !== "puntaje";
+              const isErrorField = errorFieldId === campo.id;
               return (
-                <div key={campo.id} className={`space-y-2 ${fieldDisabled ? "opacity-50" : ""}`}>
+                <div
+                  key={campo.id}
+                  ref={(el) => {
+                    if (el) fieldRefs.current.set(campo.id, el);
+                    else fieldRefs.current.delete(campo.id);
+                  }}
+                  className={`space-y-2 scroll-mt-24 ${fieldDisabled ? "opacity-50" : ""} ${
+                    isErrorField ? "ring-2 ring-destructive rounded-md p-2 -m-2 bg-destructive/5 transition-all" : ""
+                  }`}
+                >
                   {campo.tipo_campo !== "checkbox" && campo.tipo_campo !== "texto_informativo" && campo.tipo_campo !== "puntaje" && (
                     <Label className="flex items-center gap-1">
                       {campo.etiqueta}
