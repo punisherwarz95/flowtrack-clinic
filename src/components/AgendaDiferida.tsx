@@ -425,10 +425,49 @@ const AgendaDiferida = () => {
         </Card>
       )}
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Buscar por nombre o RUT..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
+      {/* Filtros: búsqueda + rango de fechas */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Buscar por nombre o RUT..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
+        </div>
+        <div className="flex gap-2 items-end flex-wrap">
+          <div className="space-y-1">
+            <Label className="text-xs">Desde</Label>
+            <Input
+              type="date"
+              value={fechaDesde}
+              onChange={(e) => {
+                const v = e.target.value;
+                setFechaDesde(v);
+                if (v > fechaHasta) setFechaHasta(v);
+              }}
+              className="w-[150px]"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Hasta</Label>
+            <Input
+              type="date"
+              value={fechaHasta}
+              min={fechaDesde}
+              onChange={(e) => setFechaHasta(e.target.value)}
+              className="w-[150px]"
+            />
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => { setFechaDesde(tomorrowStr); setFechaHasta(tomorrowStr); }}>
+            Solo mañana
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => { setFechaDesde(tomorrowStr); setFechaHasta(format(addDays(new Date(), 7), "yyyy-MM-dd")); }}>
+            Próximos 7 días
+          </Button>
+        </div>
+      </div>
+
+      <div className="text-xs text-muted-foreground">
+        Mostrando rango: {format(new Date(fechaDesde + "T12:00:00"), "dd-MM-yyyy", { locale: es })}
+        {fechaDesde !== fechaHasta && ` → ${format(new Date(fechaHasta + "T12:00:00"), "dd-MM-yyyy", { locale: es })}`}
+        {" "}· Los registros sin fecha programada siempre se muestran.
       </div>
 
       {/* List */}
