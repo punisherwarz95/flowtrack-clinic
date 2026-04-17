@@ -83,7 +83,10 @@ const EmpresaAgendamiento = () => {
   const [prereservas, setPrereservas] = useState<Prereserva[]>([]);
   const [cuposDisponibles, setCuposDisponibles] = useState<Record<string, number>>({});
   
-  const [selectedDate, setSelectedDate] = useState(format(addDays(new Date(), 1), "yyyy-MM-dd"));
+  const tomorrowStr = format(addDays(new Date(), 1), "yyyy-MM-dd");
+  const [selectedDate, setSelectedDate] = useState(tomorrowStr);
+  const [fechaDesde, setFechaDesde] = useState(tomorrowStr);
+  const [fechaHasta, setFechaHasta] = useState(tomorrowStr);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   
@@ -107,12 +110,12 @@ const EmpresaAgendamiento = () => {
     }
   }, [currentEmpresaId]);
 
-  // Load prereservas when date changes
+  // Load prereservas when date range changes
   useEffect(() => {
-    if (selectedDate && currentEmpresaId) {
+    if (fechaDesde && fechaHasta && currentEmpresaId) {
       loadPrereservas();
     }
-  }, [selectedDate, currentEmpresaId]);
+  }, [fechaDesde, fechaHasta, currentEmpresaId]);
 
   // Recalculate cupos when bloques load or date changes
   useEffect(() => {
@@ -177,7 +180,9 @@ const EmpresaAgendamiento = () => {
         baterias:prereserva_baterias(paquete:paquetes_examenes(*))
       `)
       .eq("empresa_id", currentEmpresaId)
-      .eq("fecha", selectedDate)
+      .gte("fecha", fechaDesde)
+      .lte("fecha", fechaHasta)
+      .order("fecha", { ascending: true })
       .order("created_at", { ascending: false });
 
     setPrereservas((data as unknown as Prereserva[]) || []);
@@ -578,18 +583,68 @@ const EmpresaAgendamiento = () => {
         {/* Lista de prereservas */}
         <Card>
           <CardHeader>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <CardTitle>
-                Pre-reservas para {format(new Date(selectedDate + "T12:00:00"), "EEEE d 'de' MMMM", { locale: es })}
-              </CardTitle>
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nombre, RUT..."
-                  value={searchFilter}
-                  onChange={(e) => setSearchFilter(e.target.value)}
-                  className="pl-10"
-                />
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <CardTitle>
+                  Pre-reservas{" "}
+                  {fechaDesde === fechaHasta
+                    ? `del ${format(new Date(fechaDesde + "T12:00:00"), "EEEE d 'de' MMMM", { locale: es })}`
+                    : `del ${format(new Date(fechaDesde + "T12:00:00"), "d MMM", { locale: es })} al ${format(new Date(fechaHasta + "T12:00:00"), "d MMM yyyy", { locale: es })}`}
+                </CardTitle>
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por nombre, RUT..."
+                    value={searchFilter}
+                    onChange={(e) => setSearchFilter(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 items-end">
+                <div className="space-y-1 flex-1 min-w-[140px]">
+                  <Label className="text-xs">Desde</Label>
+                  <Input
+                    type="date"
+                    value={fechaDesde}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setFechaDesde(v);
+                      if (v > fechaHasta) setFechaHasta(v);
+                    }}
+                  />
+                </div>
+                <div className="space-y-1 flex-1 min-w-[140px]">
+                  <Label className="text-xs">Hasta</Label>
+                  <Input
+                    type="date"
+                    value={fechaHasta}
+                    min={fechaDesde}
+                    onChange={(e) => setFechaHasta(e.target.value)}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setFechaDesde(tomorrowStr);
+                    setFechaHasta(tomorrowStr);
+                  }}
+                >
+                  Solo mañana
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setFechaDesde(tomorrowStr);
+                    setFechaHasta(format(addDays(new Date(), 7), "yyyy-MM-dd"));
+                  }}
+                >
+                  Próximos 7 días
+                </Button>
               </div>
             </div>
           </CardHeader>
@@ -603,6 +658,7 @@ const EmpresaAgendamiento = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Fecha</TableHead>
                       <TableHead>Bloque</TableHead>
                       <TableHead>Nombre</TableHead>
                       <TableHead>RUT</TableHead>
@@ -616,6 +672,9 @@ const EmpresaAgendamiento = () => {
                   <TableBody>
                     {filteredPrereservas.map((prereserva) => (
                       <TableRow key={prereserva.id}>
+                        <TableCell className="text-sm whitespace-nowrap">
+                          {format(new Date(prereserva.fecha + "T12:00:00"), "dd-MM-yyyy", { locale: es })}
+                        </TableCell>
                         <TableCell>
                           <div className="text-sm">
                             {prereserva.bloque?.nombre}
