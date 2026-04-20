@@ -746,6 +746,13 @@ const Pacientes = () => {
         setExamenesYaRealizados(yaRealizadosMap);
         setOriginalExamenesCount(exams.length);
         setSelectedDocumentos(docs);
+
+        // FIX: Cargar baterías ya asignadas a la atención para preservarlas
+        const { data: bateriasAtencion } = await supabase
+          .from("atencion_baterias")
+          .select("paquete_id")
+          .eq("atencion_id", atencion.id);
+        setSelectedPaquetes((bateriasAtencion || []).map((b: any) => b.paquete_id));
       } else {
         setAtencionPrioridad(false);
         setSelectedExamenes([]);
@@ -753,6 +760,7 @@ const Pacientes = () => {
         setExamenesYaRealizados({});
         setOriginalExamenesCount(0);
         setSelectedDocumentos([]);
+        setSelectedPaquetes([]);
       }
     } else {
       try {
