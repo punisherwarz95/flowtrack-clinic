@@ -824,12 +824,14 @@ const Pacientes = () => {
           setExamenesYaRealizados({});
           setOriginalExamenesCount(0);
           setSelectedDocumentos([]);
+          setSelectedPaquetes([]);
         }
       } catch (error) {
         console.error("Error loading exams:", error);
         setSelectedExamenes([]);
         setSelectedDocumentos([]);
         setExamenesYaRealizados({});
+        setSelectedPaquetes([]);
       }
     }
 
