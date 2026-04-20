@@ -803,6 +803,13 @@ const Pacientes = () => {
           setExamenesYaRealizados(yaRealizadosMap);
           setOriginalExamenesCount(loadedExams.length);
           setSelectedDocumentos(docsRes.data?.map(d => d.documento_id) || []);
+
+          // FIX: Cargar baterías ya asignadas a la atención para preservarlas
+          const { data: bateriasAtencion } = await supabase
+            .from("atencion_baterias")
+            .select("paquete_id")
+            .eq("atencion_id", atencionData.id);
+          setSelectedPaquetes((bateriasAtencion || []).map((b: any) => b.paquete_id));
         } else {
           setSelectedExamenes([]);
           setExamenEstados({});
