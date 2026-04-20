@@ -924,24 +924,36 @@ const Pacientes = () => {
               if (examenesError) throw examenesError;
             }
 
-            // Registrar baterías asignadas a la atención para trazabilidad (edición)
-            if (selectedPaquetes.length > 0) {
-              // Primero eliminar baterías anteriores de esta atención
+            // Registrar baterías asignadas a la atención (DIFF: preservar las existentes)
+            // Solo agregamos las nuevas y eliminamos las que el usuario quitó explícitamente.
+            // Esto evita que las baterías originales se pierdan por bugs de carga del formulario.
+            const { data: bateriasActuales } = await supabase
+              .from("atencion_baterias")
+              .select("paquete_id")
+              .eq("atencion_id", atencionData.id);
+            const idsActuales = new Set((bateriasActuales || []).map((b: any) => b.paquete_id));
+            const idsSeleccionados = new Set(selectedPaquetes);
+
+            // Eliminar las que el usuario desmarcó explícitamente
+            const aEliminar = [...idsActuales].filter(id => !idsSeleccionados.has(id));
+            if (aEliminar.length > 0) {
               await supabase
                 .from("atencion_baterias")
                 .delete()
-                .eq("atencion_id", atencionData.id);
+                .eq("atencion_id", atencionData.id)
+                .in("paquete_id", aEliminar);
+            }
 
-              // Insertar las nuevas baterías
-              const bateriasData = selectedPaquetes.map(paqueteId => ({
+            // Insertar solo las nuevas
+            const aInsertar = [...idsSeleccionados].filter(id => !idsActuales.has(id));
+            if (aInsertar.length > 0) {
+              const bateriasData = aInsertar.map(paqueteId => ({
                 atencion_id: atencionData.id,
                 paquete_id: paqueteId
               }));
-
               const { error: bateriasError } = await supabase
                 .from("atencion_baterias")
                 .insert(bateriasData);
-
               if (bateriasError) {
                 console.error("Error registrando baterías:", bateriasError);
               }
