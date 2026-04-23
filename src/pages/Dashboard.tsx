@@ -131,9 +131,15 @@ const Dashboard = () => {
     }
   }, [selectedDateDaily, localAtenciones, localAtencionExamenes, localLoaded, boxExamenesMapCached]);
 
+  // Solo ejecutar estadísticas mensuales cuando los mapas de referencia estén cargados.
+  // Esto evita que los exámenes se agrupen como "Sin Prestador" / "Sin Box"
+  // durante la primera carga o revalidaciones de React Query.
+  const referenciasListas = !!prestadorExamenesMapCached && !!boxExamenesMapCached;
+
   useEffect(() => {
+    if (!referenciasListas) return;
     loadMonthlyStats();
-  }, [selectedMonth, prestadorExamenesMapCached, boxExamenesMapCached]);
+  }, [selectedMonth, referenciasListas]);
 
   useEffect(() => {
     if (isToday(selectedDateTable) && localLoaded) {
@@ -146,13 +152,15 @@ const Dashboard = () => {
   // Auto-refresh only for monthly stats (daily + table use local cache for today)
   useEffect(() => {
     const interval = setInterval(() => {
-      loadMonthlyStats();
+      // No recargar mensual si los mapas de referencia no están listos:
+      // evitamos que un refetch en background deje el filtro sin prestador.
+      if (referenciasListas) loadMonthlyStats();
       if (!isToday(selectedDateDaily)) loadDailyStats();
       if (!isToday(selectedDateTable)) loadTableData();
     }, 30000);
     
     return () => clearInterval(interval);
-  }, [selectedDateDaily, selectedMonth, selectedDateTable]);
+  }, [selectedDateDaily, selectedMonth, selectedDateTable, referenciasListas]);
 
   // ── Compute daily stats from local cache (today only) ────────────────
   const computeDailyStatsFromLocal = () => {
