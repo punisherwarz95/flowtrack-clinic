@@ -89,6 +89,17 @@ interface InlineMsg {
 }
 
 export default function PortalPaciente() {
+  // Override viewport for Portal Paciente: usar device-width para que el formulario
+  // se vea centrado en móviles (sin el zoom-out forzado de width=1280 del resto del sistema)
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="viewport"]');
+    const original = meta?.getAttribute("content") ?? "width=1280, initial-scale=1.0";
+    meta?.setAttribute("content", "width=device-width, initial-scale=1.0, viewport-fit=cover");
+    return () => {
+      meta?.setAttribute("content", original);
+    };
+  }, []);
+
   const [step, setStep] = useState<"codigo" | "identificacion" | "registro" | "portal">("codigo");
   const [rut, setRut] = useState("");
   const [codigoIngresado, setCodigoIngresado] = useState("");
