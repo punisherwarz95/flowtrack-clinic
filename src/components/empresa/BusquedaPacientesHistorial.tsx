@@ -200,14 +200,7 @@ const BusquedaPacientesHistorial = ({
           return;
         }
 
-        let query2 = supabase
-          .from("atenciones")
-          .select(selectQuery)
-          .order("fecha_ingreso", { ascending: false })
-          .in("paciente_id", pacienteIds);
 
-        if (fechaDesde) query2 = query2.gte("fecha_ingreso", fechaDesde);
-        if (fechaHasta) query2 = query2.lte("fecha_ingreso", `${fechaHasta}T23:59:59`);
 
         const res2 = await fetchAllPaginated((q: any) => {
           q = q.in("paciente_id", pacienteIds);
