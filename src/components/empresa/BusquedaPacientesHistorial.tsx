@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,9 @@ import { Search, Calendar, Building2, User, Download, ChevronDown } from "lucide
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import * as XLSX from "xlsx";
+import { normalizeRut } from "@/lib/utils";
+
+// v2 - Búsqueda histórica por RUT normalizado y empresa histórica de la atención
 
 const ALL_EXPORT_COLUMNS = [
   { key: "Fecha", label: "Fecha" },
@@ -111,47 +114,26 @@ const BusquedaPacientesHistorial = ({
     try {
       const empresaIdToFilter = empresaId || (empresaFiltro !== "__all__" ? empresaFiltro : null);
 
-      const selectQuery = `
+      const baseSelectQuery = `
         id,
+        empresa_id,
         fecha_ingreso,
         estado,
+        paciente_id,
         pacientes!inner (
           id,
           nombre,
           rut,
-          empresa_id,
-          empresas ( nombre ),
-          faena_id,
           faenas ( nombre )
-        ),
-        prereservas!atenciones_prereserva_id_fkey (
-          prereserva_baterias (
-            paquetes_examenes ( nombre )
-          )
-        ),
-        atencion_baterias (
-          paquetes_examenes (
-            id,
-            nombre,
-            paquete_examen_items (
-              examenes ( id, nombre, codigo )
-            )
-          )
-        ),
-        atencion_examenes (
-          estado,
-          examen_id,
-          examenes ( nombre, codigo )
         )
       `;
 
-      // Paginación por bloques pequeños (200) para evitar truncado por payload pesado
-      // de los joins anidados (baterías + exámenes). Supabase puede cortar respuestas
-      // grandes silenciosamente al exceder ~1MB.
-      const PAGE_SIZE = 200;
-      const MAX_PAGES = 100; // hasta 20.000 atenciones
+      const PAGE_SIZE = 500;
+      const MAX_PAGES = 200; // hasta 100.000 atenciones livianas
+      const DETAIL_CHUNK_SIZE = 100;
 
       const fetchAllPaginated = async (
+        selectQuery: string,
         applyFilters: (q: any) => any
       ): Promise<{ data: any[] | null; error: any; total: number | null }> => {
         const all: any[] = [];
@@ -177,49 +159,92 @@ const BusquedaPacientesHistorial = ({
         return { data: all, error: null, total };
       };
 
+      const fetchDetallesAtenciones = async (atencionIds: string[]) => {
+        const bateriasPorAtencion = new Map<string, BateriaHistorial[]>();
+        const examenesPorAtencion = new Map<string, ExamenHistorial[]>();
+
+        for (let i = 0; i < atencionIds.length; i += DETAIL_CHUNK_SIZE) {
+          const idsChunk = atencionIds.slice(i, i + DETAIL_CHUNK_SIZE);
+
+          const [{ data: atencionExamenesData, error: examenesError }, { data: atencionBateriasData, error: bateriasError }] = await Promise.all([
+            supabase
+              .from("atencion_examenes")
+              .select(`
+                atencion_id,
+                estado,
+                examen_id,
+                examen:examenes ( id, nombre, codigo )
+              `)
+              .in("atencion_id", idsChunk),
+            supabase
+              .from("atencion_baterias")
+              .select(`
+                atencion_id,
+                paquete:paquetes_examenes (
+                  id,
+                  nombre,
+                  paquete_examen_items (
+                    examenes ( id, nombre, codigo )
+                  )
+                )
+              `)
+              .in("atencion_id", idsChunk),
+          ]);
+
+          if (examenesError) throw examenesError;
+          if (bateriasError) throw bateriasError;
+
+          const estadoExamenPorAtencion = new Map<string, Map<string, string>>();
+
+          (atencionExamenesData || []).forEach((ae: any) => {
+            if (!examenesPorAtencion.has(ae.atencion_id)) {
+              examenesPorAtencion.set(ae.atencion_id, []);
+            }
+            examenesPorAtencion.get(ae.atencion_id)!.push({
+              codigo: ae.examen?.codigo || null,
+              nombre: ae.examen?.nombre || "",
+              estado: ae.estado || "pendiente",
+            });
+
+            if (!estadoExamenPorAtencion.has(ae.atencion_id)) {
+              estadoExamenPorAtencion.set(ae.atencion_id, new Map<string, string>());
+            }
+            if (ae.examen_id) {
+              estadoExamenPorAtencion.get(ae.atencion_id)!.set(ae.examen_id, ae.estado || "pendiente");
+            }
+          });
+
+          (atencionBateriasData || []).forEach((ab: any) => {
+            const paquete = ab.paquete;
+            const estadoMap = estadoExamenPorAtencion.get(ab.atencion_id) || new Map<string, string>();
+            const examenesDelPaquete: ExamenHistorial[] = (paquete?.paquete_examen_items || []).map((item: any) => ({
+              codigo: item.examenes?.codigo || null,
+              nombre: item.examenes?.nombre || "",
+              estado: estadoMap.get(item.examenes?.id) || "pendiente",
+            }));
+
+            if (!bateriasPorAtencion.has(ab.atencion_id)) {
+              bateriasPorAtencion.set(ab.atencion_id, []);
+            }
+            bateriasPorAtencion.get(ab.atencion_id)!.push({
+              nombre: paquete?.nombre || "Sin nombre",
+              examenes: examenesDelPaquete,
+            });
+          });
+        }
+
+        return { bateriasPorAtencion, examenesPorAtencion };
+      };
+
       const applyMainFilters = (q: any) => {
         if (empresaIdToFilter) q = q.eq("empresa_id", empresaIdToFilter);
-        if (fechaDesde) q = q.gte("fecha_ingreso", fechaDesde);
+        if (fechaDesde) q = q.gte("fecha_ingreso", `${fechaDesde}T00:00:00`);
         if (fechaHasta) q = q.lte("fecha_ingreso", `${fechaHasta}T23:59:59`);
         return q;
       };
 
-      let { data, error, total } = await fetchAllPaginated(applyMainFilters);
-
-      // Fallback
-      if (!error && empresaIdToFilter && (!data || data.length === 0)) {
-        // Fallback: search by atenciones.empresa_id with in-clause on paciente_ids
-        const { data: atencionesData, error: atencionesError } = await supabase
-          .from("atenciones")
-          .select("paciente_id")
-          .eq("empresa_id", empresaIdToFilter);
-
-        if (atencionesError) {
-          setErrorMsg("No se pudieron cargar los pacientes de la empresa seleccionada.");
-          setResultados([]);
-          return;
-        }
-
-        const pacienteIds = [...new Set((atencionesData || []).map((a: any) => a.paciente_id))];
-        if (pacienteIds.length === 0) {
-          setResultados([]);
-          setDebugInfo(`empresa=${empresaIdToFilter} · pacientes=0 · atenciones=0`);
-          return;
-        }
-
-        const res2 = await fetchAllPaginated((q: any) => {
-          q = q.in("paciente_id", pacienteIds);
-          if (fechaDesde) q = q.gte("fecha_ingreso", fechaDesde);
-          if (fechaHasta) q = q.lte("fecha_ingreso", `${fechaHasta}T23:59:59`);
-          return q;
-        });
-        data = res2.data;
-        error = res2.error;
-        total = res2.total;
-        setDebugInfo(`fallback · empresa=${empresaIdToFilter} · pacientes=${pacienteIds.length} · atenciones=${data?.length ?? 0}/${total ?? "?"}`);
-      } else {
-        setDebugInfo(`join · empresa=${empresaIdToFilter ?? "__all__"} · atenciones=${data?.length ?? 0}/${total ?? "?"}`);
-      }
+      const { data, error, total } = await fetchAllPaginated(baseSelectQuery, applyMainFilters);
+      setDebugInfo(`histórico · empresa=${empresaIdToFilter ?? "__all__"} · atenciones=${data?.length ?? 0}/${total ?? "?"}`);
 
       if (error) {
         console.error("Error buscando historial:", error);
@@ -228,55 +253,43 @@ const BusquedaPacientesHistorial = ({
         return;
       }
 
-      let visitas: VisitaHistorial[] = (data || []).map((atencion: any) => {
-        // Build atencion_examenes map by examen_id for status lookup
-        const examenEstadoMap = new Map<string, string>();
-        (atencion.atencion_examenes || []).forEach((ae: any) => {
-          if (ae.examen_id) examenEstadoMap.set(ae.examen_id, ae.estado || "pendiente");
-        });
+      let baseAtenciones = data || [];
 
-        // Build bateriasDetalle from atencion_baterias
-        const bateriasDetalle: BateriaHistorial[] = (atencion.atencion_baterias || []).map((ab: any) => {
-          const paquete = ab.paquetes_examenes;
-          const examenesDelPaquete: ExamenHistorial[] = (paquete?.paquete_examen_items || []).map((item: any) => ({
-            codigo: item.examenes?.codigo || null,
-            nombre: item.examenes?.nombre || "",
-            estado: examenEstadoMap.get(item.examenes?.id) || "pendiente",
-          }));
-          return {
-            nombre: paquete?.nombre || "Sin nombre",
-            examenes: examenesDelPaquete,
-          };
-        });
+      if (busquedaGlobal.trim()) {
+        const termino = busquedaGlobal.toLowerCase().trim();
+        const terminoRut = normalizeRut(busquedaGlobal.trim());
+        baseAtenciones = baseAtenciones.filter(
+          (v) =>
+            v.pacientes?.nombre?.toLowerCase().includes(termino) ||
+            (terminoRut.length > 0 && normalizeRut(v.pacientes?.rut || "").includes(terminoRut))
+        );
+      }
 
+      const empresaIds = [...new Set(baseAtenciones.map((atencion: any) => atencion.empresa_id).filter(Boolean))];
+      const { data: empresasData, error: empresasError } = empresaIds.length
+        ? await supabase.from("empresas").select("id, nombre").in("id", empresaIds)
+        : { data: [], error: null };
+
+      if (empresasError) throw empresasError;
+
+      const empresasMap = new Map((empresasData || []).map((empresa: any) => [empresa.id, empresa.nombre]));
+      const { bateriasPorAtencion, examenesPorAtencion } = await fetchDetallesAtenciones(baseAtenciones.map((atencion: any) => atencion.id));
+
+      const visitas: VisitaHistorial[] = baseAtenciones.map((atencion: any) => {
+        const bateriasDetalle = bateriasPorAtencion.get(atencion.id) || [];
         return {
           id: atencion.id,
           fecha_ingreso: atencion.fecha_ingreso,
           estado: atencion.estado,
           paciente_nombre: atencion.pacientes?.nombre || "",
           paciente_rut: atencion.pacientes?.rut || "",
-          empresa_nombre: atencion.pacientes?.empresas?.nombre || "Sin empresa",
+          empresa_nombre: empresasMap.get(atencion.empresa_id) || "Sin empresa",
           faena_nombre: atencion.pacientes?.faenas?.nombre || null,
-          baterias: (atencion.atencion_baterias || []).map(
-            (ab: any) => ab.paquetes_examenes?.nombre
-          ).filter(Boolean),
+          baterias: bateriasDetalle.map((bateria) => bateria.nombre),
           bateriasDetalle,
-          examenes: (atencion.atencion_examenes || []).map((ae: any) => ({
-            codigo: ae.examenes?.codigo || null,
-            nombre: ae.examenes?.nombre || "",
-            estado: ae.estado || "pendiente",
-          })),
+          examenes: examenesPorAtencion.get(atencion.id) || [],
         };
       });
-
-      if (busquedaGlobal.trim()) {
-        const termino = busquedaGlobal.toLowerCase().trim();
-        visitas = visitas.filter(
-          (v) =>
-            v.paciente_nombre.toLowerCase().includes(termino) ||
-            (v.paciente_rut && v.paciente_rut.toLowerCase().includes(termino))
-        );
-      }
 
       setResultados(visitas);
     } catch (err) {
