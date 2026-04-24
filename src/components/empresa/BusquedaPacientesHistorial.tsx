@@ -129,8 +129,11 @@ const BusquedaPacientesHistorial = ({
       `;
 
       const PAGE_SIZE = 500;
+      const SUPABASE_ROW_LIMIT = 1000;
       const MAX_PAGES = 200; // hasta 100.000 atenciones livianas
-      const DETAIL_CHUNK_SIZE = 100;
+      // Chunk pequeño para evitar el límite de 1,000 filas por query de Supabase.
+      // Con ~12 exámenes por atención, 50 atenciones ~= 600 filas (margen seguro).
+      const DETAIL_CHUNK_SIZE = 50;
 
       const fetchAllPaginated = async (
         selectQuery: string,
@@ -163,36 +166,40 @@ const BusquedaPacientesHistorial = ({
         const bateriasPorAtencion = new Map<string, BateriaHistorial[]>();
         const examenesPorAtencion = new Map<string, ExamenHistorial[]>();
 
+        // Fetch paginado para evitar el límite de 1,000 filas por query de Supabase.
+        const fetchAllRowsByAtencionIds = async (table: string, select: string, ids: string[]) => {
+          const all: any[] = [];
+          let from = 0;
+          while (true) {
+            const { data, error } = await supabase
+              .from(table as any)
+              .select(select)
+              .in("atencion_id", ids)
+              .range(from, from + SUPABASE_ROW_LIMIT - 1);
+            if (error) throw error;
+            if (!data || data.length === 0) break;
+            all.push(...data);
+            if (data.length < SUPABASE_ROW_LIMIT) break;
+            from += data.length;
+          }
+          return all;
+        };
+
         for (let i = 0; i < atencionIds.length; i += DETAIL_CHUNK_SIZE) {
           const idsChunk = atencionIds.slice(i, i + DETAIL_CHUNK_SIZE);
 
-          const [{ data: atencionExamenesData, error: examenesError }, { data: atencionBateriasData, error: bateriasError }] = await Promise.all([
-            supabase
-              .from("atencion_examenes")
-              .select(`
-                atencion_id,
-                estado,
-                examen_id,
-                examen:examenes ( id, nombre, codigo )
-              `)
-              .in("atencion_id", idsChunk),
-            supabase
-              .from("atencion_baterias")
-              .select(`
-                atencion_id,
-                paquete:paquetes_examenes (
-                  id,
-                  nombre,
-                  paquete_examen_items (
-                    examenes ( id, nombre, codigo )
-                  )
-                )
-              `)
-              .in("atencion_id", idsChunk),
+          const [atencionExamenesData, atencionBateriasData] = await Promise.all([
+            fetchAllRowsByAtencionIds(
+              "atencion_examenes",
+              `atencion_id, estado, examen_id, examen:examenes ( id, nombre, codigo )`,
+              idsChunk
+            ),
+            fetchAllRowsByAtencionIds(
+              "atencion_baterias",
+              `atencion_id, paquete:paquetes_examenes ( id, nombre, paquete_examen_items ( examenes ( id, nombre, codigo ) ) )`,
+              idsChunk
+            ),
           ]);
-
-          if (examenesError) throw examenesError;
-          if (bateriasError) throw bateriasError;
 
           const estadoExamenPorAtencion = new Map<string, Map<string, string>>();
 
