@@ -145,29 +145,36 @@ const BusquedaPacientesHistorial = ({
         )
       `;
 
-      // Paginación por bloques para evitar el límite de 1000 filas de Supabase
-      const PAGE_SIZE = 500;
+      // Paginación por bloques pequeños (200) para evitar truncado por payload pesado
+      // de los joins anidados (baterías + exámenes). Supabase puede cortar respuestas
+      // grandes silenciosamente al exceder ~1MB.
+      const PAGE_SIZE = 200;
+      const MAX_PAGES = 100; // hasta 20.000 atenciones
+
       const fetchAllPaginated = async (
         applyFilters: (q: any) => any
-      ): Promise<{ data: any[] | null; error: any }> => {
+      ): Promise<{ data: any[] | null; error: any; total: number | null }> => {
         const all: any[] = [];
         let from = 0;
-        // Hasta 20 páginas (10.000 atenciones) como tope de seguridad
-        for (let i = 0; i < 20; i++) {
+        let total: number | null = null;
+
+        for (let i = 0; i < MAX_PAGES; i++) {
           let q = supabase
             .from("atenciones")
-            .select(selectQuery)
+            .select(selectQuery, i === 0 ? { count: "exact" } : undefined)
             .order("fecha_ingreso", { ascending: false });
           q = applyFilters(q);
           q = q.range(from, from + PAGE_SIZE - 1);
-          const { data: pageData, error: pageErr } = await q;
-          if (pageErr) return { data: null, error: pageErr };
+          const { data: pageData, error: pageErr, count } = await q;
+          if (pageErr) return { data: null, error: pageErr, total };
+          if (i === 0 && typeof count === "number") total = count;
           if (!pageData || pageData.length === 0) break;
           all.push(...pageData);
+          from += pageData.length;
           if (pageData.length < PAGE_SIZE) break;
-          from += PAGE_SIZE;
+          if (total !== null && all.length >= total) break;
         }
-        return { data: all, error: null };
+        return { data: all, error: null, total };
       };
 
       const applyMainFilters = (q: any) => {
@@ -177,7 +184,7 @@ const BusquedaPacientesHistorial = ({
         return q;
       };
 
-      let { data, error } = await fetchAllPaginated(applyMainFilters);
+      let { data, error, total } = await fetchAllPaginated(applyMainFilters);
 
       // Fallback
       if (!error && empresaIdToFilter && (!data || data.length === 0)) {
@@ -200,8 +207,6 @@ const BusquedaPacientesHistorial = ({
           return;
         }
 
-
-
         const res2 = await fetchAllPaginated((q: any) => {
           q = q.in("paciente_id", pacienteIds);
           if (fechaDesde) q = q.gte("fecha_ingreso", fechaDesde);
@@ -210,9 +215,10 @@ const BusquedaPacientesHistorial = ({
         });
         data = res2.data;
         error = res2.error;
-        setDebugInfo(`fallback · empresa=${empresaIdToFilter} · pacientes=${pacienteIds.length} · atenciones=${data?.length ?? 0}`);
+        total = res2.total;
+        setDebugInfo(`fallback · empresa=${empresaIdToFilter} · pacientes=${pacienteIds.length} · atenciones=${data?.length ?? 0}/${total ?? "?"}`);
       } else {
-        setDebugInfo(`join · empresa=${empresaIdToFilter ?? "__all__"} · atenciones=${data?.length ?? 0}`);
+        setDebugInfo(`join · empresa=${empresaIdToFilter ?? "__all__"} · atenciones=${data?.length ?? 0}/${total ?? "?"}`);
       }
 
       if (error) {
