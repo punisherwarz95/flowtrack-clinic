@@ -145,18 +145,39 @@ const BusquedaPacientesHistorial = ({
         )
       `;
 
-      let query = supabase
-        .from("atenciones")
-        .select(selectQuery)
-        .order("fecha_ingreso", { ascending: false });
+      // Paginación por bloques para evitar el límite de 1000 filas de Supabase
+      const PAGE_SIZE = 500;
+      const fetchAllPaginated = async (
+        applyFilters: (q: any) => any
+      ): Promise<{ data: any[] | null; error: any }> => {
+        const all: any[] = [];
+        let from = 0;
+        // Hasta 20 páginas (10.000 atenciones) como tope de seguridad
+        for (let i = 0; i < 20; i++) {
+          let q = supabase
+            .from("atenciones")
+            .select(selectQuery)
+            .order("fecha_ingreso", { ascending: false });
+          q = applyFilters(q);
+          q = q.range(from, from + PAGE_SIZE - 1);
+          const { data: pageData, error: pageErr } = await q;
+          if (pageErr) return { data: null, error: pageErr };
+          if (!pageData || pageData.length === 0) break;
+          all.push(...pageData);
+          if (pageData.length < PAGE_SIZE) break;
+          from += PAGE_SIZE;
+        }
+        return { data: all, error: null };
+      };
 
-      if (empresaIdToFilter) {
-        query = query.eq("empresa_id", empresaIdToFilter);
-      }
-      if (fechaDesde) query = query.gte("fecha_ingreso", fechaDesde);
-      if (fechaHasta) query = query.lte("fecha_ingreso", `${fechaHasta}T23:59:59`);
+      const applyMainFilters = (q: any) => {
+        if (empresaIdToFilter) q = q.eq("empresa_id", empresaIdToFilter);
+        if (fechaDesde) q = q.gte("fecha_ingreso", fechaDesde);
+        if (fechaHasta) q = q.lte("fecha_ingreso", `${fechaHasta}T23:59:59`);
+        return q;
+      };
 
-      let { data, error } = await query.limit(500);
+      let { data, error } = await fetchAllPaginated(applyMainFilters);
 
       // Fallback
       if (!error && empresaIdToFilter && (!data || data.length === 0)) {
@@ -179,16 +200,14 @@ const BusquedaPacientesHistorial = ({
           return;
         }
 
-        let query2 = supabase
-          .from("atenciones")
-          .select(selectQuery)
-          .order("fecha_ingreso", { ascending: false })
-          .in("paciente_id", pacienteIds);
 
-        if (fechaDesde) query2 = query2.gte("fecha_ingreso", fechaDesde);
-        if (fechaHasta) query2 = query2.lte("fecha_ingreso", `${fechaHasta}T23:59:59`);
 
-        const res2 = await query2.limit(500);
+        const res2 = await fetchAllPaginated((q: any) => {
+          q = q.in("paciente_id", pacienteIds);
+          if (fechaDesde) q = q.gte("fecha_ingreso", fechaDesde);
+          if (fechaHasta) q = q.lte("fecha_ingreso", `${fechaHasta}T23:59:59`);
+          return q;
+        });
         data = res2.data;
         error = res2.error;
         setDebugInfo(`fallback · empresa=${empresaIdToFilter} · pacientes=${pacienteIds.length} · atenciones=${data?.length ?? 0}`);
