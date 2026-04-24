@@ -897,6 +897,13 @@ const Pacientes = () => {
         if (atencionError) throw atencionError;
 
         if (atencionData) {
+          // Sincronizar empresa_id de la atención con el paciente (corrige NULL históricos
+          // cuando el paciente entró por Portal sin empresa y recepción se la asigna ahora)
+          await supabase
+            .from("atenciones")
+            .update({ empresa_id: updateData.empresa_id ?? null })
+            .eq("id", atencionData.id);
+
           // Detectar si hubo cambios en exámenes (agregaron, quitaron o cambiaron paquetes)
           const hayCambiosExamenes = selectedExamenes.length > 0 || selectedPaquetes.length > 0 || originalExamenesCount > 0;
           
