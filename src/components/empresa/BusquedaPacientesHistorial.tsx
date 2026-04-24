@@ -129,6 +129,7 @@ const BusquedaPacientesHistorial = ({
       `;
 
       const PAGE_SIZE = 500;
+      const SUPABASE_ROW_LIMIT = 1000;
       const MAX_PAGES = 200; // hasta 100.000 atenciones livianas
       const DETAIL_CHUNK_SIZE = 100;
 
