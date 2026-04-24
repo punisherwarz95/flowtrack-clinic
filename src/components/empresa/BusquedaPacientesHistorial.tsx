@@ -209,7 +209,12 @@ const BusquedaPacientesHistorial = ({
         if (fechaDesde) query2 = query2.gte("fecha_ingreso", fechaDesde);
         if (fechaHasta) query2 = query2.lte("fecha_ingreso", `${fechaHasta}T23:59:59`);
 
-        const res2 = await query2.limit(500);
+        const res2 = await fetchAllPaginated((q: any) => {
+          q = q.in("paciente_id", pacienteIds);
+          if (fechaDesde) q = q.gte("fecha_ingreso", fechaDesde);
+          if (fechaHasta) q = q.lte("fecha_ingreso", `${fechaHasta}T23:59:59`);
+          return q;
+        });
         data = res2.data;
         error = res2.error;
         setDebugInfo(`fallback · empresa=${empresaIdToFilter} · pacientes=${pacienteIds.length} · atenciones=${data?.length ?? 0}`);
