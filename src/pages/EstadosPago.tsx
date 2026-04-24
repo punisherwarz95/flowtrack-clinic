@@ -26,6 +26,8 @@ import {
 } from "lucide-react";
 import { generateEstadoPagoPDF } from "@/components/cotizacion/EstadoPagoPDF";
 
+// v2 - Estados de pago calculados por empresa histórica de la atención
+
 interface Empresa {
   id: string;
   nombre: string;
@@ -370,24 +372,10 @@ const EstadosPago = () => {
       const empresa = empresas.find(e => e.id === selectedEmpresaId);
       const esAfectaIva = empresa?.afecto_iva !== false;
 
-      const { data: pacientesEmpresa } = await supabase
-        .from("pacientes")
-        .select("id, nombre, rut, cargo, faena:faenas(nombre)")
-        .eq("empresa_id", selectedEmpresaId);
-
-      if (!pacientesEmpresa?.length) {
-        toast({ title: "No hay pacientes registrados para esta empresa", variant: "destructive" });
-        setGenerando(false);
-        return;
-      }
-
-      const pacienteIds = pacientesEmpresa.map(p => p.id);
-      const pacientesMap = new Map(pacientesEmpresa.map(p => [p.id, p]));
-
       const { data: atenciones } = await supabase
         .from("atenciones")
         .select("id, paciente_id, fecha_ingreso, estado")
-        .in("paciente_id", pacienteIds)
+        .eq("empresa_id", selectedEmpresaId)
         .eq("estado", "completado")
         .gte("fecha_ingreso", `${fechaDesde}T00:00:00`)
         .lte("fecha_ingreso", `${fechaHasta}T23:59:59`);
@@ -397,6 +385,14 @@ const EstadosPago = () => {
         setGenerando(false);
         return;
       }
+
+      const pacienteIds = [...new Set(atenciones.map(a => a.paciente_id).filter(Boolean))];
+      const { data: pacientesEmpresa } = await supabase
+        .from("pacientes")
+        .select("id, nombre, rut, cargo, faena:faenas(nombre)")
+        .in("id", pacienteIds);
+
+      const pacientesMap = new Map((pacientesEmpresa || []).map(p => [p.id, p]));
 
       const atencionIds = atenciones.map(a => a.id);
       const { data: atencionBaterias } = await supabase
