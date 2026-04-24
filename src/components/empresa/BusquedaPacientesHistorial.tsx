@@ -131,7 +131,9 @@ const BusquedaPacientesHistorial = ({
       const PAGE_SIZE = 500;
       const SUPABASE_ROW_LIMIT = 1000;
       const MAX_PAGES = 200; // hasta 100.000 atenciones livianas
-      const DETAIL_CHUNK_SIZE = 100;
+      // Chunk pequeño para evitar el límite de 1,000 filas por query de Supabase.
+      // Con ~12 exámenes por atención, 50 atenciones ~= 600 filas (margen seguro).
+      const DETAIL_CHUNK_SIZE = 50;
 
       const fetchAllPaginated = async (
         selectQuery: string,
